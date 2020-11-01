@@ -3,15 +3,15 @@ require 'vpsfree/client'
 
 module ConfCtl::Cli
   class GenData < Command
-    DATADIR = File.join(ConfCtl.root, 'data')
+    DATADIR = File.join(ConfCtl.conf_dir, 'data')
 
-    def all
-      containers
-      network
+    def vpsadmin_all
+      vpsadmin_containers
+      vpsadmin_network
     end
 
-    def containers
-      api = get_client
+    def vpsadmin_containers
+      api = get_vpsadmin_client
 
       deployments = ConfCtl::Deployments.new
       data = {}
@@ -40,17 +40,17 @@ module ConfCtl::Cli
       end
 
       nixer = ConfCtl::Nixer.new(data)
-      update_file('containers.nix') do |f|
+      update_file('vpsadmin/containers.nix') do |f|
         f.puts(nixer.serialize)
       end
     end
 
-    def network
+    def vpsadmin_network
       network_containers
     end
 
-    def network_containers
-      api = get_client
+    def vpsadmin_network_containers
+      api = get_vpsadmin_client
       networks = api.network.list
       data = {}
 
@@ -61,13 +61,13 @@ module ConfCtl::Cli
       end
 
       nixer = ConfCtl::Nixer.new(data)
-      update_file('networks/containers.nix') do |f|
+      update_file('vpsadmin/networks/containers.nix') do |f|
         f.puts(nixer.serialize)
       end
     end
 
     protected
-    def get_client
+    def get_vpsadmin_client
       return @api if @api
       @api = VpsFree::Client.new
 

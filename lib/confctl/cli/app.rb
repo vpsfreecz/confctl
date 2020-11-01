@@ -178,19 +178,22 @@ module ConfCtl::Cli
 
       desc 'Generate data files from vpsAdmin API'
       command 'gen-data' do |gen|
-        gen.desc 'Generate all data files'
-        gen.command :all do |c|
-          c.action &Command.run(GenData, :all)
-        end
+        gen.desc 'Fetch data from vpsAdmin'
+        gen.command :vpsadmin do |vpsa|
+          vpsa.desc 'Generate all data files'
+          vpsa.command :all do |c|
+            c.action &Command.run(GenData, :vpsadmin_all)
+          end
 
-        gen.desc 'Generate container data files'
-        gen.command :containers do |c|
-          c.action &Command.run(GenData, :containers)
-        end
+          vpsa.desc 'Generate container data files'
+          vpsa.command :containers do |c|
+            c.action &Command.run(GenData, :vpsadmin_containers)
+          end
 
-        gen.desc 'Generate network data files'
-        gen.command :network do |c|
-          c.action &Command.run(GenData, :network)
+          vpsa.desc 'Generate network data files'
+          vpsa.command :network do |c|
+            c.action &Command.run(GenData, :vpsadmin_network)
+          end
         end
       end
     end

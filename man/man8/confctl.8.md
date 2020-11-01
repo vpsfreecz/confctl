@@ -96,13 +96,13 @@ information.
       Determines whether health checks are run after activation. Enabled by
       default.
 
-`confctl gen-data all`
+`confctl gen-data vpsadmin all`
   Generate all required data files from vpsAdmin API.
 
-`confctl gen-data containers`
+`confctl gen-data vpsadmin containers`
   Generate container data files from vpsAdmin API.
 
-`confctl gen-data network`
+`confctl gen-data vpsadmin network`
   Generate network data files from vpsAdmin API.
 
 `confctl swpins file ls` [*file-pattern* [*sw-pattern*]]

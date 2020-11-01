@@ -10,7 +10,7 @@ let
       (map (addr: fn ifname 6 addr) ips.v6)
     ) addresses);
 
-  allNetworks = data.networks.containers;
+  allNetworks = data.vpsadmin.networks.containers;
 
   importNetworkFilter = ipVer:
     let
