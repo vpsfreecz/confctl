@@ -5,20 +5,47 @@ module ConfCtl
     handle :git
 
     def version
-      opts[:rev][0..8]
+      spec_opts[:rev] && spec_opts[:rev][0..8]
     end
 
     # @param override_opts [Hash]
     # @option override_opts [String] :ref
-    def prefetch(override_opts = {})
-      json = `nix-prefetch-git --quiet #{opts[:url]} #{override_opts[:ref] || opts[:rev]}`
+    def prefetch(override_opts)
+      if /^https:\/\/github\.com\// =~ spec_opts[:url] && !spec_opts[:fetch_submodules]
+        gopts[:fetcher] = 'zip'
+        prefetch_github(override_opts)
+      else
+        gopts[:fetcher] = 'git'
+        prefetch_git(override_opts)
+      end
+    end
+
+    protected
+    def prefetch_git(override_opts)
+      ref = override_opts[:ref]
+      json = `nix-prefetch-git --quiet #{spec_opts[:url]} #{ref}`
 
       if $?.exitstatus != 0
         fail "nix-prefetch-git failed with status #{$?.exitstatus}"
       end
 
-      opts.update(JSON.parse(json.strip, symbolize_names: true))
+      @fetcher_opts = JSON.parse(json.strip, symbolize_names: true)
       self.channel = nil
+    end
+
+    def prefetch_github(override_opts)
+      ref = override_opts[:ref]
+      url = File.join(spec_opts[:url], 'archive', "#{ref}.tar.gz")
+      hash = `nix-prefetch-url --unpack #{url} 2> /dev/null`
+
+      if $?.exitstatus != 0
+        fail "nix-prefetch-url failed with status #{$?.exitstatus}"
+      end
+
+      @fetcher_opts = {
+        url: url,
+        sha256: hash.strip,
+      }
     end
   end
 end

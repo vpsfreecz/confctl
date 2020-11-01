@@ -24,7 +24,12 @@ module ConfCtl
       json = JSON.parse(File.read(path), symbolize_names: true)
       @specs = Hash[json.map do |k, v|
         name = k.to_s
-        spec = Swpins::Spec.for(v[:type].to_sym).new(name, v, v[:options])
+        spec = Swpins::Spec.for(v[:type].to_sym).new(
+          name,
+          v,
+          v[:spec_options],
+          v[:fetcher_options],
+        )
         [name, spec]
       end]
       @channels = @specs.each_value.map(&:channel).compact.uniq

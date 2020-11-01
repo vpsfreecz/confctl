@@ -32,7 +32,15 @@ module ConfCtl
 
     def parse
       @specs = Hash[JSON.parse(File.read(path), symbolize_names: true).map do |name, spec|
-        [name.to_s, Swpins::Spec.for(spec[:type].to_sym).new(name, spec, spec[:options])]
+        [
+          name.to_s,
+          Swpins::Spec.for(spec[:type].to_sym).new(
+            name,
+            spec,
+            spec[:spec_options],
+            spec[:fetcher_options],
+          ),
+        ]
       end]
     end
 

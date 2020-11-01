@@ -6,11 +6,11 @@ let
 
   swpins = lib.mapAttrs (k: v: swpin v) sources;
 
-  swpin = { type, options, handler ? null, ... }:
-    let
-      realHandler = if handler == null then type else handler;
-    in
-      handlers.${realHandler} options;
+  swpin = { fetcher, fetcher_options, handler ? null, ... }:
+    if handler == null then
+      handlers.${fetcher} fetcher_options
+    else
+      handlers.${handler} handlers.${fetcher} fetcher_options;
 
   handlers = rec {
     git = opts:
@@ -20,9 +20,12 @@ let
         ]);
       in pkgs.fetchgit (filter opts);
 
-    vpsadminos = opts:
+    zip = opts:
+      pkgs.fetchzip opts;
+
+    vpsadminos = fetcher: opts:
       let
-        repo = git opts;
+        repo = fetcher opts;
         shortRev = lib.substring 0 7 (opts.rev);
       in
         pkgs.runCommand "os-version-suffix" {} ''

@@ -68,7 +68,14 @@ module ConfCtl::Cli
       require_args!('channel', 'sw', 'url', 'ref')
       chan_pattern, sw, url, ref = args
 
-      spec = ConfCtl::Swpins::Specs::Git.new(sw, {}, url: url)
+      spec = ConfCtl::Swpins::Specs::Git.new(
+        sw,
+        {},
+        {
+          url: url,
+          fetch_submodules: opts['fetch-submodules'],
+        },
+      )
       spec.prefetch(ref: ref)
 
       each_channel(chan_pattern) do |chan|

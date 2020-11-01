@@ -205,6 +205,9 @@ module ConfCtl::Cli
         git.desc 'Add git sw pins'
         git.arg_name "<#{arg_name}> <sw> <url> <ref>"
         git.command :add do |c|
+          c.desc 'Fetch submodules'
+          c.switch 'fetch-submodules', default_value: false
+
           c.action &Command.run(klass, :git_add)
         end
 

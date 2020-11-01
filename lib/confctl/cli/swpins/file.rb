@@ -48,7 +48,14 @@ module ConfCtl::Cli
       require_args!('file', 'sw', 'url', 'ref')
       file_pattern, sw, url, ref = args
 
-      spec = ConfCtl::Swpins::Specs::Git.new(sw, {}, url: url)
+      spec = ConfCtl::Swpins::Specs::Git.new(
+        sw,
+        {},
+        {
+          url: url,
+          fetch_submodules: opts['fetch-submodules'],
+        },
+      )
       spec.prefetch(ref: ref)
 
       each_file(file_pattern) do |file|
