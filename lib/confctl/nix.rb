@@ -75,7 +75,7 @@ module ConfCtl
         build: :swpins,
         deployments: [host],
       }) do |arg|
-        out_link = File.join(conf_dir, '.confctl/gcroots', "#{host}.swpins")
+        out_link = File.join(cache_dir, 'gcroots', "#{host}.swpins")
 
         cmd = [
           'nix-build',
@@ -106,11 +106,7 @@ module ConfCtl
         build: :toplevel,
         deployments: hosts,
       }) do |arg|
-        gcroot = File.join(
-          conf_dir,
-          '.confctl/gcroots',
-          "#{SecureRandom.hex(4)}.build",
-        )
+        gcroot = File.join(cache_dir, 'gcroots', "#{SecureRandom.hex(4)}.build")
 
         pid = Process.fork do
           ENV['NIX_PATH'] = swpins.map { |k, v| "#{k}=#{v}" }.join(':')
@@ -133,7 +129,7 @@ module ConfCtl
         begin
           host_toplevels = JSON.parse(File.read(gcroot))
           host_toplevels.each do |host, toplevel|
-            host_gcroot = File.join('.confctl/gcroots', "#{host}.toplevel")
+            host_gcroot = File.join(cache_dir, 'gcroots', "#{host}.toplevel")
             replace_symlink(host_gcroot, toplevel)
             add_gcroot("confctl-#{host}.toplevel", File.absolute_path(host_gcroot))
           end
@@ -197,6 +193,10 @@ module ConfCtl
       true
     rescue Errno::ENOENT
       false
+    end
+
+    def cache_dir
+      ConfCtl.cache_dir
     end
   end
 end

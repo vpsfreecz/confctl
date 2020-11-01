@@ -13,6 +13,12 @@ module ConfCtl
     File.realpath(Dir.pwd)
   end
 
+  # Path to cache directory
+  # @return [String]
+  def self.cache_dir
+    File.join(conf_dir, '.confctl')
+  end
+
   # Path to a nix asset
   # @param name [String]
   # @return [String]
