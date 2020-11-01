@@ -1,7 +1,13 @@
-{ config, pkgs, lib, confLib, confData, ... }:
+{ config
+, pkgs
+, lib
+, confLib
+, confData
+, swpinsName ? "images"
+, nixosModules ? [] }:
 with lib;
 let
-  swpins = import ./swpins.nix { name = "images"; inherit confLib pkgs lib; };
+  swpins = import ./swpins.nix { name = swpinsName; inherit confLib pkgs lib; };
 
   deployments = confLib.getClusterDeployments config.cluster;
 
@@ -30,16 +36,7 @@ let
         pkgs = nixpkgs;
         system = "x86_64-linux";
         configuration = {};
-        modules = modules ++ [
-          # deployment options are defined by morph, which is not used when
-          # building images
-          {
-            options = {
-              deployment = mkOption {};
-            };
-            config = {};
-          }
-        ];
+        modules = modules;
         inherit vpsadmin;
       };
 
@@ -54,7 +51,7 @@ let
 
   nodeImage = node:
     let
-      nodepins = import ../swpins { name = node.fqdn; inherit pkgs lib; };
+      nodepins = import ./swpins { name = node.fqdn; inherit pkgs lib; };
       build = vpsadminosBuild {
         modules = [
           {
@@ -80,7 +77,12 @@ let
       system = "x86_64-linux";
       modules = [
         ("${swpins.nixpkgs}/nixos/modules/installer/netboot/netboot-minimal.nix")
-        ../data
+        ({ config, pkgs, lib, ... }:
+        {
+          _module.args = {
+            inherit confLib confData;
+          };
+        })
       ] ++ modules;
     }).config.system.build;
 
@@ -121,7 +123,7 @@ in rec {
 
   nixosZfsSSH = nixosNetboot {
     modules = [ {
-        imports = [ ../environments/base.nix ];
+        imports = nixosModules;
         boot.supportedFilesystems = [ "zfs" ];
         # enable ssh
         systemd.services.sshd.wantedBy = lib.mkForce [ "multi-user.target" ];
@@ -134,12 +136,8 @@ in rec {
     nixoszfsssh = inMenu "NixOS ZFS SSH" nixosZfsSSH;
   };
 
-  nodesInLocation = domain: {
-    prg = selectNodes (node: node.domain == domain && node.location == "prg");
-    brq = selectNodes (node: node.domain == domain && node.location == "brq");
-    pgnd = selectNodes (node: node.domain == domain && node.location == "pgnd");
-    stg = selectNodes (node: node.domain == domain && node.location == "stg");
-  };
+  nodesInLocation = domain: location:
+    selectNodes (node: node.domain == domain && node.location == location);
 
   allNodes = domain: selectNodes (node: node.domain == domain);
 }
