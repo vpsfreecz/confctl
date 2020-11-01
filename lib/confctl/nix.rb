@@ -109,7 +109,7 @@ module ConfCtl
         gcroot = File.join(cache_dir, 'gcroots', "#{SecureRandom.hex(4)}.build")
 
         pid = Process.fork do
-          ENV['NIX_PATH'] = swpins.map { |k, v| "#{k}=#{v}" }.join(':')
+          ENV['NIX_PATH'] = build_nix_path(swpins)
 
           Process.exec(
             'nix-build',
@@ -170,6 +170,13 @@ module ConfCtl
       yield(f.path)
     ensure
       f.unlink
+    end
+
+    def build_nix_path(swpins)
+      paths = []
+      paths << "confctl=#{ConfCtl.root}"
+      paths.concat(swpins.map { |k, v| "#{k}=#{v}" })
+      paths.join(':')
     end
 
     def add_gcroot(name, path)
