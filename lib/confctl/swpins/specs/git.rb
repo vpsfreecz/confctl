@@ -34,9 +34,12 @@ module ConfCtl
     end
 
     def prefetch_github(override_opts)
-      ref = override_opts[:ref]
+      mirror = GitRepoMirror.new(spec_opts[:url])
+      mirror.setup
+
+      ref = mirror.revision_parse(override_opts[:ref])
       url = File.join(spec_opts[:url], 'archive', "#{ref}.tar.gz")
-      hash = `nix-prefetch-url --unpack #{url} 2> /dev/null`
+      hash = `nix-prefetch-url --unpack "#{url}" 2> /dev/null`
 
       if $?.exitstatus != 0
         fail "nix-prefetch-url failed with status #{$?.exitstatus}"
