@@ -1,4 +1,4 @@
-{ config, pkgs, lib, confLib, data, ... }:
+{ config, pkgs, lib, confLib, confData, ... }:
 with lib;
 let
   swpins = import ./swpins.nix { name = "images"; inherit confLib pkgs lib; };

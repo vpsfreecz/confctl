@@ -1,4 +1,4 @@
-{ config, lib, confLib, data, deploymentInfo, ... }:
+{ config, lib, confLib, confData, deploymentInfo, ... }:
 with lib;
 let
   cfg = deploymentInfo.config;
@@ -10,7 +10,7 @@ let
       (map (addr: fn ifname 6 addr) ips.v6)
     ) addresses);
 
-  allNetworks = data.vpsadmin.networks.containers;
+  allNetworks = confData.vpsadmin.networks.containers;
 
   importNetworkFilter = ipVer:
     let

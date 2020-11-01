@@ -13,7 +13,7 @@ let
     {
       _module.args = {
         confLib = import ../../lib { inherit confDir lib pkgs; };
-        data = import "${toString confDir}/data/default.nix" { inherit lib; };
+        confData = import "${toString confDir}/data/default.nix" { inherit lib; };
       };
     })
   ] ++ (import ../../modules/module-list.nix).${spin}
