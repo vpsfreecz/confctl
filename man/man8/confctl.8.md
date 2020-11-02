@@ -34,6 +34,13 @@ similarly to shell patterns, see
 information.
 
 ## COMMANDS
+`confctl init`
+  Create a new configuration in the current directory. The current directory
+  is set up to be used with `confctl`
+
+`confctl add` *name*
+  Add new deployment.
+
 `confctl rediscover`
   Auto-discover deployments within the `cluster/` directory and generate a list
   of their modules in `cluster/cluster.nix`.

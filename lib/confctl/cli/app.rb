@@ -24,6 +24,17 @@ module ConfCtl::Cli
       arguments :strict
       hide_commands_without_desc true
 
+      desc 'Create a new configuration'
+      command :init do |c|
+        c.action &Command.run(Configuration, :init)
+      end
+      
+      desc 'Add a new deployment'
+      arg_name '<name>'
+      command :add do |c|
+        c.action &Command.run(Configuration, :add)
+      end
+
       desc 'Update deployment list with contents of cluster/'
       command :rediscover do |c|
         c.action &Command.run(Configuration, :rediscover)
