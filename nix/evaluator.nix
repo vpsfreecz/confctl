@@ -52,14 +52,7 @@ let
       };
 
       evalConfig = import importPath.${d.config.spin} {
-        modules = [
-          ({config, lib, pkgs, ...}: {
-            key = "confctl-deploy";
-            # TODO
-            # networking.hostName = lib.mkDefault d.fqdn;
-          })
-          d.build.toplevel
-        ];
+        modules = [ d.build.toplevel ];
       };
     in evalConfig;
 

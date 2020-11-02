@@ -9,12 +9,17 @@ let
     };
 
   makeImports = spin: extraImports: [
-    ({ config, pkgs, lib, ... }:
+    ({ config, pkgs, lib, deploymentInfo, ... }:
     {
+      _file = "confctl/nix/lib/deployment/default.nix";
+
       _module.args = {
         confLib = import ../../lib { inherit confDir lib pkgs; };
         confData = import "${toString confDir}/data/default.nix" { inherit lib; };
       };
+
+      networking.hostName =
+        lib.mkIf (deploymentInfo.host != null) (lib.mkDefault deploymentInfo.host.fqdn);
     })
   ] ++ (import ../../modules/module-list.nix).${spin}
     ++ (import "${toString confDir}/modules/module-list.nix").${spin}
