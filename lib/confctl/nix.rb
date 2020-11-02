@@ -114,13 +114,13 @@ module ConfCtl
         pid = Process.fork do
           ENV['NIX_PATH'] = build_nix_path(swpins)
 
-          Process.exec(
+          Process.exec(*[
             'nix-build',
             '--arg', 'jsonArg', arg,
             '--out-link', gcroot,
-            (show_trace ? '--show-trace' : ''),
+            (show_trace ? '--show-trace' : nil),
             ConfCtl.nix_asset('evaluator.nix'),
-          )
+          ].compact)
         end
 
         Process.wait(pid)
