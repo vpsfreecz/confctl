@@ -59,32 +59,12 @@ let
           '';
         };
 
-        addresses = {
-          primary = mkOption {
-            type = types.submodule (mkOptions.addresses 4);
-            default = head config.addresses.v4;
-            description = ''
-              Default address other machines should use to connect to this machine
-
-              Defaults to the first IPv4 address if not set
-            '';
-          };
-
-          v4 = mkOption {
-            type = types.listOf (types.submodule (mkOptions.addresses 4));
-            default = [ config.addresses.primary ];
-            description = ''
-              List of IPv4 addresses this machine responds to
-            '';
-          };
-
-          v6 = mkOption {
-            type = types.listOf (types.submodule (mkOptions.addresses 6));
-            default = [];
-            description = ''
-              List of IPv6 addresses this machine responds to
-            '';
-          };
+        addresses = mkOption {
+          type = types.nullOr (types.submodule addresses);
+          default = null;
+          description = ''
+            IP addresses
+          '';
         };
 
         netboot = {
@@ -211,6 +191,44 @@ let
           default = null;
           description = ''
             What kind of monitoring this services needs
+          '';
+        };
+      };
+    };
+
+  addresses =
+    { config, ... }:
+    {
+      options = {
+        primary = mkOption {
+          type = types.nullOr (types.submodule (mkOptions.addresses 4));
+          default =
+            if config.v4 != [] then
+              head config.v4
+            else if config.v6 != [] then
+              head config.v6
+            else
+              null;
+          description = ''
+            Default address other machines should use to connect to this machine
+
+            Defaults to the first IPv4 address if not set
+          '';
+        };
+
+        v4 = mkOption {
+          type = types.listOf (types.submodule (mkOptions.addresses 4));
+          default = [];
+          description = ''
+            List of IPv4 addresses this machine responds to
+          '';
+        };
+
+        v6 = mkOption {
+          type = types.listOf (types.submodule (mkOptions.addresses 6));
+          default = [];
+          description = ''
+            List of IPv6 addresses this machine responds to
           '';
         };
       };
