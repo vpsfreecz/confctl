@@ -1,6 +1,10 @@
 { confDir, name, pkgs, lib }:
 let
-  json = builtins.readFile ("${toString confDir}/swpins/files/${name}.json");
+  fileName = builtins.replaceStrings [ "/" ] [ ":" ] name;
+
+  filePath = "${toString confDir}/swpins/files/${fileName}.json";
+
+  json = builtins.readFile filePath;
 
   sources = builtins.fromJSON json;
 

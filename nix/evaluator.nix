@@ -9,46 +9,25 @@ let
   deployments = import ./deployments.nix { inherit (arg) confDir; inherit pkgs lib; };
 
   nameValuePairs = builtins.map (d: {
-    name = d.fqdn;
+    name = d.name;
     value = {
-      inherit (d) managed type spin name location domain fqdn role;
-      config = configByType d.config d.type d.spin;
+      inherit (d) name;
+      inherit (d.config) managed spin targetHost addresses netboot;
+      inherit (d.config) container node osNode vzNode;
     };
   }) deployments;
 
   deploymentsAttrs = builtins.listToAttrs nameValuePairs;
 
   fullDeploymentsAttrs = builtins.listToAttrs (builtins.map (d: {
-    name = d.fqdn;
+    name = d.name;
     value = d;
   }) deployments);
-
-  configByType = config: type: spin: rec {
-    base = {
-      inherit (config) addresses netboot;
-    };
-
-    container = base // { inherit (config) container; };
-
-    node = base // (nodeConfigBySpin config spin);
-
-    machine = base;
-  }.${type};
-
-  nodeConfigBySpin = config: spin: rec {
-    base = {
-      inherit (config) node;
-    };
-
-    openvz = base // { inherit (config) vzNode; };
-
-    vpsadminos = base // { inherit (config) osNode; };
-  }.${spin};
 
   deploymentSwpins = d:
     import ./lib/swpins.nix {
       inherit (arg) confDir;
-      name = d.fqdn;
+      name = d.name;
       pkgs = nixpkgs.pkgs;
       lib = lib;
     };
@@ -72,11 +51,12 @@ let
         vpsadminos = <vpsadminos/os/default.nix>;
       };
 
-      evalConfig = import importPath.${d.spin} {
+      evalConfig = import importPath.${d.config.spin} {
         modules = [
           ({config, lib, pkgs, ...}: {
             key = "confctl-deploy";
-            networking.hostName = lib.mkDefault d.fqdn;
+            # TODO
+            # networking.hostName = lib.mkDefault d.fqdn;
           })
           d.build.toplevel
         ];
@@ -85,7 +65,7 @@ let
 
   build = {
     # List of deployment hosts
-    list = { deployments = builtins.map (d: d.fqdn) deployments; };
+    list = { deployments = builtins.map (d: d.name) deployments; };
 
     # List of deployments in an attrset: host => config
     info = deploymentsAttrs;

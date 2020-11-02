@@ -75,9 +75,7 @@ module ConfCtl::Cli
 
       deps.select do |host, d|
         (pattern.nil? || ConfCtl::Pattern.match?(pattern, host)) \
-          && (opts[:type].nil? || opts[:type] == d.type) \
-          && (opts[:spin].nil? || opts[:spin] == d.spin) \
-          && (opts[:role].nil? || opts[:role] == d.role)
+          && (opts[:spin].nil? || opts[:spin] == d.spin)
       end
     end
 
@@ -101,10 +99,7 @@ module ConfCtl::Cli
       deps.each do |host, d|
         args = [fmt, host]
         args << (d.managed ? 'yes' : 'no') if fmtopts[:managed]
-        args.concat([
-          d.type, d.spin, d.role,
-          rdomain(d.name), rdomain(d.location), rdomain(d.domain),
-        ])
+        args << d.spin
 
         puts sprintf(*args)
       end
@@ -154,7 +149,7 @@ module ConfCtl::Cli
     end
 
     def printf_fmt_cols
-      fmts = %w(%-30s)
+      fmts = %w(%-40s)
       cols = %w(HOST)
       managed = %w(a all).include?(opts[:managed])
 
@@ -163,14 +158,10 @@ module ConfCtl::Cli
         cols << 'MANAGED'
       end
 
-      fmts.concat(%w(%-12s %-12s %-12s %-15s %-10s %s))
-      cols.concat(%w(TYPE SPIN ROLE NAME LOCATION DOMAIN))
+      fmts.concat(%w(%s))
+      cols.concat(%w(SPIN))
 
       [fmts.join(' '), cols, {managed: managed}]
-    end
-
-    def rdomain(domain)
-      domain ? domain.split('.').reverse.join('.') : nil
     end
   end
 end

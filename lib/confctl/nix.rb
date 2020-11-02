@@ -75,7 +75,7 @@ module ConfCtl
         build: :swpins,
         deployments: [host],
       }) do |arg|
-        out_link = File.join(cache_dir, 'gcroots', "#{host}.swpins")
+        out_link = File.join(cache_dir, 'gcroots', "#{escape_name(host)}.swpins")
 
         cmd = [
           'nix-build',
@@ -91,7 +91,10 @@ module ConfCtl
           fail "nix-build failed with exit status #{$?.exitstatus}"
         end
 
-        add_gcroot("confctl-#{host}.swpins", File.absolute_path(out_link))
+        add_gcroot(
+          "confctl-#{escape_name(host)}.swpins",
+          File.absolute_path(out_link)
+        )
         JSON.parse(File.read(output))[host]
       end
     end
@@ -129,9 +132,16 @@ module ConfCtl
         begin
           host_toplevels = JSON.parse(File.read(gcroot))
           host_toplevels.each do |host, toplevel|
-            host_gcroot = File.join(cache_dir, 'gcroots', "#{host}.toplevel")
+            host_gcroot = File.join(
+              cache_dir,
+              'gcroots',
+              "#{escape_name(host)}.toplevel"
+            )
             replace_symlink(host_gcroot, toplevel)
-            add_gcroot("confctl-#{host}.toplevel", File.absolute_path(host_gcroot))
+            add_gcroot(
+              "confctl-#{escape_name(host)}.toplevel",
+              File.absolute_path(host_gcroot)
+            )
           end
         ensure
           unlink_if_exists(gcroot)
@@ -200,6 +210,10 @@ module ConfCtl
       true
     rescue Errno::ENOENT
       false
+    end
+
+    def escape_name(host)
+      host.gsub(/\//, ':')
     end
 
     def cache_dir

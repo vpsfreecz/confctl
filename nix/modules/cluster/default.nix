@@ -45,11 +45,6 @@ let
           '';
         };
 
-        type = mkOption {
-          type = types.enum [ "node" "machine" "container" ];
-          description = "Deployment type";
-        };
-
         spin = mkOption {
           type = types.enum [ "openvz" "nixos" "vpsadminos" "other" ];
           description = "OS type";
@@ -119,20 +114,29 @@ let
             });
         };
 
+        host = mkOption {
+          type = types.nullOr (types.submodule host);
+          default = null;
+        };
+
         container = mkOption {
           type = types.nullOr (types.submodule container);
+          default = null;
         };
 
         node = mkOption {
           type = types.nullOr (types.submodule node);
+          default = null;
         };
 
         osNode = mkOption {
           type = types.nullOr (types.submodule osNode);
+          default = null;
         };
 
         vzNode = mkOption {
           type = types.nullOr (types.submodule vzNode);
+          default = null;
         };
 
         monitoring = {
@@ -212,6 +216,51 @@ let
       };
     };
 
+  host =
+    { config, ... }:
+    {
+      options = {
+        name = mkOption {
+          type = types.str;
+          description = ''
+           Host name
+          '';
+        };
+
+        location = mkOption {
+          type = types.nullOr types.str;
+          default = null;
+          description = ''
+            Host location domain
+          '';
+        };
+
+        domain = mkOption {
+          type = types.str;
+          description = ''
+            Host domain
+          '';
+        };
+
+        fqdn = mkOption {
+          type = types.str;
+          default = "";
+          description = ''
+            Host FQDN
+          '';
+          apply = v:
+            if v == "" then
+              concatStringsSep "." (
+                [ config.name ]
+                ++ (optional (config.location != null) config.location)
+                ++ [ config.domain ]
+              )
+            else
+              v;
+        };
+      };
+    };
+
   container =
     { config, ... }:
     {
@@ -223,7 +272,7 @@ let
       };
     };
 
-  node = (import ./nodes/common.nix) args;
+  node = import ./nodes/common.nix;
 
   osNode = (import ./nodes/vpsadminos.nix) (args // { inherit mkOptions; });
 
@@ -231,8 +280,7 @@ let
 in {
   options = {
     cluster = mkOption {
-      #      domain         location       name           deployment
-      type = types.attrsOf (types.attrsOf (types.attrsOf (types.submodule deployment)));
+      type = types.attrsOf (types.submodule deployment);
       default = {};
     };
   };

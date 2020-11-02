@@ -24,6 +24,11 @@ module ConfCtl::Cli
       arguments :strict
       hide_commands_without_desc true
 
+      desc 'Update deployment list with contents of cluster/'
+      command :rediscover do |c|
+        c.action &Command.run(Configuration, :rediscover)
+      end
+
       desc 'Manage software pins'
       command :swpins do |pins|
         pins.desc 'Manage software pins channels'
@@ -106,14 +111,8 @@ module ConfCtl::Cli
         c.desc 'Filter (un)managed deployments'
         c.flag :managed, must_match: %w(y yes n no a all)
 
-        c.desc 'Filter deployments by type'
-        c.flag :type
-
         c.desc 'Filter deployments by spin'
         c.flag :spin
-
-        c.desc 'Filter deployments by role'
-        c.flag :role
 
         c.action &Command.run(Nix, :list)
       end
@@ -124,14 +123,8 @@ module ConfCtl::Cli
         c.desc 'Enable traces in Nix'
         c.switch 'show-trace'
 
-        c.desc 'Filter deployments by type'
-        c.flag :type
-
         c.desc 'Filter deployments by spin'
         c.flag :spin
-
-        c.desc 'Filter deployments by role'
-        c.flag :role
 
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w(y yes)
@@ -145,20 +138,11 @@ module ConfCtl::Cli
         c.desc 'Enable traces in Nix'
         c.switch 'show-trace'
 
-        c.desc 'Filter deployments by type'
-        c.flag :type
-
         c.desc 'Filter deployments by spin'
         c.flag :spin
 
-        c.desc 'Filter deployments by role'
-        c.flag :role
-
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w(y yes)
-
-        c.desc 'Toggle health checks'
-        c.switch 'health-checks', default_value: true
 
         c.action &Command.run(Nix, :deploy)
       end

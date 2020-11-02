@@ -34,6 +34,10 @@ similarly to shell patterns, see
 information.
 
 ## COMMANDS
+`confctl rediscover`
+  Auto-discover deployments within the `cluster/` directory and generate a list
+  of their modules in `cluster/cluster.nix`.
+
 `confctl ls` [*host-pattern*]
   List matching hosts available for deployment.
 

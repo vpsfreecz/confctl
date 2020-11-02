@@ -2,14 +2,6 @@ require 'json'
 
 module ConfCtl
   class Deployments
-    Deployment = Struct.new(
-      :managed, :type, :spin, :role, :name, :location, :domain, :fqdn, :config
-    ) do
-      def target_host
-        config['targetHost'] || fqdn
-      end
-    end
-
     # @param opts [Hash]
     # @option opts [Boolean] :show_trace
     # @option opts [Boolean] :deployments
@@ -63,17 +55,7 @@ module ConfCtl
 
     def parse(data)
       Hash[data.map do |host, info|
-        [host, Deployment.new(
-          info['managed'],
-          info['type'],
-          info['spin'],
-          info['role'],
-          info['name'],
-          info['location'],
-          info['domain'],
-          info['fqdn'],
-          info['config'],
-        )]
+        [host, Deployment.new(info)]
       end]
     end
   end

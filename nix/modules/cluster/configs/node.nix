@@ -1,26 +1,26 @@
 { config, lib, confLib, confData, deploymentInfo, ... }:
 with lib;
 let
-  cfg = deploymentInfo.config;
+    cfg = deploymentInfo;
 
-  mapEachIp = fn: addresses:
-    flatten (mapAttrsToList (ifname: ips:
-      (map (addr: fn ifname 4 addr) ips.v4)
-      ++
-      (map (addr: fn ifname 6 addr) ips.v6)
-    ) addresses);
+    mapEachIp = fn: addresses:
+      flatten (mapAttrsToList (ifname: ips:
+        (map (addr: fn ifname 4 addr) ips.v4)
+        ++
+        (map (addr: fn ifname 6 addr) ips.v6)
+      ) addresses);
 
-  allNetworks = confData.vpsadmin.networks.containers;
+    allNetworks = confData.vpsadmin.networks.containers;
 
-  importNetworkFilter = ipVer:
-    let
-      networks = allNetworks.${"ipv${toString ipVer}"};
-      list = map (net: "${net.address}/${toString net.prefix}+") networks;
-    in ''
-      net ~ [ ${concatStringsSep ", " list} ]
-    '';
+    importNetworkFilter = ipVer:
+      let
+        networks = allNetworks.${"ipv${toString ipVer}"};
+        list = map (net: "${net.address}/${toString net.prefix}+") networks;
+      in ''
+        net ~ [ ${concatStringsSep ", " list} ]
+      '';
 
-  importInterfaceFilter = ipVer: optionalString (cfg.osNode.networking.interfaces.addresses != {}) (
+    importInterfaceFilter = ipVer: optionalString (cfg.osNode.networking.interfaces.addresses != {}) (
     let
       ifconds = concatMapStringsSep " || " (v: "ifname = \"${v}\"") (attrNames cfg.osNode.networking.interfaces.addresses);
       netLen = {
@@ -41,15 +41,15 @@ let
     '';
   }) neighbours);
 in {
-  config = mkIf (deploymentInfo.type == "node") {
+  config = mkIf (deploymentInfo.osNode != null) {
     vpsadmin.nodeId = cfg.node.id;
-    vpsadmin.consoleHost = mkDefault deploymentInfo.config.addresses.primary.address;
+    vpsadmin.consoleHost = mkDefault deploymentInfo.addresses.primary.address;
     vpsadmin.netInterfaces = mkDefault (lib.attrNames cfg.osNode.networking.interfaces.addresses);
 
     services.udev.extraRules = confLib.mkNetUdevRules cfg.osNode.networking.interfaces.names;
-    services.rsyslogd.hostName = "${deploymentInfo.name}.${deploymentInfo.location}";
+    services.rsyslogd.hostName = "${deploymentInfo.name}.${deploymentInfo.host.location}";
 
-    networking.hostName = deploymentInfo.fqdn;
+    networking.hostName = deploymentInfo.host.fqdn;
     networking.custom = ''
       ${concatStringsSep "\n" (mapEachIp (ifname: v: addr: ''
       ip -${toString v} addr add ${addr.string} dev ${ifname}
@@ -136,6 +136,6 @@ in {
     ];
 
     system.monitoring.enable = true;
-    osctl.exporter.port = deploymentInfo.config.services.osctl-exporter.port;
+    osctl.exporter.port = deploymentInfo.services.osctl-exporter.port;
   };
 }
