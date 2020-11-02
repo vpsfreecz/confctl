@@ -9,7 +9,6 @@ let
   ];
 
   vpsadminos = [
-    ./cluster/configs/node.nix
   ];
 in {
   nixos = shared ++ nixos;
