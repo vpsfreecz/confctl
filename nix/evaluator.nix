@@ -5,14 +5,14 @@ let
   nixpkgs = import <nixpkgs> {};
   pkgs = nixpkgs.pkgs;
   lib = nixpkgs.lib;
-  
+
   deployments = import ./deployments.nix { inherit (arg) confDir; inherit pkgs lib; };
 
   nameValuePairs = builtins.map (d: {
     name = d.name;
     value = {
       inherit (d) name;
-      inherit (d.config) managed spin targetHost addresses netboot;
+      inherit (d.config) managed spin host addresses netboot;
       inherit (d.config) container node osNode vzNode;
     };
   }) deployments;

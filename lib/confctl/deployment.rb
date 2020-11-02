@@ -12,7 +12,7 @@ module ConfCtl
     end
 
     def target_host
-      opts['targetHost'] || name
+      (opts['host'] && opts['host']['target']) || name
     end
 
     def [](key)

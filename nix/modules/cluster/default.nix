@@ -50,15 +50,6 @@ let
           description = "OS type";
         };
 
-        targetHost = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = ''
-            Address/host to which the configuration is deployed to, defaults
-            to deployment FQDN
-          '';
-        };
-
         addresses = mkOption {
           type = types.nullOr (types.submodule addresses);
           default = null;
@@ -275,6 +266,14 @@ let
               )
             else
               v;
+        };
+
+        target = mkOption {
+          type = types.str;
+          default = config.fqdn;
+          description = ''
+            Address/host to which the configuration is deployed to
+          '';
         };
       };
     };
