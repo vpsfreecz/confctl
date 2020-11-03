@@ -69,7 +69,7 @@ information.
       Filter deployments that have *tag* set. If the tag begins with `^`, then
       filter deployments that do not have *tag* set.
 
-`confctl build` [*host-pattern*]
+`confctl build` [*options*] [*host-pattern*]
   Build matching hosts.
 
     `--show-trace`
@@ -87,7 +87,7 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
-`confctl deploy` [*host-pattern*] [`boot`|`switch`|`test`|`dry-activate`]
+`confctl deploy` [*options*] [*host-pattern*] [`boot`|`switch`|`test`|`dry-activate`]
   Build and deploy matching hosts. *switch-action* is the argument to
   `switch-to-configuration` called on the target host. The default action
   is `switch`.
