@@ -45,7 +45,7 @@ information.
   Auto-discover deployments within the `cluster/` directory and generate a list
   of their modules in `cluster/cluster.nix`.
 
-`confctl ls` [*host-pattern*]
+`confctl ls` [*options*] [*host-pattern*]
   List matching hosts available for deployment.
 
     `--show-trace`
@@ -56,8 +56,10 @@ information.
       and are there just for reference. This option determines what kind of
       deployments should be listed.
 
-    `--spin` `nixos`|`vpsadminos`
-      Filter deployments by spin.
+    `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
+      Filter deployments by selected attribute, which is either tested for
+      equality or inequality. Any attribute from configuration module
+      `cluster.<name>` can be tested.
 
 `confctl build` [*host-pattern*]
   Build matching hosts.
@@ -65,8 +67,10 @@ information.
     `--show-trace`
       Enable traces in Nix.
 
-    `--spin` `nixos`|`vpsadminos`
-      Filter deployments by spin.
+    `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
+      Filter deployments by selected attribute, which is either tested for
+      equality or inequality. Any attribute from configuration module
+      `cluster.<name>` can be tested.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
@@ -79,8 +83,10 @@ information.
     `--show-trace`
       Enable traces in Nix.
 
-    `--spin` `nixos`|`vpsadminos`
-      Filter deployments by spin.
+    `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
+      Filter deployments by selected attribute, which is either tested for
+      equality or inequality. Any attribute from configuration module
+      `cluster.<name>` can be tested.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.

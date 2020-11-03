@@ -72,10 +72,11 @@ module ConfCtl::Cli
     protected
     def select_deployments(pattern)
       deps = ConfCtl::Deployments.new(show_trace: opts['show-trace'])
+      attr_filters = AttrFilters.new(opts[:attr])
 
       deps.select do |host, d|
         (pattern.nil? || ConfCtl::Pattern.match?(pattern, host)) \
-          && (opts[:spin].nil? || opts[:spin] == d.spin)
+          && attr_filters.pass?(d)
       end
     end
 

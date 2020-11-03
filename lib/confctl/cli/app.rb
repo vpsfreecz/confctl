@@ -28,7 +28,7 @@ module ConfCtl::Cli
       command :init do |c|
         c.action &Command.run(Configuration, :init)
       end
-      
+
       desc 'Add a new deployment'
       arg_name '<name>'
       command :add do |c|
@@ -122,8 +122,8 @@ module ConfCtl::Cli
         c.desc 'Filter (un)managed deployments'
         c.flag :managed, must_match: %w(y yes n no a all)
 
-        c.desc 'Filter deployments by spin'
-        c.flag :spin
+        c.desc 'Filter by attribute'
+        c.flag %i(a attr), multiple: true
 
         c.action &Command.run(Nix, :list)
       end
@@ -134,8 +134,8 @@ module ConfCtl::Cli
         c.desc 'Enable traces in Nix'
         c.switch 'show-trace'
 
-        c.desc 'Filter deployments by spin'
-        c.flag :spin
+        c.desc 'Filter by attribute'
+        c.flag %i(a attr), multiple: true
 
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w(y yes)
@@ -149,8 +149,8 @@ module ConfCtl::Cli
         c.desc 'Enable traces in Nix'
         c.switch 'show-trace'
 
-        c.desc 'Filter deployments by spin'
-        c.flag :spin
+        c.desc 'Filter by attribute'
+        c.flag %i(a attr), multiple: true
 
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w(y yes)
