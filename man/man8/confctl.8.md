@@ -1,14 +1,14 @@
 # confctl 8                       2020-11-01                             master
 
 ## NAME
-`confctl` - command line interface for `vpsfree-cz-configuration`
+`confctl` - Nix deployment management tool
 
 ## SYNOPSIS
 `confctl` [*global options*] *command* [*command options*] [*arguments...*]
 
 ## DESCRIPTION
-`confctl` is a command line utility to manage `vpsfree-cz-configuration`
-and to build and deploy nodes, containers or other machines.
+`confctl` is a Nix deployment configuration management tool. It can be used to
+build and deploy *NixOS* and *vpsAdminOS* machines.
 
 ## SOFTWARE PINS
 Each deployment target in `vpsfree-cz-configuration` uses predefined software
@@ -56,14 +56,8 @@ information.
       and are there just for reference. This option determines what kind of
       deployments should be listed.
 
-    `--type` `container`|`machine`|`node`
-      Filter deployments by type.
-
     `--spin` `nixos`|`vpsadminos`
       Filter deployments by spin.
-
-    `--role` `hypervisor`|`storage`
-      Filter deployments by node role.
 
 `confctl build` [*host-pattern*]
   Build matching hosts.
@@ -71,14 +65,8 @@ information.
     `--show-trace`
       Enable traces in Nix.
 
-    `--type` `container`|`machine`|`node`
-      Filter deployments by type.
-
     `--spin` `nixos`|`vpsadminos`
       Filter deployments by spin.
-
-    `--role` `hypervisor`|`storage`
-      Filter deployments by node role.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
@@ -91,21 +79,11 @@ information.
     `--show-trace`
       Enable traces in Nix.
 
-    `--type` `container`|`machine`|`node`
-      Filter deployments by type.
-
     `--spin` `nixos`|`vpsadminos`
       Filter deployments by spin.
 
-    `--role` `hypervisor`|`storage`
-      Filter deployments by node role.
-
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
-
-    `--[no-]health-checks`
-      Determines whether health checks are run after activation. Enabled by
-      default.
 
 `confctl gen-data vpsadmin all`
   Generate all required data files from vpsAdmin API.
@@ -188,7 +166,8 @@ information.
   Stop the HTTP server started by `confctl docs start`.
 
 ## BUGS
-Report bugs to https://github.com/vpsfreecz/vpsfree-cz-configuration/issues.
+Report bugs to https://github.com/vpsfreecz/confctl/issues.
 
 ## ABOUT
-`confctl` is a part of [vpsfree-cz-configuration](https://github.com/vpsfreecz/vpsfree-cz-configuration).
+`confctl` is developed for purposes of [vpsFree.cz](https://vpsfree.org) and
+its cluster [configuration](https://github.com/vpsfreecz/vpsfree-cz-configuration).
