@@ -246,7 +246,8 @@ let
     {
       options = {
         name = mkOption {
-          type = types.str;
+          type = types.nullOr types.str;
+          default = null;
           description = ''
            Host name
           '';
@@ -261,23 +262,24 @@ let
         };
 
         domain = mkOption {
-          type = types.str;
+          type = types.nullOr types.str;
+          default = null;
           description = ''
             Host domain
           '';
         };
 
         fqdn = mkOption {
-          type = types.str;
-          default = "";
+          type = types.nullOr types.str;
+          default = null;
           description = ''
             Host FQDN
           '';
           apply = v:
-            if v == "" then
+            if isNull v && !isNull config.name && !isNull config.domain then
               concatStringsSep "." (
                 [ config.name ]
-                ++ (optional (config.location != null) config.location)
+                ++ (optional (!isNull config.location) config.location)
                 ++ [ config.domain ]
               )
             else
