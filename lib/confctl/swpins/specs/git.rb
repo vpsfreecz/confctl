@@ -30,6 +30,7 @@ module ConfCtl
       end
 
       @fetcher_opts = JSON.parse(json.strip, symbolize_names: true)
+      spec_opts[:rev] = fetcher_opts[:rev]
       self.channel = nil
     end
 
@@ -49,6 +50,7 @@ module ConfCtl
         url: url,
         sha256: hash.strip,
       }
+      spec_opts[:rev] = ref
     end
   end
 end
