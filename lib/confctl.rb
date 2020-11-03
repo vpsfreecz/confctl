@@ -4,7 +4,7 @@ module ConfCtl
   # Root of confctl repository
   # @return [String]
   def self.root
-    File.realpath(File.join(File.dirname(__FILE__), '../../'))
+    File.realpath(File.join(File.dirname(__FILE__), '../'))
   end
 
   # Path to the directory containing cluster configuration
