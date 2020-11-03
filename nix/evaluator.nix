@@ -12,7 +12,7 @@ let
     name = d.name;
     value = {
       inherit (d) name;
-      inherit (d.config) managed spin host addresses netboot;
+      inherit (d.config) managed spin host addresses netboot labels tags;
       inherit (d.config) container node osNode vzNode;
     };
   }) deployments;

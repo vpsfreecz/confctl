@@ -90,6 +90,22 @@ let
           default = null;
         };
 
+        labels = mkOption {
+          type = types.attrs;
+          default = {};
+          description = ''
+            Optional user-defined labels to classify the deployment
+          '';
+        };
+
+        tags = mkOption {
+          type = types.listOf types.str;
+          default = [];
+          description = ''
+            Optional user-defined tags to classify the deployment
+          '';
+        };
+
         container = mkOption {
           type = types.nullOr (types.submodule container);
           default = null;
