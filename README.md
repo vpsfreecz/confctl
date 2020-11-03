@@ -61,9 +61,6 @@ confctl swpins channel new nixos-unstable
 # Add unstable nixpkgs to the new channel, this will take a long time
 confctl swpins channel git add nixos-unstable nixpkgs https://github.com/NixOS/nixpkgs refs/heads/nixos-unstable
 
-# Create per-machine swpins file
-echo '{}' > swpins/files/my-machine.json
-
 # Let the machine user our channel
 confctl swpins file channel use my-machine nixos-unstable
 ```

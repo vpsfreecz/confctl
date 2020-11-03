@@ -111,6 +111,7 @@ END
       name = args[0]
       dir = File.join('cluster', name)
       depth = name.count('/')
+      escaped_name = name.gsub(/\//, ':')
 
       mkdir(dir)
 
@@ -142,6 +143,8 @@ END
 END
         )
       end
+
+      mkfile("swpins/files/#{escaped_name}.json") { |f| f.puts('{}') }
 
       rediscover
     end
