@@ -17,7 +17,7 @@ module ConfCtl
     # @param path [String]
     def initialize(path)
       @path = path
-      @name = File.basename(path, '.json')
+      @name = File.basename(path, '.json').gsub(/:/, '/')
     end
 
     def parse
