@@ -23,7 +23,7 @@ module ConfCtl
   # @param name [String]
   # @return [String]
   def self.nix_asset(name)
-    File.join(root, 'confctl', 'nix', name)
+    File.join(root, 'nix', name)
   end
 end
 
