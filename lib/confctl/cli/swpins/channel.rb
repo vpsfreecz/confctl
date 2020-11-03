@@ -8,14 +8,21 @@ module ConfCtl::Cli
     include Swpins::Utils
 
     def list
-      puts sprintf('%-30s %-25s %-6s %s', 'CHANNEL', 'SW', 'TYPE', 'PIN')
+      rows = []
 
       each_channel_spec(args[0] || '*', args[1] || '*') do |chan, spec|
-        puts sprintf(
-          '%-30s %-25s %-6s %s',
-          chan.name, spec.name, spec.type, spec.version
-        )
+        rows << {
+          channel: chan.name,
+          sw: spec.name,
+          type: spec.type,
+          pin: spec.version,
+        }
       end
+
+      OutputFormatter.print(
+        rows,
+        %i(channel sw type pin),
+      )
     end
 
     def create

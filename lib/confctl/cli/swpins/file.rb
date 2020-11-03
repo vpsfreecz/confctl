@@ -8,14 +8,22 @@ module ConfCtl::Cli
     include Swpins::Utils
 
     def list
-      puts sprintf('%-30s %-25s %-15s %-6s %s', 'FILE', 'SW', 'CHANNEL', 'TYPE', 'PIN')
+      rows = []
 
       each_file_spec(args[0] || '*', args[1] || '*') do |file, spec|
-        puts sprintf(
-          '%-30s %-25s %-15s %-6s %s',
-          file.name, spec.name, spec.channel || '-', spec.type, spec.version
-        )
+        rows << {
+          file: file.name,
+          sw: spec.name,
+          channel: spec.channel || '-',
+          type: spec.type,
+          pin: spec.version,
+        }
       end
+
+      OutputFormatter.print(
+        rows,
+        %i(file sw channel type pin),
+      )
     end
 
     def channel_use
