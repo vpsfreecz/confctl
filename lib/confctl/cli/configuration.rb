@@ -131,7 +131,7 @@ END
       depth = name.count('/')
       escaped_name = name.gsub(/\//, ':')
 
-      mkdir(dir)
+      mkdir_p(dir)
 
       mkfile(File.join(dir, 'module.nix')) do |f|
         f.puts(<<END
