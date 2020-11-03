@@ -27,7 +27,11 @@ let
     let
       # this is fed into scopedImport so vpsadminos sees correct <nixpkgs> everywhere
       overrides = {
-        __nixPath = [ { prefix = "nixpkgs"; path = nixpkgs; } ] ++ builtins.nixPath;
+        __nixPath = [
+          { prefix = "nixpkgs"; path = nixpkgs; }
+          { prefix = "vpsadminos"; path = vpsadminos; }
+        ] ++ (optional (!isNull vpsadmin) { prefix = "vpsadmin"; path = vpsadmin; })
+          ++ builtins.nixPath;
         import = fn: scopedImport overrides fn;
         scopedImport = attrs: fn: scopedImport (overrides // attrs) fn;
         builtins = builtins // overrides;
