@@ -11,13 +11,13 @@ let
 
   deployments = confLib.getClusterDeployments config.cluster;
 
-  deploymentAttrs = listToAttrs (map (d: nameValuePair d.fqdn d) deployments);
+  deploymentAttrs = listToAttrs (map (d: nameValuePair d.config.host.fqdn d) deployments);
 
   netbootable = filterAttrs (k: v: v.config.netboot.enable) deploymentAttrs;
 
   filterDeployments = filter: filterAttrs (k: v: filter v) netbootable;
 
-  filterNodes = filter: filterDeployments (v: v.type == "node" && (filter v));
+  filterNodes = filter: filterDeployments (v: !isNull v.config.node && (filter v));
 
   selectNodes = filter: mapAttrs (k: v: nodeImage v) (filterNodes filter);
 
@@ -51,7 +51,7 @@ let
 
   nodeImage = node:
     let
-      nodepins = import ./swpins { name = node.fqdn; inherit pkgs lib; };
+      nodepins = import ./swpins.nix { name = node.name; inherit pkgs lib; };
       build = vpsadminosBuild {
         modules = [
           {
@@ -137,7 +137,7 @@ in rec {
   };
 
   nodesInLocation = domain: location:
-    selectNodes (node: node.domain == domain && node.location == location);
+    selectNodes (node: node.config.host.domain == domain && node.config.host.location == location);
 
-  allNodes = domain: selectNodes (node: node.domain == domain);
+  allNodes = domain: selectNodes (node: node.config.host.domain == domain);
 }
