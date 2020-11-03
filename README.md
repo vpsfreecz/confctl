@@ -15,22 +15,29 @@ machines.
 * [Nix](https://nixos.org)
 
 ## Usage
-1. Create a new directory, where the new configuration will be stored:
+1. There are no releases or packages yet, so first clone the repository:
+```
+git clone https://github.com/vpsfreecz/confctl
+```
+
+2. Create a new directory, where your confctl-managed configuration will be
+stored:
 
 ```
 mkdir cluster-configuration
 ```
 
-2. Create a `shell.nix`:
+3. Create a `shell.nix` in the new directory and import the same file
+from confctl:
 ```
 cd cluster-configuration
 cat > shell.nix <<EOF
-import "${builtins.fetchTarball https://github.com/vpsfreecz/confctl/archive/master.tar.gz}/shell.nix"
+import "/the-location-of-your-confctl-repository/shell.nix"
 EOF
 ```
 
-3. Enter the `nix-shell`. This will install confctl and its dependencies
-into `.gems/`:
+4. Enter the `nix-shell`. This will make confctl available and install its
+dependencies into `.gems/`:
 ```
 nix-shell
 ```
@@ -41,19 +48,19 @@ From within the shell, you can access the manual:
 man confctl
 ```
 
-4. Initialize the configuration directory with confctl:
+5. Initialize the configuration directory with confctl:
 ```
 confctl init
 ```
 
-5. Add a new machine to be deployed:
+6. Add a new machine to be deployed:
 ```
 confctl add my-machine
 ```
 
 You can now edit the machine's configuration in directory `cluster/my-machine`.
 
-6. Configure software pins:
+7. Configure software pins:
 ```
 # Create a channel with software pins that can be reused by multiple machines
 confctl swpins channel new nixos-unstable
@@ -65,12 +72,12 @@ confctl swpins channel git add nixos-unstable nixpkgs https://github.com/NixOS/n
 confctl swpins file channel use my-machine nixos-unstable
 ```
 
-7. Build the machine
+8. Build the machine
 ```
 confctl build my-machine
 ```
 
-8. Deploy the machine
+9. Deploy the machine
 ```
 confctl deploy my-machine
 ```
