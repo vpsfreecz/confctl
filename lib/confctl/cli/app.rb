@@ -35,6 +35,12 @@ module ConfCtl::Cli
         c.action &Command.run(Configuration, :add)
       end
 
+      desc 'Rename an existing deployment'
+      arg_name '<old-name> <new-name>'
+      command :rename do |c|
+        c.action &Command.run(Configuration, :rename)
+      end
+
       desc 'Update deployment list with contents of cluster/'
       command :rediscover do |c|
         c.action &Command.run(Configuration, :rediscover)

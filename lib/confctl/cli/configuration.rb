@@ -1,3 +1,4 @@
+require 'fileutils'
 require 'securerandom'
 
 module ConfCtl::Cli
@@ -166,6 +167,32 @@ END
       rediscover
     end
 
+    def rename
+      require_args!('old-name', 'new-name')
+
+      src = args[0]
+      dst = args[1]
+
+      src_path = File.join('cluster', src)
+      dst_path = File.join('cluster', dst)
+
+      if !Dir.exist?(src_path)
+        fail "'#{src}' not found"
+      elsif Dir.exist?(dst_path)
+        fail "'#{dst}' already exists"
+      end
+
+      dst_dir = File.dirname(dst_path)
+      mkdir_p(dst_dir) unless Dir.exist?(dst_dir)
+      mv(src_path, dst_path)
+
+      src_swpins = File.join('swpins/files', "#{src.gsub(/\//, ':')}.json")
+      dst_swpins = File.join('swpins/files', "#{dst.gsub(/\//, ':')}.json")
+      mv(src_swpins, dst_swpins) if File.exist?(src_swpins)
+
+      rediscover
+    end
+
     def rediscover
       hosts = discover_dir('cluster').sort
 
@@ -207,6 +234,11 @@ END
       Dir.mkdir(name, DIR_MODE)
     end
 
+    def mkdir_p(name)
+      puts "mkdir #{name}"
+      FileUtils.mkdir_p(name, mode: DIR_MODE)
+    end
+
     def mkfile(name)
       puts "mkfile #{name}"
       f = File.open(name, 'w', FILE_MODE)
@@ -223,6 +255,11 @@ END
       end
 
       File.rename(replacement, name)
+    end
+
+    def mv(old_name, new_name)
+      puts "mv #{old_name} #{new_name}"
+      File.rename(old_name, new_name)
     end
   end
 end
