@@ -1,13 +1,14 @@
 { config
 , pkgs
 , lib
+, confDir
 , confLib
 , confData
 , swpinsName ? "images"
 , nixosModules ? [] }:
 with lib;
 let
-  swpins = import ./swpins.nix { name = swpinsName; inherit confLib pkgs lib; };
+  swpins = import ./swpins.nix { name = swpinsName; inherit confDir pkgs lib; };
 
   deployments = confLib.getClusterDeployments config.cluster;
 
@@ -51,7 +52,7 @@ let
 
   nodeImage = node:
     let
-      nodepins = import ./swpins.nix { name = node.name; inherit pkgs lib; };
+      nodepins = import ./swpins.nix { name = node.name; inherit confDir pkgs lib; };
       build = vpsadminosBuild {
         modules = [
           {
