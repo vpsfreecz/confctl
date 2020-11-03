@@ -125,6 +125,9 @@ module ConfCtl::Cli
         c.desc 'Filter by attribute'
         c.flag %i(a attr), multiple: true
 
+        c.desc 'Filter by tag'
+        c.flag %i(t tag), multiple: true
+
         c.action &Command.run(Nix, :list)
       end
 
@@ -136,6 +139,9 @@ module ConfCtl::Cli
 
         c.desc 'Filter by attribute'
         c.flag %i(a attr), multiple: true
+
+        c.desc 'Filter by tag'
+        c.flag %i(t tag), multiple: true
 
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w(y yes)
@@ -151,6 +157,9 @@ module ConfCtl::Cli
 
         c.desc 'Filter by attribute'
         c.flag %i(a attr), multiple: true
+
+        c.desc 'Filter by tag'
+        c.flag %i(t tag), multiple: true
 
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w(y yes)

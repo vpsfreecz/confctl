@@ -61,6 +61,10 @@ information.
       equality or inequality. Any attribute from configuration module
       `cluster.<name>` can be tested.
 
+    `-t`, `--tag` *tag*|`^`*tag*
+      Filter deployments that have *tag* set. If the tag begins with `^`, then
+      filter deployments that do not have *tag* set.
+
 `confctl build` [*host-pattern*]
   Build matching hosts.
 
@@ -71,6 +75,10 @@ information.
       Filter deployments by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module
       `cluster.<name>` can be tested.
+
+    `-t`, `--tag` *tag*|`^`*tag*
+      Filter deployments that have *tag* set. If the tag begins with `^`, then
+      filter deployments that do not have *tag* set.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
@@ -87,6 +95,10 @@ information.
       Filter deployments by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module
       `cluster.<name>` can be tested.
+
+    `-t`, `--tag` *tag*|`^`*tag*
+      Filter deployments that have *tag* set. If the tag begins with `^`, then
+      filter deployments that do not have *tag* set.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
