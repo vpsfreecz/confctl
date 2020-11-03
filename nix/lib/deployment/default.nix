@@ -14,6 +14,7 @@ let
       _file = "confctl/nix/lib/deployment/default.nix";
 
       _module.args = {
+        inherit confDir;
         confLib = import ../../lib { inherit confDir lib pkgs; };
         confData = import "${toString confDir}/data/default.nix" { inherit lib; };
       };
