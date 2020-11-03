@@ -10,60 +10,29 @@ module ConfCtl
       @show_trace = show_trace
     end
 
+    def confctl_settings
+      nix_instantiate({
+        confDir: conf_dir,
+        build: :confctl,
+      })['confctl']
+    end
+
     # Returns an array with deployment fqdns
     # @return [Array<String>]
     def list_deployment_fqdns
-      with_argument({
+      nix_instantiate({
         confDir: conf_dir,
         build: :list,
-      }) do |arg|
-        cmd = [
-          'nix-instantiate',
-          '--eval',
-          '--json',
-          '--strict',
-          '--read-write-mode',
-          '--arg', 'jsonArg', arg,
-          (show_trace ? '--show-trace' : ''),
-          ConfCtl.nix_asset('evaluator.nix'),
-        ]
-
-        json = `#{cmd.join(' ')}`
-
-        if $?.exitstatus != 0
-          fail "nix-instantiate failed with exit status #{$?.exitstatus}"
-        end
-
-        JSON.parse(json)['deployments']
-      end
+      })['deployments']
     end
 
     # Return deployments and their config in a hash
     # @return [Hash]
     def list_deployments
-      with_argument({
+      nix_instantiate({
         confDir: conf_dir,
         build: :info,
-      }) do |arg|
-        cmd = [
-          'nix-instantiate',
-          '--eval',
-          '--json',
-          '--strict',
-          '--read-write-mode',
-          '--arg', 'jsonArg', arg,
-          (show_trace ? '--show-trace' : ''),
-          ConfCtl.nix_asset('evaluator.nix'),
-        ]
-
-        json = `#{cmd.join(' ')}`
-
-        if $?.exitstatus != 0
-          fail "nix-instantiate failed with exit status #{$?.exitstatus}"
-        end
-
-        JSON.parse(json)
-      end
+      })
     end
 
     # Evaluate swpins for host
@@ -180,6 +149,29 @@ module ConfCtl
       yield(f.path)
     ensure
       f.unlink
+    end
+
+    def nix_instantiate(hash)
+      with_argument(hash) do |arg|
+        cmd = [
+          'nix-instantiate',
+          '--eval',
+          '--json',
+          '--strict',
+          '--read-write-mode',
+          '--arg', 'jsonArg', arg,
+          (show_trace ? '--show-trace' : ''),
+          ConfCtl.nix_asset('evaluator.nix'),
+        ]
+
+        json = `#{cmd.join(' ')}`
+
+        if $?.exitstatus != 0
+          fail "nix-instantiate failed with exit status #{$?.exitstatus}"
+        end
+
+        JSON.parse(json)
+      end
     end
 
     def build_nix_path(swpins)

@@ -1,6 +1,7 @@
 let
   shared = [
     ./cluster
+    ./confctl.nix
     ./service-definitions.nix
   ];
 

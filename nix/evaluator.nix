@@ -56,7 +56,19 @@ let
       };
     in evalConfig;
 
+  evalConfctl =
+    let
+      cfg = "${toString arg.confDir}/configs/confctl.nix";
+    in import <nixpkgs/nixos/lib/eval-config.nix> {
+      modules = [
+        ./modules/confctl.nix
+      ] ++ lib.optional (builtins.pathExists cfg) cfg;
+    };
+
   build = {
+    # confctl settings
+    confctl = { confctl = evalConfctl.config.confctl; };
+
     # List of deployment hosts
     list = { deployments = builtins.map (d: d.name) deployments; };
 

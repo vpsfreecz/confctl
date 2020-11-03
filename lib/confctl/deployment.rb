@@ -16,11 +16,32 @@ module ConfCtl
     end
 
     def [](key)
-      opts[key]
+      if key.index('.')
+        get(opts, key.split('.'))
+      else
+        opts[key]
+      end
     end
 
     def to_s
       name
+    end
+
+    protected
+    def get(hash, keys)
+      k = keys.shift
+
+      if hash.has_key?(k)
+        if keys.empty?
+          hash[k]
+        elsif hash[k].nil?
+          nil
+        else
+          get(hash[k], keys)
+        end
+      else
+        nil
+      end
     end
   end
 end

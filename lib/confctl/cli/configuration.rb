@@ -33,6 +33,23 @@ END
         )
       end
 
+      mkdir('configs')
+      mkfile('configs/confctl.nix') do |f|
+        f.puts(<<END
+{ config, ... }:
+{
+  confctl = {
+    # listColumns = {
+    #   "name"
+    #   "spin"
+    #   "host.fqdn"
+    # };
+  };
+}
+END
+        )
+      end
+
       mkdir('data')
 
       mkfile('data/default.nix') do |f|

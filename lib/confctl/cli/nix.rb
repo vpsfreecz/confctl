@@ -49,11 +49,11 @@ module ConfCtl::Cli
 
       host_toplevels = do_build(deps)
       nix = ConfCtl::Nix.new(show_trace: opts['show-trace'])
-      
+
       host_toplevels.each do |host, toplevel|
         dep = deps[host]
         puts "Copying configuration to #{host} (#{dep.target_host})"
-        
+
         unless nix.copy(dep, toplevel)
           fail "Error while copying system to #{host}"
         end
@@ -62,7 +62,7 @@ module ConfCtl::Cli
       host_toplevels.each do |host, toplevel|
         dep = deps[host]
         puts "Activating configuration on #{host} (#{dep.target_host})"
-        
+
         unless nix.activate(dep, toplevel, action)
           fail "Error while activating configuration on #{host}"
         end
@@ -93,16 +93,12 @@ module ConfCtl::Cli
     end
 
     def list_deployments(deps)
-      fmt, cols, fmtopts = printf_fmt_cols
-      puts sprintf(fmt, *cols)
-
-      deps.each do |host, d|
-        args = [fmt, host]
-        args << (d.managed ? 'yes' : 'no') if fmtopts[:managed]
-        args << d.spin
-
-        puts sprintf(*args)
+      cols = ConfCtl::Settings.instance.list_columns
+      rows = deps.map do |host, d|
+        Hash[cols.map { |c| [c, d[c]] }]
       end
+
+      OutputFormatter.print(rows, cols, layout: :columns)
     end
 
     def do_build(deps)
@@ -134,7 +130,7 @@ module ConfCtl::Cli
     def swpin_build_groups(host_swpins)
       ret = []
       all_swpins = host_swpins.values.uniq
-      
+
       all_swpins.each do |swpins|
         hosts = []
 
@@ -146,22 +142,6 @@ module ConfCtl::Cli
       end
 
       ret
-    end
-
-    def printf_fmt_cols
-      fmts = %w(%-40s)
-      cols = %w(HOST)
-      managed = %w(a all).include?(opts[:managed])
-
-      if managed
-        fmts << '%-10s'
-        cols << 'MANAGED'
-      end
-
-      fmts.concat(%w(%s))
-      cols.concat(%w(SPIN))
-
-      [fmts.join(' '), cols, {managed: managed}]
     end
   end
 end
