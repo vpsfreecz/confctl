@@ -40,7 +40,7 @@ information.
 ## COMMANDS
 `confctl init`
   Create a new configuration in the current directory. The current directory
-  is set up to be used with `confctl`
+  is set up to be used with `confctl`.
 
 `confctl add` *name*
   Add new deployment.
@@ -195,5 +195,6 @@ information.
 Report bugs to https://github.com/vpsfreecz/confctl/issues.
 
 ## ABOUT
-`confctl` is developed for purposes of [vpsFree.cz](https://vpsfree.org) and
-its cluster [configuration](https://github.com/vpsfreecz/vpsfree-cz-configuration).
+`confctl` was originally developed for the purposes of
+[vpsFree.cz](https://vpsfree.org) and its cluster 
+[configuration](https://github.com/vpsfreecz/vpsfree-cz-configuration).
