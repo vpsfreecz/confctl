@@ -122,6 +122,9 @@ module ConfCtl::Cli
         c.desc 'Filter (un)managed deployments'
         c.flag :managed, must_match: %w(y yes n no a all)
 
+        c.desc 'Select attributes to output'
+        c.flag %i(o output)
+
         c.desc 'Filter by attribute'
         c.flag %i(a attr), multiple: true
 

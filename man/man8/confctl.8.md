@@ -56,6 +56,10 @@ information.
       and are there just for reference. This option determines what kind of
       deployments should be listed.
 
+    `-o`, `--output` *attributes*
+      Comma-separated list of attributes to output. Defaults to the value
+      of option `confctl.list.columns`.
+
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
       Filter deployments by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module

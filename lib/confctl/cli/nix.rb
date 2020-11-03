@@ -97,7 +97,13 @@ module ConfCtl::Cli
     end
 
     def list_deployments(deps)
-      cols = ConfCtl::Settings.instance.list_columns
+      cols =
+        if opts[:output]
+          opts[:output].split(',')
+        else
+          ConfCtl::Settings.instance.list_columns
+        end
+
       rows = deps.map do |host, d|
         Hash[cols.map { |c| [c, d[c]] }]
       end
