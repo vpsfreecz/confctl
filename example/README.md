@@ -15,8 +15,7 @@ nix-shell
 
 2. Update software pins:
 ```
-confctl swpins channel git set branch nixos-unstable nixpkgs nixos-unstable
-confctl swpins channel git set branch vpsadminos vpsadminos master
+confctl swpins channel update
 ```
 
 3. Edit configurations in `cluster/` to your liking.
