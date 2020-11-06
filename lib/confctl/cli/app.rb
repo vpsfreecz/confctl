@@ -133,19 +133,6 @@ module ConfCtl::Cli
         c.action &Command.run(Cluster, :deploy)
       end
 
-      desc 'Access rendered documentation'
-      command :docs do |docs|
-        docs.desc 'Start HTTP server'
-        docs.command :start do |c|
-          c.action &Command.run(Documentation, :start_server)
-        end
-
-        docs.desc 'Stop HTTP server'
-        docs.command :stop do |c|
-          c.action &Command.run(Documentation, :stop_server)
-        end
-      end
-
       desc 'Generate data files from vpsAdmin API'
       command 'gen-data' do |gen|
         gen.desc 'Fetch data from vpsAdmin'

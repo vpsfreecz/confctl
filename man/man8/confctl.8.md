@@ -152,12 +152,6 @@ information.
   Regenerate all confctl-managed software pin files according to the Nix
   configuration.
 
-`confctl docs start`
-  Start HTTP server at `http://localhost:8000` to serve rendered documentation.
-
-`confctl docs stop`
-  Stop the HTTP server started by `confctl docs start`.
-
 ## BUGS
 Report bugs to https://github.com/vpsfreecz/confctl/issues.
 
