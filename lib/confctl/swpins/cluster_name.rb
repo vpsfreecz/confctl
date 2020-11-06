@@ -18,14 +18,12 @@ module ConfCtl
     # @return [Array<Swpins::Channel>]
     attr_reader :channels
 
-    # @param cluster_dir [String]
     # @param deployment [Deployment]
     # @param channels [Swpins::ChannelList]
-    def initialize(cluster_dir, deployment, channels)
+    def initialize(deployment, channels)
       @deployment = deployment
       @name = deployment.name
-      @cluster_dir = cluster_dir
-      @path = File.join(cluster_dir, "#{name.gsub(/\//, ':')}.json")
+      @path = File.join(ConfCtl::Swpins.cluster_dir, "#{name.gsub(/\//, ':')}.json")
       @channels = channels.select do |c|
         deployment['swpins']['channels'].include?(c.name)
       end
@@ -78,7 +76,7 @@ module ConfCtl
       else
         tmp = "#{path}.new"
 
-        FileUtils.mkdir_p(cluster_dir)
+        FileUtils.mkdir_p(ConfCtl::Swpins.cluster_dir)
 
         File.open(tmp, 'w') do |f|
           f.puts(JSON.pretty_generate(custom))
@@ -89,6 +87,6 @@ module ConfCtl
     end
 
     protected
-    attr_reader :cluster_dir, :nix_specs, :json_specs
+    attr_reader :nix_specs, :json_specs
   end
 end

@@ -5,7 +5,6 @@ module ConfCtl::Cli
       channels.each(&:parse)
 
       ConfCtl::Swpins::ClusterNameList.new(
-        Swpins::Cluster::DIR,
         channels,
         pattern: pattern,
       )
@@ -27,10 +26,7 @@ module ConfCtl::Cli
     end
 
     def channel_list(pattern)
-      ConfCtl::Swpins::ChannelList.new(
-        Swpins::Channel::DIR,
-        pattern: pattern,
-      )
+      ConfCtl::Swpins::ChannelList.new(pattern: pattern)
     end
 
     def each_channel(chan_pattern)

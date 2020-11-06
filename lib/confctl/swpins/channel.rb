@@ -12,13 +12,11 @@ module ConfCtl
     # @return [Hash<String, Swpins::Specs::Base>]
     attr_reader :specs
 
-    # @param channel_dir [String]
     # @param name [String]
     # @param nix_specs [Hash]
-    def initialize(channel_dir, name, nix_specs)
-      @channel_dir = channel_dir
+    def initialize(name, nix_specs)
       @name = name
-      @path = File.join(channel_dir, "#{name}.json")
+      @path = File.join(ConfCtl::Swpins.channel_dir, "#{name}.json")
       @nix_specs = nix_specs
     end
 
@@ -48,7 +46,7 @@ module ConfCtl
     def save
       tmp = "#{path}.new"
 
-      FileUtils.mkdir_p(channel_dir)
+      FileUtils.mkdir_p(ConfCtl::Swpins.channel_dir)
 
       File.open(tmp, 'w') do |f|
         f.puts(JSON.pretty_generate(specs))
@@ -58,6 +56,6 @@ module ConfCtl
     end
 
     protected
-    attr_reader :channel_dir, :nix_specs, :json_specs
+    attr_reader :nix_specs, :json_specs
   end
 end

@@ -3,8 +3,6 @@ require 'confctl/cli/swpins/utils'
 
 module ConfCtl::Cli
   class Swpins::Channel < Command
-    DIR = File.join(Dir.pwd, 'swpins/channels')
-
     include Swpins::Utils
 
     def list

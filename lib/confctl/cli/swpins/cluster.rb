@@ -3,8 +3,6 @@ require 'confctl/cli/swpins/utils'
 
 module ConfCtl::Cli
   class Swpins::Cluster < Command
-    DIR = File.join(Dir.pwd, 'swpins/cluster')
-
     include Swpins::Utils
 
     def list
