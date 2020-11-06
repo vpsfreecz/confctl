@@ -21,6 +21,7 @@ module ConfCtl::Cli
       OutputFormatter.print(
         rows,
         %i(cluster_name sw channel type pin),
+        layout: :columns,
       )
     end
 

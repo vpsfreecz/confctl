@@ -20,6 +20,7 @@ module ConfCtl::Cli
       OutputFormatter.print(
         rows,
         %i(channel sw type pin),
+        layout: :columns,
       )
     end
 
