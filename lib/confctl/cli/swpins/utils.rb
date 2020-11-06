@@ -1,13 +1,7 @@
 module ConfCtl::Cli
   module Swpins::Utils
     def cluster_name_list(pattern)
-      channels = channel_list('*')
-      channels.each(&:parse)
-
-      ConfCtl::Swpins::ClusterNameList.new(
-        channels,
-        pattern: pattern,
-      )
+      ConfCtl::Swpins::ClusterNameList.new(pattern: pattern)
     end
 
     def each_cluster_name(cn_pattern)

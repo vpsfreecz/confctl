@@ -115,6 +115,10 @@ module ConfCtl::Cli
       nix = ConfCtl::Nix.new(show_trace: opts['show-trace'])
       host_swpins = {}
 
+      unless check_swpins(deps)
+        fail 'one or more swpins need to be updated'
+      end
+
       deps.each do |host, d|
         puts "Evaluating swpins for #{host}..."
         host_swpins[host] = nix.eval_swpins(host)
@@ -135,6 +139,23 @@ module ConfCtl::Cli
       end
 
       host_toplevels
+    end
+
+    def check_swpins(deps)
+      ret = true
+
+      ConfCtl::Swpins::ClusterNameList.new(deployments: deps).each do |cn|
+        cn.parse
+
+        puts "Checking swpins for #{cn.name}..."
+
+        cn.specs.each do |name, s|
+          puts "  #{name} ... #{s.valid? ? 'ok' : 'needs update'}"
+          ret = false unless s.valid?
+        end
+      end
+
+      ret
     end
 
     def swpin_build_groups(host_swpins)
