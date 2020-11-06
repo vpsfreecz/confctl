@@ -171,7 +171,7 @@ END
 {
   cluster."#{name}" = {
     spin = "nixos";
-    swpins.channels = [ "nixos-stable" ];
+    swpins.channels = [ "nixos-unstable" ];
     host = { name = "machine"; domain = "example.com"; };
   };
 }
