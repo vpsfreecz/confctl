@@ -30,7 +30,7 @@ module ConfCtl::Cli
 
       each_channel_spec(args[0], args[1]) do |chan, spec|
         puts "Configuring #{spec.name} in channel #{chan.name}"
-        spec.prefetch_set(args[2..])
+        spec.prefetch_set(args[2..-1])
         channels << chan unless channels.include?(chan)
       end
 

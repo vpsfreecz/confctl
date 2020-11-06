@@ -34,7 +34,7 @@ module ConfCtl::Cli
           puts "Skipping #{spec.name} as it comes from channel #{spec.channel}"
         else
           puts "Configuring #{spec.name} in #{cluster_name.name}"
-          spec.prefetch_set(args[2..])
+          spec.prefetch_set(args[2..-1])
           files << file unless files.include?(file)
         end
       end
