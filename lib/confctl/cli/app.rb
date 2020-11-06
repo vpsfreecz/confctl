@@ -94,7 +94,7 @@ module ConfCtl::Cli
         c.desc 'Filter by tag'
         c.flag %i(t tag), multiple: true
 
-        c.action &Command.run(Nix, :list)
+        c.action &Command.run(Cluster, :list)
       end
 
       desc 'Build target systems'
@@ -112,7 +112,7 @@ module ConfCtl::Cli
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w(y yes)
 
-        c.action &Command.run(Nix, :build)
+        c.action &Command.run(Cluster, :build)
       end
 
       desc 'Deploy target systems'
@@ -130,7 +130,7 @@ module ConfCtl::Cli
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w(y yes)
 
-        c.action &Command.run(Nix, :deploy)
+        c.action &Command.run(Cluster, :deploy)
       end
 
       desc 'Access rendered documentation'

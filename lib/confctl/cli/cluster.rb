@@ -1,7 +1,8 @@
+require_relative 'command'
 require 'json'
 
 module ConfCtl::Cli
-  class Nix < Command
+  class Cluster < Command
     def list
       deps = ConfCtl::Deployments.new(show_trace: opts['show-trace'])
       selected = select_deployments(args[0])
