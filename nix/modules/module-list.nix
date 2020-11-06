@@ -1,7 +1,8 @@
 let
   shared = [
     ./cluster
-    ./confctl.nix
+    ./confctl/cli.nix
+    ./confctl/swpins.nix
     ./service-definitions.nix
   ];
 

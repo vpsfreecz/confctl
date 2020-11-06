@@ -11,20 +11,17 @@ let
     { name, config }:
     {
       inherit name config;
-      build.toplevel = buildConfig {
-        inherit name;
-        inherit (config) managed spin;
-      };
+      build.toplevel = buildConfig { inherit name config; };
     };
 
   buildConfig =
-    { name, managed, spin, ... }:
-    if !managed then
+    { name, config }:
+    if !config.managed then
       null
-    else if spin == "nixos" then
-      deployment.nixos { inherit name; }
-    else if spin == "vpsadminos" then
-      deployment.vpsadminos { inherit name; }
+    else if config.spin == "nixos" then
+      deployment.nixos { inherit name config; }
+    else if config.spin == "vpsadminos" then
+      deployment.vpsadminos { inherit name config; }
     else
       null;
 in rec {

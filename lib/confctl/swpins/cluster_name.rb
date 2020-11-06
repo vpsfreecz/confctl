@@ -1,0 +1,94 @@
+require 'fileutils'
+require 'json'
+
+module ConfCtl
+  class Swpins::ClusterName
+    # @return [Deployment]
+    attr_reader :deployment
+
+    # @return [String]
+    attr_reader :name
+
+    # @return [String]
+    attr_reader :path
+
+    # @return [Array<Swpins::Specs::Base>]
+    attr_reader :specs
+
+    # @return [Array<Swpins::Channel>]
+    attr_reader :channels
+
+    # @param cluster_dir [String]
+    # @param deployment [Deployment]
+    # @param channels [Swpins::ChannelList]
+    def initialize(cluster_dir, deployment, channels)
+      @deployment = deployment
+      @name = deployment.name
+      @cluster_dir = cluster_dir
+      @path = File.join(cluster_dir, "#{name.gsub(/\//, ':')}.json")
+      @channels = channels.select do |c|
+        deployment['swpins']['channels'].include?(c.name)
+      end
+      @nix_specs = deployment['swpins']['pins']
+    end
+
+    def parse
+      @specs = {}
+
+      # Add specs from channels
+      channels.each do |chan|
+        chan.specs.each do |name, chan_spec|
+          s = chan_spec.clone
+          s.channel = chan.name
+          specs[name] = s
+        end
+      end
+
+      # Add deployment-specific specs
+      if File.exist?(path)
+        @json_specs = JSON.parse(File.read(path))
+      else
+        @json_specs = {}
+      end
+
+      nix_specs.each do |name, nix_opts|
+        specs[name] = Swpins::Spec.for(nix_opts['type'].to_sym).new(
+          name,
+          nix_opts[nix_opts['type']],
+          json_specs[name],
+        )
+      end
+    end
+
+    def valid?
+      specs.values.all?(&:valid?)
+    end
+
+    def save
+      custom = {}
+      specs.each do |name, s|
+        custom[name] = s unless s.from_channel?
+      end
+
+      if custom.empty?
+        begin
+          File.unlink(path)
+        rescue Errno::ENOENT
+        end
+      else
+        tmp = "#{path}.new"
+
+        FileUtils.mkdir_p(cluster_dir)
+
+        File.open(tmp, 'w') do |f|
+          f.puts(JSON.pretty_generate(custom))
+        end
+
+        File.rename(tmp, path)
+      end
+    end
+
+    protected
+    attr_reader :cluster_dir, :nix_specs, :json_specs
+  end
+end

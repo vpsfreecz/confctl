@@ -1,26 +1,36 @@
 module ConfCtl::Cli
   module Swpins::Utils
-    def file_list(pattern)
-      ConfCtl::Swpins::FileList.new(Swpins::File::DIR, pattern: pattern)
+    def cluster_name_list(pattern)
+      channels = channel_list('*')
+      channels.each(&:parse)
+
+      ConfCtl::Swpins::ClusterNameList.new(
+        Swpins::Cluster::DIR,
+        channels,
+        pattern: pattern,
+      )
     end
 
-    def each_file(file_pattern)
-      file_list(file_pattern).each do |file|
-        file.parse
-        yield(file)
+    def each_cluster_name(cn_pattern)
+      cluster_name_list(cn_pattern).each do |cn|
+        cn.parse
+        yield(cn)
       end
     end
 
-    def each_file_spec(file_pattern, sw_pattern)
-      each_file(file_pattern) do |file|
-        file.specs.each do |name, spec|
-          yield(file, spec) if ConfCtl::Pattern.match?(sw_pattern, name)
+    def each_cluster_name_spec(cn_pattern, sw_pattern)
+      each_cluster_name(cn_pattern) do |cn|
+        cn.specs.each do |name, spec|
+          yield(cn, spec) if ConfCtl::Pattern.match?(sw_pattern, name)
         end
       end
     end
 
     def channel_list(pattern)
-      ConfCtl::Swpins::ChannelList.new(Swpins::Channel::DIR, Swpins::File::DIR, pattern: pattern)
+      ConfCtl::Swpins::ChannelList.new(
+        Swpins::Channel::DIR,
+        pattern: pattern,
+      )
     end
 
     def each_channel(chan_pattern)

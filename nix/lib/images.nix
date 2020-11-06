@@ -8,8 +8,6 @@
 , nixosModules ? [] }:
 with lib;
 let
-  swpins = import ./swpins.nix { name = swpinsName; inherit confDir pkgs lib; };
-
   deployments = confLib.getClusterDeployments config.cluster;
 
   deploymentAttrs = listToAttrs (map (d: nameValuePair d.config.host.fqdn d) deployments);
@@ -47,8 +45,8 @@ let
 
   vpsadminos = {modules ? [], ...}@args: vpsadminosCustom {
     inherit modules;
-    vpsadminos = args.vpsadminos or swpins.vpsadminos;
-    nixpkgs = args.nixpkgs or swpins.nixpkgs;
+    vpsadminos = args.vpsadminos or <vpsadminos>;
+    nixpkgs = args.nixpkgs or <nixpkgs>;
     vpsadmin = args.vpsadmin or null;
   };
 
@@ -56,7 +54,11 @@ let
 
   nodeImage = node:
     let
-      nodepins = import ./swpins.nix { name = node.name; inherit confDir pkgs lib; };
+      nodepins = import ./swpins/eval.nix {
+        name = node.name;
+        channels = node.config.swpins.channels;
+        inherit confDir pkgs lib;
+      };
       build = vpsadminosBuild {
         modules = [
           {
@@ -78,10 +80,10 @@ let
     };
 
   nixosBuild = {modules ? []}:
-    (import ("${swpins.nixpkgs}/nixos/lib/eval-config.nix") {
+    (import <nixpkgs/nixos/lib/eval-config.nix> {
       system = "x86_64-linux";
       modules = [
-        ("${swpins.nixpkgs}/nixos/modules/installer/netboot/netboot-minimal.nix")
+        <nixpkgs/nixos/modules/installer/netboot/netboot-minimal.nix>
         ({ config, pkgs, lib, ... }:
         {
           _module.args = {
@@ -110,7 +112,7 @@ in rec {
       build = vpsadminosBuild {
         modules = [{
           imports = [
-            "${swpins.vpsadminos}/os/configs/iso.nix"
+            <vpsadminos/os/configs/iso.nix>
           ];
 
           system.secretsDir = null;

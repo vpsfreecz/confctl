@@ -12,7 +12,7 @@ let
     name = d.name;
     value = {
       inherit (d) name;
-      inherit (d.config) managed spin host addresses netboot labels tags;
+      inherit (d.config) managed spin swpins host addresses netboot labels tags;
       inherit (d.config) container node osNode vzNode;
     };
   }) deployments;
@@ -25,16 +25,17 @@ let
   }) deployments);
 
   deploymentSwpins = d:
-    import ./lib/swpins.nix {
+    import ./lib/swpins/eval.nix {
       inherit (arg) confDir;
       name = d.name;
+      channels = d.config.swpins.channels;
       pkgs = nixpkgs.pkgs;
       lib = lib;
     };
 
   selectedSwpinsAttrs = builtins.listToAttrs (builtins.map (host: {
     name = host;
-    value = deploymentSwpins deploymentsAttrs.${host};
+    value = deploymentSwpins fullDeploymentsAttrs.${host};
   }) arg.deployments);
 
   selectedToplevels = builtins.listToAttrs (builtins.map (host: {
@@ -61,7 +62,9 @@ let
       cfg = "${toString arg.confDir}/configs/confctl.nix";
     in import <nixpkgs/nixos/lib/eval-config.nix> {
       modules = [
-        ./modules/confctl.nix
+        ./modules/confctl/cli.nix
+        ./modules/confctl/swpins.nix
+        "${toString arg.confDir}/configs/swpins.nix"
       ] ++ lib.optional (builtins.pathExists cfg) cfg;
     };
 
@@ -75,8 +78,11 @@ let
     # List of deployments in an attrset: host => config
     info = deploymentsAttrs;
 
+    # Nix configuration of swpins channels
+    listSwpinsChannels = evalConfctl.config.confctl.swpins.channels;
+
     # JSON file with swpins for selected deployments
-    swpins = pkgs.writeText "swpins.json" (builtins.toJSON selectedSwpinsAttrs);
+    evalSwpins = pkgs.writeText "swpins.json" (builtins.toJSON selectedSwpinsAttrs);
 
     # JSON file with system.build.toplevel for selected deployments, this must
     # be run with proper NIX_PATH with swpins

@@ -1,56 +1,60 @@
+require_relative 'base'
 require 'json'
 
 module ConfCtl
   class Swpins::Specs::Git < Swpins::Specs::Base
     handle :git
 
-    def version
-      spec_opts[:rev] && spec_opts[:rev][0..8]
+    def check_opts
+      nix_opts['url'] === json_opts['nix_options']['url'] \
+        && nix_opts['fetchSubmodules'] === json_opts['nix_options']['fetchSubmodules']
     end
 
-    # @param override_opts [Hash]
-    # @option override_opts [String] :ref
-    def prefetch(override_opts)
-      if /^https:\/\/github\.com\// =~ spec_opts[:url] && !spec_opts[:fetch_submodules]
-        gopts[:fetcher] = 'zip'
-        prefetch_github(override_opts)
+    def version
+      state['rev'][0..7]
+    end
+
+    def prefetch_set(args)
+      ref = args[0]
+
+      if /^https:\/\/github\.com\// =~ nix_opts['url'] && !nix_opts['fetchSubmodules']
+        set_fetcher('zip', prefetch_github(ref))
       else
-        gopts[:fetcher] = 'git'
-        prefetch_git(override_opts)
+        set_fetcher('git', prefetch_git(ref))
       end
     end
 
+    def prefetch_update
+      prefetch_set([nix_opts['update']])
+    end
+
     protected
-    def prefetch_git(override_opts)
-      ref = override_opts[:ref]
-      json = `nix-prefetch-git --quiet #{spec_opts[:url]} #{ref}`
+    def prefetch_git(ref)
+      json = `nix-prefetch-git --quiet #{nix_opts['url']} #{ref}`
 
       if $?.exitstatus != 0
         fail "nix-prefetch-git failed with status #{$?.exitstatus}"
       end
 
-      @fetcher_opts = JSON.parse(json.strip, symbolize_names: true)
-      spec_opts[:rev] = fetcher_opts[:rev]
-      self.channel = nil
+      ret = JSON.parse(json.strip)
+      set_state({'rev' => ret['rev']})
+      ret
     end
 
-    def prefetch_github(override_opts)
-      mirror = GitRepoMirror.new(spec_opts[:url])
+    def prefetch_github(ref)
+      mirror = GitRepoMirror.new(nix_opts['url'])
       mirror.setup
 
-      ref = mirror.revision_parse(override_opts[:ref])
-      url = File.join(spec_opts[:url], 'archive', "#{ref}.tar.gz")
+      rev = mirror.revision_parse(ref)
+      url = File.join(nix_opts['url'], 'archive', "#{rev}.tar.gz")
       hash = `nix-prefetch-url --unpack "#{url}" 2> /dev/null`
 
       if $?.exitstatus != 0
         fail "nix-prefetch-url failed with status #{$?.exitstatus}"
       end
 
-      @fetcher_opts = {
-        url: url,
-        sha256: hash.strip,
-      }
-      spec_opts[:rev] = ref
+      set_state({'rev' => rev})
+      {'url' => url, 'sha256' => hash.strip}
     end
   end
 end

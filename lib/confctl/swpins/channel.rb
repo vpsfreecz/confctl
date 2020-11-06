@@ -1,3 +1,4 @@
+require 'fileutils'
 require 'json'
 
 module ConfCtl
@@ -8,79 +9,46 @@ module ConfCtl
     # @return [String]
     attr_reader :name
 
-    # @return [Array<Swpins::Specs::Base>]
+    # @return [Hash<String, Swpins::Specs::Base>]
     attr_reader :specs
-
-    # @return [String]
-    attr_reader :file_dir
 
     # @param channel_dir [String]
     # @param name [String]
-    # @param file_dir [String]
-    # @return [Swpins::Channel]
-    def self.by_name(channel_dir, name, file_dir)
-      new(File.join(channel_dir, "#{name}.json"), file_dir)
-    end
-
-    # @param path [String]
-    # @param file_dir [String]
-    def initialize(path, file_dir)
-      @path = path
-      @name = File.basename(path, '.json')
-      @file_dir = file_dir
+    # @param nix_specs [Hash]
+    def initialize(channel_dir, name, nix_specs)
+      @channel_dir = channel_dir
+      @name = name
+      @path = File.join(channel_dir, "#{name}.json")
+      @nix_specs = nix_specs
     end
 
     def parse
-      @specs = Hash[JSON.parse(File.read(path), symbolize_names: true).map do |name, spec|
+      if File.exist?(path)
+        @json_specs = JSON.parse(File.read(path))
+      else
+        @json_specs = {}
+      end
+
+      @specs = Hash[nix_specs.map do |name, nix_opts|
         [
-          name.to_s,
-          Swpins::Spec.for(spec[:type].to_sym).new(
+          name,
+          Swpins::Spec.for(nix_opts['type'].to_sym).new(
             name,
-            spec,
-            spec[:spec_options],
-            spec[:fetcher_options],
+            nix_opts[nix_opts['type']],
+            json_specs[name],
           ),
         ]
       end]
     end
 
-    # @param spec [Swpins::Specs::Base]
-    def add_spec(spec)
-      specs[spec.name] = spec
-    end
-
-    # @param pattern [String]
-    # @return [Array<Swpins::Specs::Base>] deleted specs
-    def delete_specs(pattern)
-      ret = []
-
-      specs.delete_if do |name, spec|
-        if Pattern.match?(pattern, name)
-          ret << spec
-          true
-        else
-          false
-        end
-      end
-
-      ret
-    end
-
-    # @return [Hash<Swpins::File, Array<Swpins::Specs::Base>>]
-    def file_specs
-      ret = {}
-
-      Swpins::FileList.new(file_dir).each do |file|
-        file.parse
-        specs = file.specs.detect { |s| s.channel == name }
-        ret[file] = specs if specs.any?
-      end
-
-      ret
+    def valid?
+      specs.values.all?(&:valid?)
     end
 
     def save
       tmp = "#{path}.new"
+
+      FileUtils.mkdir_p(channel_dir)
 
       File.open(tmp, 'w') do |f|
         f.puts(JSON.pretty_generate(specs))
@@ -89,22 +57,7 @@ module ConfCtl
       File.rename(tmp, path)
     end
 
-    def create
-      @specs = {}
-      save
-    end
-
-    # @param new_name [String]
-    def rename(new_name)
-      orig_path = path
-      @name = new_name
-      @path = File.join(File.dirname(path), "#{new_name}.json")
-      save
-      File.unlink(orig_path)
-    end
-
-    def delete
-      File.unlink(path)
-    end
+    protected
+    attr_reader :channel_dir, :nix_specs, :json_specs
   end
 end

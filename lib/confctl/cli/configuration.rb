@@ -51,6 +51,40 @@ END
         )
       end
 
+      mkfile('configs/swpins.nix') do |f|
+        f.puts(<<END
+{ config, ... }:
+let
+  nixpkgsBranch = branch: {
+    type = "git";
+
+    git = {
+      url = "https://github.com/NixOS/nixpkgs";
+      update = "refs/heads/${branch}";
+    };
+  };
+
+  vpsadminosBranch = branch: {
+    type = "git-rev";
+
+    git-rev = {
+      url = "https://github.com/vpsfreecz/vpsadminos";
+      update = "refs/heads/${branch}";
+    };
+  };
+in {
+  confctl.swpins.channels = {
+    nixos-unstable = { nixpkgs = nixpkgsBranch "nixos-unstable"; };
+
+    # nixos-stable = { nixpkgs = nixpkgsBranch "nixos-20.09"; };
+
+    # vpsadminos-master = { vpsadminos = vpsadminosBranch "master"; };
+  };
+}
+END
+        )
+      end
+
       mkdir('data')
 
       mkfile('data/default.nix') do |f|
@@ -120,7 +154,6 @@ END
 
       mkdir('swpins')
       mkdir('swpins/channels')
-      mkdir('swpins/files')
     end
 
     def add
@@ -129,7 +162,6 @@ END
       name = args[0]
       dir = File.join('cluster', name)
       depth = name.count('/')
-      escaped_name = name.gsub(/\//, ':')
 
       mkdir_p(dir)
 
@@ -139,6 +171,7 @@ END
 {
   cluster."#{name}" = {
     spin = "nixos";
+    swpins.channels = [ "nixos-stable" ];
     host = { name = "machine"; domain = "example.com"; };
   };
 }
@@ -162,8 +195,6 @@ END
         )
       end
 
-      mkfile("swpins/files/#{escaped_name}.json") { |f| f.puts('{}') }
-
       rediscover
     end
 
@@ -186,8 +217,8 @@ END
       mkdir_p(dst_dir) unless Dir.exist?(dst_dir)
       mv(src_path, dst_path)
 
-      src_swpins = File.join('swpins/files', "#{src.gsub(/\//, ':')}.json")
-      dst_swpins = File.join('swpins/files', "#{dst.gsub(/\//, ':')}.json")
+      src_swpins = File.join('swpins/cluster', "#{src.gsub(/\//, ':')}.json")
+      dst_swpins = File.join('swpins/cluster', "#{dst.gsub(/\//, ':')}.json")
       mv(src_swpins, dst_swpins) if File.exist?(src_swpins)
 
       rediscover

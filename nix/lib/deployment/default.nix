@@ -1,6 +1,11 @@
 { confDir, pkgs, lib, findConfig }:
 let
-  swpinsFor = name: import ../swpins.nix { inherit confDir name pkgs lib; };
+  swpinsFor =
+    { name, config }:
+    import ../swpins/eval.nix {
+      inherit confDir name pkgs lib;
+      channels = config.swpins.channels;
+    };
 
   makeModuleArgs =
     { config, swpins, spin, name }@args: {
@@ -27,9 +32,9 @@ let
     ++ (import "${toString confDir}/cluster/module-list.nix")
     ++ extraImports;
 in rec {
-  nixos = { name }:
+  nixos = { name, config }:
     let
-      swpins = swpinsFor name;
+      swpins = swpinsFor { inherit name config; };
     in
       { config, pkgs, ... }@args:
       {
@@ -44,9 +49,9 @@ in rec {
         ];
       };
 
-  vpsadminos = { name }:
+  vpsadminos = { name, config }:
     let
-      swpins = swpinsFor name;
+      swpins = swpinsFor { inherit name config; };
     in
       { config, pkgs, ... }@args:
       let

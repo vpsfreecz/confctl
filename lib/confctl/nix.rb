@@ -35,13 +35,20 @@ module ConfCtl
       })
     end
 
+    def list_swpins_channels
+      nix_instantiate({
+        confDir: conf_dir,
+        build: :listSwpinsChannels,
+      })
+    end
+
     # Evaluate swpins for host
     # @param host [String]
     # @return [Hash]
     def eval_swpins(host)
       with_argument({
         confDir: conf_dir,
-        build: :swpins,
+        build: :evalSwpins,
         deployments: [host],
       }) do |arg|
         out_link = File.join(cache_dir, 'gcroots', "#{escape_name(host)}.swpins")
@@ -170,7 +177,7 @@ module ConfCtl
           fail "nix-instantiate failed with exit status #{$?.exitstatus}"
         end
 
-        JSON.parse(json)
+        demodulify(JSON.parse(json))
       end
     end
 
@@ -179,6 +186,15 @@ module ConfCtl
       paths << "confctl=#{ConfCtl.root}"
       paths.concat(swpins.map { |k, v| "#{k}=#{v}" })
       paths.join(':')
+    end
+
+    def demodulify(value)
+      if value.is_a?(Array)
+        value.each { |item| demodulify(item) }
+      elsif value.is_a?(Hash)
+        value.delete('_module')
+        value.each { |k, v| demodulify(v) }
+      end
     end
 
     def add_gcroot(name, path)

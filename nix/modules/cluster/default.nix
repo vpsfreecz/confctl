@@ -50,6 +50,26 @@ let
           description = "OS type";
         };
 
+        swpins = {
+          channels = mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = ''
+              List of channels from <option>confctl.swpins.channels</option>
+              to use on this deployment
+            '';
+          };
+
+          pins = mkOption {
+            type = types.attrsOf (types.submodule swpinOptions.specModule);
+            default = {};
+            description = ''
+              List of swpins for this deployment, which can supplement or
+              override swpins from configured channels
+            '';
+          };
+        };
+
         addresses = mkOption {
           type = types.nullOr (types.submodule addresses);
           default = null;
@@ -172,6 +192,8 @@ let
         };
       };
     };
+
+  swpinOptions = import ../../lib/swpins/options.nix { inherit lib; };
 
   service =
     { config, ... }:
