@@ -25,7 +25,10 @@ let
       };
 
       networking.hostName =
-        lib.mkIf (deploymentInfo.host != null) (lib.mkDefault deploymentInfo.host.fqdn);
+        lib.mkIf (deploymentInfo.host != null && deploymentInfo.host.name != null) (lib.mkDefault deploymentInfo.host.name);
+
+      networking.domain =
+        lib.mkIf (deploymentInfo.host != null) (lib.mkDefault deploymentInfo.host.fullDomain);
     })
   ] ++ (import ../../modules/module-list.nix).${spin}
     ++ (import "${toString confDir}/modules/module-list.nix").${spin}

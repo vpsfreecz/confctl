@@ -302,6 +302,22 @@ let
           '';
         };
 
+        fullDomain = mkOption {
+          type = types.nullOr types.str;
+          default = null;
+          description = ''
+            Domain including location, i.e. FQDN without host name
+          '';
+          apply = v:
+            if isNull v && !isNull config.domain then
+              concatStringsSep "." (
+                (optional (!isNull config.location) config.location)
+                ++ [ config.domain ]
+              )
+            else
+              v;
+        };
+
         fqdn = mkOption {
           type = types.nullOr types.str;
           default = null;
