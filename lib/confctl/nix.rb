@@ -130,9 +130,7 @@ module ConfCtl
     # @param toplevel [String]
     # @return [Boolean]
     def copy(dep, toplevel)
-      t = dep.target_host
-
-      if t == 'localhost'
+      if dep.localhost?
         true
       else
         system('nix', 'copy', '--to', "ssh://root@#{dep.target_host}", toplevel)
@@ -144,10 +142,13 @@ module ConfCtl
     # @param action [String]
     # @return [Boolean]
     def activate(dep, toplevel, action)
-      system(
-        'ssh', "root@#{dep.target_host}",
-        File.join(toplevel, 'bin/switch-to-configuration'), action
-      )
+      args = [File.join(toplevel, 'bin/switch-to-configuration'), action]
+
+      if dep.localhost? && Process.uid == 0
+        system(*args)
+      else
+        system('ssh', "root@#{dep.target_host}", *args)
+      end
     end
 
     protected

@@ -15,6 +15,10 @@ module ConfCtl
       (opts['host'] && opts['host']['target']) || name
     end
 
+    def localhost?
+      target_host == 'localhost'
+    end
+
     def nix_paths
       Hash[opts['nix']['nixPath'].map do |v|
         eq = v.index('=')
