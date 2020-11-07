@@ -74,3 +74,11 @@ confctl build my-machine
 ```
 confctl deploy my-machine
 ```
+
+# Example configuration
+Example configuration, which can be used as a starting point, can be found in
+directory [example/](example/).
+
+See also
+[vpsfree-cz-configuration](https://github.com/vpsfreecz/vpsfree-cz-configuration),
+which uses confctl to manage its cluster.
