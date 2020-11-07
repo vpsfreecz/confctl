@@ -56,9 +56,9 @@ END
 { config, ... }:
 let
   nixpkgsBranch = branch: {
-    type = "git";
+    type = "git-rev";
 
-    git = {
+    git-rev = {
       url = "https://github.com/NixOS/nixpkgs";
       update.ref = "refs/heads/${branch}";
     };
