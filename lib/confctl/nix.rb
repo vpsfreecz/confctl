@@ -130,7 +130,13 @@ module ConfCtl
     # @param toplevel [String]
     # @return [Boolean]
     def copy(dep, toplevel)
-      system('nix', 'copy', '--to', "ssh://root@#{dep.target_host}", toplevel)
+      t = dep.target_host
+
+      if t == 'localhost'
+        true
+      else
+        system('nix', 'copy', '--to', "ssh://root@#{dep.target_host}", toplevel)
+      end
     end
 
     # @param dep [Deployments::Deployment]
