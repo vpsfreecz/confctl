@@ -14,16 +14,10 @@
       "options": {
         "rev": "9d8e87fc38c8d287cfb77c5fe93667771f48d1f8",
         "wrapped_fetcher": {
-          "type": "git-rev",
+          "type": "zip",
           "options": {
-            "rev": "9d8e87fc38c8d287cfb77c5fe93667771f48d1f8",
-            "wrapped_fetcher": {
-              "type": "zip",
-              "options": {
-                "url": "https://github.com/vpsfreecz/vpsadminos/archive/9d8e87fc38c8d287cfb77c5fe93667771f48d1f8.tar.gz",
-                "sha256": "0c85spfv2mwy2kng94hb6d2v50a05ni3w76lmvmp8dhgknb8yjqg"
-              }
-            }
+            "url": "https://github.com/vpsfreecz/vpsadminos/archive/9d8e87fc38c8d287cfb77c5fe93667771f48d1f8.tar.gz",
+            "sha256": "0c85spfv2mwy2kng94hb6d2v50a05ni3w76lmvmp8dhgknb8yjqg"
           }
         }
       }

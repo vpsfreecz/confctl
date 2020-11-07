@@ -9,11 +9,6 @@ module ConfCtl
       wrap_fetcher
     end
 
-    def prefetch_update
-      super
-      wrap_fetcher
-    end
-
     protected
     def wrap_fetcher
       set_fetcher('git-rev', {
