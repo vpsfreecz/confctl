@@ -60,6 +60,15 @@ rec {
               <literal>ref</literal> before building deployments.
             '';
           };
+
+          interval = mkOption {
+            type = types.int;
+            default = 60*60;
+            description = ''
+              Number of seconds from the last update to trigger the next
+              auto-update, if auto-update is enabled.
+            '';
+          };
         };
       };
     };

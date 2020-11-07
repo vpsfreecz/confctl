@@ -18,7 +18,7 @@ module ConfCtl
     def auto_update?
       super && (
         state['date'].nil? \
-        || (Time.iso8601(state['date']) + 60*60 < Time.now)
+        || (Time.iso8601(state['date']) + nix_opts['update']['interval'] < Time.now)
       )
     end
 
