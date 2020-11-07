@@ -124,7 +124,7 @@ module ConfCtl::Cli
 
       deps.each do |host, d|
         puts "Evaluating swpins for #{host}..."
-        host_swpins[host] = nix.eval_swpins(host)
+        host_swpins[host] = nix.eval_swpins(host).update(d.nix_paths)
       end
 
       grps = swpin_build_groups(host_swpins)

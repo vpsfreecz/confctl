@@ -15,6 +15,14 @@ module ConfCtl
       (opts['host'] && opts['host']['target']) || name
     end
 
+    def nix_paths
+      Hash[opts['nix']['nixPath'].map do |v|
+        eq = v.index('=')
+        fail "'#{v}' is not a valid nix path entry " if eq.nil?
+        [v[0..eq-1], v[eq+1..-1]]
+      end]
+    end
+
     def [](key)
       if key.index('.')
         get(opts, key.split('.'))

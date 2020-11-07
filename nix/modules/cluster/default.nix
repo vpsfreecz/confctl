@@ -126,6 +126,17 @@ let
           '';
         };
 
+        nix = {
+          nixPath = mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = ''
+              List of extra paths added to environment variable
+              <literal>NIX_PATH</literal> for <literal>nix-build</literal>
+            '';
+          };
+        };
+
         container = mkOption {
           type = types.nullOr (types.submodule container);
           default = null;
