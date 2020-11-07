@@ -191,6 +191,7 @@ module ConfCtl
       paths = []
       paths << "confctl=#{ConfCtl.root}"
       paths.concat(swpins.map { |k, v| "#{k}=#{v}" })
+      paths.concat(Settings.instance.nix_paths)
       paths.join(':')
     end
 

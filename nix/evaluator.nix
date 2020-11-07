@@ -63,6 +63,7 @@ let
     in import <nixpkgs/nixos/lib/eval-config.nix> {
       modules = [
         ./modules/confctl/cli.nix
+        ./modules/confctl/nix.nix
         ./modules/confctl/swpins.nix
         "${toString arg.confDir}/configs/swpins.nix"
       ] ++ lib.optional (builtins.pathExists cfg) cfg;

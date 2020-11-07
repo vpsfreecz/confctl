@@ -12,5 +12,9 @@ module ConfCtl
     def list_columns
       @settings['list']['columns']
     end
+
+    def nix_paths
+      @settings['nix']['nixPath']
+    end
   end
 end
