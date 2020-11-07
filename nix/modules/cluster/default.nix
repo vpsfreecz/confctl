@@ -336,7 +336,7 @@ let
         };
 
         target = mkOption {
-          type = types.str;
+          type = types.nullOr types.str;
           default = config.fqdn;
           description = ''
             Address/host to which the configuration is deployed to
