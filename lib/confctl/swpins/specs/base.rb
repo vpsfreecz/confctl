@@ -49,7 +49,11 @@ module ConfCtl
     end
 
     def can_update?
-      nix_opts['update'] ? true : false
+      nix_opts['update']['ref'] ? true : false
+    end
+
+    def auto_update?
+      can_update? && nix_opts['update']['auto']
     end
 
     def from_channel?

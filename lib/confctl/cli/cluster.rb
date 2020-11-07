@@ -116,6 +116,8 @@ module ConfCtl::Cli
       nix = ConfCtl::Nix.new(show_trace: opts['show-trace'])
       host_swpins = {}
 
+      autoupdate_swpins(deps)
+
       unless check_swpins(deps)
         fail 'one or more swpins need to be updated'
       end
@@ -140,6 +142,54 @@ module ConfCtl::Cli
       end
 
       host_toplevels
+    end
+
+    def autoupdate_swpins(deps)
+      puts "Running swpins auto updates..."
+      channels = ConfCtl::Swpins::ChannelList.new
+      channels.each(&:parse)
+      channels_update = []
+
+      cluster_names = ConfCtl::Swpins::ClusterNameList.new(
+        channels: channels,
+        deployments: deps,
+      )
+
+      cluster_names.each do |cn|
+        cn.parse
+
+        cn.channels.each do |c|
+          channels_update << c unless channels_update.include?(c)
+        end
+      end
+
+      channels_update.each do |c|
+        updated = false
+
+        c.specs.each do |name, s|
+          if s.auto_update?
+            puts " updating #{c.name}.#{name}"
+            s.prefetch_update
+            updated = true
+          end
+        end
+
+        c.save if updated
+      end
+
+      cluster_names.each do |cn|
+        updated = false
+
+        cn.specs.each do |name, s|
+          if !s.from_channel? && s.auto_update?
+            puts " updating #{c.name}.#{name}"
+            s.prefetch_update
+            updated = true
+          end
+        end
+
+        cn.save if updated
+      end
     end
 
     def check_swpins(deps)

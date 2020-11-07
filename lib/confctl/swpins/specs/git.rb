@@ -1,5 +1,6 @@
 require_relative 'base'
 require 'json'
+require 'time'
 
 module ConfCtl
   class Swpins::Specs::Git < Swpins::Specs::Base
@@ -14,6 +15,13 @@ module ConfCtl
       state['rev'][0..7]
     end
 
+    def auto_update?
+      super && (
+        state['date'].nil? \
+        || (Time.iso8601(state['date']) + 60*60 < Time.now)
+      )
+    end
+
     def prefetch_set(args)
       ref = args[0]
 
@@ -25,7 +33,7 @@ module ConfCtl
     end
 
     def prefetch_update
-      prefetch_set([nix_opts['update']])
+      prefetch_set([nix_opts['update']['ref']])
     end
 
     protected
@@ -53,7 +61,10 @@ module ConfCtl
         fail "nix-prefetch-url failed with status #{$?.exitstatus}"
       end
 
-      set_state({'rev' => rev})
+      set_state({
+        'rev' => rev,
+        'date' => Time.now.iso8601,
+      })
       {'url' => url, 'sha256' => hash.strip}
     end
   end

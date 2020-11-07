@@ -42,13 +42,24 @@ rec {
           '';
         };
 
-        update = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = ''
-            Implicit git reference to use for automatic updates
-          '';
-          example = "refs/heads/master";
+        update = {
+          ref = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = ''
+              Implicit git reference to use for both manual and automatic updates
+            '';
+            example = "refs/heads/master";
+          };
+
+          auto = mkOption {
+            type = types.bool;
+            default = false;
+            description = ''
+              When enabled, the pin is automatically updated to
+              <literal>ref</literal> before building deployments.
+            '';
+          };
         };
       };
     };
