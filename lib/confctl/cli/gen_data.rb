@@ -17,23 +17,25 @@ module ConfCtl::Cli
       data = {}
 
       deployments.each do |host, d|
-        next if d.type != 'container'
+        next if d.spin != 'nixos' || !d['container']
 
         ct = api.vps.show(
-          d.config['container']['id'],
+          d['container.id'],
           meta: {includes: 'node__location__environment'},
         )
 
-        loc = d.location || 'global'
+        ct_fqdn = [
+          d['host.name'],
+          d['host.location'],
+          d['host.domain'],
+        ].compact.join('.')
 
-        data[d.domain] ||= {}
-        data[d.domain][loc] ||= {}
-        data[d.domain][loc][d.name] = {
+        data[ct_fqdn] = {
           node: {
             id: ct.node.id,
-            name: rdomain(ct.node.name),
-            location: rdomain(ct.node.location.domain),
-            domain: rdomain(ct.node.location.environment.domain),
+            name: ct.node.name,
+            location: ct.node.location.domain,
+            domain: ct.node.location.environment.domain,
             fqdn: "#{ct.node.domain_name}.#{ct.node.location.environment.domain}",
           },
         }
@@ -87,10 +89,6 @@ module ConfCtl::Cli
 
       File.open(tmp, 'w') { |f| yield(f) }
       File.rename(tmp, abs)
-    end
-
-    def rdomain(domain)
-      domain ? domain.split('.').reverse.join('.') : nil
     end
   end
 end
