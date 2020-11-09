@@ -17,7 +17,7 @@ module ConfCtl::Cli
       data = {}
 
       deployments.each do |host, d|
-        next if d.spin != 'nixos' || !d['container']
+        next if d['container'].nil?
 
         ct = api.vps.show(
           d['container.id'],
