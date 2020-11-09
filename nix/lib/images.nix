@@ -4,7 +4,6 @@
 , confDir
 , confLib
 , confData
-, swpinsName ? "images"
 , nixosModules ? [] }:
 with lib;
 let
@@ -88,6 +87,9 @@ let
         {
           _module.args = {
             inherit confLib confData;
+            swpins = {
+              nixpkgs = <nixpkgs>;
+            };
           };
         })
       ] ++ modules;
