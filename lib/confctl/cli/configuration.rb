@@ -163,6 +163,10 @@ END
       dir = File.join('cluster', name)
       depth = name.count('/')
 
+      if Dir.exist?(dir)
+        fail "#{dir} already exists"
+      end
+
       mkdir_p(dir)
 
       mkfile(File.join(dir, 'module.nix')) do |f|
