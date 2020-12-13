@@ -151,6 +151,23 @@ module ConfCtl
       end
     end
 
+    # @param dep [Deployments::Deployment]
+    # @param toplevel [String]
+    # @return [Boolean]
+    def set_profile(dep, toplevel)
+      args = [
+        'nix-env',
+        '-p', '/nix/var/nix/profiles/system',
+        '--set', toplevel,
+      ]
+
+      if dep.localhost? && Process.uid == 0
+        system(*args)
+      else
+        system('ssh', "root@#{dep.target_host}", *args)
+      end
+    end
+
     protected
     attr_reader :conf_dir, :show_trace
 

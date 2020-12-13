@@ -67,6 +67,10 @@ module ConfCtl::Cli
         unless nix.activate(dep, toplevel, action)
           fail "Error while activating configuration on #{host}"
         end
+
+        unless nix.set_profile(dep, toplevel)
+          fail "Error while setting profile on #{host}"
+        end
       end
     end
 
