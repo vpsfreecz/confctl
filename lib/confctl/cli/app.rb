@@ -133,6 +133,9 @@ module ConfCtl::Cli
         c.desc 'Ask for confirmation before activation'
         c.switch %w(i interactive)
 
+        c.desc 'Try to dry-activate before the real switch'
+        c.switch 'dry-activate-first'
+
         c.action &Command.run(Cluster, :deploy)
       end
 

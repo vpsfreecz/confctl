@@ -118,6 +118,11 @@ information.
     `-i`, `--interactive`
       Deploy hosts one by one while asking for confirmation for activation.
 
+    `--dry-activate-first`
+      After the new system is copied to the target host, try to switch the
+      configuration using *dry-activate* action to see what would happen before
+      the real switch.
+
 `confctl gen-data vpsadmin all`
   Generate all required data files from vpsAdmin API.
 

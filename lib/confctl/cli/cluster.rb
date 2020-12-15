@@ -74,6 +74,15 @@ module ConfCtl::Cli
         end
 
         dep = deps[host]
+
+        if opts['dry-activate-first']
+          puts "Trying to activate configuration on #{host} (#{dep.target_host})"
+
+          unless nix.activate(dep, toplevel, 'dry-activate')
+            fail "Error while activating configuration on #{host}"
+          end
+        end
+
         puts "Activating configuration on #{host} (#{dep.target_host}): #{action}"
 
         if opts[:interactive] && !ask_confirmation(always: true)
