@@ -36,7 +36,6 @@ module ConfCtl::Cli
     def deploy
       deps = select_deployments(args[0]).managed
       action = args[1] || 'switch'
-      skipped_copy = []
 
       unless %w(boot switch test dry-activate).include?(action)
         raise GLI::BadCommandLine, "invalid action '#{action}'"
@@ -51,6 +50,17 @@ module ConfCtl::Cli
 
       host_toplevels = do_build(deps)
       nix = ConfCtl::Nix.new(show_trace: opts['show-trace'])
+
+      if opts['one-by-one']
+        deploy_one_by_one(deps, host_toplevels, nix, action)
+      else
+        deploy_in_bulk(deps, host_toplevels, nix, action)
+      end
+    end
+
+    protected
+    def deploy_in_bulk(deps, host_toplevels, nix, action)
+      skipped_copy = []
 
       host_toplevels.each do |host, toplevel|
         dep = deps[host]
@@ -102,7 +112,47 @@ module ConfCtl::Cli
       end
     end
 
-    protected
+    def deploy_one_by_one(deps, host_toplevels, nix, action)
+      host_toplevels.each do |host, toplevel|
+        dep = deps[host]
+        puts "Copying configuration to #{host} (#{dep.target_host})"
+
+        if opts[:interactive] && !ask_confirmation(always: true)
+          puts "Skipping #{host}"
+          next
+        end
+
+        unless nix.copy(dep, toplevel)
+          fail "Error while copying system to #{host}"
+        end
+
+        if opts['dry-activate-first']
+          puts "Trying to activate configuration on #{host} (#{dep.target_host})"
+
+          unless nix.activate(dep, toplevel, 'dry-activate')
+            fail "Error while activating configuration on #{host}"
+          end
+        end
+
+        puts "Activating configuration on #{host} (#{dep.target_host}): #{action}"
+
+        if opts[:interactive] && !ask_confirmation(always: true)
+          puts "Skipping #{host}"
+          next
+        end
+
+        unless nix.activate(dep, toplevel, action)
+          fail "Error while activating configuration on #{host}"
+        end
+
+        unless nix.set_profile(dep, toplevel)
+          fail "Error while setting profile on #{host}"
+        end
+
+        puts if opts[:interactive]
+      end
+    end
+
     def select_deployments(pattern)
       deps = ConfCtl::Deployments.new(show_trace: opts['show-trace'])
 

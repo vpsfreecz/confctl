@@ -136,6 +136,9 @@ module ConfCtl::Cli
         c.desc 'Try to dry-activate before the real switch'
         c.switch 'dry-activate-first'
 
+        c.desc 'Copy and deploy machines one by one'
+        c.switch 'one-by-one'
+
         c.action &Command.run(Cluster, :deploy)
       end
 

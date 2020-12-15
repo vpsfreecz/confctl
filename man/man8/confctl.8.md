@@ -123,6 +123,10 @@ information.
       configuration using *dry-activate* action to see what would happen before
       the real switch.
 
+    `--one-by-one`
+      Instead of copying the systems to all hosts in bulk before actiovations,
+      copy and deploy hosts one by one.
+
 `confctl gen-data vpsadmin all`
   Generate all required data files from vpsAdmin API.
 
