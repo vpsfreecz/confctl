@@ -4,8 +4,6 @@ module ConfCtl::Cli
   class Command
     def self.run(klass, method)
       Proc.new do |global_opts, opts, args|
-        ConfCtl::Settings.instance
-
         cmd = klass.new(global_opts, opts, args)
         cmd.method(method).call
       end
