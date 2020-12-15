@@ -12,11 +12,13 @@ module ConfCtl
     end
 
     def setup
-      if Dir.exist?(mirror_path)
-        git_repo('fetch')
-      else
+      begin
+        File.stat(mirror_path)
+      rescue Errno::ENOENT
         FileUtils.mkdir_p(mirror_path)
         git("clone --mirror \"#{url}\" \"#{mirror_path}\"")
+      else
+        git_repo('fetch')
       end
     end
 
