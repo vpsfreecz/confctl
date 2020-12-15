@@ -36,6 +36,7 @@ module ConfCtl::Cli
     def deploy
       deps = select_deployments(args[0]).managed
       action = args[1] || 'switch'
+      skipped_copy = []
 
       unless %w(boot switch test dry-activate).include?(action)
         raise GLI::BadCommandLine, "invalid action '#{action}'"
@@ -55,14 +56,30 @@ module ConfCtl::Cli
         dep = deps[host]
         puts "Copying configuration to #{host} (#{dep.target_host})"
 
+        if opts[:interactive] && !ask_confirmation(always: true)
+          puts "Skipping #{host}"
+          skipped_copy << host
+          next
+        end
+
         unless nix.copy(dep, toplevel)
           fail "Error while copying system to #{host}"
         end
       end
 
       host_toplevels.each do |host, toplevel|
+        if skipped_copy.include?(host)
+          puts "Copy to #{host} was skipped, skipping activation as well"
+          next
+        end
+
         dep = deps[host]
-        puts "Activating configuration on #{host} (#{dep.target_host})"
+        puts "Activating configuration on #{host} (#{dep.target_host}): #{action}"
+
+        if opts[:interactive] && !ask_confirmation(always: true)
+          puts "Skipping #{host}"
+          next
+        end
 
         unless nix.activate(dep, toplevel, action)
           fail "Error while activating configuration on #{host}"
@@ -71,6 +88,8 @@ module ConfCtl::Cli
         unless nix.set_profile(dep, toplevel)
           fail "Error while setting profile on #{host}"
         end
+
+        puts if opts[:interactive]
       end
     end
 
@@ -88,17 +107,17 @@ module ConfCtl::Cli
       end
     end
 
-    def ask_confirmation
-      return true if opts[:yes]
+    def ask_confirmation(always: false)
+      return true if !always && opts[:yes]
 
-      yield
+      yield if block_given?
       STDOUT.write("\nContinue? [y/N]: ")
       STDOUT.flush
       STDIN.readline.strip.downcase == 'y'
     end
 
-    def ask_confirmation!(&block)
-      fail 'Aborted' unless ask_confirmation(&block)
+    def ask_confirmation!(**kwargs, &block)
+      fail 'Aborted' unless ask_confirmation(**kwargs, &block)
     end
 
     def list_deployments(deps)

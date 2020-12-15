@@ -115,6 +115,9 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
+    `-i`, `--interactive`
+      Deploy hosts one by one while asking for confirmation for activation.
+
 `confctl gen-data vpsadmin all`
   Generate all required data files from vpsAdmin API.
 

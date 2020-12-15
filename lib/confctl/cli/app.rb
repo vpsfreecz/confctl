@@ -130,6 +130,9 @@ module ConfCtl::Cli
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w(y yes)
 
+        c.desc 'Ask for confirmation before activation'
+        c.switch %w(i interactive)
+
         c.action &Command.run(Cluster, :deploy)
       end
 
