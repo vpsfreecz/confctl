@@ -2,9 +2,7 @@
 {
   imports = [
     ../../environments/base.nix
-    <nixpkgs/nixos/modules/virtualisation/container-config.nix>
-    <vpsadminos/os/lib/nixos-container/build.nix>
-    <vpsadminos/os/lib/nixos-container/networking.nix>
+    <vpsadminos/os/lib/nixos-container/vpsadminos.nix>
   ];
 
   networking.hostName = "vpsadminos-container";
