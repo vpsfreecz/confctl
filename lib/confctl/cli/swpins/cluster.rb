@@ -27,7 +27,7 @@ module ConfCtl::Cli
 
     def set
       require_args!('cluster-name', 'sw', 'version...')
-      files = []
+      cluster_names = []
 
       each_cluster_name_spec(args[0], args[1]) do |cluster_name, spec|
         if spec.from_channel?
@@ -35,15 +35,15 @@ module ConfCtl::Cli
         else
           puts "Configuring #{spec.name} in #{cluster_name.name}"
           spec.prefetch_set(args[2..-1])
-          files << file unless files.include?(file)
+          cluster_names << cluster_name unless cluster_names.include?(cluster_name)
         end
       end
 
-      files.each(&:save)
+      cluster_names.each(&:save)
     end
 
     def update
-      files = []
+      cluster_names = []
 
       each_cluster_name_spec(args[0] || '*', args[1] || '*') do |cluster_name, spec|
         if spec.from_channel?
@@ -51,26 +51,13 @@ module ConfCtl::Cli
         elsif spec.can_update?
           puts "Updating #{spec.name} in #{cluster_name.name}"
           spec.prefetch_update
-          files << file unless files.include?(file)
+          cluster_names << cluster_name unless cluster_names.include?(cluster_name)
         else
           puts "#{spec.name} not configured for update"
         end
       end
 
-      files.each(&:save)
-    end
-
-    protected
-    def git_set(file_pattern, sw_pattern, ref)
-      files = []
-
-      each_file_spec(file_pattern, sw_pattern) do |file, spec|
-        puts "Updating #{spec.name} to #{ref} in #{file.name}"
-        spec.prefetch(ref: ref)
-        files << file unless files.include?(file)
-      end
-
-      files.each(&:save)
+      cluster_names.each(&:save)
     end
   end
 end
