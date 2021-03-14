@@ -168,6 +168,29 @@ module ConfCtl
       end
     end
 
+    # @param packages [Array<String>]
+    # @param command [String]
+    # @return [Boolean]
+    def run_command_in_shell(packages: [], command: nil)
+      args = ['nix-shell']
+
+      if packages.any?
+        args << '-p'
+        args.concat(packages)
+      end
+
+      args << '--command'
+      args << command
+
+      pid = Process.fork do
+        ENV.delete('shellHook')
+        Process.exec(*args)
+      end
+
+      Process.wait(pid)
+      $?.exitstatus == 0
+    end
+
     protected
     attr_reader :conf_dir, :show_trace
 

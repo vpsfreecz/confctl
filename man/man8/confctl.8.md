@@ -127,6 +127,21 @@ information.
       Instead of copying the systems to all hosts in bulk before actiovations,
       copy and deploy hosts one by one.
 
+`confctl cssh` [*options*] [*host-pattern*]
+  Open ClusterSSH on selected or all hosts.
+
+    `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
+      Filter deployments by selected attribute, which is either tested for
+      equality or inequality. Any attribute from configuration module
+      `cluster.<name>` can be tested.
+
+    `-t`, `--tag` *tag*|`^`*tag*
+      Filter deployments that have *tag* set. If the tag begins with `^`, then
+      filter deployments that do not have *tag* set.
+
+    `-y`, `--yes`
+      Do not ask for confirmation on standard input, assume the answer is yes.
+
 `confctl gen-data vpsadmin all`
   Generate all required data files from vpsAdmin API.
 

@@ -142,6 +142,21 @@ module ConfCtl::Cli
         c.action &Command.run(Cluster, :deploy)
       end
 
+      desc 'Open ClusterSSH'
+      arg_name '[host-pattern]'
+      command :cssh do |c|
+        c.desc 'Filter by attribute'
+        c.flag %i(a attr), multiple: true
+
+        c.desc 'Filter by tag'
+        c.flag %i(t tag), multiple: true
+
+        c.desc 'Assume the answer to confirmations is yes'
+        c.switch %w(y yes)
+
+        c.action &Command.run(Cluster, :cssh)
+      end
+
       desc 'Generate data files from vpsAdmin API'
       command 'gen-data' do |gen|
         gen.desc 'Fetch data from vpsAdmin'

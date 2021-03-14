@@ -58,6 +58,31 @@ module ConfCtl::Cli
       end
     end
 
+    def cssh
+      deps = select_deployments(args[0]).managed
+
+      ask_confirmation! do
+        puts "Open cssh to the following deployments:"
+        list_deployments(deps)
+      end
+
+      nix = ConfCtl::Nix.new
+
+      cssh = [
+        'cssh',
+        '-l', 'root',
+      ]
+
+      deps.each do |host, dep|
+        cssh << dep.target_host
+      end
+
+      nix.run_command_in_shell(
+        packages: ['perlPackages.AppClusterSSH'],
+        command: cssh.join(' '),
+      )
+    end
+
     protected
     def deploy_in_bulk(deps, host_toplevels, nix, action)
       skipped_copy = []
