@@ -66,7 +66,7 @@ let
             ];
           }
         ];
-        inherit (nodepins) vpsadminos nixpkgs vpsadmin;
+        inherit (nodepins.evaluated) vpsadminos nixpkgs vpsadmin;
       };
     in {
       toplevel = build.toplevel;

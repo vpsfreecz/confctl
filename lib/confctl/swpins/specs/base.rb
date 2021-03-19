@@ -28,6 +28,7 @@ module ConfCtl
       @nix_opts = nix_opts
       @json_opts = json_opts
       @state = nil
+      @info = nil
       @fetcher = nil
       @fetcher_opts = nil
       @errors = []
@@ -81,6 +82,7 @@ module ConfCtl
       ret['type'] = type.to_s
       ret['nix_options'] = nix_opts
       ret['state'] = state
+      ret['info'] = info
       ret['fetcher'] = fetcher && {
         'type' => fetcher,
         'options' => fetcher_opts,
@@ -101,6 +103,9 @@ module ConfCtl
 
     # @return [Hash]
     attr_reader :state
+
+    # @return [Hash]
+    attr_reader :info
 
     # @return [String]
     attr_reader :fetcher
@@ -133,6 +138,10 @@ module ConfCtl
 
     def set_state(v)
       @state = v
+    end
+
+    def set_info(v)
+      @info = v
     end
 
     def set_fetcher(name, opts)

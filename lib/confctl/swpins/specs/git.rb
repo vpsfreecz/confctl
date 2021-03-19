@@ -49,6 +49,10 @@ module ConfCtl
         'rev' => ret['rev'],
         'date' => Time.now.iso8601,
       })
+      set_info({
+        'rev' => ret['rev'],
+        'sha256' => ret['sha256'],
+      })
       ret
     end
 
@@ -58,7 +62,7 @@ module ConfCtl
 
       rev = mirror.revision_parse(ref)
       url = File.join(nix_opts['url'], 'archive', "#{rev}.tar.gz")
-      hash = `nix-prefetch-url --unpack "#{url}" 2> /dev/null`
+      hash = `nix-prefetch-url --unpack "#{url}" 2> /dev/null`.strip
 
       if $?.exitstatus != 0
         fail "nix-prefetch-url failed with status #{$?.exitstatus}"
@@ -68,7 +72,11 @@ module ConfCtl
         'rev' => rev,
         'date' => Time.now.iso8601,
       })
-      {'url' => url, 'sha256' => hash.strip}
+      set_info({
+        'rev' => rev,
+        'sha256' => hash,
+      })
+      {'url' => url, 'sha256' => hash}
     end
   end
 end

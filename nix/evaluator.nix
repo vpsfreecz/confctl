@@ -35,7 +35,7 @@ let
 
   selectedSwpinsAttrs = builtins.listToAttrs (builtins.map (host: {
     name = host;
-    value = deploymentSwpins fullDeploymentsAttrs.${host};
+    value = (deploymentSwpins fullDeploymentsAttrs.${host}).evaluated;
   }) arg.deployments);
 
   selectedToplevels = builtins.listToAttrs (builtins.map (host: {

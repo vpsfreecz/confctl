@@ -52,4 +52,17 @@ let
           echo ".git.${shortRev}" > $out/.version-suffix
         '';
   };
-in allSwpins
+
+  clusterFileInfos = lib.mapAttrs (k: v: v.info or {}) clusterFileSpecs;
+
+  channelInfos = chan: lib.mapAttrs (k: v: v.info or {}) (channelSpecs chan);
+
+  allChannelInfos = map channelInfos channels;
+
+  allInfos = (lib.foldl (a: b: a // b) {} allChannelInfos) // clusterFileInfos;
+
+in {
+  evaluated = allSwpins;
+
+  infos = allInfos;
+}

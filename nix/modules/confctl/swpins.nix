@@ -1,7 +1,9 @@
-{ config, lib, ... }:
+{ config, pkgs, lib, swpinsInfo, ... }:
 with lib;
 let
   swpinOptions = import ../../lib/swpins/options.nix { inherit lib; };
+
+  deploymentSwpinsInfo = pkgs.writeText "swpins-info.json" (builtins.toJSON swpinsInfo);
 in {
   options = {
     confctl = {
@@ -13,5 +15,9 @@ in {
         '';
       };
     };
+  };
+
+  config = {
+    environment.etc."confctl/swpins-info.json".source = deploymentSwpinsInfo;
   };
 }

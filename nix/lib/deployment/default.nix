@@ -9,7 +9,8 @@ let
 
   makeModuleArgs =
     { config, swpins, spin, name }@args: {
-      inherit swpins;
+      swpins = swpins.evaluated;
+      swpinsInfo = swpins.infos;
       deploymentInfo = import ./info.nix (args // { inherit lib findConfig; });
     };
 
@@ -57,13 +58,7 @@ in rec {
       swpins = swpinsFor { inherit name config; };
     in
       { config, pkgs, ... }@args:
-      let
-        moduleArgs = makeModuleArgs {
-          inherit config swpins;
-          spin = "vpsadminos";
-          inherit name;
-        };
-      in {
+      {
         _module.args = makeModuleArgs {
           inherit config swpins;
           spin = "vpsadminos";
