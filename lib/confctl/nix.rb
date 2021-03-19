@@ -144,11 +144,7 @@ module ConfCtl
     def activate(dep, toplevel, action)
       args = [File.join(toplevel, 'bin/switch-to-configuration'), action]
 
-      if dep.localhost? && Process.uid == 0
-        system(*args)
-      else
-        system('ssh', "root@#{dep.target_host}", *args)
-      end
+      MachineControl.new(dep).execute(*args).success?
     end
 
     # @param dep [Deployments::Deployment]
@@ -161,11 +157,7 @@ module ConfCtl
         '--set', toplevel,
       ]
 
-      if dep.localhost? && Process.uid == 0
-        system(*args)
-      else
-        system('ssh', "root@#{dep.target_host}", *args)
-      end
+      MachineControl.new(dep).execute(*args).success?
     end
 
     # @param packages [Array<String>]
