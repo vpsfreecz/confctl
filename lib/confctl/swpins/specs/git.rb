@@ -45,7 +45,10 @@ module ConfCtl
       end
 
       ret = JSON.parse(json.strip)
-      set_state({'rev' => ret['rev']})
+      set_state({
+        'rev' => ret['rev'],
+        'date' => Time.now.iso8601,
+      })
       ret
     end
 
