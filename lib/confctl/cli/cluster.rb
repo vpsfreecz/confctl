@@ -88,17 +88,9 @@ module ConfCtl::Cli
       skipped_copy = []
 
       host_toplevels.each do |host, toplevel|
-        dep = deps[host]
-        puts "Copying configuration to #{host} (#{dep.target_host})"
-
-        if opts[:interactive] && !ask_confirmation(always: true)
+        if copy_to_host(nix, host, deps[host], toplevel) == :skip
           puts "Skipping #{host}"
           skipped_copy << host
-          next
-        end
-
-        unless nix.copy(dep, toplevel)
-          fail "Error while copying system to #{host}"
         end
       end
 
@@ -108,29 +100,9 @@ module ConfCtl::Cli
           next
         end
 
-        dep = deps[host]
-
-        if opts['dry-activate-first']
-          puts "Trying to activate configuration on #{host} (#{dep.target_host})"
-
-          unless nix.activate(dep, toplevel, 'dry-activate')
-            fail "Error while activating configuration on #{host}"
-          end
-        end
-
-        puts "Activating configuration on #{host} (#{dep.target_host}): #{action}"
-
-        if opts[:interactive] && !ask_confirmation(always: true)
+        if deploy_to_host(nix, host, deps[host], toplevel, action) == :skip
           puts "Skipping #{host}"
           next
-        end
-
-        unless nix.activate(dep, toplevel, action)
-          fail "Error while activating configuration on #{host}"
-        end
-
-        unless nix.set_profile(dep, toplevel)
-          fail "Error while setting profile on #{host}"
         end
 
         puts if opts[:interactive]
@@ -140,41 +112,56 @@ module ConfCtl::Cli
     def deploy_one_by_one(deps, host_toplevels, nix, action)
       host_toplevels.each do |host, toplevel|
         dep = deps[host]
-        puts "Copying configuration to #{host} (#{dep.target_host})"
 
-        if opts[:interactive] && !ask_confirmation(always: true)
+        if copy_to_host(nix, host, dep, toplevel) == :skip
           puts "Skipping #{host}"
           next
         end
 
-        unless nix.copy(dep, toplevel)
-          fail "Error while copying system to #{host}"
-        end
-
-        if opts['dry-activate-first']
-          puts "Trying to activate configuration on #{host} (#{dep.target_host})"
-
-          unless nix.activate(dep, toplevel, 'dry-activate')
-            fail "Error while activating configuration on #{host}"
-          end
-        end
-
-        puts "Activating configuration on #{host} (#{dep.target_host}): #{action}"
-
-        if opts[:interactive] && !ask_confirmation(always: true)
+        if deploy_to_host(nix, host, dep, toplevel, action) == :skip
           puts "Skipping #{host}"
           next
-        end
-
-        unless nix.activate(dep, toplevel, action)
-          fail "Error while activating configuration on #{host}"
-        end
-
-        unless nix.set_profile(dep, toplevel)
-          fail "Error while setting profile on #{host}"
         end
 
         puts if opts[:interactive]
+      end
+    end
+
+    def copy_to_host(nix, host, dep, toplevel)
+      puts "Copying configuration to #{host} (#{dep.target_host})"
+
+      if opts[:interactive] && !ask_confirmation(always: true)
+        return :skip
+      end
+
+      unless nix.copy(dep, toplevel)
+        fail "Error while copying system to #{host}"
+      end
+
+      true
+    end
+
+    def deploy_to_host(nix, host, dep, toplevel, action)
+      if opts['dry-activate-first']
+        puts "Trying to activate configuration on #{host} (#{dep.target_host})"
+
+        unless nix.activate(dep, toplevel, 'dry-activate')
+          fail "Error while activating configuration on #{host}"
+        end
+      end
+
+      puts "Activating configuration on #{host} (#{dep.target_host}): #{action}"
+
+      if opts[:interactive] && !ask_confirmation(always: true)
+        return :skip
+      end
+
+      unless nix.activate(dep, toplevel, action)
+        fail "Error while activating configuration on #{host}"
+      end
+
+      unless nix.set_profile(dep, toplevel)
+        fail "Error while setting profile on #{host}"
       end
     end
 
