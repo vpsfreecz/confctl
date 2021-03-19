@@ -287,7 +287,7 @@ to manage configured pins.
 Machine/deployment configs can use the following extra module arguments:
 
 - `confDir` - path to the cluster configuration directory
-- `confLib` - confctl functions, see [lib/default.nix](lib/default.nix)
+- `confLib` - confctl functions, see [nix/lib/default.nix](nix/lib/default.nix)
 - `confData` - access to user-defined datasets found in `data/default.nix`,
   see [example/data/default.nix](example/data/default.nix)
 - `deploymentInfo` - attrset with information about the machine that is currently
