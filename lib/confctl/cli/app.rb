@@ -163,7 +163,7 @@ module ConfCtl::Cli
         c.action &Command.run(Cluster, :cssh)
       end
 
-      desc 'Generate data files from vpsAdmin API'
+      desc 'Generate data files'
       command 'gen-data' do |gen|
         gen.desc 'Fetch data from vpsAdmin'
         gen.command :vpsadmin do |vpsa|
