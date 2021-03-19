@@ -57,7 +57,13 @@ module ConfCtl
 
     # @return [Integer] uptime in seconds
     def get_uptime
-      popen_read!('cat', '/proc/uptime').output.strip.split[0].to_f
+      read_file!('/proc/uptime').strip.split[0].to_f
+    end
+
+    # @param path [String]
+    # @return [String]
+    def read_file!(path)
+      popen_read!('cat', path).output
     end
 
     # @return [Process::Status]
