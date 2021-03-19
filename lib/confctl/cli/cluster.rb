@@ -41,11 +41,19 @@ module ConfCtl::Cli
         raise GLI::BadCommandLine, "invalid action '#{action}'"
       end
 
+      if opts[:reboot]
+        if action != 'boot'
+          raise GLI::BadCommandLine, '--reboot can be used only with switch-action boot'
+        end
+
+        parse_wait_online
+      end
+
       ask_confirmation! do
         puts "The following deployments will be built and deployed:"
         list_deployments(deps)
         puts
-        puts "Target action: #{action}"
+        puts "Target action: #{action}#{opts[:reboot] ? ' + reboot' : ''}"
       end
 
       host_toplevels = do_build(deps)
@@ -84,8 +92,11 @@ module ConfCtl::Cli
     end
 
     protected
+    attr_reader :wait_online
+
     def deploy_in_bulk(deps, host_toplevels, nix, action)
       skipped_copy = []
+      skipped_activation = []
 
       host_toplevels.each do |host, toplevel|
         if copy_to_host(nix, host, deps[host], toplevel) == :skip
@@ -97,15 +108,33 @@ module ConfCtl::Cli
       host_toplevels.each do |host, toplevel|
         if skipped_copy.include?(host)
           puts "Copy to #{host} was skipped, skipping activation as well"
+          skipped_activation << host
           next
         end
 
         if deploy_to_host(nix, host, deps[host], toplevel, action) == :skip
           puts "Skipping #{host}"
+          skipped_activation << host
           next
         end
 
         puts if opts[:interactive]
+      end
+
+      if opts[:reboot]
+        host_toplevels.each do |host, toplevel|
+          if skipped_activation.include?(host)
+            puts "Activation on #{host} was skipped, skipping reboot as well"
+            next
+          end
+
+          if reboot_host(host, deps[host]) == :skip
+            puts "Skipping #{host}"
+            next
+          end
+
+          puts if opts[:interactive]
+        end
       end
     end
 
@@ -119,6 +148,11 @@ module ConfCtl::Cli
         end
 
         if deploy_to_host(nix, host, dep, toplevel, action) == :skip
+          puts "Skipping #{host}"
+          next
+        end
+
+        if opts[:reboot] && reboot_host(host, dep) == :skip
           puts "Skipping #{host}"
           next
         end
@@ -162,6 +196,28 @@ module ConfCtl::Cli
 
       unless nix.set_profile(dep, toplevel)
         fail "Error while setting profile on #{host}"
+      end
+    end
+
+    def reboot_host(host, dep)
+      if dep.localhost?
+        puts "Skipping reboot of #{host} as it is localhost"
+        return :skip
+      end
+
+      puts "Rebooting #{host} (#{dep.target_host})"
+
+      if opts[:interactive] && !ask_confirmation(always: true)
+        return :skip
+      end
+
+      m = ConfCtl::MachineControl.new(dep)
+
+      if wait_online == :nowait
+        m.reboot
+      else
+        secs = m.reboot_and_wait(timeout: wait_online == :wait ? nil : wait_online)
+        puts "#{host} (#{dep.target_host}) is online (took #{secs.round(1)}s to reboot)"
       end
     end
 
@@ -318,6 +374,20 @@ module ConfCtl::Cli
       end
 
       ret
+    end
+
+    def parse_wait_online
+      @wait_online =
+        case opts['wait-online']
+        when 'wait'
+          :wait
+        when 'nowait'
+          :nowait
+        when /^\d+$/
+          opts['wait-online'].to_i
+        else
+          raise GLI::BadCommandLine, 'invalid value of --wait-online'
+        end
     end
   end
 end

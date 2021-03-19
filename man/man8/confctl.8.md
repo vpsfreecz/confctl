@@ -127,6 +127,14 @@ information.
       Instead of copying the systems to all hosts in bulk before actiovations,
       copy and deploy hosts one by one.
 
+    `--reboot`
+      Applicable only when *switch-action* is `boot`. Reboot the host after the
+      configuration is activated.
+
+    `--wait-online` [*seconds* | `wait` | `nowait`]
+      Determines whether to wait for the hosts to come back online if `--reboot`
+      is used. `confctl` will wait for `60 seconds` by default.
+
 `confctl cssh` [*options*] [*host-pattern*]
   Open ClusterSSH on selected or all hosts.
 

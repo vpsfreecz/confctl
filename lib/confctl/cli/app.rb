@@ -139,6 +139,12 @@ module ConfCtl::Cli
         c.desc 'Copy and deploy machines one by one'
         c.switch 'one-by-one'
 
+        c.desc 'Reboot target systems after deployment'
+        c.switch :reboot
+
+        c.desc 'Wait for the host to boot'
+        c.flag 'wait-online', default_value: '60'
+
         c.action &Command.run(Cluster, :deploy)
       end
 
