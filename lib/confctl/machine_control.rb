@@ -66,6 +66,12 @@ module ConfCtl
       popen_read!('cat', path).output
     end
 
+    # @param path [String]
+    # @return [String]
+    def read_symlink!(path)
+      popen_read!('readlink', path).output.strip
+    end
+
     # @return [Process::Status]
     def execute(*command)
       system_exec(*command)

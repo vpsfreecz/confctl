@@ -66,6 +66,92 @@ module ConfCtl::Cli
       end
     end
 
+    def status
+      deps = select_deployments(args[0]).managed
+
+      ask_confirmation! do
+        if opts[:toplevel]
+          puts "The following deployments will be built and then checked:"
+        else
+          puts "The following deployments will be checked:"
+        end
+
+        list_deployments(deps)
+      end
+
+      statuses = Hash[deps.map do |host, dep|
+        [host, ConfCtl::MachineStatus.new(dep)]
+      end]
+
+      # Evaluate toplevels
+      if opts[:toplevel]
+        host_toplevels = do_build(deps)
+
+        host_toplevels.each do |host, toplevel|
+          statuses[host].target_toplevel = toplevel
+        end
+
+        puts
+      end
+
+      # Read configured swpins
+      # TODO: this is done by do_build() as well
+      channels = ConfCtl::Swpins::ChannelList.new
+      channels.each(&:parse)
+
+      ConfCtl::Swpins::ClusterNameList.new(
+        deployments: deps,
+        channels: channels,
+      ).each do |cn|
+        cn.parse
+
+        statuses[cn.name].target_swpin_specs = cn.specs
+      end
+
+      # Check runtime status
+      tw = ConfCtl::ParallelExecutor.new(deps.length)
+
+      statuses.each do |host, st|
+        tw.add do
+          st.query(toplevel: opts[:toplevel])
+        end
+      end
+
+      tw.run
+
+      # Collect all swpins
+      swpins = []
+
+      statuses.each do |host, st|
+        st.target_swpin_specs.each_key do |name|
+          swpins << name unless swpins.include?(name)
+        end
+
+        st.evaluate
+      end
+
+      # Render results
+      cols = %w(host online uptime status) + swpins
+      rows = []
+
+      statuses.each do |host, st|
+        row = {
+          'host' => host,
+          'online' => st.online? && 'yes',
+          'uptime' => st.uptime && format_duration(st.uptime),
+          'status' => st.status ? 'ok' : 'outdated',
+        }
+
+        swpins.each do |name|
+          row[name] = st.swpins_state[name] ? 'ok' : 'outdated'
+        end
+
+        rows << row
+      end
+
+      OutputFormatter.print(rows, cols, layout: :columns)
+    end
+
     def cssh
       deps = select_deployments(args[0]).managed
 
@@ -388,6 +474,21 @@ module ConfCtl::Cli
         else
           raise GLI::BadCommandLine, 'invalid value of --wait-online'
         end
+    end
+
+    def format_duration(interval)
+      {
+        'd' => 24*60*60,
+        'h' => 60*60,
+        'm' => 60,
+        's' => 1,
+      }.each do |unit, n|
+        if interval > n
+          return "#{(interval / n.to_f).round(1)}#{unit}"
+        end
+      end
+
+      raise ArgumentError, "invalid time duration '#{interval}'"
     end
   end
 end

@@ -28,7 +28,7 @@ module ConfCtl
       @nix_opts = nix_opts
       @json_opts = json_opts
       @state = nil
-      @info = nil
+      @info = json_opts['info']
       @fetcher = nil
       @fetcher_opts = nil
       @errors = []
@@ -74,6 +74,12 @@ module ConfCtl
     end
 
     def prefetch_update
+      raise NotImplementedError
+    end
+
+    # Check that `other_info` corresponds to this spec
+    # @return [Boolean]
+    def check_info(other_info)
       raise NotImplementedError
     end
 

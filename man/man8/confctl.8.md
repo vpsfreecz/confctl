@@ -135,6 +135,25 @@ information.
       Determines whether to wait for the hosts to come back online if `--reboot`
       is used. `confctl` will wait for `60 seconds` by default.
 
+`confctl status` [*options*] [*host-pattern*]
+  Probe managed hosts and determine their status.
+
+    `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
+      Filter deployments by selected attribute, which is either tested for
+      equality or inequality. Any attribute from configuration module
+      `cluster.<name>` can be tested.
+
+    `-t`, `--tag` *tag*|`^`*tag*
+      Filter deployments that have *tag* set. If the tag begins with `^`, then
+      filter deployments that do not have *tag* set.
+
+    `-y`, `--yes`
+      Do not ask for confirmation on standard input, assume the answer is yes.
+
+    `--[no-]toplevel`
+      In order to check whether the selected hosts are up-to-date, `confctl` has
+      to build them all. Enabled by default.
+
 `confctl cssh` [*options*] [*host-pattern*]
   Open ClusterSSH on selected or all hosts.
 

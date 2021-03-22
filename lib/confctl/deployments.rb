@@ -45,6 +45,11 @@ module ConfCtl
       @deployments[host]
     end
 
+    # @return [Integer]
+    def length
+      @deployments.length
+    end
+
     protected
     attr_reader :opts, :deployments
 

@@ -36,6 +36,11 @@ module ConfCtl
       prefetch_set([nix_opts['update']['ref']])
     end
 
+    def check_info(other_info)
+      return false if !other_info.is_a?(Hash) || !info.is_a?(Hash)
+      other_info['rev'] == info['rev'] && other_info['sha256'] == info['sha256']
+    end
+
     protected
     def prefetch_git(ref)
       json = `nix-prefetch-git --quiet #{nix_opts['url']} #{ref}`
