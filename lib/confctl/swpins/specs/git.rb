@@ -41,6 +41,18 @@ module ConfCtl
       other_info['rev'] == info['rev'] && other_info['sha256'] == info['sha256']
     end
 
+    def string_diff_upgrade_info(other_info)
+      string_diff_info(other_info) do |mirror|
+        mirror.shortlog_diff(other_info['rev'], state['rev'])
+      end
+    end
+
+    def string_diff_downgrade_info(other_info)
+      string_diff_info(other_info) do |mirror|
+        mirror.shortlog_diff(state['rev'], other_info['rev'])
+      end
+    end
+
     protected
     def prefetch_git(ref)
       json = `nix-prefetch-git --quiet #{nix_opts['url']} #{ref}`
@@ -82,6 +94,18 @@ module ConfCtl
         'sha256' => hash,
       })
       {'url' => url, 'sha256' => hash}
+    end
+
+    def string_diff_info(other_info)
+      if info.nil?
+        raise ConfCtl::Error, 'swpin not configured'
+      end
+
+      return if state['rev'] == other_info['rev']
+
+      mirror = GitRepoMirror.new(nix_opts['url'], quiet: true)
+      mirror.setup
+      yield(mirror)
     end
   end
 end

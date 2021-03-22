@@ -154,6 +154,35 @@ information.
       In order to check whether the selected hosts are up-to-date, `confctl` has
       to build them all. Enabled by default.
 
+`confctl diff` [*options*] [[*host-pattern*] [*sw-pattern*]]
+  Show differences in deployed and configured software pins. For git software
+  pins, it's a git short log.
+
+  By default, `confctl` assumes that the configuration contains upgraded
+  software pins, i.e. that the configuration is equal to or ahead of the deployed
+  hosts. `confctl diff` then prints a lists of changesets that are missing from
+  the deployed hosts. Too see a diff for downgrade, use option `-d`, `--downgrade`.
+
+  `confctl diff` will not show changes to the deployment configuration itself,
+  it works only on software pins.
+
+    `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
+      Filter deployments by selected attribute, which is either tested for
+      equality or inequality. Any attribute from configuration module
+      `cluster.<name>` can be tested.
+
+    `-t`, `--tag` *tag*|`^`*tag*
+      Filter deployments that have *tag* set. If the tag begins with `^`, then
+      filter deployments that do not have *tag* set.
+
+    `-y`, `--yes`
+      Do not ask for confirmation on standard input, assume the answer is yes.
+
+    `-d`, `--downgrade`
+      Use when the configuration has older software pins than deployed hosts,
+      e.g. when doing a downgrade. Show a list of changesets that are deployed
+      on the hosts and are missing in the configured software pins.
+
 `confctl cssh` [*options*] [*host-pattern*]
   Open ClusterSSH on selected or all hosts.
 

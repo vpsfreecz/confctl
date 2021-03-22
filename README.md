@@ -31,6 +31,7 @@ COMMANDS
     build      - Build target systems
     cssh       - Open ClusterSSH
     deploy     - Deploy target systems
+    diff       - Compare deployed and configured swpins
     gen-data   - Generate data files
     help       - Shows a list of commands or help for one command
     init       - Create a new configuration

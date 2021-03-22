@@ -28,6 +28,18 @@ module ConfCtl
       git_repo("rev-parse", args: [str])
     end
 
+    # @param from_ref [String]
+    # @param to_ref [String]
+    def shortlog_diff(from_ref, to_ref)
+      ret = "git shortlog for #{from_ref}..#{to_ref}\n"
+      ret << git_repo(
+        'log',
+        opts: ['--oneline', '--no-decorate', '--left-right', '--cherry-mark'],
+        args: ["#{from_ref}..#{to_ref}"]
+      )
+      ret
+    end
+
     protected
     attr_reader :quiet
 

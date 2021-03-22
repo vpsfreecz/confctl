@@ -83,6 +83,13 @@ module ConfCtl
       raise NotImplementedError
     end
 
+    # Generate diff between revisions
+    # @param other [any] version reference
+    # @return [String, nil]
+    def string_diff_info(other_info)
+      raise NotImplementedError
+    end
+
     def as_json
       ret = {}
       ret['type'] = type.to_s
