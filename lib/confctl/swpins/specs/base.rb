@@ -28,7 +28,7 @@ module ConfCtl
       @nix_opts = nix_opts
       @json_opts = json_opts
       @state = nil
-      @info = json_opts['info']
+      @info = nil
       @fetcher = nil
       @fetcher_opts = nil
       @errors = []
@@ -142,6 +142,7 @@ module ConfCtl
       return if errors.any?
 
       @state = json_opts['state']
+      @info = json_opts['info']
 
       if json_opts['fetcher']
         @fetcher = json_opts['fetcher']['type']
