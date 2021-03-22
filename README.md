@@ -137,7 +137,7 @@ and deploy specific machines. It doesn't matter what nixpkgs version the build
 machine uses, because each deployment gets its own nixpkgs as configured by the
 software pin.
 
-Software pins can be defined in channels, which can then be used by all
+Software pins can be grouped in channels, which can then be used by all
 or selected machines in the configuration. Or, if needed, custom software pins
 can be configured on selected machines. See below for usage examples.
 
@@ -192,7 +192,10 @@ Software pin channels are defined in file `confctl/swpins.nix`:
 }
 ```
 
-Configured channels can then be manipulated using `confctl`:
+This configuration defines what channels exist, what packages they contain
+and how to fetch them. Such configured channels can then be manipulated using
+`confctl`. `confctl` prefetches selected software pins and saves their hashes
+in JSON files in the `swpins/` directory.
 
 ```
 # List channels
@@ -212,9 +215,7 @@ $ confctl swpins channel update nixos-unstable nixpkgs
 $ confctl swpins channel set nixos-unstable nixpkgs 1f77a4c8
 ```
 
-`confctl swpins channel update/set` will prefetch the software pins and save
-their hashes in JSON files in the `swpins/` directory. These files are then read
-by `confctl build` and `confctl deploy`.
+`confctl build` and `confctl deploy` will now use the prefetched software pins.
 
 ## Machine metadata and software pins
 Machine/deployment configuration directory usually contain at least two files:
