@@ -3,8 +3,9 @@ module ConfCtl
     Generation = Struct.new(:id, :date, :current)
 
     # @param str [String] output of nix-env --list-generations
+    # @param timezone_offset [String]
     # @return [GenerationList]
-    def self.parse(str)
+    def self.parse(str, timezone_offset)
       list = new
 
       str.strip.split("\n").each do |line|
@@ -12,8 +13,7 @@ module ConfCtl
 
         list << Generation.new(
           id.to_i,
-          # TODO: we might have the wrong timezone here
-          Time.strptime("#{date} #{time}", '%Y-%m-%d %H:%M:%S'),
+          Time.strptime("#{date} #{time} #{timezone_offset}", '%Y-%m-%d %H:%M:%S %z'),
           current == '(current)',
         )
       end

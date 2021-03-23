@@ -60,6 +60,11 @@ module ConfCtl
       read_file!('/proc/uptime').strip.split[0].to_f
     end
 
+    # @return [Array<String>]
+    def get_timezone
+      popen_read!('date +"%Z;%z"').output.strip.split(';')
+    end
+
     # @param path [String]
     # @return [String]
     def read_file!(path)

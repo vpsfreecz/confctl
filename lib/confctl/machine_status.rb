@@ -19,6 +19,12 @@ module ConfCtl
     # @return [String]
     attr_reader :current_toplevel
 
+    # @return [String]
+    attr_reader :timezone_name
+
+    # @return [String]
+    attr_reader :timezone_offset
+
     # @return [GenerationList]
     attr_reader :generations
 
@@ -55,11 +61,13 @@ module ConfCtl
 
       if generations
         begin
+          @timezone_name, @timezone_offset = mc.get_timezone
+
           @generations = GenerationList.parse(mc.popen_read!(
             'nix-env',
             '-p', '/nix/var/nix/profiles/system',
             '--list-generations',
-          ).output)
+          ).output, @timezone_offset)
         rescue CommandFailed
           return
         end
