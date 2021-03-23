@@ -131,7 +131,7 @@ module ConfCtl::Cli
       end
 
       # Render results
-      cols = %w(host online uptime status) + swpins
+      cols = %w(host online uptime status generations) + swpins
       rows = []
 
       statuses.each do |host, st|
@@ -140,6 +140,7 @@ module ConfCtl::Cli
           'online' => st.online? && 'yes',
           'uptime' => st.uptime && format_duration(st.uptime),
           'status' => st.status ? 'ok' : 'outdated',
+          'generations' => st.generations && st.generations.count,
         }
 
         swpins.each do |name|
@@ -177,7 +178,7 @@ module ConfCtl::Cli
       end
 
       statuses.each do |host, st|
-        st.query(toplevel: false)
+        st.query(toplevel: false, generations: false)
         st.evaluate
 
         unless st.online?

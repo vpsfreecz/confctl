@@ -19,6 +19,9 @@ module ConfCtl
     # @return [String]
     attr_reader :current_toplevel
 
+    # @return [GenerationList]
+    attr_reader :generations
+
     # @return [Hash]
     attr_accessor :target_swpin_specs
 
@@ -35,7 +38,7 @@ module ConfCtl
     end
 
     # Connect to the machine and query its state
-    def query(toplevel: true)
+    def query(toplevel: true, generations: true)
       begin
         @uptime = mc.get_uptime
       rescue CommandFailed
@@ -45,6 +48,18 @@ module ConfCtl
       if toplevel
         begin
           @current_toplevel = mc.read_symlink!('/run/current-system')
+        rescue CommandFailed
+          return
+        end
+      end
+
+      if generations
+        begin
+          @generations = GenerationList.parse(mc.popen_read!(
+            'nix-env',
+            '-p', '/nix/var/nix/profiles/system',
+            '--list-generations',
+          ).output)
         rescue CommandFailed
           return
         end
