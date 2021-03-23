@@ -38,6 +38,7 @@ COMMANDS
     ls         - List configured deployments
     rediscover - Update deployment list with contents of cluster/
     rename     - Rename an existing deployment
+    status     - Check host status
     swpins     - Manage software pins
 ```
 
