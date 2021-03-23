@@ -110,8 +110,8 @@ Example configuration, which can be used as a starting point, can be found in
 directory [example/](example/).
 
 See also
-[vpsfree-cz-configuration](https://github.com/vpsfreecz/vpsfree-cz-configuration),
-which uses confctl to manage its cluster.
+[vpsfree-cz-configuration](https://github.com/vpsfreecz/vpsfree-cz-configuration)
+for a full-featured cluster configuration.
 
 ## Configuration directory structure
 `confctl` configurations should adhere to the following structure:
@@ -135,7 +135,7 @@ which uses confctl to manage its cluster.
 ## Software pins
 Software pins in confctl allow you to use specific revisions of
 [nixpkgs](https://github.com/NixOS/nixpkgs) or any other software to build
-and deploy specific machines. It doesn't matter what nixpkgs version the build
+and deploy target machines. It doesn't matter what nixpkgs version the build
 machine uses, because each deployment gets its own nixpkgs as configured by the
 software pin.
 
@@ -220,7 +220,7 @@ $ confctl swpins channel set nixos-unstable nixpkgs 1f77a4c8
 `confctl build` and `confctl deploy` will now use the prefetched software pins.
 
 ## Machine metadata and software pins
-Machine/deployment configuration directory usually contain at least two files:
+Machine/deployment configuration directory usually contains at least two files:
 `cluster/<machine name>/config.nix` and `cluster/<machine name>/module.nix`.
 
 `config.nix` is evaluated only when that particular machine is being built. It is
@@ -229,8 +229,9 @@ a standard NixOS configuration module, similar to `/etc/nixos/configuration.nix`
 `module.nix` is specific to confctl configurations. `module.nix` files from
 all machines are evaluated during every build, whether that particular machine
 is being built or not. `module.nix` contains metadata about machines from which
-confctl knows how to treat them and also software pins. In addition, metadata
-about any machine can be read from `config.nix` of any other machine.
+confctl knows how to treat them. It is also used to declare which software pins
+or channels the machine uses. Metadata about any machine can be read from
+`config.nix` of any other machine.
 
 For example, deployment named `my-machine` would be described in
 `cluster/my-machine/module.nix` as:
@@ -303,10 +304,10 @@ For example in `cluster/my-machine/config.nix`:
 ```nix
 { config, lib, pkgs, confLib, confData, deploymentInfo, ... }:
 {
-  # Set hostname to machine name from confctl
+  # Set the hostname to the machine name from confctl
   networking.hostName = deploymentInfo.name;
 
-  # When used with data defined at example/data/default.nix
+  # When used with the data defined at example/data/default.nix
   users.users.root.openssh.authorizedKeys.keys = with confData.sshKeys; admins;
 }
 ```
