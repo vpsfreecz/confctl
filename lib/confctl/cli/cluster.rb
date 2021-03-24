@@ -362,7 +362,9 @@ module ConfCtl::Cli
       yield if block_given?
       STDOUT.write("\nContinue? [y/N]: ")
       STDOUT.flush
-      STDIN.readline.strip.downcase == 'y'
+      ret = STDIN.readline.strip.downcase == 'y'
+      puts
+      ret
     end
 
     def ask_confirmation!(**kwargs, &block)
@@ -395,17 +397,18 @@ module ConfCtl::Cli
       end
 
       deps.each do |host, d|
-        puts "Evaluating swpins for #{host}..."
+        puts Rainbow("Evaluating swpins for #{host}...").bright
         host_swpins[host] = nix.eval_swpins(host).update(d.nix_paths)
       end
 
       grps = swpin_build_groups(host_swpins)
+      puts
       puts "Deployments will be built in #{grps.length} groups"
       puts
       host_toplevels = {}
 
       grps.each do |hosts, swpins|
-        puts "Building deployments"
+        puts Rainbow("Building deployments").bright
         hosts.each { |h| puts "  #{h}" }
         puts "with swpins"
         swpins.each { |k, v| puts "  #{k}=#{v}" }
@@ -417,7 +420,7 @@ module ConfCtl::Cli
     end
 
     def autoupdate_swpins(deps)
-      puts "Running swpins auto updates..."
+      puts Rainbow("Running swpins auto updates...").bright
       channels = ConfCtl::Swpins::ChannelList.new
       channels.each(&:parse)
       channels_update = []
@@ -470,10 +473,11 @@ module ConfCtl::Cli
       ConfCtl::Swpins::ClusterNameList.new(deployments: deps).each do |cn|
         cn.parse
 
-        puts "Checking swpins for #{cn.name}..."
+        puts Rainbow("Checking swpins for #{cn.name}...").yellow
 
         cn.specs.each do |name, s|
-          puts "  #{name} ... #{s.valid? ? 'ok' : 'needs update'}"
+          puts "  #{Rainbow(name).bright} ... "+
+               (s.valid? ? Rainbow('ok').green : Rainbow('needs update').cyan)
           ret = false unless s.valid?
         end
       end
