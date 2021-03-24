@@ -17,6 +17,7 @@ module ConfCtl::Cli
       @opts = opts
       @args = args
       @use_color = determine_color
+      @use_pager = determine_pager
     end
 
     # @param v [Array] list of required arguments
@@ -37,6 +38,10 @@ module ConfCtl::Cli
       @use_color
     end
 
+    def use_pager?
+      @use_pager
+    end
+
     protected
     def determine_color
       case gopts[:color]
@@ -49,6 +54,10 @@ module ConfCtl::Cli
       when 'auto'
         Rainbow.enabled
       end
+    end
+
+    def determine_pager
+      ENV['PAGER'] && ENV['PAGER'].strip != ''
     end
   end
 end

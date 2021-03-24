@@ -1,6 +1,7 @@
 require_relative 'command'
 require 'json'
 require 'rainbow'
+require 'tty-pager'
 require 'tty-spinner'
 
 module ConfCtl::Cli
@@ -550,7 +551,7 @@ module ConfCtl::Cli
         statuses[cn.name].target_swpin_specs = cn.specs
       end
 
-      Pager.open do |io|
+      TTY::Pager.page(enabled: use_pager?) do |io|
         statuses.each do |host, st|
           st.query(toplevel: false, generations: false)
           st.evaluate
@@ -571,7 +572,7 @@ module ConfCtl::Cli
               io.puts "#{host} @ #{name} in unknown state"
             end
 
-            io.puts
+            io.puts ''
           end
         end
       end
