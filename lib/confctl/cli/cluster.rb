@@ -197,6 +197,7 @@ module ConfCtl::Cli
                 opts[:downgrade] ? :downgrade : :upgrade,
                 st.swpins_info[name],
                 verbose: opts[:verbose],
+                patch: opts[:patch],
               )
             rescue ConfCtl::Error => e
               puts e.message

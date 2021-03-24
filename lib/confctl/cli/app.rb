@@ -184,6 +184,9 @@ module ConfCtl::Cli
         c.desc 'Show full-length changelog descriptions'
         c.switch %i(v verbose)
 
+        c.desc 'Show patches'
+        c.switch %i(p patch)
+
         c.action &Command.run(Cluster, :changelog)
       end
 

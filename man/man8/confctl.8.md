@@ -187,6 +187,9 @@ information.
     `-v`, `--verbose`
       Show full-length changelog descriptions.
 
+    `-p`, `--patch`
+      Show patches.
+
 `confctl cssh` [*options*] [*host-pattern*]
   Open ClusterSSH on selected or all hosts.
 

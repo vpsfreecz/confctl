@@ -41,9 +41,10 @@ module ConfCtl
       other_info['rev'] == info['rev'] && other_info['sha256'] == info['sha256']
     end
 
-    def string_changelog_info(type, other_info, verbose: false)
+    def string_changelog_info(type, other_info, verbose: false, patch: false)
       opts = []
       opts << '--oneline' unless verbose
+      opts << '-p' if patch
 
       args =
         if type == :upgrade

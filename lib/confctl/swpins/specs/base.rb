@@ -88,6 +88,7 @@ module ConfCtl
     # @param other_info [any] version reference
     # @param opts [Hash] options
     # @option opts [Boolean] :verbose
+    # @option opts [Boolean] :patch
     # @return [String, nil]
     def string_changelog_info(type, other_info, opts = {})
       raise NotImplementedError
