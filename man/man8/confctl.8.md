@@ -138,7 +138,7 @@ information.
 
     `--wait-online` [*seconds* | `wait` | `nowait`]
       Determines whether to wait for the hosts to come back online if `--reboot`
-      is used. `confctl` will wait for `60 seconds` by default.
+      is used. `confctl` will wait for `600 seconds` by default.
 
 `confctl status` [*options*] [*host-pattern*]
   Probe managed hosts and determine their status.

@@ -146,7 +146,7 @@ module ConfCtl::Cli
         c.switch :reboot
 
         c.desc 'Wait for the host to boot'
-        c.flag 'wait-online', default_value: '60'
+        c.flag 'wait-online', default_value: '600'
 
         c.action &Command.run(Cluster, :deploy)
       end
