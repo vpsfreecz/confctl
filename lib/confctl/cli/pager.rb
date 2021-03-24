@@ -7,7 +7,8 @@ module ConfCtl::Cli
 
     def open
       if ENV['PAGER'].nil? || ENV['PAGER'].strip.empty?
-        return yield(STDOUT)
+        yield(STDOUT)
+        return
       end
 
       r, w = IO.pipe
@@ -22,12 +23,17 @@ module ConfCtl::Cli
 
       Signal.trap('INT') {}
 
-      ret = yield(w)
+      begin
+        yield(w)
+      rescue Errno::EPIPE
+        # the pager was closed prematurely
+      end
+
       w.close
 
       Process.wait(pid)
       Signal.trap('INT', 'DEFAULT')
-      ret
+      nil
     end
   end
 end
