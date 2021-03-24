@@ -1,4 +1,5 @@
 require 'gli'
+require 'rainbow'
 
 module ConfCtl::Cli
   class Command
@@ -15,6 +16,7 @@ module ConfCtl::Cli
       @gopts = global_opts
       @opts = opts
       @args = args
+      @use_color = determine_color
     end
 
     # @param v [Array] list of required arguments
@@ -32,14 +34,21 @@ module ConfCtl::Cli
     end
 
     def use_color?
+      @use_color
+    end
+
+    protected
+    def determine_color
       case gopts[:color]
       when 'always'
+        Rainbow.enabled = true
         true
       when 'never'
+        Rainbow.enabled = false
         false
       when 'auto'
-        STDOUT.tty?
+        Rainbow.enabled
       end
     end
- end
+  end
 end
