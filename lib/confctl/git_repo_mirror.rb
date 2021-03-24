@@ -40,6 +40,18 @@ module ConfCtl
       ret
     end
 
+    # @param from_ref [String]
+    # @param to_ref [String]
+    def diff(from_ref, to_ref)
+      ret = "git diff for #{from_ref}..#{to_ref}\n"
+      ret << git_repo(
+        'diff',
+        opts: [],
+        args: ["#{from_ref}..#{to_ref}"]
+      )
+      ret
+    end
+
     protected
     attr_reader :quiet
 
@@ -50,7 +62,7 @@ module ConfCtl
     end
 
     def git(cmd, args: [], opts: [], gopts: [])
-      opts << '--quiet' if quiet
+      opts << '--quiet' if quiet && %w(clone fetch).include?(cmd)
 
       full_cmd = (['git'] + gopts + [cmd] + opts + args).join(' ')
       ret = `#{full_cmd}`.strip

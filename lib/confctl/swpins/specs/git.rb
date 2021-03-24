@@ -58,6 +58,19 @@ module ConfCtl
       end
     end
 
+    def string_diff_info(type, other_info, opts = {})
+      args =
+        if type == :upgrade
+          [other_info['rev'], state['rev']]
+        else
+          [state['rev'], other_info['rev']]
+        end
+
+      git_mirror_with_info(other_info) do |mirror|
+        mirror.diff(*args)
+      end
+    end
+
     protected
     def prefetch_git(ref)
       json = `nix-prefetch-git --quiet #{nix_opts['url']} #{ref}`

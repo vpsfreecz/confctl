@@ -213,6 +213,64 @@ module ConfCtl::Cli
       end
     end
 
+    def diff
+      deps = select_deployments(args[0]).managed
+
+      ask_confirmation! do
+        puts "Compare swpins on the following deployments:"
+        list_deployments(deps)
+      end
+
+      statuses = Hash[deps.map do |host, dep|
+        [host, ConfCtl::MachineStatus.new(dep)]
+      end]
+
+      channels = ConfCtl::Swpins::ChannelList.new
+      channels.each(&:parse)
+
+      ConfCtl::Swpins::ClusterNameList.new(
+        deployments: deps,
+        channels: channels,
+      ).each do |cn|
+        cn.parse
+
+        statuses[cn.name].target_swpin_specs = cn.specs
+      end
+
+      statuses.each do |host, st|
+        st.query(toplevel: false, generations: false)
+        st.evaluate
+
+        unless st.online?
+          puts "#{host} is offline"
+          next
+        end
+
+        st.target_swpin_specs.each do |name, spec|
+          next if args[1] && !ConfCtl::Pattern.match?(args[1], name)
+
+          if st.swpins_info[name]
+            puts "#{host} @ #{name}:"
+
+            begin
+              s = spec.string_diff_info(
+                opts[:downgrade] ? :downgrade : :upgrade,
+                st.swpins_info[name],
+              )
+            rescue ConfCtl::Error => e
+              puts e.message
+            else
+              puts (s || 'no changes')
+            end
+          else
+            puts "#{host} @ #{name} in unknown state"
+          end
+
+          puts
+        end
+      end
+    end
+
     def cssh
       deps = select_deployments(args[0]).managed
 

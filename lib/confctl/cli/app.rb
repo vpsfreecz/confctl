@@ -166,7 +166,7 @@ module ConfCtl::Cli
         c.action &Command.run(Cluster, :status)
       end
 
-      desc 'Compare deployed and configured swpins'
+      desc 'Changelog between deployed and configured swpins'
       arg_name '[host-pattern [sw-pattern]]'
       command :changelog do |c|
         c.desc 'Filter by attribute'
@@ -188,6 +188,24 @@ module ConfCtl::Cli
         c.switch %i(p patch)
 
         c.action &Command.run(Cluster, :changelog)
+      end
+
+      desc 'Diff between deployed and configured swpins'
+      arg_name '[host-pattern [sw-pattern]]'
+      command :diff do |c|
+        c.desc 'Filter by attribute'
+        c.flag %i(a attr), multiple: true
+
+        c.desc 'Filter by tag'
+        c.flag %i(t tag), multiple: true
+
+        c.desc 'Assume the answer to confirmations is yes'
+        c.switch %w(y yes)
+
+        c.desc 'Show a changelog for downgrade'
+        c.switch %i(d downgrade)
+
+        c.action &Command.run(Cluster, :diff)
       end
 
       desc 'Open ClusterSSH'
