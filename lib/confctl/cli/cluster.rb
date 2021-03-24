@@ -159,6 +159,7 @@ module ConfCtl::Cli
           s = spec.string_changelog_info(
             opts[:downgrade] ? :downgrade : :upgrade,
             status.swpins_info[sw_name],
+            color: use_color?,
             verbose: opts[:verbose],
             patch: opts[:patch],
           )
@@ -176,6 +177,7 @@ module ConfCtl::Cli
           s = spec.string_diff_info(
             opts[:downgrade] ? :downgrade : :upgrade,
             status.swpins_info[sw_name],
+            color: use_color?,
           )
         rescue ConfCtl::Error => e
           io.puts e.message

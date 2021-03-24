@@ -87,6 +87,7 @@ module ConfCtl
     # @param type [:upgrade, :downgrade]
     # @param other_info [any] version reference
     # @param opts [Hash] options
+    # @option opts [Boolean] :color
     # @option opts [Boolean] :verbose
     # @option opts [Boolean] :patch
     # @return [String, nil]
@@ -98,6 +99,7 @@ module ConfCtl
     # @param type [:upgrade, :downgrade]
     # @param other_info [any] version reference
     # @param opts [Hash] options
+    # @option opts [Boolean] :color
     # @return [String, nil]
     def string_diff_info(type, other_info, opts = {})
       raise NotImplementedError

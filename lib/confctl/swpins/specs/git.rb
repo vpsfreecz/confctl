@@ -41,8 +41,9 @@ module ConfCtl
       other_info['rev'] == info['rev'] && other_info['sha256'] == info['sha256']
     end
 
-    def string_changelog_info(type, other_info, verbose: false, patch: false)
+    def string_changelog_info(type, other_info, verbose: false, patch: false, color: false)
       opts = []
+      opts << '--color=always' if color
       opts << '--oneline' unless verbose
       opts << '-p' if patch
 
@@ -59,6 +60,9 @@ module ConfCtl
     end
 
     def string_diff_info(type, other_info, opts = {})
+      gitopts = []
+      gitopts << '--color=always' if color
+
       args =
         if type == :upgrade
           [other_info['rev'], state['rev']]
@@ -67,7 +71,7 @@ module ConfCtl
         end
 
       git_mirror_with_info(other_info) do |mirror|
-        mirror.diff(*args)
+        mirror.diff(*args, opts: gitopts)
       end
     end
 
