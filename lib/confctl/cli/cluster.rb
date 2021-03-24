@@ -1,5 +1,6 @@
 require_relative 'command'
 require 'json'
+require 'rainbow'
 
 module ConfCtl::Cli
   class Cluster < Command
@@ -137,20 +138,20 @@ module ConfCtl::Cli
       statuses.each do |host, st|
         row = {
           'host' => host,
-          'online' => st.online? && 'yes',
+          'online' => st.online? && Rainbow('yes').green,
           'uptime' => st.uptime && format_duration(st.uptime),
-          'status' => st.status ? 'ok' : 'outdated',
+          'status' => st.status ? Rainbow('ok').green : Rainbow('outdated').red,
           'generations' => st.generations && st.generations.count,
         }
 
         swpins.each do |name|
-          row[name] = st.swpins_state[name] ? 'ok' : 'outdated'
+          row[name] = st.swpins_state[name] ? Rainbow('ok').green : Rainbow('outdated').red
         end
 
         rows << row
       end
 
-      OutputFormatter.print(rows, cols, layout: :columns)
+      OutputFormatter.print(rows, cols, layout: :columns, color: use_color?)
     end
 
     def changelog
