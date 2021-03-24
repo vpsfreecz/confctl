@@ -83,10 +83,17 @@ module ConfCtl
       raise NotImplementedError
     end
 
-    # Generate diff between revisions
+    # Generate changelog between revisions
     # @param other [any] version reference
     # @return [String, nil]
-    def string_diff_info(other_info)
+    def string_changelog_upgrade_info(other_info)
+      raise NotImplementedError
+    end
+
+    # Generate changelog between revisions
+    # @param other [any] version reference
+    # @return [String, nil]
+    def string_changelog_downgrade_info(other_info)
       raise NotImplementedError
     end
 

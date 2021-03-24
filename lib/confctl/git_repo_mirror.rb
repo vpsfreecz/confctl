@@ -30,11 +30,11 @@ module ConfCtl
 
     # @param from_ref [String]
     # @param to_ref [String]
-    def shortlog_diff(from_ref, to_ref)
-      ret = "git shortlog for #{from_ref}..#{to_ref}\n"
+    def log(from_ref, to_ref, opts: [])
+      ret = "git log for #{from_ref}..#{to_ref}\n"
       ret << git_repo(
         'log',
-        opts: ['--oneline', '--no-decorate', '--left-right', '--cherry-mark'],
+        opts: ['--no-decorate', '--left-right', '--cherry-mark'] + opts,
         args: ["#{from_ref}..#{to_ref}"]
       )
       ret

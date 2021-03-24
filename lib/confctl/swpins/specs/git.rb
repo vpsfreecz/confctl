@@ -41,15 +41,15 @@ module ConfCtl
       other_info['rev'] == info['rev'] && other_info['sha256'] == info['sha256']
     end
 
-    def string_diff_upgrade_info(other_info)
-      string_diff_info(other_info) do |mirror|
-        mirror.shortlog_diff(other_info['rev'], state['rev'])
+    def string_changelog_upgrade_info(other_info)
+      string_changelog_info(other_info) do |mirror|
+        mirror.log(other_info['rev'], state['rev'], opts: ['--oneline'])
       end
     end
 
-    def string_diff_downgrade_info(other_info)
-      string_diff_info(other_info) do |mirror|
-        mirror.shortlog_diff(state['rev'], other_info['rev'])
+    def string_changelog_downgrade_info(other_info)
+      string_changelog_info(other_info) do |mirror|
+        mirror.log(state['rev'], other_info['rev'], opts: ['--oneline'])
       end
     end
 
@@ -96,7 +96,7 @@ module ConfCtl
       {'url' => url, 'sha256' => hash}
     end
 
-    def string_diff_info(other_info)
+    def string_changelog_info(other_info)
       if info.nil?
         raise ConfCtl::Error, 'swpin not configured'
       end

@@ -153,7 +153,7 @@ module ConfCtl::Cli
       OutputFormatter.print(rows, cols, layout: :columns)
     end
 
-    def diff
+    def changelog
       deps = select_deployments(args[0]).managed
 
       ask_confirmation! do
@@ -195,9 +195,9 @@ module ConfCtl::Cli
             begin
               s =
                 if opts[:downgrade]
-                  spec.string_diff_downgrade_info(st.swpins_info[name])
+                  spec.string_changelog_downgrade_info(st.swpins_info[name])
                 else
-                  spec.string_diff_upgrade_info(st.swpins_info[name])
+                  spec.string_changelog_upgrade_info(st.swpins_info[name])
                 end
             rescue ConfCtl::Error => e
               puts e.message
