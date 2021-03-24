@@ -222,20 +222,20 @@ module ConfCtl::Cli
 
       host_toplevels.each do |host, toplevel|
         if copy_to_host(nix, host, deps[host], toplevel) == :skip
-          puts "Skipping #{host}"
+          puts Rainbow("Skipping #{host}").yellow
           skipped_copy << host
         end
       end
 
       host_toplevels.each do |host, toplevel|
         if skipped_copy.include?(host)
-          puts "Copy to #{host} was skipped, skipping activation as well"
+          puts Rainbow("Copy to #{host} was skipped, skipping activation as well").yellow
           skipped_activation << host
           next
         end
 
         if deploy_to_host(nix, host, deps[host], toplevel, action) == :skip
-          puts "Skipping #{host}"
+          puts Rainbow("Skipping #{host}").yellow
           skipped_activation << host
           next
         end
@@ -246,7 +246,7 @@ module ConfCtl::Cli
       if opts[:reboot]
         host_toplevels.each do |host, toplevel|
           if skipped_activation.include?(host)
-            puts "Activation on #{host} was skipped, skipping reboot as well"
+            puts Rainbow("Activation on #{host} was skipped, skipping reboot as well").yellow
             next
           end
 
@@ -265,17 +265,17 @@ module ConfCtl::Cli
         dep = deps[host]
 
         if copy_to_host(nix, host, dep, toplevel) == :skip
-          puts "Skipping #{host}"
+          puts Rainbow("Skipping #{host}").yellow
           next
         end
 
         if deploy_to_host(nix, host, dep, toplevel, action) == :skip
-          puts "Skipping #{host}"
+          puts Rainbow("Skipping #{host}").yellow
           next
         end
 
         if opts[:reboot] && reboot_host(host, dep) == :skip
-          puts "Skipping #{host}"
+          puts Rainbow("Skipping #{host}").yellow
           next
         end
 
@@ -284,7 +284,7 @@ module ConfCtl::Cli
     end
 
     def copy_to_host(nix, host, dep, toplevel)
-      puts "Copying configuration to #{host} (#{dep.target_host})"
+      puts Rainbow("Copying configuration to #{host} (#{dep.target_host})").yellow
 
       if opts[:interactive] && !ask_confirmation(always: true)
         return :skip
@@ -299,14 +299,14 @@ module ConfCtl::Cli
 
     def deploy_to_host(nix, host, dep, toplevel, action)
       if opts['dry-activate-first']
-        puts "Trying to activate configuration on #{host} (#{dep.target_host})"
+        puts Rainbow("Trying to activate configuration on #{host} (#{dep.target_host})").yellow
 
         unless nix.activate(dep, toplevel, 'dry-activate')
           fail "Error while activating configuration on #{host}"
         end
       end
 
-      puts "Activating configuration on #{host} (#{dep.target_host}): #{action}"
+      puts Rainbow("Activating configuration on #{host} (#{dep.target_host}): #{action}").yellow
 
       if opts[:interactive] && !ask_confirmation(always: true)
         return :skip
@@ -323,11 +323,11 @@ module ConfCtl::Cli
 
     def reboot_host(host, dep)
       if dep.localhost?
-        puts "Skipping reboot of #{host} as it is localhost"
+        puts Rainbow("Skipping reboot of #{host} as it is localhost").yellow
         return :skip
       end
 
-      puts "Rebooting #{host} (#{dep.target_host})"
+      puts Rainbow("Rebooting #{host} (#{dep.target_host})").yellow
 
       if opts[:interactive] && !ask_confirmation(always: true)
         return :skip
@@ -339,7 +339,7 @@ module ConfCtl::Cli
         m.reboot
       else
         secs = m.reboot_and_wait(timeout: wait_online == :wait ? nil : wait_online)
-        puts "#{host} (#{dep.target_host}) is online (took #{secs.round(1)}s to reboot)"
+        puts Rainbow("#{host} (#{dep.target_host}) is online (took #{secs.round(1)}s to reboot)").yellow
       end
     end
 
