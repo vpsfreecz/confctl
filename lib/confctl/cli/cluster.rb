@@ -154,119 +154,33 @@ module ConfCtl::Cli
     end
 
     def changelog
-      deps = select_deployments(args[0]).managed
-
-      ask_confirmation! do
-        puts "Compare swpins on the following deployments:"
-        list_deployments(deps)
-      end
-
-      statuses = Hash[deps.map do |host, dep|
-        [host, ConfCtl::MachineStatus.new(dep)]
-      end]
-
-      channels = ConfCtl::Swpins::ChannelList.new
-      channels.each(&:parse)
-
-      ConfCtl::Swpins::ClusterNameList.new(
-        deployments: deps,
-        channels: channels,
-      ).each do |cn|
-        cn.parse
-
-        statuses[cn.name].target_swpin_specs = cn.specs
-      end
-
-      statuses.each do |host, st|
-        st.query(toplevel: false, generations: false)
-        st.evaluate
-
-        unless st.online?
-          puts "#{host} is offline"
-          next
-        end
-
-        st.target_swpin_specs.each do |name, spec|
-          next if args[1] && !ConfCtl::Pattern.match?(args[1], name)
-
-          if st.swpins_info[name]
-            puts "#{host} @ #{name}:"
-
-            begin
-              s = spec.string_changelog_info(
-                opts[:downgrade] ? :downgrade : :upgrade,
-                st.swpins_info[name],
-                verbose: opts[:verbose],
-                patch: opts[:patch],
-              )
-            rescue ConfCtl::Error => e
-              puts e.message
-            else
-              puts (s || 'no changes')
-            end
-          else
-            puts "#{host} @ #{name} in unknown state"
-          end
-
-          puts
+      compare_swpins do |host, status, sw_name, spec|
+        begin
+          s = spec.string_changelog_info(
+            opts[:downgrade] ? :downgrade : :upgrade,
+            status.swpins_info[sw_name],
+            verbose: opts[:verbose],
+            patch: opts[:patch],
+          )
+        rescue ConfCtl::Error => e
+          puts e.message
+        else
+          puts (s || 'no changes')
         end
       end
     end
 
     def diff
-      deps = select_deployments(args[0]).managed
-
-      ask_confirmation! do
-        puts "Compare swpins on the following deployments:"
-        list_deployments(deps)
-      end
-
-      statuses = Hash[deps.map do |host, dep|
-        [host, ConfCtl::MachineStatus.new(dep)]
-      end]
-
-      channels = ConfCtl::Swpins::ChannelList.new
-      channels.each(&:parse)
-
-      ConfCtl::Swpins::ClusterNameList.new(
-        deployments: deps,
-        channels: channels,
-      ).each do |cn|
-        cn.parse
-
-        statuses[cn.name].target_swpin_specs = cn.specs
-      end
-
-      statuses.each do |host, st|
-        st.query(toplevel: false, generations: false)
-        st.evaluate
-
-        unless st.online?
-          puts "#{host} is offline"
-          next
-        end
-
-        st.target_swpin_specs.each do |name, spec|
-          next if args[1] && !ConfCtl::Pattern.match?(args[1], name)
-
-          if st.swpins_info[name]
-            puts "#{host} @ #{name}:"
-
-            begin
-              s = spec.string_diff_info(
-                opts[:downgrade] ? :downgrade : :upgrade,
-                st.swpins_info[name],
-              )
-            rescue ConfCtl::Error => e
-              puts e.message
-            else
-              puts (s || 'no changes')
-            end
-          else
-            puts "#{host} @ #{name} in unknown state"
-          end
-
-          puts
+      compare_swpins do |host, status, sw_name, spec|
+        begin
+          s = spec.string_diff_info(
+            opts[:downgrade] ? :downgrade : :upgrade,
+            status.swpins_info[sw_name],
+          )
+        rescue ConfCtl::Error => e
+          puts e.message
+        else
+          puts (s || 'no changes')
         end
       end
     end
@@ -579,6 +493,55 @@ module ConfCtl::Cli
       end
 
       ret
+    end
+
+    def compare_swpins
+      deps = select_deployments(args[0]).managed
+
+      ask_confirmation! do
+        puts "Compare swpins on the following deployments:"
+        list_deployments(deps)
+      end
+
+      statuses = Hash[deps.map do |host, dep|
+        [host, ConfCtl::MachineStatus.new(dep)]
+      end]
+
+      channels = ConfCtl::Swpins::ChannelList.new
+      channels.each(&:parse)
+
+      ConfCtl::Swpins::ClusterNameList.new(
+        deployments: deps,
+        channels: channels,
+      ).each do |cn|
+        cn.parse
+
+        statuses[cn.name].target_swpin_specs = cn.specs
+      end
+
+      statuses.each do |host, st|
+        st.query(toplevel: false, generations: false)
+        st.evaluate
+
+        unless st.online?
+          puts "#{host} is offline"
+          next
+        end
+
+        st.target_swpin_specs.each do |name, spec|
+          next if args[1] && !ConfCtl::Pattern.match?(args[1], name)
+
+          if st.swpins_info[name]
+            puts "#{host} @ #{name}:"
+
+            yield(host, st, name, spec)
+          else
+            puts "#{host} @ #{name} in unknown state"
+          end
+
+          puts
+        end
+      end
     end
 
     def parse_wait_online
