@@ -13,12 +13,19 @@ module ConfCtl::Cli
 
       r, w = IO.pipe
 
-      pid = Kernel.spawn(
-        ENV['PAGER'],
-        :in => r,
-        w => :close,
-        :close_others => true,
-      )
+      begin
+        pid = Kernel.spawn(
+          ENV['PAGER'],
+          :in => r,
+          w => :close,
+          :close_others => true,
+        )
+      rescue SystemCallError => e
+        r.close
+        w.close
+        raise ConfCtl::Error, "unable to spawn pager: #{e.message} (#{e.class})"
+      end
+
       r.close
 
       Signal.trap('INT') {}
