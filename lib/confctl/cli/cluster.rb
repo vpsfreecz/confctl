@@ -154,7 +154,7 @@ module ConfCtl::Cli
     end
 
     def changelog
-      compare_swpins do |host, status, sw_name, spec|
+      compare_swpins do |io, host, status, sw_name, spec|
         begin
           s = spec.string_changelog_info(
             opts[:downgrade] ? :downgrade : :upgrade,
@@ -163,24 +163,24 @@ module ConfCtl::Cli
             patch: opts[:patch],
           )
         rescue ConfCtl::Error => e
-          puts e.message
+          io.puts e.message
         else
-          puts (s || 'no changes')
+          io.puts (s || 'no changes')
         end
       end
     end
 
     def diff
-      compare_swpins do |host, status, sw_name, spec|
+      compare_swpins do |io, host, status, sw_name, spec|
         begin
           s = spec.string_diff_info(
             opts[:downgrade] ? :downgrade : :upgrade,
             status.swpins_info[sw_name],
           )
         rescue ConfCtl::Error => e
-          puts e.message
+          io.puts e.message
         else
-          puts (s || 'no changes')
+          io.puts (s || 'no changes')
         end
       end
     end
@@ -519,27 +519,29 @@ module ConfCtl::Cli
         statuses[cn.name].target_swpin_specs = cn.specs
       end
 
-      statuses.each do |host, st|
-        st.query(toplevel: false, generations: false)
-        st.evaluate
+      Pager.open do |io|
+        statuses.each do |host, st|
+          st.query(toplevel: false, generations: false)
+          st.evaluate
 
-        unless st.online?
-          puts "#{host} is offline"
-          next
-        end
-
-        st.target_swpin_specs.each do |name, spec|
-          next if args[1] && !ConfCtl::Pattern.match?(args[1], name)
-
-          if st.swpins_info[name]
-            puts "#{host} @ #{name}:"
-
-            yield(host, st, name, spec)
-          else
-            puts "#{host} @ #{name} in unknown state"
+          unless st.online?
+            io.puts "#{host} is offline"
+            next
           end
 
-          puts
+          st.target_swpin_specs.each do |name, spec|
+            next if args[1] && !ConfCtl::Pattern.match?(args[1], name)
+
+            if st.swpins_info[name]
+              io.puts "#{host} @ #{name}:"
+
+              yield(io, host, st, name, spec)
+            else
+              io.puts "#{host} @ #{name} in unknown state"
+            end
+
+            io.puts
+          end
         end
       end
     end
