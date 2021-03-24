@@ -497,10 +497,10 @@ module ConfCtl::Cli
       ConfCtl::Swpins::ClusterNameList.new(deployments: deps).each do |cn|
         cn.parse
 
-        puts Rainbow("Checking swpins for #{cn.name}...").yellow
+        puts Rainbow("Checking swpins for #{cn.name}...").bright
 
         cn.specs.each do |name, s|
-          puts "  #{Rainbow(name).bright} ... "+
+          puts "  #{name} ... "+
                (s.valid? ? Rainbow('ok').green : Rainbow('needs update').cyan)
           ret = false unless s.valid?
         end
