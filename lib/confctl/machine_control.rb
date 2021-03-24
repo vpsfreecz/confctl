@@ -22,10 +22,12 @@ module ConfCtl
       initial_uptime = get_uptime
       t = Time.now
       went_down = false
-      yield :reboot if block_given?
       reboot
+      yield :reboot, timeout if block_given?
 
       loop do
+        state = nil
+
         begin
           current_uptime = with_ssh_opts(
             '-o', 'ConnectTimeout=3',
@@ -34,21 +36,25 @@ module ConfCtl
           ) { get_uptime }
 
           if current_uptime < initial_uptime
-            yield :is_up if block_given?
+            yield :is_up, nil
             return Time.now - t
           end
         rescue CommandFailed
           if went_down
-            yield :is_down if block_given?
+            state = :is_down
           else
-            yield :went_down if block_given?
+            state = :went_down
             went_down = true
           end
         end
 
-        if timeout && (t + timeout) < Time.now
-          yield :timeout if block_given?
-          fail 'timeout'
+        if timeout
+          timeleft = (t + timeout) - Time.now
+
+          fail 'timeout' if timeleft <= 0
+          yield state, timeleft if block_given?
+        elsif block_given?
+          yield state, nil
         end
 
         sleep(0.3)

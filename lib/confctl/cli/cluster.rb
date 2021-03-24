@@ -1,6 +1,7 @@
 require_relative 'command'
 require 'json'
 require 'rainbow'
+require 'tty-spinner'
 
 module ConfCtl::Cli
   class Cluster < Command
@@ -338,7 +339,30 @@ module ConfCtl::Cli
       if wait_online == :nowait
         m.reboot
       else
-        secs = m.reboot_and_wait(timeout: wait_online == :wait ? nil : wait_online)
+        since = Time.now
+        spinner = nil
+
+        secs = m.reboot_and_wait(
+          timeout: wait_online == :wait ? nil : wait_online,
+        ) do |state, timeleft|
+          if state == :reboot
+            spinner = TTY::Spinner.new(
+              ":spinner Waiting for #{host} (:seconds s)",
+              format: :classic,
+            )
+            spinner.auto_spin
+          elsif state == :is_up
+            spinner.success('up')
+            next
+          end
+
+          if wait_online == :wait
+            spinner.update(seconds: (Time.now - since).round)
+          else
+            spinner.update(seconds: timeleft.round)
+          end
+        end
+
         puts Rainbow("#{host} (#{dep.target_host}) is online (took #{secs.round(1)}s to reboot)").yellow
       end
     end
