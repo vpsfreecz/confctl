@@ -24,14 +24,16 @@ SYNOPSIS
     confctl [global options] command [command options] [arguments...]
 
 GLOBAL OPTIONS
-    --help - Show this message
+    -c, --color=arg - Toggle color mode (default: auto)
+    --help          - Show this message
 
 COMMANDS
     add        - Add a new deployment
     build      - Build target systems
+    changelog  - Changelog between deployed and configured swpins
     cssh       - Open ClusterSSH
     deploy     - Deploy target systems
-    diff       - Compare deployed and configured swpins
+    diff       - Diff between deployed and configured swpins
     gen-data   - Generate data files
     help       - Shows a list of commands or help for one command
     init       - Create a new configuration
