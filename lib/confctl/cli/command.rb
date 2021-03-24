@@ -30,5 +30,16 @@ module ConfCtl::Cli
       arg = required[ args.count ]
       raise GLI::BadCommandLine, "missing argument <#{arg}>"
     end
+
+    def use_color?
+      case gopts[:color]
+      when 'always'
+        true
+      when 'never'
+        false
+      when 'auto'
+        STDOUT.tty?
+      end
+    end
  end
 end

@@ -24,6 +24,9 @@ module ConfCtl::Cli
       arguments :strict
       hide_commands_without_desc true
 
+      desc 'Toggle color mode'
+      flag %i(c color), must_match: %w(always never auto), default_value: 'auto'
+
       desc 'Create a new configuration'
       command :init do |c|
         c.action &Command.run(Configuration, :init)

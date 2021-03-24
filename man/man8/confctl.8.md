@@ -38,6 +38,11 @@ similarly to shell patterns, see
 <http://ruby-doc.org/core/File.html#method-c-fnmatch-3F> for more
 information.
 
+## GLOBAL OPTIONS
+`-c`, `--color` `always`|`never`|`auto`
+  Set output color mode. Defaults to `auto`, which enables colors when
+  the standard output is connected to a terminal.
+
 ## COMMANDS
 `confctl init`
   Create a new configuration in the current directory. The current directory
