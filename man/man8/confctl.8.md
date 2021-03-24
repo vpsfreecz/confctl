@@ -184,6 +184,9 @@ information.
       e.g. when doing a downgrade. Show a list of changes that are deployed
       on the hosts and are missing in the configured software pins.
 
+    `-v`, `--verbose`
+      Show full-length changelog descriptions.
+
 `confctl cssh` [*options*] [*host-pattern*]
   Open ClusterSSH on selected or all hosts.
 

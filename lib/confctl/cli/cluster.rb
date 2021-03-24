@@ -193,12 +193,14 @@ module ConfCtl::Cli
             puts "#{host} @ #{name}:"
 
             begin
-              s =
+              m =
                 if opts[:downgrade]
-                  spec.string_changelog_downgrade_info(st.swpins_info[name])
+                  :string_changelog_downgrade_info
                 else
-                  spec.string_changelog_upgrade_info(st.swpins_info[name])
+                  :string_changelog_upgrade_info
                 end
+
+              s = spec.send(m, st.swpins_info[name], verbose: opts[:verbose])
             rescue ConfCtl::Error => e
               puts e.message
             else

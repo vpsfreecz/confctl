@@ -181,6 +181,9 @@ module ConfCtl::Cli
         c.desc 'Show a changelog for downgrade'
         c.switch %i(d downgrade)
 
+        c.desc 'Show full-length changelog descriptions'
+        c.switch %i(v verbose)
+
         c.action &Command.run(Cluster, :changelog)
       end
 

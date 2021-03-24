@@ -41,15 +41,21 @@ module ConfCtl
       other_info['rev'] == info['rev'] && other_info['sha256'] == info['sha256']
     end
 
-    def string_changelog_upgrade_info(other_info)
+    def string_changelog_upgrade_info(other_info, verbose: false)
+      opts = []
+      opts << '--oneline' unless verbose
+
       string_changelog_info(other_info) do |mirror|
-        mirror.log(other_info['rev'], state['rev'], opts: ['--oneline'])
+        mirror.log(other_info['rev'], state['rev'], opts: opts)
       end
     end
 
-    def string_changelog_downgrade_info(other_info)
+    def string_changelog_downgrade_info(other_info, verbose: false)
+      opts = []
+      opts << '--oneline' unless verbose
+
       string_changelog_info(other_info) do |mirror|
-        mirror.log(state['rev'], other_info['rev'], opts: ['--oneline'])
+        mirror.log(state['rev'], other_info['rev'], opts: opts)
       end
     end
 

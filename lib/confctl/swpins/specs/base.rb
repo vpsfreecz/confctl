@@ -86,14 +86,14 @@ module ConfCtl
     # Generate changelog between revisions
     # @param other [any] version reference
     # @return [String, nil]
-    def string_changelog_upgrade_info(other_info)
+    def string_changelog_upgrade_info(other_info, **kwargs)
       raise NotImplementedError
     end
 
     # Generate changelog between revisions
     # @param other [any] version reference
     # @return [String, nil]
-    def string_changelog_downgrade_info(other_info)
+    def string_changelog_downgrade_info(other_info, **kwargs)
       raise NotImplementedError
     end
 
