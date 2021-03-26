@@ -104,11 +104,17 @@ module ConfCtl
     end
 
     def add_gcroot
-      GCRoot.add(gcroot_name, dir)
+      GCRoot.add(gcroot_name('toplevel'), toplevel_path)
+      swpin_paths.each do |name, path|
+        GCRoot.add(gcroot_name("swpin.#{name}"), toplevel_path)
+      end
     end
 
     def remove_gcroot
-      GCRoot.remove(gcroot_name)
+      GCRoot.remove(gcroot_name('toplevel'))
+      swpin_paths.each do |name, path|
+        GCRoot.remove(gcroot_name("swpin.#{name}"))
+      end
     end
 
     def dir
@@ -132,8 +138,8 @@ module ConfCtl
       @escaped_host ||= ConfCtl.safe_host_name(host)
     end
 
-    def gcroot_name
-      "#{escaped_host}-generation-#{name}"
+    def gcroot_name(file)
+      "#{escaped_host}-generation-#{name}-#{file}"
     end
   end
 end
