@@ -18,7 +18,7 @@ module ConfCtl::Cli
     def setup
       Thread.abort_on_exception = true
 
-      program_desc 'Manage vpsFree.cz cluster configuration and deployments'
+      program_desc 'Nix deployment configuration management tool'
       subcommand_option_handling :normal
       preserve_argv true
       arguments :strict
