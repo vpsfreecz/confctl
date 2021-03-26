@@ -105,16 +105,12 @@ module ConfCtl::Cli
         end
       else
         host_generations = do_build(deps)
-
-        host_generations.each do |host, gen|
-          statuses[host].target_toplevel = gen.toplevel
-        end
-
         puts
       end
 
-      # Assign configured swpins
+      # Assign configured toplevel and swpins
       host_generations.each do |host, gen|
+        statuses[host].target_toplevel = gen.toplevel
         statuses[host].target_swpin_specs = gen.swpin_specs
       end
 
