@@ -103,7 +103,7 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
-`confctl deploy` [*options*] [*host-pattern*] [`boot`|`switch`|`test`|`dry-activate`]
+`confctl deploy` [*options*] [*host-pattern* [`boot`|`switch`|`test`|`dry-activate`]]
   Deploy either a new or an existing build generation to matching hosts.
 
   *switch-action* is the argument to `switch-to-configuration` called on
@@ -165,7 +165,7 @@ information.
     `-g`, `--generation` *generation*|`current`
       Check status against a selected generation instead of a new build.
 
-`confctl changelog` [*options*] [[*host-pattern*] [*sw-pattern*]]
+`confctl changelog` [*options*] [*host-pattern* [*sw-pattern*]]
   Show differences in deployed and configured software pins. For git software
   pins, it's a git log.
 
@@ -205,7 +205,7 @@ information.
     `-p`, `--patch`
       Show patches.
 
-`confctl diff` [*options*] [[*host-pattern*] [*sw-pattern*]]
+`confctl diff` [*options*] [*host-pattern* [*sw-pattern*]]
   Show differences in deployed and configured software pins. For git software
   pins, it's a git diff.
 
