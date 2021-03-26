@@ -1,8 +1,11 @@
+require 'confctl/utils/file'
 require 'etc'
 require 'fileutils'
 
 module ConfCtl
   module GCRoot
+    extend Utils::File
+
     def self.dir
       File.join('/nix/var/nix/gcroots/per-user', Etc.getlogin, 'confctl')
     end
@@ -17,7 +20,7 @@ module ConfCtl
     end
 
     def self.remove(name)
-      File.unlink(File.join(dir, name))
+      unlink_if_exists(File.join(dir, name))
     end
   end
 end
