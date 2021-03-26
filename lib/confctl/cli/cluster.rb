@@ -80,13 +80,15 @@ module ConfCtl::Cli
       deps = select_deployments(args[0]).managed
 
       ask_confirmation! do
-        if opts[:toplevel]
-          puts "The following deployments will be built and then checked:"
-        else
+        if opts[:generation]
           puts "The following deployments will be checked:"
+        else
+          puts "The following deployments will be built and then checked:"
         end
 
         list_deployments(deps)
+        puts
+        puts "Generation: #{opts[:generation] || 'new build'}"
       end
 
       statuses = Hash[deps.map do |host, dep|
@@ -94,7 +96,14 @@ module ConfCtl::Cli
       end]
 
       # Evaluate toplevels
-      if opts[:toplevel]
+      if opts[:generation]
+        host_generations = find_generations(deps, opts[:generation])
+
+        # Ignore statuses when no generation was found
+        statuses.delete_if do |host, st|
+          !host_generations.has_key?(host)
+        end
+      else
         host_generations = do_build(deps)
 
         host_generations.each do |host, gen|
@@ -104,18 +113,9 @@ module ConfCtl::Cli
         puts
       end
 
-      # Read configured swpins
-      # TODO: this is done by do_build() as well
-      channels = ConfCtl::Swpins::ChannelList.new
-      channels.each(&:parse)
-
-      ConfCtl::Swpins::ClusterNameList.new(
-        deployments: deps,
-        channels: channels,
-      ).each do |cn|
-        cn.parse
-
-        statuses[cn.name].target_swpin_specs = cn.specs
+      # Assign configured swpins
+      host_generations.each do |host, gen|
+        statuses[host].target_swpin_specs = gen.swpin_specs
       end
 
       # Check runtime status
@@ -123,7 +123,7 @@ module ConfCtl::Cli
 
       statuses.each do |host, st|
         tw.add do
-          st.query(toplevel: opts[:toplevel])
+          st.query
         end
       end
 
@@ -435,7 +435,7 @@ module ConfCtl::Cli
           puts "Generation '#{generation_name}' was not found on the following hosts:"
           missing_hosts.each { |host| puts "  #{host}" }
           puts
-          puts "These hosts will not be deployed."
+          puts "These hosts will be ignored."
         end
       end
 

@@ -162,9 +162,8 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
-    `--[no-]toplevel`
-      In order to check whether the selected hosts are up-to-date, `confctl` has
-      to build them all. Enabled by default.
+    `-g`, `--generation` *generation*|`current`
+      Check status against a selected generation instead of a new build.
 
 `confctl changelog` [*options*] [[*host-pattern*] [*sw-pattern*]]
   Show differences in deployed and configured software pins. For git software

@@ -166,8 +166,8 @@ module ConfCtl::Cli
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w(y yes)
 
-        c.desc 'Check toplevels'
-        c.switch :toplevel, negatable: true, default_value: true
+        c.desc 'Check status against selected generation'
+        c.flag %i(g generation)
 
         c.action &Command.run(Cluster, :status)
       end
