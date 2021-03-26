@@ -59,13 +59,13 @@ module ConfCtl::Cli
         puts "Target action: #{action}#{opts[:reboot] ? ' + reboot' : ''}"
       end
 
-      host_toplevels = do_build(deps)
+      host_generations = do_build(deps)
       nix = ConfCtl::Nix.new(show_trace: opts['show-trace'])
 
       if opts['one-by-one']
-        deploy_one_by_one(deps, host_toplevels, nix, action)
+        deploy_one_by_one(deps, host_generations, nix, action)
       else
-        deploy_in_bulk(deps, host_toplevels, nix, action)
+        deploy_in_bulk(deps, host_generations, nix, action)
       end
     end
 
@@ -88,10 +88,10 @@ module ConfCtl::Cli
 
       # Evaluate toplevels
       if opts[:toplevel]
-        host_toplevels = do_build(deps)
+        host_generations = do_build(deps)
 
-        host_toplevels.each do |host, toplevel|
-          statuses[host].target_toplevel = toplevel
+        host_generations.each do |host, gen|
+          statuses[host].target_toplevel = gen.toplevel
         end
 
         puts
@@ -218,25 +218,25 @@ module ConfCtl::Cli
     protected
     attr_reader :wait_online
 
-    def deploy_in_bulk(deps, host_toplevels, nix, action)
+    def deploy_in_bulk(deps, host_generations, nix, action)
       skipped_copy = []
       skipped_activation = []
 
-      host_toplevels.each do |host, toplevel|
-        if copy_to_host(nix, host, deps[host], toplevel) == :skip
+      host_generations.each do |host, gen|
+        if copy_to_host(nix, host, deps[host], gen.toplevel) == :skip
           puts Rainbow("Skipping #{host}").yellow
           skipped_copy << host
         end
       end
 
-      host_toplevels.each do |host, toplevel|
+      host_generations.each do |host, gen|
         if skipped_copy.include?(host)
           puts Rainbow("Copy to #{host} was skipped, skipping activation as well").yellow
           skipped_activation << host
           next
         end
 
-        if deploy_to_host(nix, host, deps[host], toplevel, action) == :skip
+        if deploy_to_host(nix, host, deps[host], gen.toplevel, action) == :skip
           puts Rainbow("Skipping #{host}").yellow
           skipped_activation << host
           next
@@ -246,7 +246,7 @@ module ConfCtl::Cli
       end
 
       if opts[:reboot]
-        host_toplevels.each do |host, toplevel|
+        host_generations.each do |host, gen|
           if skipped_activation.include?(host)
             puts Rainbow("Activation on #{host} was skipped, skipping reboot as well").yellow
             next
@@ -262,16 +262,16 @@ module ConfCtl::Cli
       end
     end
 
-    def deploy_one_by_one(deps, host_toplevels, nix, action)
-      host_toplevels.each do |host, toplevel|
+    def deploy_one_by_one(deps, host_generations, nix, action)
+      host_generations.each do |host, gen|
         dep = deps[host]
 
-        if copy_to_host(nix, host, dep, toplevel) == :skip
+        if copy_to_host(nix, host, dep, gen.toplevel) == :skip
           puts Rainbow("Skipping #{host}").yellow
           next
         end
 
-        if deploy_to_host(nix, host, dep, toplevel, action) == :skip
+        if deploy_to_host(nix, host, dep, gen.toplevel, action) == :skip
           puts Rainbow("Skipping #{host}").yellow
           next
         end
@@ -381,21 +381,6 @@ module ConfCtl::Cli
       end
     end
 
-    def ask_confirmation(always: false)
-      return true if !always && opts[:yes]
-
-      yield if block_given?
-      STDOUT.write("\nContinue? [y/N]: ")
-      STDOUT.flush
-      ret = STDIN.readline.strip.downcase == 'y'
-      puts
-      ret
-    end
-
-    def ask_confirmation!(**kwargs, &block)
-      fail 'Aborted' unless ask_confirmation(**kwargs, &block)
-    end
-
     def list_deployments(deps)
       cols =
         if opts[:output]
@@ -413,35 +398,56 @@ module ConfCtl::Cli
 
     def do_build(deps)
       nix = ConfCtl::Nix.new(show_trace: opts['show-trace'])
-      host_swpins = {}
+      host_swpin_paths = {}
 
       autoupdate_swpins(deps)
+      host_swpin_specs = check_swpins(deps)
 
-      unless check_swpins(deps)
+      unless host_swpin_specs
         fail 'one or more swpins need to be updated'
       end
 
       deps.each do |host, d|
         puts Rainbow("Evaluating swpins for #{host}...").bright
-        host_swpins[host] = nix.eval_swpins(host).update(d.nix_paths)
+        host_swpin_paths[host] = nix.eval_swpins(host).update(d.nix_paths)
       end
 
-      grps = swpin_build_groups(host_swpins)
+      grps = swpin_build_groups(host_swpin_paths)
       puts
       puts "Deployments will be built in #{grps.length} groups"
       puts
-      host_toplevels = {}
+      host_generations = {}
+      time = Time.now
 
-      grps.each do |hosts, swpins|
+      grps.each do |hosts, swpin_paths|
         puts Rainbow("Building deployments").bright
         hosts.each { |h| puts "  #{h}" }
         puts "with swpins"
-        swpins.each { |k, v| puts "  #{k}=#{v}" }
+        swpin_paths.each { |k, v| puts "  #{k}=#{v}" }
 
-        host_toplevels.update(nix.build_toplevels(hosts, swpins))
+        host_generations.update(nix.build_toplevels(
+          hosts: hosts,
+          swpin_paths: swpin_paths,
+          time: time,
+          host_swpin_specs: host_swpin_specs,
+        ))
       end
 
-      host_toplevels
+      generation_hosts = {}
+
+      host_generations.each do |host, gen|
+        generation_hosts[gen.name] ||= []
+        generation_hosts[gen.name] << host
+      end
+
+      puts
+      puts Rainbow("Built generations:").bright
+      generation_hosts.each do |gen, hosts|
+        puts Rainbow(gen).cyan
+        hosts.each { |host| puts "  #{host}" }
+      end
+
+      host_generations
     end
 
     def autoupdate_swpins(deps)
@@ -493,7 +499,8 @@ module ConfCtl::Cli
     end
 
     def check_swpins(deps)
-      ret = true
+      ret = {}
+      valid = true
 
       ConfCtl::Swpins::ClusterNameList.new(deployments: deps).each do |cn|
         cn.parse
@@ -503,11 +510,13 @@ module ConfCtl::Cli
         cn.specs.each do |name, s|
           puts "  #{name} ... "+
                (s.valid? ? Rainbow('ok').green : Rainbow('needs update').cyan)
-          ret = false unless s.valid?
+          valid = false unless s.valid?
         end
+
+        ret[cn.name] = cn.specs
       end
 
-      ret
+      valid ? ret : false
     end
 
     def swpin_build_groups(host_swpins)

@@ -12,7 +12,7 @@ module ConfCtl
     # @return [String]
     attr_reader :path
 
-    # @return [Array<Swpins::Specs::Base>]
+    # @return [Hash<String, Swpins::Specs::Base>]
     attr_reader :specs
 
     # @return [Array<Swpins::Channel>]

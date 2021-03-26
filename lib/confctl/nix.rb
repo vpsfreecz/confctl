@@ -1,3 +1,4 @@
+require 'confctl/utils/file'
 require 'etc'
 require 'json'
 require 'securerandom'
@@ -5,6 +6,8 @@ require 'tempfile'
 
 module ConfCtl
   class Nix
+    include Utils::File
+
     def initialize(conf_dir: nil, show_trace: false)
       @conf_dir = conf_dir || ConfCtl.conf_dir
       @show_trace = show_trace
@@ -51,7 +54,11 @@ module ConfCtl
         build: :evalSwpins,
         deployments: [host],
       }) do |arg|
-        out_link = File.join(cache_dir, 'gcroots', "#{escape_name(host)}.swpins")
+        out_link = File.join(
+          cache_dir,
+          'build',
+          "#{ConfCtl.safe_host_name(host)}.swpins",
+        )
 
         cmd = [
           'nix-build',
@@ -67,33 +74,33 @@ module ConfCtl
           fail "nix-build failed with exit status #{$?.exitstatus}"
         end
 
-        add_gcroot(
-          "confctl-#{escape_name(host)}.swpins",
-          File.absolute_path(out_link)
-        )
         JSON.parse(File.read(output))[host]
       end
     end
 
     # Build config.system.build.toplevel for selected hosts
     # @param hosts [Array<String>]
-    # @param swpins [Hash]
-    # @return [Hash]
-    def build_toplevels(hosts, swpins)
+    # @param swpin_paths [Hash]
+    # @param host_swpin_specs [Hash]
+    # @param time [Time]
+    # @return [Hash<String, BuildGeneration>]
+    def build_toplevels(hosts: [], swpin_paths: {}, host_swpin_specs: {}, time: nil)
       with_argument({
         confDir: conf_dir,
         build: :toplevel,
         deployments: hosts,
       }) do |arg|
-        gcroot = File.join(cache_dir, 'gcroots', "#{SecureRandom.hex(4)}.build")
+        time ||= Time.now
+        ret_generations = {}
+        out_link = File.join(cache_dir, 'build', "#{SecureRandom.hex(4)}.build")
 
         pid = Process.fork do
-          ENV['NIX_PATH'] = build_nix_path(swpins)
+          ENV['NIX_PATH'] = build_nix_path(swpin_paths)
 
           Process.exec(*[
             'nix-build',
             '--arg', 'jsonArg', arg,
-            '--out-link', gcroot,
+            '--out-link', out_link,
             (show_trace ? '--show-trace' : nil),
             ConfCtl.nix_asset('evaluator.nix'),
           ].compact)
@@ -106,23 +113,30 @@ module ConfCtl
         end
 
         begin
-          host_toplevels = JSON.parse(File.read(gcroot))
+          host_toplevels = JSON.parse(File.read(out_link))
           host_toplevels.each do |host, toplevel|
-            host_gcroot = File.join(
-              cache_dir,
-              'gcroots',
-              "#{escape_name(host)}.toplevel"
-            )
-            replace_symlink(host_gcroot, toplevel)
-            add_gcroot(
-              "confctl-#{escape_name(host)}.toplevel",
-              File.absolute_path(host_gcroot)
-            )
+            host_generations = BuildGenerationList.new(host)
+            generation = host_generations.find(toplevel, swpin_paths)
+
+            if generation.nil?
+              generation = BuildGeneration.new(host)
+              generation.create(
+                toplevel,
+                swpin_paths,
+                host_swpin_specs[host],
+                date: time,
+              )
+              generation.save
+            end
+
+            host_generations.current = generation
+            ret_generations[host] = generation
           end
         ensure
-          unlink_if_exists(gcroot)
+          unlink_if_exists(out_link)
         end
-        host_toplevels
+
+        ret_generations
       end
     end
 
@@ -235,33 +249,6 @@ module ConfCtl
         value.delete('_module')
         value.each { |k, v| demodulify(v) }
       end
-    end
-
-    def add_gcroot(name, path)
-      replace_symlink(
-        File.join('/nix/var/nix/gcroots/per-user', Etc.getlogin, name),
-        path
-      )
-    end
-
-    # Atomically replace or create symlink
-    # @param path [String] symlink path
-    # @param dst [String] destination
-    def replace_symlink(path, dst)
-      replacement = "#{path}.new-#{SecureRandom.hex(3)}"
-      File.symlink(dst, replacement)
-      File.rename(replacement, path)
-    end
-
-    def unlink_if_exists(path)
-      File.unlink(path)
-      true
-    rescue Errno::ENOENT
-      false
-    end
-
-    def escape_name(host)
-      host.gsub(/\//, ':')
     end
 
     def cache_dir

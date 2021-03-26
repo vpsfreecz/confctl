@@ -42,6 +42,21 @@ module ConfCtl::Cli
       @use_pager
     end
 
+    def ask_confirmation(always: false)
+      return true if !always && opts[:yes]
+
+      yield if block_given?
+      STDOUT.write("\nContinue? [y/N]: ")
+      STDOUT.flush
+      ret = STDIN.readline.strip.downcase == 'y'
+      puts
+      ret
+    end
+
+    def ask_confirmation!(**kwargs, &block)
+      fail 'Aborted' unless ask_confirmation(**kwargs, &block)
+    end
+
     protected
     def determine_color
       case gopts[:color]

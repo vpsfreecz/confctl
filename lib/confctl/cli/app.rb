@@ -226,6 +226,36 @@ module ConfCtl::Cli
         c.action &Command.run(Cluster, :cssh)
       end
 
+      desc 'Manage built host generations'
+      command :generation do |gen|
+        gen.desc 'List host generations'
+        gen.arg_name '[host-pattern [generation-pattern]]'
+        gen.command :ls do |c|
+          c.desc 'Filter by attribute'
+          c.flag %i(a attr), multiple: true
+
+          c.desc 'Filter by tag'
+          c.flag %i(t tag), multiple: true
+
+          c.action &Command.run(Generation, :list)
+        end
+
+        gen.desc 'Remove host generations'
+        gen.arg_name '[host-pattern [generation-pattern|old]]'
+        gen.command :rm do |c|
+          c.desc 'Filter by attribute'
+          c.flag %i(a attr), multiple: true
+
+          c.desc 'Filter by tag'
+          c.flag %i(t tag), multiple: true
+
+          c.desc 'Assume the answer to confirmations is yes'
+          c.switch %w(y yes)
+
+          c.action &Command.run(Generation, :remove)
+        end
+      end
+
       desc 'Generate data files'
       command 'gen-data' do |gen|
         gen.desc 'Fetch data from vpsAdmin'

@@ -83,7 +83,10 @@ information.
       filter deployments that do not have *tag* set.
 
 `confctl build` [*options*] [*host-pattern*]
-  Build matching hosts.
+  Build matching hosts. The result of a build is one generation for each built
+  host. Subsequent builds either return an existing generation if there had been
+  no changes for a host or a new generation is created. Built generations can
+  be managed using `confctl generation` command family.
 
     `--show-trace`
       Enable traces in Nix.
@@ -227,6 +230,36 @@ information.
 
 `confctl cssh` [*options*] [*host-pattern*]
   Open ClusterSSH on selected or all hosts.
+
+    `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
+      Filter deployments by selected attribute, which is either tested for
+      equality or inequality. Any attribute from configuration module
+      `cluster.<name>` can be tested.
+
+    `-t`, `--tag` *tag*|`^`*tag*
+      Filter deployments that have *tag* set. If the tag begins with `^`, then
+      filter deployments that do not have *tag* set.
+
+    `-y`, `--yes`
+      Do not ask for confirmation on standard input, assume the answer is yes.
+
+`confctl generation ls` [*host-pattern* [*generation-pattern*]]
+  List all or selected build generations.
+
+    `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
+      Filter deployments by selected attribute, which is either tested for
+      equality or inequality. Any attribute from configuration module
+      `cluster.<name>` can be tested.
+
+    `-t`, `--tag` *tag*|`^`*tag*
+      Filter deployments that have *tag* set. If the tag begins with `^`, then
+      filter deployments that do not have *tag* set.
+
+`confctl generation rm` [*host-pattern* [*generation-pattern*|`old`]]
+  Remove selected build generations.
+
+  `old` will remove all generations except the current one, i.e. the one that
+  was built by `confctl build` the last.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
       Filter deployments by selected attribute, which is either tested for
