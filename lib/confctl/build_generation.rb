@@ -133,7 +133,7 @@ module ConfCtl
     end
 
     def gcroot_name
-      "confctl-#{escaped_host}-generation-#{name}"
+      "#{escaped_host}-generation-#{name}"
     end
   end
 end
