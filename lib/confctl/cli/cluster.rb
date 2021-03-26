@@ -588,22 +588,37 @@ module ConfCtl::Cli
       ask_confirmation! do
         puts "Compare swpins on the following deployments:"
         list_deployments(deps)
+        puts
+        puts "Generation: #{opts[:generation] || 'current configuration'}"
       end
 
       statuses = Hash[deps.map do |host, dep|
         [host, ConfCtl::MachineStatus.new(dep)]
       end]
 
-      channels = ConfCtl::Swpins::ChannelList.new
-      channels.each(&:parse)
+      if opts[:generation]
+        host_generations = find_generations(deps, opts[:generation])
 
-      ConfCtl::Swpins::ClusterNameList.new(
-        deployments: deps,
-        channels: channels,
-      ).each do |cn|
-        cn.parse
+        host_generations.each do |host, gen|
+          statuses[host].target_swpin_specs = gen.swpin_specs
+        end
 
-        statuses[cn.name].target_swpin_specs = cn.specs
+        # Ignore statuses when no generation was found
+        statuses.delete_if do |host, st|
+          !host_generations.has_key?(host)
+        end
+      else
+        channels = ConfCtl::Swpins::ChannelList.new
+        channels.each(&:parse)
+
+        ConfCtl::Swpins::ClusterNameList.new(
+          deployments: deps,
+          channels: channels,
+        ).each do |cn|
+          cn.parse
+
+          statuses[cn.name].target_swpin_specs = cn.specs
+        end
       end
 
       TTY::Pager.page(enabled: use_pager?) do |io|

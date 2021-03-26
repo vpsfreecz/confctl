@@ -190,6 +190,10 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
+    `-g`, `--generation` *generation*|`current`
+      Show changelog against software pins from a selected generation instead
+      of the current configuration.
+
     `-d`, `--downgrade`
       Use when the configuration has older software pins than deployed hosts,
       e.g. when doing a downgrade. Show a list of changes that are deployed
@@ -225,6 +229,10 @@ information.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
+
+    `-g`, `--generation` *generation*|`current`
+      Show diff against software pins from a selected generation instead
+      of the current configuration.
 
     `-d`, `--downgrade`
       Use when the configuration has older software pins than deployed hosts,

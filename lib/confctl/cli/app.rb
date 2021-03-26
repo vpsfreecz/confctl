@@ -184,6 +184,9 @@ module ConfCtl::Cli
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w(y yes)
 
+        c.desc 'Show changelog against swpins from selected generation'
+        c.flag %i(g generation)
+
         c.desc 'Show a changelog for downgrade'
         c.switch %i(d downgrade)
 
@@ -207,6 +210,9 @@ module ConfCtl::Cli
 
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w(y yes)
+
+        c.desc 'Show diff against swpins from selected generation'
+        c.flag %i(g generation)
 
         c.desc 'Show a changelog for downgrade'
         c.switch %i(d downgrade)
