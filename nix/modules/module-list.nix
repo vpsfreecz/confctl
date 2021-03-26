@@ -1,6 +1,7 @@
 let
   shared = [
     ./cluster
+    ./confctl/generations.nix
     ./confctl/cli.nix
     ./confctl/nix.nix
     ./confctl/swpins.nix

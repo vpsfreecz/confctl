@@ -13,7 +13,7 @@ let
     value = {
       inherit (d) name;
       inherit (d.config) managed spin swpins host addresses netboot labels tags;
-      inherit (d.config) nix container node osNode vzNode;
+      inherit (d.config) nix buildGenerations container node osNode vzNode;
     };
   }) deployments;
 
@@ -62,6 +62,7 @@ let
       cfg = "${toString arg.confDir}/configs/confctl.nix";
     in import <nixpkgs/nixos/lib/eval-config.nix> {
       modules = [
+        ./modules/confctl/generations.nix
         ./modules/confctl/cli.nix
         ./modules/confctl/nix.nix
         ./modules/confctl/swpins.nix

@@ -284,6 +284,25 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
+`confctl generation gc` [*options*] [*host-pattern*]
+  Delete old build generations of all or selected hosts. Old generations are
+  deleted based on rules configured in `configs/confctl.nix`.
+
+  This command deletes old build generations from `confctl`. To remove them
+  from the Nix store, use `nix-collect-garbage` afterwards.
+
+    `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
+      Filter deployments by selected attribute, which is either tested for
+      equality or inequality. Any attribute from configuration module
+      `cluster.<name>` can be tested.
+
+    `-t`, `--tag` *tag*|`^`*tag*
+      Filter deployments that have *tag* set. If the tag begins with `^`, then
+      filter deployments that do not have *tag* set.
+
+    `-y`, `--yes`
+      Do not ask for confirmation on standard input, assume the answer is yes.
+
 `confctl gen-data vpsadmin all`
   Generate all required data files from vpsAdmin API.
 

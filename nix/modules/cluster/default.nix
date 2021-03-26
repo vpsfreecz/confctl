@@ -137,6 +137,36 @@ let
           };
         };
 
+        buildGenerations = {
+          min = mkOption {
+            type = types.nullOr types.int;
+            default = null;
+            description = ''
+              The minimum number of build generations to be kept.
+            '';
+          };
+
+          max = mkOption {
+            type = types.nullOr types.int;
+            default = null;
+            description = ''
+              The maximum number of build generations to be kept.
+            '';
+          };
+
+          maxAge = mkOption {
+            type = types.nullOr types.int;
+            default = null;
+            description = ''
+              Delete build generations older than
+              <option>cluster.&lt;name&gt;.buildGenerations.maxAge</option> seconds.
+              Old generations are deleted even if
+              <option>cluster.&lt;name&gt;.buildGenerations.max</option> is
+              not reached.
+            '';
+          };
+        };
+
         container = mkOption {
           type = types.nullOr (types.submodule container);
           default = null;

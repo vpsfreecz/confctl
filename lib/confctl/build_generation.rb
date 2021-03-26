@@ -10,7 +10,7 @@ module ConfCtl
     # @return [String]
     attr_reader :name
 
-    # @return [String]
+    # @return [Time]
     attr_reader :date
 
     # @return [String]

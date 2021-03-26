@@ -28,6 +28,52 @@ module ConfCtl::Cli
       end
     end
 
+    def autoremove
+      deps = select_deployments(args[0])
+
+      global = ConfCtl::Settings.instance.build_generations
+      to_delete = []
+
+      deps.each do |host, dep|
+        min = dep['buildGenerations']['min'] || global['min']
+        max = dep['buildGenerations']['max'] || global['max']
+        maxAge = dep['buildGenerations']['maxAge'] || global['maxAge']
+
+        gens = ConfCtl::BuildGenerationList.new(host)
+        next if gens.count <= min
+
+        dep_deleted = 0
+
+        gens.each do |gen|
+          next if gen.current
+
+          if gen.date + maxAge < Time.now
+            to_delete << {host: gen.host, name: gen.name, generation: gen}
+            dep_deleted += 1
+          end
+
+          break if gens.count - dep_deleted <= min
+        end
+      end
+
+      if to_delete.empty?
+        puts 'No generations to delete'
+        return
+      end
+
+      ask_confirmation! do
+        puts "The following generations will be removed:"
+        to_delete.each do |gen|
+          OutputFormatter.print(to_delete, %i(host name), layout: :columns)
+        end
+      end
+
+      to_delete.each do |gen|
+        puts "Removing generation #{gen[:host]}@#{gen[:name]}"
+        gen[:generation].destroy
+      end
+    end
+
     protected
     def select_generations(deps, pattern)
       gens = []

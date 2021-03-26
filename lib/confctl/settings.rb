@@ -16,5 +16,9 @@ module ConfCtl
     def nix_paths
       @settings['nix']['nixPath']
     end
+
+    def build_generations
+      @settings['buildGenerations']
+    end
   end
 end
