@@ -53,13 +53,20 @@ module ConfCtl::Cli
       end
 
       ask_confirmation! do
-        puts "The following deployments will be built and deployed:"
+        puts "The following deployments will be deployed:"
         list_deployments(deps)
         puts
+        puts "Generation: #{opts[:generation] || 'new build'}"
         puts "Target action: #{action}#{opts[:reboot] ? ' + reboot' : ''}"
       end
 
-      host_generations = do_build(deps)
+      host_generations =
+        if opts[:generation]
+          find_generations(deps, opts[:generation])
+        else
+          do_build(deps)
+        end
+
       nix = ConfCtl::Nix.new(show_trace: opts['show-trace'])
 
       if opts['one-by-one']
@@ -394,6 +401,43 @@ module ConfCtl::Cli
       end
 
       OutputFormatter.print(rows, cols, layout: :columns)
+    end
+
+    def find_generations(deps, generation_name)
+      host_generations = {}
+      missing_hosts = []
+
+      deps.each do |host, d|
+        list = ConfCtl::BuildGenerationList.new(host)
+
+        gen =
+          if generation_name == 'current'
+            list.current
+          else
+            list[generation_name]
+          end
+
+        if gen
+          host_generations[host] = gen
+        else
+          missing_hosts << host
+        end
+      end
+
+      if host_generations.empty?
+        fail 'No generation found'
+      end
+
+      if missing_hosts.any?
+        ask_confirmation! do
+          puts "Generation '#{generation_name}' was not found on the following hosts:"
+          missing_hosts.each { |host| puts "  #{host}" }
+          puts
+          puts "These hosts will not be deployed."
+        end
+      end
+
+      host_generations
     end
 
     def do_build(deps)

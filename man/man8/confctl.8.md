@@ -104,9 +104,10 @@ information.
       Do not ask for confirmation on standard input, assume the answer is yes.
 
 `confctl deploy` [*options*] [*host-pattern*] [`boot`|`switch`|`test`|`dry-activate`]
-  Build and deploy matching hosts. *switch-action* is the argument to
-  `switch-to-configuration` called on the target host. The default action
-  is `switch`.
+  Deploy either a new or an existing build generation to matching hosts.
+
+  *switch-action* is the argument to `switch-to-configuration` called on
+  the target host. The default action is `switch`.
 
     `--show-trace`
       Enable traces in Nix.
@@ -122,6 +123,9 @@ information.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
+
+    `-g`, `--generation` *generation*|`current`
+      Do not build a new generation, but deploy an existing generation.
 
     `-i`, `--interactive`
       Deploy hosts one by one while asking for confirmation for activation.

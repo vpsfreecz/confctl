@@ -46,6 +46,11 @@ module ConfCtl
       change_current(current_gen) if current_gen
     end
 
+    # @param name [String]
+    def [](name)
+      index[name]
+    end
+
     def each(&block)
       generations.each(&block)
     end
