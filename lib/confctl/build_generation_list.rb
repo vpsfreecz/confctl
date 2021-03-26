@@ -60,6 +60,11 @@ module ConfCtl
       generations.clone
     end
 
+    # @return [Integer]
+    def count
+      generations.length
+    end
+
     # @param gen [BuildGeneration]
     def current=(gen)
       change_current(gen)

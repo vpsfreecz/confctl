@@ -145,12 +145,14 @@ module ConfCtl::Cli
       rows = []
 
       statuses.each do |host, st|
+        build_generations = ConfCtl::BuildGenerationList.new(host)
+
         row = {
           'host' => host,
           'online' => st.online? && Rainbow('yes').green,
           'uptime' => st.uptime && format_duration(st.uptime),
           'status' => st.status ? Rainbow('ok').green : Rainbow('outdated').red,
-          'generations' => st.generations && st.generations.count,
+          'generations' => "#{build_generations.count}:#{st.generations && st.generations.count}",
         }
 
         swpins.each do |name|
