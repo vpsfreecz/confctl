@@ -76,14 +76,42 @@ module ConfCtl::Cli
 
     protected
     def select_generations(deps, pattern)
-      gens = []
+      gens = ConfCtl::UnifiedGenerationList.new
+      include_remote = opts[:remote]
+      include_local = opts[:local] || (!opts[:remote] && !opts[:local])
 
-      deps.each do |host, dep|
-        ConfCtl::BuildGenerationList.new(host).each do |gen|
-          if pattern.nil? \
-             || ConfCtl::Pattern.match?(pattern, gen.name) \
-             || (pattern == 'old' && !gen.current)
-            gens << gen
+      if include_remote
+        tw = ConfCtl::ParallelExecutor.new(deps.length)
+        statuses = {}
+
+        deps.each do |host, dep|
+          st = ConfCtl::MachineStatus.new(dep)
+          statuses[host] = st
+
+          tw.add do
+            st.query(toplevel: false)
+          end
+        end
+
+        tw.run
+
+        statuses.each do |host, st|
+          gens.add_host_generations(st.generations) if st.generations
+        end
+      end
+
+      if include_local
+        deps.each do |host, dep|
+          gens.add_build_generations(ConfCtl::BuildGenerationList.new(host))
+        end
+      end
+
+      if pattern
+        gens.delete_if do |gen|
+          if pattern == 'old'
+            gen.current
+          else
+            !ConfCtl::Pattern.match?(pattern, gen.name)
           end
         end
       end
@@ -104,7 +132,9 @@ module ConfCtl::Cli
         row = {
           'host' => gen.host,
           'name' => gen.name,
-          'current' => gen.current,
+          'id' => gen.id,
+          'presence' => gen.presence_str,
+          'current' => gen.current_str,
         }
 
         gen.swpin_specs.each do |name, spec|
@@ -116,7 +146,7 @@ module ConfCtl::Cli
 
       OutputFormatter.print(
         rows,
-        %w(host name current) + swpin_names,
+        %w(host name id presence current) + swpin_names,
         layout: :columns,
         sort: %w(name host),
       )

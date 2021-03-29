@@ -255,7 +255,8 @@ information.
       Do not ask for confirmation on standard input, assume the answer is yes.
 
 `confctl generation ls` [*host-pattern* [*generation-pattern*]]
-  List all or selected build generations.
+  List all or selected generations. By default only local build generations
+  are listed.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
       Filter deployments by selected attribute, which is either tested for
@@ -266,12 +267,20 @@ information.
       Filter deployments that have *tag* set. If the tag begins with `^`, then
       filter deployments that do not have *tag* set.
 
+    `-l`, `--local`
+      List build generations.
+
+    `-r`, `--remote`
+      List remote generations found on deployed hosts.
+
 `confctl generation rm` [*host-pattern* [*generation-pattern*|`old`]]
-  Remove selected build generations.
+  Remove selected generations.
 
   `old` will remove all generations except the current one, i.e. the one that
   was built by `confctl build` the last.
 
+  By default, only local build generations are considered.
+
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
       Filter deployments by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module
@@ -280,6 +289,12 @@ information.
     `-t`, `--tag` *tag*|`^`*tag*
       Filter deployments that have *tag* set. If the tag begins with `^`, then
       filter deployments that do not have *tag* set.
+
+    `-l`, `--local`
+      Consider local build generations.
+
+    `-r`, `--remote`
+      Consider remove generations found on deployed hosts.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.

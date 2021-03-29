@@ -119,6 +119,42 @@ module ConfCtl
       res
     end
 
+    def bash_script_read(script)
+      cmd = ['bash', '--norc']
+
+      args =
+        if deployment.localhost?
+          cmd
+        else
+          ssh_args + cmd
+        end
+
+      args << {
+        err: [:child, :out],
+      }
+
+      out = ''
+
+      IO.popen(args, 'r+') do |io|
+        io.write(script)
+        io.close_write
+
+        out = io.read
+      end
+
+      CommandResult.new(args, $?.exitstatus, output: out)
+    end
+
+    def bash_script_read!(script)
+      res = bash_script_read(script)
+
+      if res.failed?
+        raise CommandFailed, res
+      end
+
+      res
+    end
+
     protected
     attr_reader :extra_ssh_opts
 

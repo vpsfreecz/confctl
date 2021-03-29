@@ -246,6 +246,12 @@ module ConfCtl::Cli
           c.desc 'Filter by tag'
           c.flag %i(t tag), multiple: true
 
+          c.desc 'List local build generations'
+          c.switch %i(l local)
+
+          c.desc 'List remote host generations'
+          c.switch %i(r remote)
+
           c.action &Command.run(Generation, :list)
         end
 
@@ -257,6 +263,12 @@ module ConfCtl::Cli
 
           c.desc 'Filter by tag'
           c.flag %i(t tag), multiple: true
+
+          c.desc 'List local build generations'
+          c.switch %i(l local)
+
+          c.desc 'List remote host generations'
+          c.switch %i(r remote)
 
           c.desc 'Assume the answer to confirmations is yes'
           c.switch %w(y yes)

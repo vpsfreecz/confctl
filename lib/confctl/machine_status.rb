@@ -61,13 +61,7 @@ module ConfCtl
 
       if generations
         begin
-          @timezone_name, @timezone_offset = mc.get_timezone
-
-          @generations = GenerationList.parse(mc.popen_read!(
-            'nix-env',
-            '-p', '/nix/var/nix/profiles/system',
-            '--list-generations',
-          ).output, @timezone_offset)
+          @generations = HostGenerationList.fetch(mc)
         rescue CommandFailed
           return
         end
