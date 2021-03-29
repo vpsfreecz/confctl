@@ -278,17 +278,23 @@ module ConfCtl::Cli
 
         gen.desc 'Auto-remove old host generations'
         gen.arg_name '[host-pattern]'
-        gen.command :gc do |c|
+        gen.command :rotate do |c|
           c.desc 'Filter by attribute'
           c.flag %i(a attr), multiple: true
 
           c.desc 'Filter by tag'
           c.flag %i(t tag), multiple: true
 
+          c.desc 'List local build generations'
+          c.switch %i(l local)
+
+          c.desc 'List remote host generations'
+          c.switch %i(r remote)
+
           c.desc 'Assume the answer to confirmations is yes'
           c.switch %w(y yes)
 
-          c.action &Command.run(Generation, :autoremove)
+          c.action &Command.run(Generation, :rotate)
         end
       end
 

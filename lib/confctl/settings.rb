@@ -20,5 +20,9 @@ module ConfCtl
     def build_generations
       @settings['buildGenerations']
     end
+
+    def host_generations
+      @settings['hostGenerations']
+    end
   end
 end

@@ -13,7 +13,8 @@ let
     value = {
       inherit (d) name;
       inherit (d.config) managed spin swpins host addresses netboot labels tags;
-      inherit (d.config) nix buildGenerations container node osNode vzNode;
+      inherit (d.config) nix buildGenerations hostGenerations;
+      inherit (d.config) container node osNode vzNode;
     };
   }) deployments;
 

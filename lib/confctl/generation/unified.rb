@@ -39,7 +39,7 @@ module ConfCtl
         @date = build_generation.date
         @current ||= build_generation.current
       elsif host_generation
-        @name = host_generation.date.strftime('%Y-%m-%d--%H-%M-%S')
+        @name = host_generation.approx_name
         @toplevel = host_generation.toplevel
         @date = host_generation.date
         @current ||= host_generation.current

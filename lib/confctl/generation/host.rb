@@ -21,5 +21,9 @@ module ConfCtl
       @date = date
       @current = current
     end
+
+    def approx_name
+      @approx_name ||= date.strftime('%Y-%m-%d--%H-%M-%S')
+    end
   end
 end

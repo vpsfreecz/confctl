@@ -28,32 +28,17 @@ module ConfCtl::Cli
       end
     end
 
-    def autoremove
+    def rotate
       deps = select_deployments(args[0])
 
-      global = ConfCtl::Settings.instance.build_generations
       to_delete = []
 
-      deps.each do |host, dep|
-        min = dep['buildGenerations']['min'] || global['min']
-        max = dep['buildGenerations']['max'] || global['max']
-        maxAge = dep['buildGenerations']['maxAge'] || global['maxAge']
+      if opts[:remote]
+        to_delete.concat(host_generations_rotate(deps))
+      end
 
-        gens = ConfCtl::Generation::BuildList.new(host)
-        next if gens.count <= min
-
-        dep_deleted = 0
-
-        gens.each do |gen|
-          next if gen.current
-
-          if gen.date + maxAge < Time.now
-            to_delete << {host: gen.host, name: gen.name, generation: gen}
-            dep_deleted += 1
-          end
-
-          break if gens.count - dep_deleted <= min
-        end
+      if opts[:local] || (!opts[:local] && !opts[:remote])
+        to_delete.concat(build_generations_rotate(deps))
       end
 
       if to_delete.empty?
@@ -63,9 +48,7 @@ module ConfCtl::Cli
 
       ask_confirmation! do
         puts "The following generations will be removed:"
-        to_delete.each do |gen|
-          OutputFormatter.print(to_delete, %i(host name), layout: :columns)
-        end
+        OutputFormatter.print(to_delete, %i(host name type id), layout: :columns)
       end
 
       to_delete.each do |gen|
@@ -117,6 +100,95 @@ module ConfCtl::Cli
       end
 
       gens
+    end
+
+    def build_generations_rotate(deps)
+      global = ConfCtl::Settings.instance.build_generations
+      ret = []
+
+      deps.each do |host, dep|
+        to_delete = generations_rotate(
+          ConfCtl::Generation::BuildList.new(host),
+          min: dep['buildGenerations']['min'] || global['min'],
+          max: dep['buildGenerations']['max'] || global['max'],
+          maxAge: dep['buildGenerations']['maxAge'] || global['maxAge'],
+        ) do |gen|
+          {
+            name: gen.name,
+            type: 'build',
+          }
+        end
+
+        ret.concat(to_delete)
+      end
+
+      ret
+    end
+
+    def host_generations_rotate(deps)
+      global = ConfCtl::Settings.instance.host_generations
+      ret = []
+
+      tw = ConfCtl::ParallelExecutor.new(deps.length)
+      statuses = {}
+
+      deps.each do |host, dep|
+        st = ConfCtl::MachineStatus.new(dep)
+        statuses[host] = st
+
+        tw.add do
+          st.query(toplevel: false)
+        end
+      end
+
+      tw.run
+
+      statuses.each do |host, st|
+        next unless st.generations
+
+        dep = st.deployment
+
+        to_delete = generations_rotate(
+          st.generations,
+          min: dep['hostGenerations']['min'] || global['min'],
+          max: dep['hostGenerations']['max'] || global['max'],
+          maxAge: dep['hostGenerations']['maxAge'] || global['maxAge'],
+        ) do |gen|
+          {
+            type: 'host',
+            name: gen.approx_name,
+            id: gen.id,
+          }
+        end
+
+        ret.concat(to_delete)
+      end
+
+      ret
+    end
+
+    def generations_rotate(gens, min: nil, max: nil, maxAge: nil)
+      ret = []
+
+      return ret if gens.count <= min
+
+      dep_deleted = 0
+
+      gens.each do |gen|
+        next if gen.current
+
+        if (gens.count - dep_deleted) > max || (gen.date + maxAge) < Time.now
+          ret << {
+            host: gen.host,
+            generation: gen,
+          }.merge(yield(gen))
+          dep_deleted += 1
+        end
+
+        break if gens.count - dep_deleted <= min
+      end
+
+      ret
     end
 
     def list_generations(gens)

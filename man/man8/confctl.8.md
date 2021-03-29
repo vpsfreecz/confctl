@@ -294,12 +294,12 @@ information.
       Consider local build generations.
 
     `-r`, `--remote`
-      Consider remove generations found on deployed hosts.
+      Consider generations found on deployed hosts.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
-`confctl generation gc` [*options*] [*host-pattern*]
+`confctl generation rotate` [*options*] [*host-pattern*]
   Delete old build generations of all or selected hosts. Old generations are
   deleted based on rules configured in `configs/confctl.nix`.
 
@@ -317,6 +317,12 @@ information.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
+
+    `-l`, `--local`
+      Consider local build generations.
+
+    `-r`, `--remote`
+      Consider generations found on deployed hosts.
 
 `confctl gen-data vpsadmin all`
   Generate all required data files from vpsAdmin API.
