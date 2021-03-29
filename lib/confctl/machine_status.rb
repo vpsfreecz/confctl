@@ -25,7 +25,7 @@ module ConfCtl
     # @return [String]
     attr_reader :timezone_offset
 
-    # @return [GenerationList]
+    # @return [Generation::HostList]
     attr_reader :generations
 
     # @return [Hash]
@@ -61,7 +61,7 @@ module ConfCtl
 
       if generations
         begin
-          @generations = HostGenerationList.fetch(mc)
+          @generations = Generation::HostList.fetch(mc)
         rescue CommandFailed
           return
         end

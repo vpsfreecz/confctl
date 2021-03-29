@@ -1,5 +1,3 @@
-require 'confctl/utils'
-
 module ConfCtl
   module Utils::File
     # Atomically replace or create symlink

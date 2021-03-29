@@ -39,7 +39,7 @@ module ConfCtl::Cli
         max = dep['buildGenerations']['max'] || global['max']
         maxAge = dep['buildGenerations']['maxAge'] || global['maxAge']
 
-        gens = ConfCtl::BuildGenerationList.new(host)
+        gens = ConfCtl::Generation::BuildList.new(host)
         next if gens.count <= min
 
         dep_deleted = 0
@@ -76,7 +76,7 @@ module ConfCtl::Cli
 
     protected
     def select_generations(deps, pattern)
-      gens = ConfCtl::UnifiedGenerationList.new
+      gens = ConfCtl::Generation::UnifiedList.new
       include_remote = opts[:remote]
       include_local = opts[:local] || (!opts[:remote] && !opts[:local])
 
@@ -102,7 +102,7 @@ module ConfCtl::Cli
 
       if include_local
         deps.each do |host, dep|
-          gens.add_build_generations(ConfCtl::BuildGenerationList.new(host))
+          gens.add_build_generations(ConfCtl::Generation::BuildList.new(host))
         end
       end
 

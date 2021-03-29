@@ -3,7 +3,7 @@ require 'json'
 require 'time'
 
 module ConfCtl
-  class BuildGeneration
+  class Generation::Build
     # @return [String]
     attr_reader :host
 

@@ -1,13 +1,13 @@
 require 'confctl/utils/file'
 
 module ConfCtl
-  class BuildGenerationList
+  class Generation::BuildList
     include Utils::File
 
     # @return [String]
     attr_reader :host
 
-    # @return [BuildGeneration, nil]
+    # @return [Generation::Build, nil]
     attr_reader :current
 
     # @return [String]
@@ -22,7 +22,7 @@ module ConfCtl
         abs_path = File.join(dir, v)
         next if %w(. ..).include?(v) || !Dir.exist?(abs_path) || File.symlink?(abs_path)
 
-        gen = BuildGeneration.new(host)
+        gen = Generation::Build.new(host)
 
         begin
           gen.load(v)
@@ -55,7 +55,7 @@ module ConfCtl
       generations.each(&block)
     end
 
-    # @return [Array<BuildGeneration>]
+    # @return [Array<Generation::Build>]
     def to_a
       generations.clone
     end
@@ -65,7 +65,7 @@ module ConfCtl
       generations.length
     end
 
-    # @param gen [BuildGeneration]
+    # @param gen [Generation::Build]
     def current=(gen)
       change_current(gen)
       generations << gen unless generations.include?(gen)
@@ -74,7 +74,7 @@ module ConfCtl
 
     # @param toplevel [String]
     # @param swpin_paths [Hash]
-    # @return [BuildGeneration, nil]
+    # @return [Generation::Build, nil]
     def find(toplevel, swpin_paths)
       generations.detect do |gen|
         gen.toplevel == toplevel && gen.swpin_paths == swpin_paths

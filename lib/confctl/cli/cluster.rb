@@ -141,7 +141,7 @@ module ConfCtl::Cli
       rows = []
 
       statuses.each do |host, st|
-        build_generations = ConfCtl::BuildGenerationList.new(host)
+        build_generations = ConfCtl::Generation::BuildList.new(host)
 
         row = {
           'host' => host,
@@ -406,7 +406,7 @@ module ConfCtl::Cli
       missing_hosts = []
 
       deps.each do |host, d|
-        list = ConfCtl::BuildGenerationList.new(host)
+        list = ConfCtl::Generation::BuildList.new(host)
 
         gen =
           if generation_name == 'current'

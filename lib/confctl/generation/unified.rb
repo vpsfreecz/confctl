@@ -1,5 +1,5 @@
 module ConfCtl
-  class UnifiedGeneration
+  class Generation::Unified
     # @return [String]
     attr_reader :host
 
@@ -18,15 +18,15 @@ module ConfCtl
     # @return [Boolean]
     attr_reader :current
 
-    # @return [BuildGeneration]
+    # @return [Generation::Build]
     attr_reader :build_generation
 
-    # @return [HostGeneration]
+    # @return [Generation::Host]
     attr_reader :host_generation
 
     # @param host [String]
-    # @param build_generation [BuildGeneration]
-    # @param host_generation [HostGeneration]
+    # @param build_generation [Generation::Build]
+    # @param host_generation [Generation::Host]
     def initialize(host, build_generation: nil, host_generation: nil)
       @host = host
       @build_generation = build_generation
@@ -48,7 +48,7 @@ module ConfCtl
       end
     end
 
-    # @param gen [BuildGeneration]
+    # @param gen [Generation::Build]
     def set_build_generation(gen)
       @build_generation = gen
       @name = gen.name
@@ -56,7 +56,7 @@ module ConfCtl
       @current ||= gen.current
     end
 
-    # @param gen [HostGeneration]
+    # @param gen [Generation::Host]
     def set_host_generation(gen)
       @host_generation = gen
       @id = gen.id
@@ -101,70 +101,5 @@ module ConfCtl
       host_generation.destroy if host_generation
       true
     end
-  end
-
-  class UnifiedGenerationList
-    def initialize
-      @generations = []
-    end
-
-    # @param generation [BuildGeneration]
-    def add_build_generation(generation)
-      unified = generations.detect do |g|
-        g.host == generation.host && g.toplevel == generation.toplevel
-      end
-
-      if unified
-        unified.set_build_generation(generation)
-      else
-        generations << UnifiedGeneration.new(generation.host, build_generation: generation)
-      end
-
-      true
-    end
-
-    # @param generations [BuildGenerationList]
-    def add_build_generations(generations)
-      generations.each { |v| add_build_generation(v) }
-      true
-    end
-
-    # @param generation [HostGeneration]
-    def add_host_generation(generation)
-      unified = generations.detect do |g|
-        g.host == generation.host && g.toplevel == generation.toplevel
-      end
-
-      if unified
-        unified.set_host_generation(generation)
-      else
-        generations << UnifiedGeneration.new(generation.host, host_generation: generation)
-      end
-
-      true
-    end
-
-    # @param generations [HostGenerationList]
-    def add_host_generations(generations)
-      generations.each { |v| add_host_generation(v) }
-      true
-    end
-
-    def each(&block)
-      generations.each(&block)
-    end
-
-    def delete_if(&block)
-      generations.delete_if(&block)
-    end
-
-    def empty?
-      generations.empty?
-    end
-
-    include Enumerable
-
-    protected
-    attr_reader :generations
   end
 end

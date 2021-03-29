@@ -1,5 +1,5 @@
 module ConfCtl
-  class HostGeneration
+  class Generation::Host
     attr_reader :host
 
     attr_reader :id

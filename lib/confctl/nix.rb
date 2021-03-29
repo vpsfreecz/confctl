@@ -83,7 +83,7 @@ module ConfCtl
     # @param swpin_paths [Hash]
     # @param host_swpin_specs [Hash]
     # @param time [Time]
-    # @return [Hash<String, BuildGeneration>]
+    # @return [Hash<String, Generation::Build>]
     def build_toplevels(hosts: [], swpin_paths: {}, host_swpin_specs: {}, time: nil)
       with_argument({
         confDir: conf_dir,
@@ -115,11 +115,11 @@ module ConfCtl
         begin
           host_toplevels = JSON.parse(File.read(out_link))
           host_toplevels.each do |host, toplevel|
-            host_generations = BuildGenerationList.new(host)
+            host_generations = Generation::BuildList.new(host)
             generation = host_generations.find(toplevel, swpin_paths)
 
             if generation.nil?
-              generation = BuildGeneration.new(host)
+              generation = Generation::Build.new(host)
               generation.create(
                 toplevel,
                 swpin_paths,

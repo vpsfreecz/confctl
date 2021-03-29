@@ -1,6 +1,9 @@
 require 'require_all'
 
 module ConfCtl
+  module Generation ; end
+  module Utils ; end
+
   # Root of confctl repository
   # @return [String]
   def self.root
@@ -40,3 +43,5 @@ module ConfCtl
 end
 
 require_rel 'confctl/*.rb'
+require_rel 'confctl/utils'
+require_rel 'confctl/generation'

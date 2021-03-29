@@ -1,7 +1,7 @@
 module ConfCtl
-  class HostGenerationList
+  class Generation::HostList
     # @param mc [MachineControl]
-    # @return [HostGenerationList]
+    # @return [Generation::HostList]
     def self.fetch(mc, profile: '/nix/var/nix/profiles/system')
       str = mc.bash_script_read!(<<-END
         realpath #{profile}
@@ -27,7 +27,7 @@ module ConfCtl
           next
         end
 
-        list << HostGeneration.new(
+        list << Generation::Host.new(
           mc.deployment.name,
           id,
           path,
@@ -49,7 +49,7 @@ module ConfCtl
       @generations = []
     end
 
-    # @param generation [HostGeneration]
+    # @param generation [Generation::Host]
     def <<(generation)
       generations << generation
     end
@@ -67,7 +67,7 @@ module ConfCtl
       generations.length
     end
 
-    # @return [HostGeneration]
+    # @return [Generation::Host]
     def current
       generations.detect(&:current)
     end
