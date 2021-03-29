@@ -23,7 +23,7 @@ module ConfCtl::Cli
       end
 
       gens.each do |gen|
-        puts "Removing generation #{gen.host}@#{gen.name}"
+        puts "Removing #{gen.presence_str} generation #{gen.host}@#{gen.name}"
         gen.destroy
       end
     end
@@ -52,7 +52,7 @@ module ConfCtl::Cli
       end
 
       to_delete.each do |gen|
-        puts "Removing generation #{gen[:host]}@#{gen[:name]}"
+        puts "Removing #{gen[:type]} generation #{gen[:host]}@#{gen[:name]}"
         gen[:generation].destroy
       end
     end

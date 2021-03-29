@@ -29,10 +29,12 @@ module ConfCtl
 
         list << Generation::Host.new(
           mc.deployment.name,
+          profile,
           id,
           path,
           Time.at(created_at.to_i),
           current: path == current_path,
+          mc: mc,
         )
       end
 

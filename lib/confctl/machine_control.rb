@@ -88,6 +88,17 @@ module ConfCtl
       system_exec(*command)
     end
 
+    # @return [Process::Status]
+    def execute!(*command)
+      res = system_exec(*command)
+
+      if res.failed?
+        raise CommandFailed, res
+      end
+
+      res
+    end
+
     def popen_read(*command)
       args =
         if deployment.localhost?
