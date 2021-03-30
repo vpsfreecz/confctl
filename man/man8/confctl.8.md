@@ -162,8 +162,10 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
-    `-g`, `--generation` *generation*|`current`
-      Check status against a selected generation instead of a new build.
+    `-g`, `--generation` *generation*|`current`|`none`
+      Check status against a selected generation instead of a new build. If set
+      to `none`, only the currently configured software pins are checked and not
+      the system version itself.
 
 `confctl changelog` [*options*] [*host-pattern* [*sw-pattern*]]
   Show differences in deployed and configured software pins. For git software

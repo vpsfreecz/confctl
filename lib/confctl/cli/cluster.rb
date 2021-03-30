@@ -96,7 +96,9 @@ module ConfCtl::Cli
       end]
 
       # Evaluate toplevels
-      if opts[:generation]
+      if opts[:generation] == 'none'
+        host_generations = nil
+      elsif opts[:generation]
         host_generations = find_generations(deps, opts[:generation])
 
         # Ignore statuses when no generation was found
@@ -109,9 +111,24 @@ module ConfCtl::Cli
       end
 
       # Assign configured toplevel and swpins
-      host_generations.each do |host, gen|
-        statuses[host].target_toplevel = gen.toplevel
-        statuses[host].target_swpin_specs = gen.swpin_specs
+      if host_generations
+        host_generations.each do |host, gen|
+          statuses[host].target_toplevel = gen.toplevel
+          statuses[host].target_swpin_specs = gen.swpin_specs
+        end
+      else
+        # We're not comparing a system generation, only configured swpins
+        channels = ConfCtl::Swpins::ChannelList.new
+        channels.each(&:parse)
+
+        ConfCtl::Swpins::ClusterNameList.new(
+          deployments: deps,
+          channels: channels,
+        ).each do |cn|
+          cn.parse
+
+          statuses[cn.name].target_swpin_specs = cn.specs
+        end
       end
 
       # Check runtime status
@@ -119,7 +136,7 @@ module ConfCtl::Cli
 
       statuses.each do |host, st|
         tw.add do
-          st.query
+          st.query(toplevel: opts[:generation] != 'none')
         end
       end
 
