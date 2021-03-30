@@ -7,7 +7,7 @@ module ConfCtl
         realpath #{profile}
 
         for generation in `ls -d -1 #{profile}-*-link` ; do
-          echo "$generation $(readlink $generation) $(stat --format=%Y $generation)"
+          echo "$generation;$(readlink $generation);$(stat --format=%Y $generation)"
         done
         END
       ).output
@@ -18,7 +18,7 @@ module ConfCtl
       id_rx = /^#{Regexp.escape(profile)}\-(\d+)\-link$/
 
       lines.each do |line|
-        link, path, created_at = line.split
+        link, path, created_at = line.split(';')
 
         if id_rx =~ link
           id = $1.to_i
