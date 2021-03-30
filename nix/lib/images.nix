@@ -90,6 +90,7 @@ let
             swpins = {
               nixpkgs = <nixpkgs>;
             };
+            swpinsInfo = {};
           };
         })
       ] ++ modules;
