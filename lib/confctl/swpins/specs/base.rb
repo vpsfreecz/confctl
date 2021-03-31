@@ -78,8 +78,16 @@ module ConfCtl
     end
 
     # Check that `other_info` corresponds to this spec
+    # @param other_info [Hash]
     # @return [Boolean]
     def check_info(other_info)
+      raise NotImplementedError
+    end
+
+    # Return version based on the info hash
+    # @param other_info [Hash]
+    # @return [String]
+    def version_info(other_info)
       raise NotImplementedError
     end
 

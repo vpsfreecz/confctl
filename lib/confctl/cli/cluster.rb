@@ -169,7 +169,16 @@ module ConfCtl::Cli
         }
 
         swpins.each do |name|
-          row[name] = st.swpins_state[name] ? Rainbow('ok').green : Rainbow('outdated').red
+          swpin_state = st.swpins_state[name]
+
+          row[name] =
+            if swpin_state
+              Rainbow(swpin_state.current_version).color(
+                swpin_state.uptodate? ? :green : :red,
+              )
+            else
+              nil
+            end
         end
 
         rows << row

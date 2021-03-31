@@ -1,5 +1,44 @@
 module ConfCtl
   class MachineStatus
+    class SwpinState
+      # @return [Swpins::Specs::Base]
+      attr_reader :target_spec
+
+      # @return [Hash, nil]
+      attr_reader :current_info
+
+      # @param target_spec [Swpins::Specs::Base]
+      # @param current_info [Hash, nil]
+      def initialize(target_spec, current_info)
+        @target_spec = target_spec
+        @current_info = current_info
+        @uptodate =
+          if current_info
+            target_spec.check_info(current_info)
+          else
+            false
+          end
+      end
+
+      def uptodate?
+        @uptodate
+      end
+
+      def outdated?
+        !uptodate?
+      end
+
+      # @return [String, nil]
+      def target_version
+        target_spec.version
+      end
+
+      # @return [String, nil]
+      def current_version
+        current_info && target_spec.version_info(current_info)
+      end
+    end
+
     # @return [Deployment]
     attr_reader :deployment
 
@@ -78,15 +117,10 @@ module ConfCtl
       @swpins_state = {}
 
       target_swpin_specs.each do |name, spec|
-        swpins_state[name] =
-          if swpins_info
-            spec.check_info(swpins_info[name])
-          else
-            false
-          end
+        swpins_state[name] = SwpinState.new(spec, swpins_info && swpins_info[name])
       end
 
-      outdated_swpins = swpins_state.detect { |k, v| !v }
+      outdated_swpins = swpins_state.detect { |k, v| v.outdated? }
       @online = uptime ? true : false
       @status = online? && !outdated_swpins
       @status = false if target_toplevel && target_toplevel != current_toplevel
