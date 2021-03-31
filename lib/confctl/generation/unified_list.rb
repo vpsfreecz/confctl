@@ -6,9 +6,7 @@ module ConfCtl
 
     # @param generation [Generation::Build]
     def add_build_generation(generation)
-      unified = generations.detect do |g|
-        g.host == generation.host && g.toplevel == generation.toplevel
-      end
+      unified = generations.detect { |g| g.includes?(generation) }
 
       if unified
         unified.set_build_generation(generation)
@@ -27,9 +25,7 @@ module ConfCtl
 
     # @param generation [Generation::Host]
     def add_host_generation(generation)
-      unified = generations.detect do |g|
-        g.host == generation.host && g.toplevel == generation.toplevel
-      end
+      unified = generations.detect { |g| g.includes?(generation) }
 
       if unified
         unified.set_host_generation(generation)

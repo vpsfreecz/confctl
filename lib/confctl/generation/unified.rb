@@ -63,6 +63,20 @@ module ConfCtl
       @current ||= gen.current
     end
 
+    # Determines whether `gen` can be wrapped by this object
+    # @param gen [Generation::Build, Generation::Host]
+    # @return [Boolean]
+    def includes?(gen)
+      return false if host != gen.host || toplevel != gen.toplevel
+
+      if build_generation && gen.is_a?(Generation::Build)
+        build_generation.name == gen.name \
+          && build_generation.swpin_paths == gen.swpin_paths
+      else
+        true
+      end
+    end
+
     %i(swpin_names swpin_specs).each do |v|
       define_method(v) do
         build_generation ? build_generation.send(v) : []
