@@ -35,7 +35,7 @@ module ConfCtl
 
       # @return [String, nil]
       def current_version
-        current_info && target_spec.version_info(current_info)
+        target_spec.version_info(current_info) || 'unknown'
       end
     end
 
