@@ -51,6 +51,7 @@ module ConfCtl::Cli
       end
 
       core.save
+      core.pre_evaluate
     end
 
     def update
@@ -74,6 +75,7 @@ module ConfCtl::Cli
       end
 
       core.save
+      core.pre_evaluate
     end
   end
 end

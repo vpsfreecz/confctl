@@ -477,7 +477,7 @@ module ConfCtl::Cli
 
       deps.each do |host, d|
         puts Rainbow("Evaluating swpins for #{host}...").bright
-        host_swpin_paths[host] = nix.eval_swpins(host).update(d.nix_paths)
+        host_swpin_paths[host] = nix.eval_host_swpins(host).update(d.nix_paths)
       end
 
       grps = swpin_build_groups(host_swpin_paths)
@@ -568,7 +568,10 @@ module ConfCtl::Cli
         end
       end
 
-      core.save if core_updated
+      if core_updated
+        core.save
+        core.pre_evaluate
+      end
 
       cluster_names.each do |cn|
         updated = false

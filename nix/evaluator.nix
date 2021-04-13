@@ -2,7 +2,13 @@
 let
   arg = builtins.fromJSON (builtins.readFile jsonArg);
 
-  nixpkgs = import <nixpkgs> {};
+  hasCorePkgs = (builtins.hasAttr "coreSwpins" arg) && (builtins.hasAttr "nixpkgs" arg.coreSwpins);
+
+  nixpkgs =
+    if hasCorePkgs then
+      import arg.coreSwpins.nixpkgs {}
+    else
+      import <nixpkgs> {};
 
   deployments = import ./deployments.nix {
     inherit (arg) confDir;
@@ -36,7 +42,12 @@ let
       lib = nixpkgs.lib;
     };
 
-  corePkgs = import coreSwpins.evaluated.nixpkgs {};
+  corePkgs =
+    if hasCorePkgs then
+      nixpkgs
+    else
+      import coreSwpins.evaluated.nixpkgs {};
+
   coreLib = corePkgs.lib;
 
   deploymentSwpins = d:
@@ -47,6 +58,8 @@ let
       pkgs = corePkgs.pkgs;
       lib = corePkgs.lib;
     };
+
+  coreSwpinsAttrs = coreSwpins.evaluated;
 
   selectedSwpinsAttrs = builtins.listToAttrs (builtins.map (host: {
     name = host;
@@ -98,8 +111,11 @@ let
     # Nix configuration of swpins channels
     listSwpinsChannels = evalConfctl.config.confctl.swpins.channels;
 
+    # JSON file with core swpins
+    evalCoreSwpins = corePkgs.writeText "swpins.json" (builtins.toJSON coreSwpinsAttrs);
+
     # JSON file with swpins for selected deployments
-    evalSwpins = corePkgs.writeText "swpins.json" (builtins.toJSON selectedSwpinsAttrs);
+    evalHostSwpins = corePkgs.writeText "swpins.json" (builtins.toJSON selectedSwpinsAttrs);
 
     # JSON file with system.build.toplevel for selected deployments, this must
     # be run with proper NIX_PATH with swpins

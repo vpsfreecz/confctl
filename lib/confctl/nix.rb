@@ -35,7 +35,7 @@ module ConfCtl
       nix_instantiate({
         confDir: conf_dir,
         build: :info,
-      })
+      }, core_swpins: true)
     end
 
     def list_swpins_channels
@@ -46,14 +46,45 @@ module ConfCtl
     end
 
     # Evaluate swpins for host
-    # @param host [String]
     # @return [Hash]
-    def eval_swpins(host)
+    def eval_core_swpins
       with_argument({
         confDir: conf_dir,
-        build: :evalSwpins,
-        deployments: [host],
+        build: :evalCoreSwpins,
       }) do |arg|
+        out_link = File.join(
+          cache_dir,
+          'build',
+          'core.swpins',
+        )
+
+        cmd = [
+          'nix-build',
+          '--arg', 'jsonArg', arg,
+          '--out-link', out_link,
+          (show_trace ? '--show-trace' : ''),
+          ConfCtl.nix_asset('evaluator.nix'),
+        ]
+
+        output = `#{cmd.join(' ')}`.strip
+
+        if $?.exitstatus != 0
+          fail "nix-build failed with exit status #{$?.exitstatus}"
+        end
+
+        JSON.parse(File.read(output))
+      end
+    end
+
+    # Evaluate swpins for host
+    # @param host [String]
+    # @return [Hash]
+    def eval_host_swpins(host)
+      with_argument({
+        confDir: conf_dir,
+        build: :evalHostSwpins,
+        deployments: [host],
+      }, core_swpins: true) do |arg|
         out_link = File.join(
           cache_dir,
           'build',
@@ -201,8 +232,20 @@ module ConfCtl
     attr_reader :conf_dir, :show_trace
 
     # @param hash [Hash]
+    # @param core_swpins [Boolean]
     # @yieldparam file [String]
-    def with_argument(hash)
+    def with_argument(hash, core_swpins: false)
+      if core_swpins
+        channels = ConfCtl::Swpins::ChannelList.new
+        channels.each(&:parse)
+
+        core = Swpins::Core.new(channels)
+        core.parse
+
+        paths = core.pre_evaluated_store_paths
+        hash[:coreSwpins] = paths if paths
+      end
+
       f = Tempfile.new('confctl')
       f.puts(hash.to_json)
       f.close
@@ -211,8 +254,8 @@ module ConfCtl
       f.unlink
     end
 
-    def nix_instantiate(hash)
-      with_argument(hash) do |arg|
+    def nix_instantiate(hash, opts = {})
+      with_argument(hash, opts) do |arg|
         cmd = [
           'nix-instantiate',
           '--eval',

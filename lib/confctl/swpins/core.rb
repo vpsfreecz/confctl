@@ -3,6 +3,8 @@ require 'json'
 
 module ConfCtl
   class Swpins::Core
+    include Utils::File
+
     # @return [String]
     attr_reader :name
 
@@ -86,7 +88,38 @@ module ConfCtl
       end
     end
 
+    def pre_evaluate
+      nix = ConfCtl::Nix.new
+      paths = nix.eval_core_swpins
+
+      FileUtils.mkdir_p(cache_dir)
+
+      paths.each do |pin, path|
+        name = "core-swpin.#{pin}"
+        link = File.join(cache_dir, name)
+        replace_symlink(link, path)
+        ConfCtl::GCRoot.add(name, link) unless ConfCtl::GCRoot.exist?(name)
+      end
+    end
+
+    def pre_evaluated_store_paths
+      path = File.join(cache_dir, 'core.swpins')
+      return unless File.exist?(path)
+
+      swpins = JSON.parse(File.read(path))
+
+      swpins.each do |pin, path|
+        return unless Dir.exist?(path)
+      end
+
+      swpins
+    end
+
     protected
     attr_reader :nix_specs, :json_specs
+
+    def cache_dir
+      File.join(ConfCtl.cache_dir, 'build')
+    end
   end
 end
