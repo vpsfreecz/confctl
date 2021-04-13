@@ -7,7 +7,6 @@ require 'tty-spinner'
 module ConfCtl::Cli
   class Cluster < Command
     def list
-      deps = ConfCtl::Deployments.new(show_trace: opts['show-trace'])
       selected = select_deployments(args[0])
 
       managed =
