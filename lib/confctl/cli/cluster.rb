@@ -117,13 +117,7 @@ module ConfCtl::Cli
         end
       else
         # We're not comparing a system generation, only configured swpins
-        channels = ConfCtl::Swpins::ChannelList.new
-        channels.each(&:parse)
-
-        ConfCtl::Swpins::ClusterNameList.new(
-          deployments: deps,
-          channels: channels,
-        ).each do |cn|
+        ConfCtl::Swpins::ClusterNameList.new(deployments: deps).each do |cn|
           cn.parse
 
           statuses[cn.name].target_swpin_specs = cn.specs
@@ -519,21 +513,15 @@ module ConfCtl::Cli
 
     def autoupdate_swpins(deps)
       puts Rainbow("Running swpins auto updates...").bright
-      channels = ConfCtl::Swpins::ChannelList.new
-      channels.each(&:parse)
       channels_update = []
 
-      core = ConfCtl::Swpins::Core.new(channels)
-      core.parse
+      core = ConfCtl::Swpins::Core.get
 
       core.channels.each do |c|
         channels_update << c unless channels_update.include?(c)
       end
 
-      cluster_names = ConfCtl::Swpins::ClusterNameList.new(
-        channels: channels,
-        deployments: deps,
-      )
+      cluster_names = ConfCtl::Swpins::ClusterNameList.new(deployments: deps)
 
       cluster_names.each do |cn|
         cn.parse
@@ -591,23 +579,15 @@ module ConfCtl::Cli
       ret = {}
       valid = true
 
-      channels = ConfCtl::Swpins::ChannelList.new
-      channels.each(&:parse)
-
       puts Rainbow("Checking core swpins...").bright
 
-      core = ConfCtl::Swpins::Core.new(channels)
-      core.parse
-
-      core.specs.each do |name, s|
+      ConfCtl::Swpins::Core.get.specs.each do |name, s|
         puts "  #{name} ... "+
              (s.valid? ? Rainbow('ok').green : Rainbow('needs update').cyan)
         valid = false unless s.valid?
       end
 
-      ConfCtl::Swpins::ClusterNameList.new(
-        channels: channels, deployments: deps,
-      ).each do |cn|
+      ConfCtl::Swpins::ClusterNameList.new(deployments: deps).each do |cn|
         cn.parse
 
         puts Rainbow("Checking swpins for #{cn.name}...").bright
@@ -667,13 +647,7 @@ module ConfCtl::Cli
           !host_generations.has_key?(host)
         end
       else
-        channels = ConfCtl::Swpins::ChannelList.new
-        channels.each(&:parse)
-
-        ConfCtl::Swpins::ClusterNameList.new(
-          deployments: deps,
-          channels: channels,
-        ).each do |cn|
+        ConfCtl::Swpins::ClusterNameList.new(deployments: deps).each do |cn|
           cn.parse
 
           statuses[cn.name].target_swpin_specs = cn.specs

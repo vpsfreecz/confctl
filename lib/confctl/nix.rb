@@ -236,13 +236,7 @@ module ConfCtl
     # @yieldparam file [String]
     def with_argument(hash, core_swpins: false)
       if core_swpins
-        channels = ConfCtl::Swpins::ChannelList.new
-        channels.each(&:parse)
-
-        core = Swpins::Core.new(channels)
-        core.parse
-
-        paths = core.pre_evaluated_store_paths
+        paths = Swpins::Core.get.pre_evaluated_store_paths
         hash[:coreSwpins] = paths if paths
       end
 

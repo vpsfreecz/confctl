@@ -4,10 +4,7 @@ module ConfCtl
     # @param pattern [String]
     # @param deployments [Deployments]
     def initialize(channels: nil, pattern: '*', deployments: nil)
-      if channels.nil?
-        channels = ConfCtl::Swpins::ChannelList.new
-        channels.each(&:parse)
-      end
+      channels ||= ConfCtl::Swpins::ChannelList.get
 
       (deployments || Deployments.new).each do |name, dep|
         if Pattern.match?(pattern, dep.name)

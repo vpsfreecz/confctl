@@ -3,6 +3,15 @@ require 'json'
 
 module ConfCtl
   class Swpins::Core
+    # @return [Swpins::Core]
+    def self.get
+      return @instance if @instance
+
+      @instance = new
+      @instance.parse
+      @instance
+    end
+
     include Utils::File
 
     # @return [String]
@@ -17,14 +26,13 @@ module ConfCtl
     # @return [Array<Swpins::Channel>]
     attr_reader :channels
 
-    # @param channels [Swpins::ChannelList]
-    def initialize(channels)
+    def initialize
       @name = 'core'
       @path = File.join(ConfCtl::Swpins.core_dir, 'core.json')
 
       settings = ConfCtl::Settings.instance
 
-      @channels = channels.select do |c|
+      @channels = Swpins::ChannelList.get.select do |c|
         settings.core_swpin_channels.include?(c.name)
       end
 

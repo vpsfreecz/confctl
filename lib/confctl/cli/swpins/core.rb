@@ -6,11 +6,7 @@ module ConfCtl::Cli
     include Swpins::Utils
 
     def list
-      channels = ConfCtl::Swpins::ChannelList.new
-      channels.each(&:parse)
-
-      core = ConfCtl::Swpins::Core.new(channels)
-      core.parse
+      core = ConfCtl::Swpins::Core.get
 
       rows = []
 
@@ -35,11 +31,7 @@ module ConfCtl::Cli
     def set
       require_args!('sw', 'version...')
 
-      channels = ConfCtl::Swpins::ChannelList.new
-      channels.each(&:parse)
-
-      core = ConfCtl::Swpins::Core.new(channels)
-      core.parse
+      core = ConfCtl::Swpins::Core.get
 
       core.specs.each do |name, spec|
         if spec.from_channel?
@@ -55,10 +47,7 @@ module ConfCtl::Cli
     end
 
     def update
-      channels = ConfCtl::Swpins::ChannelList.new
-      channels.each(&:parse)
-
-      core = ConfCtl::Swpins::Core.new(channels)
+      core = ConfCtl::Swpins::Core.get
       core.parse
 
       core.specs.each do |name, spec|

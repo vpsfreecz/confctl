@@ -20,7 +20,7 @@ module ConfCtl::Cli
     end
 
     def channel_list(pattern)
-      ConfCtl::Swpins::ChannelList.new(pattern: pattern)
+      ConfCtl::Swpins::ChannelList.pattern(pattern)
     end
 
     def each_channel(chan_pattern)
