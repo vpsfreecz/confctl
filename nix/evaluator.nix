@@ -45,8 +45,10 @@ let
   corePkgs =
     if hasCorePkgs then
       nixpkgs
+    else if builtins.hasAttr "nixpkgs" coreSwpins.evaluated then
+      import coreSwpins.evaluated.nixpkgs {}
     else
-      import coreSwpins.evaluated.nixpkgs {};
+      abort "Core swpins not set, run `confctl swpins core update`";
 
   coreLib = corePkgs.lib;
 
