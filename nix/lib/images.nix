@@ -54,9 +54,11 @@ let
   nodeImage = node:
     let
       nodepins = import ./swpins/eval.nix {
+        inherit confDir;
         name = node.name;
         channels = node.config.swpins.channels;
-        inherit confDir pkgs lib;
+        pkgs = confLib.corePkgs;
+        lib = confLib.coreLib;
       };
       build = vpsadminosBuild {
         modules = [

@@ -73,6 +73,27 @@ module ConfCtl::Cli
           swpins_commands(cl, Swpins::Cluster, 'name')
         end
 
+        pins.desc 'Manage core software pins'
+        pins.command :core do |core|
+          core.desc 'List configured sw pins'
+          core.arg_name '[sw]'
+          core.command :ls do |c|
+            c.action &Command.run(Swpins::Core, :list)
+          end
+
+          core.desc 'Set to specific version'
+          core.arg_name "<sw> <ref>"
+          core.command :set do |c|
+            c.action &Command.run(Swpins::Core, :set)
+          end
+
+          core.desc 'Update to newest version'
+          core.arg_name "[<sw> [<version...>]]]"
+          core.command :update do |c|
+            c.action &Command.run(Swpins::Core, :update)
+          end
+        end
+
         pins.desc 'Generate confctl-managed JSON files for configured swpins'
         pins.command :reconfigure do |c|
           c.action &Command.run(Swpins::Base, :reconfigure)

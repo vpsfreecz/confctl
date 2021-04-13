@@ -17,6 +17,14 @@ module ConfCtl
       @settings['nix']['nixPath']
     end
 
+    def core_swpin_channels
+      @settings['swpins']['core']['channels']
+    end
+
+    def core_swpin_pins
+      @settings['swpins']['core']['pins']
+    end
+
     def build_generations
       @settings['buildGenerations']
     end

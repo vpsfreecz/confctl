@@ -3,10 +3,11 @@ let
   arg = builtins.fromJSON (builtins.readFile jsonArg);
 
   nixpkgs = import <nixpkgs> {};
-  pkgs = nixpkgs.pkgs;
-  lib = nixpkgs.lib;
 
-  deployments = import ./deployments.nix { inherit (arg) confDir; inherit pkgs lib; };
+  deployments = import ./deployments.nix {
+    inherit (arg) confDir;
+    inherit corePkgs coreLib;
+  };
 
   nameValuePairs = builtins.map (d: {
     name = d.name;
@@ -25,13 +26,26 @@ let
     value = d;
   }) deployments);
 
+  coreSwpins =
+    import ./lib/swpins/eval.nix {
+      inherit (arg) confDir;
+      name = "core";
+      dir = "";
+      channels = evalConfctl.config.confctl.swpins.core.channels;
+      pkgs = nixpkgs.pkgs;
+      lib = nixpkgs.lib;
+    };
+
+  corePkgs = import coreSwpins.evaluated.nixpkgs {};
+  coreLib = corePkgs.lib;
+
   deploymentSwpins = d:
     import ./lib/swpins/eval.nix {
       inherit (arg) confDir;
       name = d.name;
       channels = d.config.swpins.channels;
-      pkgs = nixpkgs.pkgs;
-      lib = lib;
+      pkgs = corePkgs.pkgs;
+      lib = corePkgs.lib;
     };
 
   selectedSwpinsAttrs = builtins.listToAttrs (builtins.map (host: {
@@ -68,7 +82,7 @@ let
         ./modules/confctl/nix.nix
         ./modules/confctl/swpins.nix
         "${toString arg.confDir}/configs/swpins.nix"
-      ] ++ lib.optional (builtins.pathExists cfg) cfg;
+      ] ++ nixpkgs.lib.optional (builtins.pathExists cfg) cfg;
     };
 
   build = {
@@ -85,10 +99,10 @@ let
     listSwpinsChannels = evalConfctl.config.confctl.swpins.channels;
 
     # JSON file with swpins for selected deployments
-    evalSwpins = pkgs.writeText "swpins.json" (builtins.toJSON selectedSwpinsAttrs);
+    evalSwpins = corePkgs.writeText "swpins.json" (builtins.toJSON selectedSwpinsAttrs);
 
     # JSON file with system.build.toplevel for selected deployments, this must
     # be run with proper NIX_PATH with swpins
-    toplevel = pkgs.writeText "toplevels.json" (builtins.toJSON selectedToplevels);
+    toplevel = corePkgs.writeText "toplevels.json" (builtins.toJSON selectedToplevels);
   };
 in build.${arg.build}

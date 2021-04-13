@@ -359,6 +359,19 @@ information.
   to support this command. The usual case for git is to pin to the current
   branch head.
 
+`confctl swpins core ls` [*sw-pattern*]
+  List core software packages used internally by confctl.
+
+`confctl swpins core set` *sw-pattern* *version...*
+  Set selected core software package to new *version*. The value
+  of *version* depends on the type of the software pin, for git it is a git
+  reference, e.g. a revision.
+
+`confctl swpins core update` [*sw-pattern*]
+  Update selected or all core software packages that have been configured
+  to support this command. The usual case for git is to pin to the current
+  branch head.
+
 `confctl swpins reconfigure`
   Regenerate all confctl-managed software pin files according to the Nix
   configuration.

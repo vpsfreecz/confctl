@@ -1,18 +1,18 @@
-{ confDir, name, channels, pkgs, lib }:
+{ confDir, name, dir ? "cluster", channels, pkgs, lib }:
 let
-  clusterFileName = builtins.replaceStrings [ "/" ] [ ":" ] name;
+  pinFileName = builtins.replaceStrings [ "/" ] [ ":" ] name;
 
-  clusterFilePath = "${toString confDir}/swpins/cluster/${clusterFileName}.json";
+  pinFilePath = "${toString confDir}/swpins/${dir}/${pinFileName}.json";
 
-  clusterFileJson = builtins.readFile clusterFilePath;
+  pinFileJson = builtins.readFile pinFilePath;
 
-  clusterFileSpecs =
-    if builtins.pathExists clusterFilePath then
-      builtins.fromJSON clusterFileJson
+  pinFileSpecs =
+    if builtins.pathExists pinFilePath then
+      builtins.fromJSON pinFileJson
     else
       {};
 
-  clusterFileSwpins = lib.mapAttrs (k: v: swpin v) clusterFileSpecs;
+  pinFileSwpins = lib.mapAttrs (k: v: swpin v) pinFileSpecs;
 
   channelPath = chan: "${toString confDir}/swpins/channels/${chan}.json";
 
@@ -24,7 +24,7 @@ let
 
   allChannelSwpins = map channelSwpins channels;
 
-  allSwpins = (lib.foldl (a: b: a // b) {} allChannelSwpins) // clusterFileSwpins;
+  allSwpins = (lib.foldl (a: b: a // b) {} allChannelSwpins) // pinFileSwpins;
 
   swpin = { fetcher, ... }:
     fetchers.${fetcher.type} fetcher.options;
@@ -53,13 +53,13 @@ let
         '';
   };
 
-  clusterFileInfos = lib.mapAttrs (k: v: v.info or {}) clusterFileSpecs;
+  pinFileInfos = lib.mapAttrs (k: v: v.info or {}) pinFileSpecs;
 
   channelInfos = chan: lib.mapAttrs (k: v: v.info or {}) (channelSpecs chan);
 
   allChannelInfos = map channelInfos channels;
 
-  allInfos = (lib.foldl (a: b: a // b) {} allChannelInfos) // clusterFileInfos;
+  allInfos = (lib.foldl (a: b: a // b) {} allChannelInfos) // pinFileInfos;
 
 in {
   evaluated = allSwpins;

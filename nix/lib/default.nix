@@ -1,7 +1,7 @@
-{ confDir, lib, pkgs }:
-with lib;
+{ confDir, coreLib, corePkgs }:
+with coreLib;
 let
-  deployment = import ./deployment { inherit confDir pkgs lib findConfig; };
+  deployment = import ./deployment { inherit confDir corePkgs coreLib findConfig; };
 
   findConfig =
     { cluster, name }:
@@ -25,6 +25,8 @@ let
     else
       null;
 in rec {
+  inherit corePkgs coreLib;
+
   mkNetUdevRule = name: mac: ''
   ACTION=="add", SUBSYSTEM=="net", DRIVERS=="?*", KERNEL=="eth*", ATTR{address}=="${mac}", NAME="${name}"
   '';

@@ -1,17 +1,19 @@
-{ confDir, pkgs, lib, findConfig }:
+{ confDir, corePkgs, coreLib, findConfig }:
 let
   swpinsFor =
     { name, config }:
     import ../swpins/eval.nix {
-      inherit confDir name pkgs lib;
+      inherit confDir name;
       channels = config.swpins.channels;
+      pkgs = corePkgs;
+      lib = coreLib;
     };
 
   makeModuleArgs =
     { config, swpins, spin, name }@args: {
       swpins = swpins.evaluated;
       swpinsInfo = swpins.infos;
-      deploymentInfo = import ./info.nix (args // { inherit lib findConfig; });
+      deploymentInfo = import ./info.nix (args // { inherit findConfig; });
     };
 
   makeImports = spin: extraImports: [
@@ -21,7 +23,7 @@ let
 
       _module.args = {
         inherit confDir;
-        confLib = import ../../lib { inherit confDir lib pkgs; };
+        confLib = import ../../lib { inherit confDir coreLib corePkgs; };
         confData = import "${toString confDir}/data/default.nix" { inherit lib; };
       };
 

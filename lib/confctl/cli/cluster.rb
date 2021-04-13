@@ -524,6 +524,13 @@ module ConfCtl::Cli
       channels.each(&:parse)
       channels_update = []
 
+      core = ConfCtl::Swpins::Core.new(channels)
+      core.parse
+
+      core.channels.each do |c|
+        channels_update << c unless channels_update.include?(c)
+      end
+
       cluster_names = ConfCtl::Swpins::ClusterNameList.new(
         channels: channels,
         deployments: deps,
@@ -551,6 +558,18 @@ module ConfCtl::Cli
         c.save if updated
       end
 
+      core_updated = false
+
+      core.specs.each do |name, s|
+        if !s.from_channel? && s.auto_update?
+          puts " updating #{core.name}.#{name}"
+          s.prefetch_update
+          core_updated = true
+        end
+      end
+
+      core.save if core_updated
+
       cluster_names.each do |cn|
         updated = false
 
@@ -570,7 +589,23 @@ module ConfCtl::Cli
       ret = {}
       valid = true
 
-      ConfCtl::Swpins::ClusterNameList.new(deployments: deps).each do |cn|
+      channels = ConfCtl::Swpins::ChannelList.new
+      channels.each(&:parse)
+
+      puts Rainbow("Checking core swpins...").bright
+
+      core = ConfCtl::Swpins::Core.new(channels)
+      core.parse
+
+      core.specs.each do |name, s|
+        puts "  #{name} ... "+
+             (s.valid? ? Rainbow('ok').green : Rainbow('needs update').cyan)
+        valid = false unless s.valid?
+      end
+
+      ConfCtl::Swpins::ClusterNameList.new(
+        channels: channels, deployments: deps,
+      ).each do |cn|
         cn.parse
 
         puts Rainbow("Checking swpins for #{cn.name}...").bright

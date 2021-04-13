@@ -1,12 +1,12 @@
-{ confDir, pkgs, lib }:
+{ confDir, corePkgs, coreLib }:
 let
-  confLib = import ./lib { inherit confDir lib pkgs; };
+  confLib = import ./lib { inherit confDir coreLib corePkgs; };
 
   baseModules = [
     ./modules/cluster
   ] ++ (import "${toString confDir}/cluster/module-list.nix");
 
-  evalConfig = pkgs.lib.evalModules {
+  evalConfig = corePkgs.lib.evalModules {
     prefix = [];
     check = true;
     modules = baseModules;
