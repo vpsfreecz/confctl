@@ -7,7 +7,11 @@ module ConfCtl
     extend Utils::File
 
     def self.dir
-      File.join('/nix/var/nix/gcroots/per-user', Etc.getlogin, 'confctl')
+      File.join(
+        '/nix/var/nix/gcroots/per-user',
+        Etc.getlogin,
+        "confctl-#{ConfDir.short_hash}",
+      )
     end
 
     def self.exist?(name)

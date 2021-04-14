@@ -1,9 +1,23 @@
+require 'digest'
+
 module ConfCtl
   module ConfDir
     # Path to the directory containing cluster configuration
     # @return [String]
     def self.path
       @path ||= File.realpath(Dir.pwd)
+    end
+
+    # Unique hash identifying the configuration based on its filesystem path
+    # @return [String]
+    def self.hash
+      @hash ||= Digest::SHA256.hexdigest(path)
+    end
+
+    # Shorter prefix of {hash}
+    # @return [String]
+    def self.short_hash
+      @short_hash ||= hash[0..7]
     end
 
     # Path to configuration-specific cache directory
