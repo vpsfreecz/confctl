@@ -94,7 +94,7 @@ You can now edit the machine's configuration in directory `cluster/my-machine`.
 
 7. Update pre-configured software pins to fetch current nixpkgs:
 ```
-confctl swpins channel update
+confctl swpins update
 ```
 
 8. Build the machine
