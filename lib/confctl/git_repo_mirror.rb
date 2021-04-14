@@ -1,5 +1,6 @@
 require 'digest'
 require 'fileutils'
+require 'tty-command'
 
 module ConfCtl
   class GitRepoMirror
@@ -11,6 +12,7 @@ module ConfCtl
       @url = url
       @quiet = quiet
       @name = Digest::SHA256.hexdigest(url)
+      @cmd = TTY::Command.new
     end
 
     def setup
@@ -18,7 +20,7 @@ module ConfCtl
         File.stat(mirror_path)
       rescue Errno::ENOENT
         FileUtils.mkdir_p(mirror_path)
-        git("clone", args: ["--mirror", "\"#{url}\"", "\"#{mirror_path}\""])
+        git("clone", args: ["--mirror", url, mirror_path])
       else
         git_repo('fetch')
       end
@@ -53,25 +55,19 @@ module ConfCtl
     end
 
     protected
-    attr_reader :quiet
+    attr_reader :cmd, :quiet
 
-    def git_repo(cmd, *args, **kwargs)
+    def git_repo(git_cmd, *args, **kwargs)
       kwargs[:gopts] ||= []
-      kwargs[:gopts] << "-C \"#{mirror_path}\""
-      git(cmd, *args, **kwargs)
+      kwargs[:gopts] << '-C' << mirror_path
+      git(git_cmd, *args, **kwargs)
     end
 
-    def git(cmd, args: [], opts: [], gopts: [])
-      opts << '--quiet' if quiet && %w(clone fetch).include?(cmd)
+    def git(git_cmd, args: [], opts: [], gopts: [])
+      opts << '--quiet' if quiet && %w(clone fetch).include?(git_cmd)
 
-      full_cmd = (['git'] + gopts + [cmd] + opts + args).join(' ')
-      ret = `#{full_cmd}`.strip
-
-      if $?.exitstatus != 0
-        fail "#{full_cmd} failed with exit status #{$?.exitstatus}"
-      end
-
-      ret
+      out, _ = cmd.run('git', *gopts, git_cmd, *opts, *args)
+      out.strip
     end
 
     def mirror_path
