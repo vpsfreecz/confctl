@@ -5,32 +5,41 @@ module ConfCtl
     include Singleton
 
     def initialize
-      nix = Nix.new
-      @settings = nix.confctl_settings
+      @settings = nil
     end
 
     def list_columns
-      @settings['list']['columns']
+      read_settings { |s| s['list']['columns'] }
     end
 
     def nix_paths
-      @settings['nix']['nixPath']
+      read_settings { |s| s['nix']['nixPath'] }
     end
 
     def core_swpin_channels
-      @settings['swpins']['core']['channels']
+      read_settings { |s| s['swpins']['core']['channels'] }
     end
 
     def core_swpin_pins
-      @settings['swpins']['core']['pins']
+      read_settings { |s| s['swpins']['core']['pins'] }
     end
 
     def build_generations
-      @settings['buildGenerations']
+      read_settings { |s| s['buildGenerations'] }
     end
 
     def host_generations
-      @settings['hostGenerations']
+      read_settings { |s| s['hostGenerations'] }
+    end
+
+    protected
+    def read_settings
+      if @settings.nil?
+        nix = Nix.new
+        @settings = nix.confctl_settings
+      end
+
+      yield(@settings)
     end
   end
 end
