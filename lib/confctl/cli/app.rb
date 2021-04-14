@@ -94,6 +94,11 @@ module ConfCtl::Cli
           end
         end
 
+        pins.desc 'Update all swpins'
+        pins.command :update do |c|
+          c.action &Command.run(Swpins::Base, :update)
+        end
+
         pins.desc 'Generate confctl-managed JSON files for configured swpins'
         pins.command :reconfigure do |c|
           c.action &Command.run(Swpins::Base, :reconfigure)

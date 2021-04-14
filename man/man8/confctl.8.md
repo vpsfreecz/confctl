@@ -372,6 +372,11 @@ information.
   to support this command. The usual case for git is to pin to the current
   branch head.
 
+`confctl swpins update`
+  Update software pins that have been configured for automated updates,
+  including pins in all channels, all machine-specific pins and the core
+  pins.
+
 `confctl swpins reconfigure`
   Regenerate all confctl-managed software pin files according to the Nix
   configuration.

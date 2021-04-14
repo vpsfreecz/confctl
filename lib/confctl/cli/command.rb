@@ -58,6 +58,11 @@ module ConfCtl::Cli
     end
 
     protected
+    def run_command(klass, method)
+      c = klass.new(gopts, opts, args)
+      c.method(method).call
+    end
+
     def determine_color
       case gopts[:color]
       when 'always'

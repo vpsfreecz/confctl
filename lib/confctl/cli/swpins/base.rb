@@ -5,6 +5,12 @@ module ConfCtl::Cli
   class Swpins::Base < Command
     include Swpins::Utils
 
+    def update
+      run_command(Swpins::Core, :update)
+      run_command(Swpins::Channel, :update)
+      run_command(Swpins::Cluster, :update)
+    end
+
     def reconfigure
       each_channel('*') do |chan|
         if chan.valid?

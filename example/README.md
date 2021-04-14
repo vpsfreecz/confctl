@@ -15,7 +15,7 @@ nix-shell
 
 2. Update software pins:
 ```
-confctl swpins channel update
+confctl swpins update
 ```
 
 3. Edit configurations in `cluster/` to your liking.
