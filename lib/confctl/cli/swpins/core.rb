@@ -48,7 +48,6 @@ module ConfCtl::Cli
 
     def update
       core = ConfCtl::Swpins::Core.get
-      core.parse
 
       core.specs.each do |name, spec|
         next if args[0] && !ConfCtl::Pattern.match(args[0], name)
