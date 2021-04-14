@@ -7,25 +7,16 @@ module ConfCtl
   # Root of confctl repository
   # @return [String]
   def self.root
-    File.realpath(File.join(File.dirname(__FILE__), '../'))
+    @root ||= File.realpath(File.join(File.dirname(__FILE__), '../'))
   end
 
-  # Path to the directory containing cluster configuration
-  # @return [String]
-  def self.conf_dir
-    File.realpath(Dir.pwd)
-  end
-
-  # Path to cache directory
+  # Path to global cache directory
   # @return [String]
   def self.cache_dir
-    File.join(conf_dir, '.confctl')
-  end
-
-  # Path to directory with build generations
-  # @return [String]
-  def self.generation_dir
-    File.join(cache_dir, 'generations')
+    @cache_dir ||= File.join(
+      ENV['XDG_CACHE_HOME'] || File.join(ENV['HOME'], '.cache'),
+      'confctl'
+    )
   end
 
   # Path to a nix asset

@@ -118,7 +118,7 @@ module ConfCtl
     end
 
     def dir
-      @dir ||= File.join(ConfCtl.generation_dir, escaped_host, name)
+      @dir ||= File.join(ConfDir.generation_dir, escaped_host, name)
     end
 
     protected

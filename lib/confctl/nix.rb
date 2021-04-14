@@ -10,7 +10,7 @@ module ConfCtl
     include Utils::File
 
     def initialize(conf_dir: nil, show_trace: false)
-      @conf_dir = conf_dir || ConfCtl.conf_dir
+      @conf_dir = conf_dir || ConfDir.path
       @show_trace = show_trace
       @cmd = TTY::Command.new
     end
@@ -266,7 +266,7 @@ module ConfCtl
     end
 
     def cache_dir
-      ConfCtl.cache_dir
+      ConfDir.cache_dir
     end
   end
 end

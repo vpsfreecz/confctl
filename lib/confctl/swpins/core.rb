@@ -127,7 +127,7 @@ module ConfCtl
     attr_reader :nix_specs, :json_specs
 
     def cache_dir
-      File.join(ConfCtl.cache_dir, 'build')
+      File.join(ConfDir.cache_dir, 'build')
     end
   end
 end

@@ -85,7 +85,7 @@ module ConfCtl
     attr_reader :generations, :index
 
     def dir
-      @dir ||= File.join(ConfCtl.generation_dir, ConfCtl.safe_host_name(host))
+      @dir ||= File.join(ConfDir.generation_dir, ConfCtl.safe_host_name(host))
     end
 
     def current_symlink

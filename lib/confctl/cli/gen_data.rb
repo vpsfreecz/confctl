@@ -1,9 +1,10 @@
 require 'highline/import'
 require 'vpsfree/client'
+require 'confctl/conf_dir'
 
 module ConfCtl::Cli
   class GenData < Command
-    DATADIR = File.join(ConfCtl.conf_dir, 'data')
+    DATADIR = File.join(ConfCtl::ConfDir.path, 'data')
 
     def vpsadmin_all
       vpsadmin_containers
