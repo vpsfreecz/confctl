@@ -164,7 +164,7 @@ module ConfCtl
       if dep.localhost?
         true
       else
-        ret = cmd.run!('nix', 'copy', '--to', "ssh://root@#{dep.target_host}", toplevel)
+        ret = cmd.run!('nix-copy-closure', '--to', "root@#{dep.target_host}", toplevel)
         ret.success?
       end
     end
