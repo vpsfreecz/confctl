@@ -35,7 +35,7 @@ module ConfCtl
     def destroy
       fail 'machine control not available' if mc.nil?
 
-      mc.execute!('nix-env', '-p', profile, '--delete-generations', id.to_s)
+      mc.execute('nix-env', '-p', profile, '--delete-generations', id.to_s)
     end
 
     protected

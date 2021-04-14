@@ -1,3 +1,5 @@
+require 'tty-command'
+
 module ConfCtl
   class MachineControl
     # @return [Deployment]
@@ -7,11 +9,12 @@ module ConfCtl
     def initialize(deployment)
       @deployment = deployment
       @extra_ssh_opts = []
+      @cmd = TTY::Command.new
     end
 
     # Reboot the machine
     def reboot
-      execute('reboot')
+      execute!('reboot')
     end
 
     # Reboot the machine and wait for it to come back online
@@ -39,7 +42,7 @@ module ConfCtl
             yield :is_up, nil
             return Time.now - t
           end
-        rescue CommandFailed
+        rescue TTY::Command::ExitError
           if went_down
             state = :is_down
           else
@@ -63,114 +66,57 @@ module ConfCtl
 
     # @return [Integer] uptime in seconds
     def get_uptime
-      read_file!('/proc/uptime').strip.split[0].to_f
+      read_file('/proc/uptime').strip.split[0].to_f
     end
 
     # @return [Array<String>]
     def get_timezone
-      popen_read!('date +"%Z;%z"').output.strip.split(';')
+      out, _ = run_cmd('date', '+%Z;%z')
+      out.strip.split(';')
     end
 
     # @param path [String]
     # @return [String]
-    def read_file!(path)
-      popen_read!('cat', path).output
+    def read_file(path)
+      out, _ = run_cmd('cat', path)
+      out
     end
 
     # @param path [String]
     # @return [String]
-    def read_symlink!(path)
-      popen_read!('readlink', path).output.strip
+    def read_symlink(path)
+      out, _ = run_cmd('readlink', path)
+      out.strip
     end
 
-    # @return [Process::Status]
+    # Execute command, raises exception on error
+    # @raise [TTY::Command::ExitError]
     def execute(*command)
-      system_exec(*command)
+      run_cmd(*command)
     end
 
-    # @return [Process::Status]
+    # Execute command, no exception raised on error
     def execute!(*command)
-      res = system_exec(*command)
-
-      if res.failed?
-        raise CommandFailed, res
-      end
-
-      res
+      run_cmd!(*command)
     end
 
-    def popen_read(*command)
-      args =
-        if deployment.localhost?
-          command
-        else
-          ssh_args + command
-        end
-
-      args << {
-        err: [:child, :out],
-      }
-
-      out = ''
-
-      IO.popen(args, 'r') do |io|
-        out = io.read
-      end
-
-      CommandResult.new(args, $?.exitstatus, output: out)
-    end
-
-    def popen_read!(*command)
-      res = popen_read(*command)
-
-      if res.failed?
-        raise CommandFailed, res
-      end
-
-      res
-    end
-
-    def bash_script_read(script)
-      cmd = ['bash', '--norc']
-
-      args =
-        if deployment.localhost?
-          cmd
-        else
-          ssh_args + cmd
-        end
-
-      args << {
-        err: [:child, :out],
-      }
-
-      out = ''
-
-      IO.popen(args, 'r+') do |io|
-        io.write(script)
-        io.close_write
-
-        out = io.read
-      end
-
-      CommandResult.new(args, $?.exitstatus, output: out)
-    end
-
-    def bash_script_read!(script)
-      res = bash_script_read(script)
-
-      if res.failed?
-        raise CommandFailed, res
-      end
-
-      res
+    # @param script [String]
+    def bash_script(script)
+      cmd.run('bash', '--norc', input: script)
     end
 
     protected
-    attr_reader :extra_ssh_opts
+    attr_reader :cmd, :extra_ssh_opts
 
-    # @return [CommandResult]
-    def system_exec(*command)
+    def run_cmd(*command, **kwargs)
+      do_run_cmd(:run, *command, **kwargs)
+    end
+
+    def run_cmd!(*command, **kwargs)
+      do_run_cmd(:run!, *command, **kwargs)
+    end
+
+    def do_run_cmd(method, *command, **kwargs)
       args =
         if deployment.localhost?
           command
@@ -178,9 +124,7 @@ module ConfCtl
           ssh_args + command
         end
 
-      pid = Process.spawn(*args)
-      Process.wait(pid)
-      CommandResult.new(args, $?.exitstatus)
+      cmd.method(method).call(*args, **kwargs)
     end
 
     def with_ssh_opts(*opts)

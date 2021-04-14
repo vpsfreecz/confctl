@@ -1,3 +1,5 @@
+require 'tty-command'
+
 module ConfCtl
   class MachineStatus
     class SwpinState
@@ -86,14 +88,14 @@ module ConfCtl
     def query(toplevel: true, generations: true)
       begin
         @uptime = mc.get_uptime
-      rescue CommandFailed
+      rescue TTY::Command::ExitError
         return
       end
 
       if toplevel
         begin
-          @current_toplevel = mc.read_symlink!('/run/current-system')
-        rescue CommandFailed
+          @current_toplevel = mc.read_symlink('/run/current-system')
+        rescue TTY::Command::ExitError
           return
         end
       end
@@ -101,13 +103,13 @@ module ConfCtl
       if generations
         begin
           @generations = Generation::HostList.fetch(mc)
-        rescue CommandFailed
+        rescue TTY::Command::ExitError
           return
         end
       end
 
       begin
-        @swpins_info = Swpins::DeployedInfo.parse!(mc.read_file!('/etc/confctl/swpins-info.json'))
+        @swpins_info = Swpins::DeployedInfo.parse!(mc.read_file('/etc/confctl/swpins-info.json'))
       rescue Error
         return
       end

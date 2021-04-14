@@ -3,17 +3,17 @@ module ConfCtl
     # @param mc [MachineControl]
     # @return [Generation::HostList]
     def self.fetch(mc, profile: '/nix/var/nix/profiles/system')
-      str = mc.bash_script_read!(<<-END
+      out, _ = mc.bash_script(<<-END
         realpath #{profile}
 
         for generation in `ls -d -1 #{profile}-*-link` ; do
           echo "$generation;$(readlink $generation);$(stat --format=%Y $generation)"
         done
         END
-      ).output
+      )
 
       list = new(mc.deployment.name)
-      lines = str.strip.split("\n")
+      lines = out.strip.split("\n")
       current_path = lines.shift
       id_rx = /^#{Regexp.escape(profile)}\-(\d+)\-link$/
 

@@ -176,7 +176,7 @@ module ConfCtl
     def activate(dep, toplevel, action)
       args = [File.join(toplevel, 'bin/switch-to-configuration'), action]
 
-      MachineControl.new(dep).execute(*args).success?
+      MachineControl.new(dep).execute!(*args).success?
     end
 
     # @param dep [Deployments::Deployment]
@@ -189,7 +189,7 @@ module ConfCtl
         '--set', toplevel,
       ]
 
-      MachineControl.new(dep).execute(*args).success?
+      MachineControl.new(dep).execute!(*args).success?
     end
 
     # @param packages [Array<String>]
