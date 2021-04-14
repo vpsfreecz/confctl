@@ -3,6 +3,7 @@ require 'etc'
 require 'json'
 require 'securerandom'
 require 'tempfile'
+require 'tty-command'
 
 module ConfCtl
   class Nix
@@ -11,6 +12,7 @@ module ConfCtl
     def initialize(conf_dir: nil, show_trace: false)
       @conf_dir = conf_dir || ConfCtl.conf_dir
       @show_trace = show_trace
+      @cmd = TTY::Command.new
     end
 
     def confctl_settings
@@ -58,21 +60,17 @@ module ConfCtl
           'core.swpins',
         )
 
-        cmd = [
+        cmd_args = [
           'nix-build',
           '--arg', 'jsonArg', arg,
           '--out-link', out_link,
-          (show_trace ? '--show-trace' : ''),
+          (show_trace ? '--show-trace' : nil),
           ConfCtl.nix_asset('evaluator.nix'),
-        ]
+        ].compact
 
-        output = `#{cmd.join(' ')}`.strip
+        out, _ = cmd.run(*cmd_args).stdout
 
-        if $?.exitstatus != 0
-          fail "nix-build failed with exit status #{$?.exitstatus}"
-        end
-
-        JSON.parse(File.read(output))
+        JSON.parse(File.read(out.strip))
       end
     end
 
@@ -91,21 +89,17 @@ module ConfCtl
           "#{ConfCtl.safe_host_name(host)}.swpins",
         )
 
-        cmd = [
+        cmd_args = [
           'nix-build',
           '--arg', 'jsonArg', arg,
           '--out-link', out_link,
-          (show_trace ? '--show-trace' : ''),
+          (show_trace ? '--show-trace' : nil),
           ConfCtl.nix_asset('evaluator.nix'),
-        ]
+        ].compact
 
-        output = `#{cmd.join(' ')}`.strip
+        out, _ = cmd.run(*cmd_args)
 
-        if $?.exitstatus != 0
-          fail "nix-build failed with exit status #{$?.exitstatus}"
-        end
-
-        JSON.parse(File.read(output))[host]
+        JSON.parse(File.read(out.strip))[host]
       end
     end
 
@@ -125,23 +119,15 @@ module ConfCtl
         ret_generations = {}
         out_link = File.join(cache_dir, 'build', "#{SecureRandom.hex(4)}.build")
 
-        pid = Process.fork do
-          ENV['NIX_PATH'] = build_nix_path(swpin_paths)
+        cmd_args = [
+          'nix-build',
+          '--arg', 'jsonArg', arg,
+          '--out-link', out_link,
+          (show_trace ? '--show-trace' : nil),
+          ConfCtl.nix_asset('evaluator.nix'),
+        ].compact
 
-          Process.exec(*[
-            'nix-build',
-            '--arg', 'jsonArg', arg,
-            '--out-link', out_link,
-            (show_trace ? '--show-trace' : nil),
-            ConfCtl.nix_asset('evaluator.nix'),
-          ].compact)
-        end
-
-        Process.wait(pid)
-
-        if $?.exitstatus != 0
-          fail "nix-build failed with exit status #{$?.exitstatus}"
-        end
+        cmd.run(*cmd_args, env: {'NIX_PATH' => build_nix_path(swpin_paths)})
 
         begin
           host_toplevels = JSON.parse(File.read(out_link))
@@ -178,7 +164,8 @@ module ConfCtl
       if dep.localhost?
         true
       else
-        system('nix', 'copy', '--to', "ssh://root@#{dep.target_host}", toplevel)
+        ret = cmd.run!('nix', 'copy', '--to', "ssh://root@#{dep.target_host}", toplevel)
+        ret.success?
       end
     end
 
@@ -219,17 +206,11 @@ module ConfCtl
       args << '--command'
       args << command
 
-      pid = Process.fork do
-        ENV.delete('shellHook')
-        Process.exec(*args)
-      end
-
-      Process.wait(pid)
-      $?.exitstatus == 0
+      cmd.run!(*args, env: {'shellHook' => nil}).success?
     end
 
     protected
-    attr_reader :conf_dir, :show_trace
+    attr_reader :conf_dir, :show_trace, :cmd
 
     # @param hash [Hash]
     # @param core_swpins [Boolean]
@@ -250,24 +231,20 @@ module ConfCtl
 
     def nix_instantiate(hash, opts = {})
       with_argument(hash, opts) do |arg|
-        cmd = [
+        cmd_args = [
           'nix-instantiate',
           '--eval',
           '--json',
           '--strict',
           '--read-write-mode',
           '--arg', 'jsonArg', arg,
-          (show_trace ? '--show-trace' : ''),
+          (show_trace ? '--show-trace' : nil),
           ConfCtl.nix_asset('evaluator.nix'),
-        ]
+        ].compact
 
-        json = `#{cmd.join(' ')}`
+        out, _ = cmd.run(*cmd_args).stdout
 
-        if $?.exitstatus != 0
-          fail "nix-instantiate failed with exit status #{$?.exitstatus}"
-        end
-
-        demodulify(JSON.parse(json))
+        demodulify(JSON.parse(out))
       end
     end
 
