@@ -388,9 +388,8 @@ information.
   branch head.
 
 `confctl swpins update`
-  Update software pins that have been configured for automated updates,
-  including pins in all channels, all machine-specific pins and the core
-  pins.
+  Update software pins that have been configured for updates, including pins
+  in all channels, all machine-specific pins and the core pins.
 
 `confctl swpins reconfigure`
   Regenerate all confctl-managed software pin files according to the Nix
