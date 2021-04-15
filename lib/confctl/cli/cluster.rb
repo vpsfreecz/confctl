@@ -458,7 +458,10 @@ module ConfCtl::Cli
     end
 
     def do_build(deps)
-      nix = ConfCtl::Nix.new(show_trace: opts['show-trace'])
+      nix = ConfCtl::Nix.new(
+        show_trace: opts['show-trace'],
+        max_jobs: opts['max-jobs'],
+      )
       host_swpin_paths = {}
 
       autoupdate_swpins(deps)

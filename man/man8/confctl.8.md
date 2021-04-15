@@ -103,6 +103,9 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
+    `-j`, `--max-jobs` *number*
+      Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
+
 `confctl deploy` [*options*] [*host-pattern* [`boot`|`switch`|`test`|`dry-activate`]]
   Deploy either a new or an existing build generation to matching hosts.
 
@@ -147,6 +150,9 @@ information.
       Determines whether to wait for the hosts to come back online if `--reboot`
       is used. `confctl` will wait for `600 seconds` by default.
 
+    `-j`, `--max-jobs` *number*
+      Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
+
 `confctl status` [*options*] [*host-pattern*]
   Probe managed hosts and determine their status.
 
@@ -166,6 +172,9 @@ information.
       Check status against a selected generation instead of a new build. If set
       to `none`, only the currently configured software pins are checked and not
       the system version itself.
+
+    `-j`, `--max-jobs` *number*
+      Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
 
 `confctl changelog` [*options*] [*host-pattern* [*sw-pattern*]]
   Show differences in deployed and configured software pins. For git software
@@ -207,6 +216,9 @@ information.
     `-p`, `--patch`
       Show patches.
 
+    `-j`, `--max-jobs` *number*
+      Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
+
 `confctl diff` [*options*] [*host-pattern* [*sw-pattern*]]
   Show differences in deployed and configured software pins. For git software
   pins, it's a git diff.
@@ -240,6 +252,9 @@ information.
       Use when the configuration has older software pins than deployed hosts,
       e.g. when doing a downgrade. Show a list of changes that are deployed
       on the hosts and are missing in the configured software pins.
+
+    `-j`, `--max-jobs` *number*
+      Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
 
 `confctl cssh` [*options*] [*host-pattern*]
   Open ClusterSSH on selected or all hosts.

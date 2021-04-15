@@ -9,9 +9,10 @@ module ConfCtl
   class Nix
     include Utils::File
 
-    def initialize(conf_dir: nil, show_trace: false)
+    def initialize(conf_dir: nil, show_trace: false, max_jobs: nil)
       @conf_dir = conf_dir || ConfDir.path
       @show_trace = show_trace
+      @max_jobs = max_jobs || Settings.instance.max_jobs
       @cmd = TTY::Command.new
     end
 
@@ -65,8 +66,9 @@ module ConfCtl
           '--arg', 'jsonArg', arg,
           '--out-link', out_link,
           (show_trace ? '--show-trace' : nil),
+          (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
           ConfCtl.nix_asset('evaluator.nix'),
-        ].compact
+        ].flatten.compact
 
         out, _ = cmd.run(*cmd_args).stdout
 
@@ -94,8 +96,9 @@ module ConfCtl
           '--arg', 'jsonArg', arg,
           '--out-link', out_link,
           (show_trace ? '--show-trace' : nil),
+          (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
           ConfCtl.nix_asset('evaluator.nix'),
-        ].compact
+        ].flatten.compact
 
         out, _ = cmd.run(*cmd_args)
 
@@ -124,8 +127,9 @@ module ConfCtl
           '--arg', 'jsonArg', arg,
           '--out-link', out_link,
           (show_trace ? '--show-trace' : nil),
+          (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
           ConfCtl.nix_asset('evaluator.nix'),
-        ].compact
+        ].flatten.compact
 
         cmd.run(*cmd_args, env: {'NIX_PATH' => build_nix_path(swpin_paths)})
 
@@ -210,7 +214,7 @@ module ConfCtl
     end
 
     protected
-    attr_reader :conf_dir, :show_trace, :cmd
+    attr_reader :conf_dir, :show_trace, :max_jobs, :cmd
 
     # @param hash [Hash]
     # @param core_swpins [Boolean]
@@ -239,8 +243,9 @@ module ConfCtl
           '--read-write-mode',
           '--arg', 'jsonArg', arg,
           (show_trace ? '--show-trace' : nil),
+          (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
           ConfCtl.nix_asset('evaluator.nix'),
-        ].compact
+        ].flatten.compact
 
         out, _ = cmd.run(*cmd_args).stdout
 

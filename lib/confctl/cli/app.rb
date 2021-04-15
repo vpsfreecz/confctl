@@ -141,6 +141,8 @@ module ConfCtl::Cli
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w(y yes)
 
+        nix_build_options(c)
+
         c.action &Command.run(Cluster, :build)
       end
 
@@ -176,6 +178,8 @@ module ConfCtl::Cli
 
         c.desc 'Wait for the host to boot'
         c.flag 'wait-online', default_value: '600'
+
+        nix_build_options(c)
 
         c.action &Command.run(Cluster, :deploy)
       end
@@ -222,6 +226,8 @@ module ConfCtl::Cli
         c.desc 'Show patches'
         c.switch %i(p patch)
 
+        nix_build_options(c)
+
         c.action &Command.run(Cluster, :changelog)
       end
 
@@ -242,6 +248,8 @@ module ConfCtl::Cli
 
         c.desc 'Show a changelog for downgrade'
         c.switch %i(d downgrade)
+
+        nix_build_options(c)
 
         c.action &Command.run(Cluster, :diff)
       end
@@ -359,6 +367,11 @@ module ConfCtl::Cli
       cmd.command :update do |c|
         c.action &Command.run(klass, :update)
       end
+    end
+
+    def nix_build_options(cmd)
+      cmd.desc 'Maximum number of build jobs (see nix-build)'
+      cmd.flag %w(j max-jobs), arg_name: 'number'
     end
   end
 end

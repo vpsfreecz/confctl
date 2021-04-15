@@ -4,6 +4,15 @@ with lib;
   options = {
     confctl = {
       nix = {
+        maxJobs = mkOption {
+          type = types.nullOr (types.either types.int (types.enum [ "auto" ]));
+          default = null;
+          description = ''
+            Maximum number of build jobs, passed to <literal>nix-build</literal>
+            commands.
+          '';
+        };
+
         nixPath = mkOption {
           type = types.listOf types.str;
           default = [];

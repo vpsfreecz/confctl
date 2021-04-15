@@ -12,6 +12,10 @@ module ConfCtl
       read_settings { |s| s['list']['columns'] }
     end
 
+    def max_jobs
+      read_settings { |s| s['nix']['maxJobs'] }
+    end
+
     def nix_paths
       read_settings { |s| s['nix']['nixPath'] }
     end
@@ -35,7 +39,7 @@ module ConfCtl
     protected
     def read_settings
       if @settings.nil?
-        nix = Nix.new
+        nix = Nix.new(max_jobs: 'auto')
         @settings = nix.confctl_settings
       end
 
