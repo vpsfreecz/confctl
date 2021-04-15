@@ -7,8 +7,10 @@ machines.
 
 * Stateless
 * Per-machine nixpkgs (both modules and packages)
+* Build generations for easy rollback
 * Support for configuration interconnections (declare and access other machines'
   configurations)
+* Query machine state, view changelogs and diffs
 
 ## Requirements
 
