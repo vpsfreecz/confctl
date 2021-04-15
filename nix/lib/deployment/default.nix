@@ -13,11 +13,11 @@ let
     { config, swpins, spin, name }@args: {
       swpins = swpins.evaluated;
       swpinsInfo = swpins.infos;
-      deploymentInfo = import ./info.nix (args // { inherit findConfig; });
+      confMachine = import ./info.nix (args // { inherit findConfig; });
     };
 
   makeImports = spin: extraImports: [
-    ({ config, pkgs, lib, deploymentInfo, ... }:
+    ({ config, pkgs, lib, confMachine, ... }:
     {
       _file = "confctl/nix/lib/deployment/default.nix";
 
@@ -28,10 +28,10 @@ let
       };
 
       networking.hostName =
-        lib.mkIf (deploymentInfo.host != null && deploymentInfo.host.name != null) (lib.mkDefault deploymentInfo.host.name);
+        lib.mkIf (confMachine.host != null && confMachine.host.name != null) (lib.mkDefault confMachine.host.name);
 
       networking.domain =
-        lib.mkIf (deploymentInfo.host != null) (lib.mkDefault deploymentInfo.host.fullDomain);
+        lib.mkIf (confMachine.host != null) (lib.mkDefault confMachine.host.fullDomain);
     })
   ] ++ (import ../../modules/module-list.nix).${spin}
     ++ (import "${toString confDir}/modules/module-list.nix").${spin}

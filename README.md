@@ -298,7 +298,7 @@ Machine/deployment configs can use the following extra module arguments:
 - `confLib` - confctl functions, see [nix/lib/default.nix](nix/lib/default.nix)
 - `confData` - access to user-defined datasets found in `data/default.nix`,
   see [example/data/default.nix](example/data/default.nix)
-- `deploymentInfo` - attrset with information about the machine that is currently
+- `confMachine` - attrset with information about the machine that is currently
   being built, contains key `name` and all options from
   [machine metadata module](##machine-metadata-and-software-pins)
 - `swpins` - attrset of software pins of the machine that is currently being built
@@ -306,10 +306,10 @@ Machine/deployment configs can use the following extra module arguments:
 For example in `cluster/my-machine/config.nix`:
 
 ```nix
-{ config, lib, pkgs, confLib, confData, deploymentInfo, ... }:
+{ config, lib, pkgs, confLib, confData, confMachine, ... }:
 {
   # Set the hostname to the machine name from confctl
-  networking.hostName = deploymentInfo.name;
+  networking.hostName = confMachine.name;
 
   # When used with the data defined at example/data/default.nix
   users.users.root.openssh.authorizedKeys.keys = with confData.sshKeys; admins;
