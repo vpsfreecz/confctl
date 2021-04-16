@@ -60,7 +60,7 @@ let
         pkgs = confLib.corePkgs;
         lib = confLib.coreLib;
       };
-      build = vpsadminosBuild {
+      osBuild = vpsadminos {
         modules = [
           {
             imports = [
@@ -71,11 +71,15 @@ let
         inherit (nodepins.evaluated) vpsadminos nixpkgs vpsadmin;
       };
     in {
-      toplevel = build.toplevel;
-      kernelParams = build.kernelParams;
+      toplevel = osBuild.config.system.build.toplevel;
+      kernelParams = osBuild.config.system.build.kernelParams;
       dir = pkgs.symlinkJoin {
-        name = "vpsadminos_netboot";
-        paths = with build; [ dist ];
+        name =
+          let
+            hn = osBuild.config.networking.hostName;
+            nn = if (hn != "") then hn else "unnamed";
+          in "vpsadminos-netboot-${nn}-${osBuild.config.system.osLabel}";
+        paths = with osBuild.config.system.build; [ dist ];
       };
       macs = node.config.netboot.macs or [];
     };
