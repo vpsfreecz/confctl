@@ -2,6 +2,7 @@ require_relative 'command'
 require 'json'
 require 'rainbow'
 require 'tty-pager'
+require 'tty-progressbar'
 require 'tty-spinner'
 
 module ConfCtl::Cli
@@ -491,12 +492,22 @@ module ConfCtl::Cli
         puts "with swpins"
         swpin_paths.each { |k, v| puts "  #{k}=#{v}" }
 
-        host_generations.update(nix.build_toplevels(
+        pb = TTY::ProgressBar.new(
+          "nix-build [:bar] :current/:total (:percent)",
+          width: 80,
+        )
+
+        built_generations = nix.build_toplevels(
           hosts: hosts,
           swpin_paths: swpin_paths,
           time: time,
           host_swpin_specs: host_swpin_specs,
-        ))
+        ) do |i, n, path|
+          pb.update(total: n) if pb.total != n
+          pb.advance
+        end
+
+        host_generations.update(built_generations)
       end
 
       generation_hosts = {}
