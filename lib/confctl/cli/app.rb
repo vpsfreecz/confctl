@@ -29,24 +29,24 @@ module ConfCtl::Cli
 
       desc 'Create a new configuration'
       command :init do |c|
-        c.action &Command.run(Configuration, :init)
+        c.action &Command.run(c, Configuration, :init)
       end
 
       desc 'Add a new deployment'
       arg_name '<name>'
       command :add do |c|
-        c.action &Command.run(Configuration, :add)
+        c.action &Command.run(c, Configuration, :add)
       end
 
       desc 'Rename an existing deployment'
       arg_name '<old-name> <new-name>'
       command :rename do |c|
-        c.action &Command.run(Configuration, :rename)
+        c.action &Command.run(c, Configuration, :rename)
       end
 
       desc 'Update deployment list with contents of cluster/'
       command :rediscover do |c|
-        c.action &Command.run(Configuration, :rediscover)
+        c.action &Command.run(c, Configuration, :rediscover)
       end
 
       desc 'Manage software pins'
@@ -56,7 +56,7 @@ module ConfCtl::Cli
           ch.desc 'List configured sw pins'
           ch.arg_name '[channel [sw]]'
           ch.command :ls do |c|
-            c.action &Command.run(Swpins::Channel, :list)
+            c.action &Command.run(c, Swpins::Channel, :list)
           end
 
           swpins_commands(ch, Swpins::Channel, 'channel')
@@ -67,7 +67,7 @@ module ConfCtl::Cli
           cl.desc 'List configured sw pins'
           cl.arg_name '[cluster-name [sw]]'
           cl.command :ls do |c|
-            c.action &Command.run(Swpins::Cluster, :list)
+            c.action &Command.run(c, Swpins::Cluster, :list)
           end
 
           swpins_commands(cl, Swpins::Cluster, 'name')
@@ -78,30 +78,30 @@ module ConfCtl::Cli
           core.desc 'List configured sw pins'
           core.arg_name '[sw]'
           core.command :ls do |c|
-            c.action &Command.run(Swpins::Core, :list)
+            c.action &Command.run(c, Swpins::Core, :list)
           end
 
           core.desc 'Set to specific version'
           core.arg_name "<sw> <ref>"
           core.command :set do |c|
-            c.action &Command.run(Swpins::Core, :set)
+            c.action &Command.run(c, Swpins::Core, :set)
           end
 
           core.desc 'Update to newest version'
           core.arg_name "[<sw> [<version...>]]]"
           core.command :update do |c|
-            c.action &Command.run(Swpins::Core, :update)
+            c.action &Command.run(c, Swpins::Core, :update)
           end
         end
 
         pins.desc 'Update all swpins'
         pins.command :update do |c|
-          c.action &Command.run(Swpins::Base, :update)
+          c.action &Command.run(c, Swpins::Base, :update)
         end
 
         pins.desc 'Generate confctl-managed JSON files for configured swpins'
         pins.command :reconfigure do |c|
-          c.action &Command.run(Swpins::Base, :reconfigure)
+          c.action &Command.run(c, Swpins::Base, :reconfigure)
         end
       end
 
@@ -123,7 +123,7 @@ module ConfCtl::Cli
         c.desc 'Filter by tag'
         c.flag %i(t tag), multiple: true
 
-        c.action &Command.run(Cluster, :list)
+        c.action &Command.run(c, Cluster, :list)
       end
 
       desc 'Build target systems'
@@ -143,7 +143,7 @@ module ConfCtl::Cli
 
         nix_build_options(c)
 
-        c.action &Command.run(Cluster, :build)
+        c.action &Command.run(c, Cluster, :build)
       end
 
       desc 'Deploy target systems'
@@ -181,7 +181,7 @@ module ConfCtl::Cli
 
         nix_build_options(c)
 
-        c.action &Command.run(Cluster, :deploy)
+        c.action &Command.run(c, Cluster, :deploy)
       end
 
       desc 'Check host status'
@@ -199,7 +199,7 @@ module ConfCtl::Cli
         c.desc 'Check status against selected generation'
         c.flag %i(g generation)
 
-        c.action &Command.run(Cluster, :status)
+        c.action &Command.run(c, Cluster, :status)
       end
 
       desc 'Changelog between deployed and configured swpins'
@@ -228,7 +228,7 @@ module ConfCtl::Cli
 
         nix_build_options(c)
 
-        c.action &Command.run(Cluster, :changelog)
+        c.action &Command.run(c, Cluster, :changelog)
       end
 
       desc 'Diff between deployed and configured swpins'
@@ -251,7 +251,7 @@ module ConfCtl::Cli
 
         nix_build_options(c)
 
-        c.action &Command.run(Cluster, :diff)
+        c.action &Command.run(c, Cluster, :diff)
       end
 
       desc 'Open ClusterSSH'
@@ -266,7 +266,7 @@ module ConfCtl::Cli
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w(y yes)
 
-        c.action &Command.run(Cluster, :cssh)
+        c.action &Command.run(c, Cluster, :cssh)
       end
 
       desc 'Manage built host generations'
@@ -286,7 +286,7 @@ module ConfCtl::Cli
           c.desc 'List remote host generations'
           c.switch %i(r remote)
 
-          c.action &Command.run(Generation, :list)
+          c.action &Command.run(c, Generation, :list)
         end
 
         gen.desc 'Remove host generations'
@@ -307,7 +307,7 @@ module ConfCtl::Cli
           c.desc 'Assume the answer to confirmations is yes'
           c.switch %w(y yes)
 
-          c.action &Command.run(Generation, :remove)
+          c.action &Command.run(c, Generation, :remove)
         end
 
         gen.desc 'Auto-remove old host generations'
@@ -328,7 +328,7 @@ module ConfCtl::Cli
           c.desc 'Assume the answer to confirmations is yes'
           c.switch %w(y yes)
 
-          c.action &Command.run(Generation, :rotate)
+          c.action &Command.run(c, Generation, :rotate)
         end
       end
 
@@ -338,17 +338,17 @@ module ConfCtl::Cli
         gen.command :vpsadmin do |vpsa|
           vpsa.desc 'Generate all data files'
           vpsa.command :all do |c|
-            c.action &Command.run(GenData, :vpsadmin_all)
+            c.action &Command.run(c, GenData, :vpsadmin_all)
           end
 
           vpsa.desc 'Generate container data files'
           vpsa.command :containers do |c|
-            c.action &Command.run(GenData, :vpsadmin_containers)
+            c.action &Command.run(c, GenData, :vpsadmin_containers)
           end
 
           vpsa.desc 'Generate network data files'
           vpsa.command :network do |c|
-            c.action &Command.run(GenData, :vpsadmin_network)
+            c.action &Command.run(c, GenData, :vpsadmin_network)
           end
         end
       end
@@ -370,13 +370,13 @@ module ConfCtl::Cli
       cmd.desc 'Set to specific version'
       cmd.arg_name "<#{arg_name}> <sw> <ref>"
       cmd.command :set do |c|
-        c.action &Command.run(klass, :set)
+        c.action &Command.run(c, klass, :set)
       end
 
       cmd.desc 'Update to newest version'
       cmd.arg_name "[<#{arg_name}> [<sw> [<version...>]]]"
       cmd.command :update do |c|
-        c.action &Command.run(klass, :update)
+        c.action &Command.run(c, klass, :update)
       end
     end
 

@@ -3,10 +3,16 @@ require 'rainbow'
 
 module ConfCtl::Cli
   class Command
-    def self.run(klass, method)
+    def self.run(gli_cmd, klass, method)
       Proc.new do |global_opts, opts, args|
         log = ConfCtl::Logger.instance
-        log.open("#{klass.name.split('::')[2..-1].join('-').downcase}-#{method}")
+        log.open(gli_cmd.name_for_help.join('-'))
+        log.cli(
+          gli_cmd.name_for_help,
+          global_opts,
+          opts,
+          args,
+        )
 
         cmd = klass.new(global_opts, opts, args)
         cmd.run_method(method)

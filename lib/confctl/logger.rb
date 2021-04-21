@@ -1,4 +1,5 @@
 require 'fileutils'
+require 'pp'
 require 'singleton'
 require 'thread'
 
@@ -52,12 +53,35 @@ module ConfCtl
       unlink
     end
 
+    def write(str)
+      sync { @io << str }
+    end
+
     def <<(str)
-      mutex.synchronize { @io << str }
+      write(str)
+    end
+
+    def cli(cmd, gopts, opts, args)
+      sync do
+        PP.pp({
+          command: cmd,
+          global_options: prune_opts(gopts.clone),
+          command_options: prune_opts(opts.clone),
+          arguments: args,
+        }, @io)
+      end
     end
 
     protected
     attr_reader :mutex
+
+    def sync
+      if mutex.owned?
+        yield
+      else
+        mutex.synchronize { yield }
+      end
+    end
 
     def file_name(name)
       n = [
@@ -66,6 +90,10 @@ module ConfCtl
         Time.now.strftime('%Y-%m-%d--%H-%M-%S'),
       ].compact.join('-')
       "#{n}.log"
+    end
+
+    def prune_opts(hash)
+      hash.delete_if { |k, v| k.is_a?(::Symbol) }
     end
   end
 end
