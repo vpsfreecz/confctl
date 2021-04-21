@@ -1,5 +1,3 @@
-require 'tty-command'
-
 module ConfCtl
   class NixCopy
     # @param target [String]
@@ -15,7 +13,7 @@ module ConfCtl
     # @yieldparam total [Integer]
     # @yieldparam path [String]
     def run!(&block)
-      cmd = TTY::Command.new
+      cmd = SystemCommand.new
 
       line_buf = LineBuffer.new do |out, err|
         parse_line(err, &block) if err && block

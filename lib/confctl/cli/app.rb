@@ -352,6 +352,17 @@ module ConfCtl::Cli
           end
         end
       end
+
+      on_error do |exception|
+        log = ConfCtl::Logger.instance
+
+        if log.open?
+          warn "\nLog file: #{log.path}"
+          log.close
+        end
+
+        true
+      end
     end
 
     protected

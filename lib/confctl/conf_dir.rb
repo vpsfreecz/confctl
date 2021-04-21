@@ -31,5 +31,11 @@ module ConfCtl
     def self.generation_dir
       @generation_dir ||= File.join(cache_dir, 'generations')
     end
+
+    # Path to configuration-specific log directory
+    # @return [String]
+    def self.log_dir
+      @log_dir ||= File.join(cache_dir, 'logs')
+    end
   end
 end

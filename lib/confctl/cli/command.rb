@@ -5,8 +5,13 @@ module ConfCtl::Cli
   class Command
     def self.run(klass, method)
       Proc.new do |global_opts, opts, args|
+        log = ConfCtl::Logger.instance
+        log.open("#{klass.name.split('::')[2..-1].join('-').downcase}-#{method}")
+
         cmd = klass.new(global_opts, opts, args)
-        cmd.method(method).call
+        cmd.run_method(method)
+
+        log.close_and_unlink
       end
     end
 
@@ -57,10 +62,14 @@ module ConfCtl::Cli
       fail 'Aborted' unless ask_confirmation(**kwargs, &block)
     end
 
+    def run_method(method)
+      self.method(method).call
+    end
+
     protected
     def run_command(klass, method)
       c = klass.new(gopts, opts, args)
-      c.method(method).call
+      c.run_method(method)
     end
 
     def determine_color

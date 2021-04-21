@@ -1,6 +1,5 @@
 require 'digest'
 require 'fileutils'
-require 'tty-command'
 
 module ConfCtl
   class GitRepoMirror
@@ -12,7 +11,7 @@ module ConfCtl
       @url = url
       @quiet = quiet
       @name = Digest::SHA256.hexdigest(url)
-      @cmd = TTY::Command.new
+      @cmd = SystemCommand.new
     end
 
     def setup

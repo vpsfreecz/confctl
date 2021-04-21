@@ -1,5 +1,3 @@
-require 'tty-command'
-
 module ConfCtl
   class MachineControl
     # @return [Deployment]
@@ -9,7 +7,7 @@ module ConfCtl
     def initialize(deployment)
       @deployment = deployment
       @extra_ssh_opts = []
-      @cmd = TTY::Command.new
+      @cmd = SystemCommand.new
     end
 
     # Reboot the machine

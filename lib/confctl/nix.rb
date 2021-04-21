@@ -3,7 +3,6 @@ require 'etc'
 require 'json'
 require 'securerandom'
 require 'tempfile'
-require 'tty-command'
 
 module ConfCtl
   class Nix
@@ -13,7 +12,7 @@ module ConfCtl
       @conf_dir = conf_dir || ConfDir.path
       @show_trace = show_trace
       @max_jobs = max_jobs || Settings.instance.max_jobs
-      @cmd = TTY::Command.new
+      @cmd = SystemCommand.new
     end
 
     def confctl_settings
