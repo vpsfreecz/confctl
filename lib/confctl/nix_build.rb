@@ -48,7 +48,7 @@ module ConfCtl
         end
       end
 
-      if /^building '([^']+)/ =~ line
+      if /^building '([^']+)/ =~ line || /^copying path '([^']+)/ =~ line
         @progress += 1
         yield(@progress, @total, $1)
       end
