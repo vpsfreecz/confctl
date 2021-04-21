@@ -85,9 +85,9 @@ module ConfCtl
 
     def file_name(name)
       n = [
+        Time.now.strftime('%Y-%m-%d--%H-%M-%S'),
         'confctl',
         name,
-        Time.now.strftime('%Y-%m-%d--%H-%M-%S'),
       ].compact.join('-')
       "#{n}.log"
     end
