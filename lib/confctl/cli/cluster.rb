@@ -483,6 +483,8 @@ module ConfCtl::Cli
       host_generations = {}
       time = Time.now
 
+      puts "#{Rainbow("Build log:").yellow} #{Rainbow(ConfCtl::Logger.path).cyan}"
+
       grps.each do |hosts, swpin_paths|
         puts Rainbow("Building deployments").bright
         hosts.each { |h| puts "  #{h}" }

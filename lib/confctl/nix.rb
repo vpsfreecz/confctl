@@ -106,12 +106,18 @@ module ConfCtl
     end
 
     # Build config.system.build.toplevel for selected hosts
+    #
     # @param hosts [Array<String>]
     # @param swpin_paths [Hash]
     # @param host_swpin_specs [Hash]
     # @param time [Time]
+    #
+    # @yieldparam progress [Integer]
+    # @yieldparam total [Integer]
+    # @yieldparam path [String]
+    #
     # @return [Hash<String, Generation::Build>]
-    def build_toplevels(hosts: [], swpin_paths: {}, host_swpin_specs: {}, time: nil)
+    def build_toplevels(hosts: [], swpin_paths: {}, host_swpin_specs: {}, time: nil, &block)
       with_argument({
         confDir: conf_dir,
         build: :toplevel,
@@ -122,7 +128,6 @@ module ConfCtl
         out_link = File.join(cache_dir, 'build', "#{SecureRandom.hex(4)}.build")
 
         cmd_args = [
-          'nix-build',
           '--arg', 'jsonArg', arg,
           '--out-link', out_link,
           (show_trace ? '--show-trace' : nil),
@@ -130,7 +135,8 @@ module ConfCtl
           ConfCtl.nix_asset('evaluator.nix'),
         ].flatten.compact
 
-        cmd.run(*cmd_args, env: {'NIX_PATH' => build_nix_path(swpin_paths)})
+        nb = NixBuild.new(cmd_args, swpin_paths)
+        nb.run(&block)
 
         begin
           host_toplevels = JSON.parse(File.read(out_link))
@@ -255,14 +261,6 @@ module ConfCtl
 
         demodulify(JSON.parse(out))
       end
-    end
-
-    def build_nix_path(swpins)
-      paths = []
-      paths << "confctl=#{ConfCtl.root}"
-      paths.concat(swpins.map { |k, v| "#{k}=#{v}" })
-      paths.concat(Settings.instance.nix_paths)
-      paths.join(':')
     end
 
     def demodulify(value)
