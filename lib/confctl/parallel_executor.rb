@@ -8,6 +8,8 @@ module ConfCtl
       @thread_count = threads
       @threads = []
       @queue = Queue.new
+      @retvals = []
+      @mutex = Mutex.new
     end
 
     def add(&block)
@@ -20,10 +22,11 @@ module ConfCtl
       end
 
       threads.each(&:join)
+      retvals
     end
 
     protected
-    attr_reader :threads, :queue
+    attr_reader :threads, :queue, :mutex, :retvals
 
     def worker
       loop do
@@ -33,7 +36,8 @@ module ConfCtl
           return
         end
 
-        block.call
+        v = block.call
+        mutex.synchronize { retvals << v }
       end
     end
   end

@@ -142,6 +142,10 @@ information.
       Instead of copying the systems to all hosts in bulk before actiovations,
       copy and deploy hosts one by one.
 
+    `--max-concurrent-copy` *n*
+      Use at most *n* concurrent nix-copy-closure processes to deploy closures
+      to the target hosts. Defaults to `5`.
+
     `--reboot`
       Applicable only when *switch-action* is `boot`. Reboot the host after the
       configuration is activated.

@@ -247,11 +247,15 @@ module ConfCtl::Cli
       skipped_copy = []
       skipped_activation = []
 
-      host_generations.each do |host, gen|
-        if copy_to_host(nix, host, deps[host], gen.toplevel) == :skip
-          puts Rainbow("Skipping #{host}").yellow
-          skipped_copy << host
+      if opts[:interactive]
+        host_generations.each do |host, gen|
+          if copy_to_host(nix, host, deps[host], gen.toplevel) == :skip
+            puts Rainbow("Skipping #{host}").yellow
+            skipped_copy << host
+          end
         end
+      else
+        concurrent_copy(deps, host_generations, nix)
       end
 
       host_generations.each do |host, gen|
@@ -332,6 +336,49 @@ module ConfCtl::Cli
       end
 
       true
+    end
+
+    def concurrent_copy(deps, host_generations, nix)
+      multibar = TTY::ProgressBar::Multi.new(
+        "Copying [:bar] :current/:total (:percent)",
+        width: 80,
+      )
+      executor = ConfCtl::ParallelExecutor.new(opts['max-concurrent-copy'])
+
+      host_generations.each do |host, gen|
+        pb = multibar.register(
+          "#{host} [:bar] :current/:total (:percent)"
+        )
+
+        executor.add do
+          ret = nix.copy(deps[host], gen.toplevel) do |i, n, path|
+            if pb.total != n
+              pb.update(total: n)
+              multibar.top_bar.resume if multibar.top_bar.done?
+              multibar.top_bar.update(total: multibar.total)
+            end
+
+            pb.advance
+          end
+
+          if !ret
+            pb.format = "#{host}: error occurred"
+            pb.advance
+          elsif pb.total.nil?
+            pb.format = "#{host}: nothing to do"
+            pb.advance
+          end
+
+          ret ? nil : host
+        end
+      end
+
+      retvals = executor.run
+      failed = retvals.compact
+
+      if failed.any?
+        fail "Copy failed to: #{failed.join(', ')}"
+      end
     end
 
     def deploy_to_host(nix, host, dep, toplevel, action)

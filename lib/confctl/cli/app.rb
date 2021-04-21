@@ -173,6 +173,10 @@ module ConfCtl::Cli
         c.desc 'Copy and deploy machines one by one'
         c.switch 'one-by-one'
 
+        c.desc 'Max number of concurrent nix-copy-closure processes'
+        c.flag 'max-concurrent-copy', arg_name: 'n', type: Integer,
+          default_value: 5
+
         c.desc 'Reboot target systems after deployment'
         c.switch :reboot
 
