@@ -400,7 +400,7 @@ module ConfCtl::Cli
         fail "Error while activating configuration on #{host}"
       end
 
-      unless nix.set_profile(dep, toplevel)
+      if %w(boot switch).include?(action) && !nix.set_profile(dep, toplevel)
         fail "Error while setting profile on #{host}"
       end
     end
