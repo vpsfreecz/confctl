@@ -317,7 +317,17 @@ module ConfCtl::Cli
         return :skip
       end
 
-      unless nix.copy(dep, toplevel)
+      pb = TTY::ProgressBar.new(
+        "Copying [:bar] :current/:total (:percent)",
+        width: 80,
+      )
+
+      ret = nix.copy(dep, toplevel) do |i, n, path|
+        pb.update(total: n) if pb.total != n
+        pb.advance
+      end
+
+      unless ret
         fail "Error while copying system to #{host}"
       end
 
