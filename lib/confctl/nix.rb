@@ -163,13 +163,18 @@ module ConfCtl
 
     # @param dep [Deployments::Deployment]
     # @param toplevel [String]
+    #
+    # @yieldparam progress [Integer]
+    # @yieldparam total [Integer]
+    # @yieldparam path [String]
+    #
     # @return [Boolean]
-    def copy(dep, toplevel)
+    def copy(dep, toplevel, &block)
       if dep.localhost?
         true
       else
-        ret = cmd.run!('nix-copy-closure', '--to', "root@#{dep.target_host}", toplevel)
-        ret.success?
+        cp = NixCopy.new(dep.target_host, toplevel)
+        cp.run!(&block).success?
       end
     end
 
