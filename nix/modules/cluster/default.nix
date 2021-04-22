@@ -19,8 +19,13 @@ let
           };
 
           string = mkOption {
-            type = types.str;
-            default = "${config.address}/${toString config.prefix}";
+            type = types.nullOr types.str;
+            default = null;
+            apply = v:
+              if isNull v then
+                "${config.address}/${toString config.prefix}"
+              else
+                v;
             description = "Address with prefix as string";
           };
         };
