@@ -54,7 +54,10 @@ module ConfCtl
     end
 
     def write(str)
-      sync { @io << str }
+      sync do
+        @io << str
+        @io.flush
+      end
     end
 
     def <<(str)
