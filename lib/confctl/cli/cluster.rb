@@ -476,7 +476,12 @@ module ConfCtl::Cli
         Hash[cols.map { |c| [c, d[c]] }]
       end
 
-      OutputFormatter.print(rows, cols, layout: :columns)
+      OutputFormatter.print(
+        rows,
+        cols,
+        header: !opts['hide-header'],
+        layout: :columns,
+      )
     end
 
     def find_generations(deps, generation_name)

@@ -117,6 +117,9 @@ module ConfCtl::Cli
         c.desc 'Select attributes to output'
         c.flag %i(o output)
 
+        c.desc 'Do not show the header'
+        c.switch %i(H hide-header)
+
         c.desc 'Filter by attribute'
         c.flag %i(a attr), multiple: true
 

@@ -73,6 +73,9 @@ information.
       Comma-separated list of attributes to output. Defaults to the value
       of option `confctl.list.columns`.
 
+    `-H`, `--hide-header`
+      Do not print the line with column labels.
+
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
       Filter deployments by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module
