@@ -263,6 +263,11 @@ information.
 `confctl cssh` [*options*] [*host-pattern*]
   Open ClusterSSH on selected or all hosts.
 
+    `--managed` `y`|`yes`|`n`|`no`|`a`|`all`
+      The configuration can contain deployments which are not managed by confctl
+      and are there just for reference. This option determines what kind of
+      deployments should be selected.
+
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
       Filter deployments by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module

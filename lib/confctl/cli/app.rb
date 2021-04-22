@@ -261,6 +261,9 @@ module ConfCtl::Cli
       desc 'Open ClusterSSH'
       arg_name '[host-pattern]'
       command :cssh do |c|
+        c.desc 'Filter (un)managed deployments'
+        c.flag :managed, must_match: %w(y yes n no a all)
+
         c.desc 'Filter by attribute'
         c.flag %i(a attr), multiple: true
 

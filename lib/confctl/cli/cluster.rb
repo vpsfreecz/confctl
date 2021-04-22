@@ -8,21 +8,7 @@ require 'tty-spinner'
 module ConfCtl::Cli
   class Cluster < Command
     def list
-      selected = select_deployments(args[0])
-
-      managed =
-        case opts[:managed]
-        when 'y', 'yes'
-          selected.managed
-        when 'n', 'no'
-          selected.unmanaged
-        when 'a', 'all'
-          selected
-        else
-          selected.managed
-        end
-
-      list_deployments(managed)
+      list_deployments(select_deployments_with_managed(args[0]))
     end
 
     def build
@@ -216,7 +202,7 @@ module ConfCtl::Cli
     end
 
     def cssh
-      deps = select_deployments(args[0]).managed
+      deps = select_deployments_with_managed(args[0])
 
       ask_confirmation! do
         puts "Open cssh to the following deployments:"
@@ -460,6 +446,21 @@ module ConfCtl::Cli
         (pattern.nil? || ConfCtl::Pattern.match?(pattern, host)) \
           && attr_filters.pass?(d) \
           && tag_filters.pass?(d)
+      end
+    end
+
+    def select_deployments_with_managed(pattern)
+      selected = select_deployments(pattern)
+
+      case opts[:managed]
+      when 'y', 'yes'
+        selected.managed
+      when 'n', 'no'
+        selected.unmanaged
+      when 'a', 'all'
+        selected
+      else
+        selected.managed
       end
     end
 
