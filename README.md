@@ -16,38 +16,6 @@ machines.
 
 * [Nix](https://nixos.org)
 
-## Usage
-```
-$ confctl --help
-NAME
-    confctl - Manage vpsFree.cz cluster configuration and deployments
-
-SYNOPSIS
-    confctl [global options] command [command options] [arguments...]
-
-GLOBAL OPTIONS
-    -c, --color=arg - Toggle color mode (default: auto)
-    --help          - Show this message
-
-COMMANDS
-    add        - Add a new deployment
-    build      - Build target systems
-    changelog  - Changelog between deployed and configured swpins
-    cssh       - Open ClusterSSH
-    deploy     - Deploy target systems
-    diff       - Diff between deployed and configured swpins
-    gen-data   - Generate data files
-    help       - Shows a list of commands or help for one command
-    init       - Create a new configuration
-    ls         - List configured deployments
-    rediscover - Update deployment list with contents of cluster/
-    rename     - Rename an existing deployment
-    status     - Check host status
-    swpins     - Manage software pins
-```
-
-More in the [manpage](./man/man8/confctl.8.md).
-
 ## Quick start
 1. There are no releases or packages yet, so first clone the repository:
 ```
@@ -76,7 +44,7 @@ dependencies into `.gems/`:
 nix-shell
 ```
 
-From within the shell, you can access the manual:
+From within the shell, you can access the [manual](./man/man8/confctl.8.md):
 
 ```
 man confctl
