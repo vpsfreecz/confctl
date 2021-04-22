@@ -36,6 +36,11 @@ module ConfCtl
     def parse_line(line)
       if /^these derivations will be built:/ =~ line
         @in_derivation_list = true
+        @in_fetch_list = false
+        return
+      elsif /^these paths will be fetched / =~ line
+        @in_derivation_list = false
+        @in_fetch_list = true
         return
       end
 
@@ -45,6 +50,14 @@ module ConfCtl
           return
         else
           @in_derivation_list = false
+        end
+
+      elsif @in_fetch_list
+        if /^\s+\/nix\/store\// =~ line
+          @total += 1
+          return
+        else
+          @in_fetch_list = false
         end
       end
 
