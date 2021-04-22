@@ -32,19 +32,19 @@ module ConfCtl::Cli
         c.action &Command.run(c, Configuration, :init)
       end
 
-      desc 'Add a new deployment'
+      desc 'Add a new machine'
       arg_name '<name>'
       command :add do |c|
         c.action &Command.run(c, Configuration, :add)
       end
 
-      desc 'Rename an existing deployment'
+      desc 'Rename an existing machine'
       arg_name '<old-name> <new-name>'
       command :rename do |c|
         c.action &Command.run(c, Configuration, :rename)
       end
 
-      desc 'Update deployment list with contents of cluster/'
+      desc 'Update cluster machine list with contents of cluster/'
       command :rediscover do |c|
         c.action &Command.run(c, Configuration, :rediscover)
       end
@@ -105,13 +105,13 @@ module ConfCtl::Cli
         end
       end
 
-      desc 'List configured deployments'
+      desc 'List configured machines'
       arg_name '[host-pattern]'
       command :ls do |c|
         c.desc 'Enable traces in Nix'
         c.switch 'show-trace'
 
-        c.desc 'Filter (un)managed deployments'
+        c.desc 'Filter (un)managed machines'
         c.flag :managed, must_match: %w(y yes n no a all)
 
         c.desc 'Select attributes to output'
@@ -264,7 +264,7 @@ module ConfCtl::Cli
       desc 'Open ClusterSSH'
       arg_name '[host-pattern]'
       command :cssh do |c|
-        c.desc 'Filter (un)managed deployments'
+        c.desc 'Filter (un)managed machines'
         c.flag :managed, must_match: %w(y yes n no a all)
 
         c.desc 'Filter by attribute'

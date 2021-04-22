@@ -11,17 +11,17 @@
 build and deploy *NixOS* and *vpsAdminOS* machines.
 
 ## SOFTWARE PINS
-Each deployment target managed by `confctl` uses predefined software packages
+Each machine managed by `confctl` uses predefined software packages
 like `nixpkgs`, `vpsadminos` and possibly other components. These packages
 are pinned to particular versions, e.g. specific git commits.
 
 Software pins are defined in the Nix configuration and then prefetched using
 `confctl`. Selected software pins are added to environment variable `NIX_PATH`
-for `nix-build` and can also be read by `Nix` while building deployments.
+for `nix-build` and can also be read by `Nix` while building machines.
 
-Software pins can be defined using channels or on specific deployments.
+Software pins can be defined using channels or on specific machines.
 The advantage of using channels is that changing a pin in a channel changes
-also all deployments that use the channel. Channels are defined in file
+also all machines that use the channel. Channels are defined in file
 `configs/swpins.nix` using option `confctl.swpins.channels`. Deployments
 declare software pins and channels in their respective `module.nix` files,
 option `cluster.<name>.swpins.channels` is a list of channels to use and option
@@ -29,7 +29,7 @@ option `cluster.<name>.swpins.channels` is a list of channels to use and option
 from channels.
 
 Software pins declared in the Nix configuration have to be prefetched before
-they can be used to build deployments. See the `confctl swpins` command family
+they can be used to build machines. See the `confctl swpins` command family
 for more information.
 
 ## PATTERNS
@@ -49,13 +49,13 @@ information.
   is set up to be used with `confctl`.
 
 `confctl add` *name*
-  Add new deployment.
+  Add new machine to the configuration.
 
 `confctl rename` *old-name* *new-name*
-  Rename deployment.
+  Rename machine from the configuration.
 
 `confctl rediscover`
-  Auto-discover deployments within the `cluster/` directory and generate a list
+  Auto-discover machines within the `cluster/` directory and generate a list
   of their modules in `cluster/cluster.nix`.
 
 `confctl ls` [*options*] [*host-pattern*]
@@ -65,9 +65,9 @@ information.
       Enable traces in Nix.
 
     `--managed` `y`|`yes`|`n`|`no`|`a`|`all`
-      The configuration can contain deployments which are not managed by confctl
+      The configuration can contain machines which are not managed by confctl
       and are there just for reference. This option determines what kind of
-      deployments should be listed.
+      machines should be listed.
 
     `-o`, `--output` *attributes*
       Comma-separated list of attributes to output. Defaults to the value
@@ -77,13 +77,13 @@ information.
       Do not print the line with column labels.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
-      Filter deployments by selected attribute, which is either tested for
+      Filter machines by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module
       `cluster.<name>` can be tested.
 
     `-t`, `--tag` *tag*|`^`*tag*
-      Filter deployments that have *tag* set. If the tag begins with `^`, then
-      filter deployments that do not have *tag* set.
+      Filter machines that have *tag* set. If the tag begins with `^`, then
+      filter machines that do not have *tag* set.
 
 `confctl build` [*options*] [*host-pattern*]
   Build matching hosts. The result of a build is one generation for each built
@@ -95,13 +95,13 @@ information.
       Enable traces in Nix.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
-      Filter deployments by selected attribute, which is either tested for
+      Filter machines by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module
       `cluster.<name>` can be tested.
 
     `-t`, `--tag` *tag*|`^`*tag*
-      Filter deployments that have *tag* set. If the tag begins with `^`, then
-      filter deployments that do not have *tag* set.
+      Filter machines that have *tag* set. If the tag begins with `^`, then
+      filter machines that do not have *tag* set.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
@@ -119,13 +119,13 @@ information.
       Enable traces in Nix.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
-      Filter deployments by selected attribute, which is either tested for
+      Filter machines by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module
       `cluster.<name>` can be tested.
 
     `-t`, `--tag` *tag*|`^`*tag*
-      Filter deployments that have *tag* set. If the tag begins with `^`, then
-      filter deployments that do not have *tag* set.
+      Filter machines that have *tag* set. If the tag begins with `^`, then
+      filter machines that do not have *tag* set.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
@@ -164,13 +164,13 @@ information.
   Probe managed hosts and determine their status.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
-      Filter deployments by selected attribute, which is either tested for
+      Filter machines by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module
       `cluster.<name>` can be tested.
 
     `-t`, `--tag` *tag*|`^`*tag*
-      Filter deployments that have *tag* set. If the tag begins with `^`, then
-      filter deployments that do not have *tag* set.
+      Filter machines that have *tag* set. If the tag begins with `^`, then
+      filter machines that do not have *tag* set.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
@@ -197,13 +197,13 @@ information.
   itself, it works only on software pins.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
-      Filter deployments by selected attribute, which is either tested for
+      Filter machines by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module
       `cluster.<name>` can be tested.
 
     `-t`, `--tag` *tag*|`^`*tag*
-      Filter deployments that have *tag* set. If the tag begins with `^`, then
-      filter deployments that do not have *tag* set.
+      Filter machines that have *tag* set. If the tag begins with `^`, then
+      filter machines that do not have *tag* set.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
@@ -240,13 +240,13 @@ information.
   itself, it works only on software pins.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
-      Filter deployments by selected attribute, which is either tested for
+      Filter machines by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module
       `cluster.<name>` can be tested.
 
     `-t`, `--tag` *tag*|`^`*tag*
-      Filter deployments that have *tag* set. If the tag begins with `^`, then
-      filter deployments that do not have *tag* set.
+      Filter machines that have *tag* set. If the tag begins with `^`, then
+      filter machines that do not have *tag* set.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
@@ -267,18 +267,18 @@ information.
   Open ClusterSSH on selected or all hosts.
 
     `--managed` `y`|`yes`|`n`|`no`|`a`|`all`
-      The configuration can contain deployments which are not managed by confctl
+      The configuration can contain machines which are not managed by confctl
       and are there just for reference. This option determines what kind of
-      deployments should be selected.
+      machines should be selected.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
-      Filter deployments by selected attribute, which is either tested for
+      Filter machines by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module
       `cluster.<name>` can be tested.
 
     `-t`, `--tag` *tag*|`^`*tag*
-      Filter deployments that have *tag* set. If the tag begins with `^`, then
-      filter deployments that do not have *tag* set.
+      Filter machines that have *tag* set. If the tag begins with `^`, then
+      filter machines that do not have *tag* set.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
@@ -288,13 +288,13 @@ information.
   are listed.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
-      Filter deployments by selected attribute, which is either tested for
+      Filter machines by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module
       `cluster.<name>` can be tested.
 
     `-t`, `--tag` *tag*|`^`*tag*
-      Filter deployments that have *tag* set. If the tag begins with `^`, then
-      filter deployments that do not have *tag* set.
+      Filter machines that have *tag* set. If the tag begins with `^`, then
+      filter machines that do not have *tag* set.
 
     `-l`, `--local`
       List build generations.
@@ -311,13 +311,13 @@ information.
   By default, only local build generations are considered.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
-      Filter deployments by selected attribute, which is either tested for
+      Filter machines by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module
       `cluster.<name>` can be tested.
 
     `-t`, `--tag` *tag*|`^`*tag*
-      Filter deployments that have *tag* set. If the tag begins with `^`, then
-      filter deployments that do not have *tag* set.
+      Filter machines that have *tag* set. If the tag begins with `^`, then
+      filter machines that do not have *tag* set.
 
     `-l`, `--local`
       Consider local build generations.
@@ -336,13 +336,13 @@ information.
   from the Nix store, use `nix-collect-garbage` afterwards.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
-      Filter deployments by selected attribute, which is either tested for
+      Filter machines by selected attribute, which is either tested for
       equality or inequality. Any attribute from configuration module
       `cluster.<name>` can be tested.
 
     `-t`, `--tag` *tag*|`^`*tag*
-      Filter deployments that have *tag* set. If the tag begins with `^`, then
-      filter deployments that do not have *tag* set.
+      Filter machines that have *tag* set. If the tag begins with `^`, then
+      filter machines that do not have *tag* set.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
@@ -363,7 +363,7 @@ information.
   Generate network data files from vpsAdmin API.
 
 `confctl swpins cluster ls` [*name-pattern* [*sw-pattern*]]
-  List cluster deployments with pinned software packages.
+  List cluster machines with pinned software packages.
 
 `confctl swpins cluster set` *name-pattern* *sw-pattern* *version...*
   Set selected software packages to new *version*. The value of *version* depends

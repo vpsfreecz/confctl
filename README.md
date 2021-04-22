@@ -122,7 +122,7 @@ for a full-featured cluster configuration.
 
     cluster-configuration/     # Configuration root
     ├── cluster/               # Machine configurations
-    │   ├── <name>/            # Single machine/deployment, can be nested directories
+    │   ├── <name>/            # Single machine, can be nested directories
     │   │   ├── config.nix     # Standard NixOS system configuration
     │   │   └── module.nix     # Config with machine metadata used by confctl
     │   ├── cluster.nix        # confctl-generated list of machines
@@ -140,7 +140,7 @@ for a full-featured cluster configuration.
 Software pins in confctl allow you to use specific revisions of
 [nixpkgs](https://github.com/NixOS/nixpkgs) or any other software to build
 and deploy target machines. It doesn't matter what nixpkgs version the build
-machine uses, because each deployment gets its own nixpkgs as configured by the
+machine uses, because each machine gets its own nixpkgs as configured by the
 software pin.
 
 Software pins can be grouped in channels, which can then be used by all
@@ -224,7 +224,7 @@ $ confctl swpins channel set nixos-unstable nixpkgs 1f77a4c8
 `confctl build` and `confctl deploy` will now use the prefetched software pins.
 
 ## Machine metadata and software pins
-Machine/deployment configuration directory usually contains at least two files:
+Machine configuration directory usually contains at least two files:
 `cluster/<machine name>/config.nix` and `cluster/<machine name>/module.nix`.
 
 `config.nix` is evaluated only when that particular machine is being built. It is
@@ -237,7 +237,7 @@ confctl knows how to treat them. It is also used to declare which software pins
 or channels the machine uses. Metadata about any machine can be read from
 `config.nix` of any other machine.
 
-For example, deployment named `my-machine` would be described in
+For example, machine named `my-machine` would be described in
 `cluster/my-machine/module.nix` as:
 
 ```nix
@@ -292,7 +292,7 @@ Instead of `confctl swpins channel` commands, use `confctl swpins cluster`
 to manage configured pins.
 
 ## Extra module arguments
-Machine/deployment configs can use the following extra module arguments:
+Machine configs can use the following extra module arguments:
 
 - `confDir` - path to the cluster configuration directory
 - `confLib` - confctl functions, see [nix/lib/default.nix](nix/lib/default.nix)
