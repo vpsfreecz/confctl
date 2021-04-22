@@ -112,6 +112,7 @@ module ConfCtl
     # @param host_swpin_specs [Hash]
     # @param time [Time]
     #
+    # @yieldparam type [:build, :fetch]
     # @yieldparam progress [Integer]
     # @yieldparam total [Integer]
     # @yieldparam path [String]

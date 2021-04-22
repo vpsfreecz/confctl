@@ -549,19 +549,38 @@ module ConfCtl::Cli
         puts "with swpins"
         swpin_paths.each { |k, v| puts "  #{k}=#{v}" }
 
-        pb = TTY::ProgressBar.new(
+        multibar = TTY::ProgressBar::Multi.new(
           "nix-build [:bar] :current/:total (:percent)",
           width: 80,
         )
+
+        build_pb = multibar.register(
+          "Building [:bar] :current/:total (:percent)",
+        )
+
+        fetch_pb = multibar.register(
+          "Fetching [:bar] :current/:total (:percent)",
+        )
+
+        multibar.start
 
         built_generations = nix.build_toplevels(
           hosts: hosts,
           swpin_paths: swpin_paths,
           time: time,
           host_swpin_specs: host_swpin_specs,
-        ) do |i, n, path|
-          pb.update(total: n) if pb.total != n
-          pb.advance
+        ) do |type, i, n, path|
+          if type == :build
+            build_pb.update(total: n) if n > 0 && build_pb.total.nil?
+            build_pb.advance
+          elsif type == :fetch
+            fetch_pb.update(total: n) if n > 0 && fetch_pb.total.nil?
+            fetch_pb.advance
+          end
+
+          if build_pb.total && fetch_pb.total && multibar.top_bar.total.nil?
+            multibar.top_bar.update(total: multibar.total)
+          end
         end
 
         host_generations.update(built_generations)

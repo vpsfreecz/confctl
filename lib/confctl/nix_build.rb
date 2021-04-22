@@ -5,10 +5,13 @@ module ConfCtl
     def initialize(args, swpin_paths)
       @args = args
       @swpin_paths = swpin_paths
-      @progress = 0
-      @total = 0
+      @build_progress = 0
+      @build_total = 0
+      @fetch_progress = 0
+      @fetch_total = 0
     end
 
+    # @yieldparam type [:build, :fetch]
     # @yieldparam progress [Integer]
     # @yieldparam total [Integer]
     # @yieldparam path [String]
@@ -34,6 +37,10 @@ module ConfCtl
     attr_reader :args, :swpin_paths
 
     def parse_line(line)
+      # Beware that nix-build can fetch/build stuff even before those two
+      # summary lines are printed. Therefore we report progress with total=0
+      # (indeterminate) until the total becomes known.
+
       if /^these derivations will be built:/ =~ line
         @in_derivation_list = true
         @in_fetch_list = false
@@ -46,24 +53,29 @@ module ConfCtl
 
       if @in_derivation_list
         if /^\s+\/nix\/store\// =~ line
-          @total += 1
+          @build_total += 1
           return
         else
           @in_derivation_list = false
+          @build_total += @build_progress
         end
 
       elsif @in_fetch_list
         if /^\s+\/nix\/store\// =~ line
-          @total += 1
+          @fetch_total += 1
           return
         else
           @in_fetch_list = false
+          @fetch_total += @fetch_progress
         end
       end
 
-      if /^building '([^']+)/ =~ line || /^copying path '([^']+)/ =~ line
-        @progress += 1
-        yield(@progress, @total, $1)
+      if /^building '([^']+)/ =~ line
+        @build_progress += 1
+        yield(:build, @build_progress, @build_total, $1)
+      elsif/^copying path '([^']+)/ =~ line
+        @fetch_progress += 1
+        yield(:fetch, @fetch_progress, @fetch_total, $1)
       end
     end
 
