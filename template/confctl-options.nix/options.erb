@@ -1,0 +1,15 @@
+<% opts.each do |opt| -%>
+`<%= opt.name %>`
+  <%= indent(opt.md_description, 2) %>
+
+    *Type:* <%= opt.type %>
+
+    *Default:* `<%= opt.nix_default %>`
+<% if opt.example -%>
+
+    *Example:* `<%= opt.nix_example %>`
+<% end -%>
+
+    *Declared by:* `<%= opt.declarations.map { |v| "`#{v}`" }.join(', ') %>`
+
+<% end -%>

@@ -1,3 +1,4 @@
+require 'confctl'
 require 'md2man/rakefile'
 require 'md2man/roff/engine'
 require 'md2man/html/engine'
@@ -16,4 +17,24 @@ require 'md2man/html/engine'
     # This option is needed for command options to be rendered property
     disable_indented_code_blocks: true,
   ))
+end
+
+desc 'Generate man/man8/confctl-options.nix.8.md'
+task 'confctl-options' do
+  ConfCtl::Logger.open('rake', output: STDOUT)
+
+  opts = ConfCtl::ModuleOptions.new(nix: ConfCtl::Nix.new(max_jobs: 'auto'))
+  opts.read
+
+  ConfCtl::ErbTemplate.render_to('confctl-options.nix/main', {
+    date: Time.now,
+    version: 'master',
+    opts: opts,
+    print_options: Proc.new do |opt_list|
+      ConfCtl::ErbTemplate.render('confctl-options.nix/options', {
+        opts: opt_list,
+        indent: Proc.new { |s, n| s.split("\n").join("\n#{' '*n}") },
+      })
+    end,
+  }, 'man/man8/confctl-options.nix.8.md')
 end

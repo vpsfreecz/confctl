@@ -411,6 +411,9 @@ information.
   Regenerate all confctl-managed software pin files according to the Nix
   configuration.
 
+## SEE ALSO
+confctl-options.nix(8)
+
 ## BUGS
 Report bugs to https://github.com/vpsfreecz/confctl/issues.
 

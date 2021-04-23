@@ -7,7 +7,7 @@ module ConfCtl
   class Logger
     class << self
       %i(open close unlink close_and_unlink io path).each do |v|
-        define_method(v) { instance.send(v) }
+        define_method(v) { |*args, **kwargs| instance.send(v, *args, **kwargs) }
       end
     end
 
@@ -17,11 +17,15 @@ module ConfCtl
       @mutex = Mutex.new
     end
 
-    def open(name)
-      dir = ConfDir.log_dir
-      FileUtils.mkdir_p(dir)
+    def open(name, output: nil)
+      if output
+        @io = output
+      else
+        dir = ConfDir.log_dir
+        FileUtils.mkdir_p(dir)
 
-      @io = File.new(File.join(dir, file_name(name)), 'w')
+        @io = File.new(File.join(dir, file_name(name)), 'w')
+      end
     end
 
     def open?

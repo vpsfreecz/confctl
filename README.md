@@ -44,10 +44,12 @@ dependencies into `.gems/`:
 nix-shell
 ```
 
-From within the shell, you can access the [manual](./man/man8/confctl.8.md):
+From within the shell, you can access the [manual](./man/man8/confctl.8.md)
+and a list of [configuration options](./man/man8/confctl-options.nix.8.md):
 
 ```
 man confctl
+man confctl-options.nix
 ```
 
 5. Initialize the configuration directory with confctl:
@@ -225,8 +227,8 @@ For example, machine named `my-machine` would be described in
 }
 ```
 
-See [nix/modules/cluster/default.nix](nix/modules/cluster/default.nix) for a list
-of all options.
+See [man/man8/confctl-options.nix.8.md](./man/man8/confctl-options.nix.8.md)
+for a list of all options.
 
 ## Per-machine software pins
 It is simpler to use software pins from channels, because they are usually

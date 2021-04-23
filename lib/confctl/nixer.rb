@@ -8,6 +8,8 @@ module ConfCtl
       case obj
       when Numeric
         obj.to_s
+      when nil
+        'null'
       else
         raise
       end

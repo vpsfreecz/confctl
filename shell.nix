@@ -25,7 +25,7 @@ in stdenv.mkDerivation rec {
     gem install --no-document bundler
     pushd "$CONFCTL"
     bundle install
-    rake md2man:man
+    bundle exec rake md2man:man
     popd
 
     cat <<EOF > "$BINDIR/confctl"
