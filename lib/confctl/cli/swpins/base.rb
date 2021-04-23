@@ -26,10 +26,10 @@ module ConfCtl::Cli
 
       each_cluster_name('*') do |cn|
         if cn.valid?
-          puts "Reconfiguring deployment #{cn.name}"
+          puts "Reconfiguring machine #{cn.name}"
           cn.save
         else
-          puts "Deployment #{cn.name} needs update"
+          puts "Machine #{cn.name} needs update"
           cn.specs.each do |name, s|
             puts "  update #{name}" unless s.valid?
           end

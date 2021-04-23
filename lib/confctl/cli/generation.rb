@@ -67,8 +67,8 @@ module ConfCtl::Cli
         tw = ConfCtl::ParallelExecutor.new(machines.length)
         statuses = {}
 
-        machines.each do |host, dep|
-          st = ConfCtl::MachineStatus.new(dep)
+        machines.each do |host, machine|
+          st = ConfCtl::MachineStatus.new(machine)
           statuses[host] = st
 
           tw.add do
@@ -84,7 +84,7 @@ module ConfCtl::Cli
       end
 
       if include_local
-        machines.each do |host, dep|
+        machines.each do |host, machine|
           gens.add_build_generations(ConfCtl::Generation::BuildList.new(host))
         end
       end
@@ -106,12 +106,12 @@ module ConfCtl::Cli
       global = ConfCtl::Settings.instance.build_generations
       ret = []
 
-      machines.each do |host, dep|
+      machines.each do |host, machine|
         to_delete = generations_rotate(
           ConfCtl::Generation::BuildList.new(host),
-          min: dep['buildGenerations']['min'] || global['min'],
-          max: dep['buildGenerations']['max'] || global['max'],
-          maxAge: dep['buildGenerations']['maxAge'] || global['maxAge'],
+          min: machine['buildGenerations']['min'] || global['min'],
+          max: machine['buildGenerations']['max'] || global['max'],
+          maxAge: machine['buildGenerations']['maxAge'] || global['maxAge'],
         ) do |gen|
           {
             name: gen.name,
@@ -132,8 +132,8 @@ module ConfCtl::Cli
       tw = ConfCtl::ParallelExecutor.new(machines.length)
       statuses = {}
 
-      machines.each do |host, dep|
-        st = ConfCtl::MachineStatus.new(dep)
+      machines.each do |host, machine|
+        st = ConfCtl::MachineStatus.new(machine)
         statuses[host] = st
 
         tw.add do
@@ -146,13 +146,13 @@ module ConfCtl::Cli
       statuses.each do |host, st|
         next unless st.generations
 
-        dep = st.deployment
+        machine = st.machineloyment
 
         to_delete = generations_rotate(
           st.generations,
-          min: dep['hostGenerations']['min'] || global['min'],
-          max: dep['hostGenerations']['max'] || global['max'],
-          maxAge: dep['hostGenerations']['maxAge'] || global['maxAge'],
+          min: machine['hostGenerations']['min'] || global['min'],
+          max: machine['hostGenerations']['max'] || global['max'],
+          maxAge: machine['hostGenerations']['maxAge'] || global['maxAge'],
         ) do |gen|
           {
             type: 'host',
@@ -172,20 +172,20 @@ module ConfCtl::Cli
 
       return ret if gens.count <= min
 
-      dep_deleted = 0
+      machine_deleted = 0
 
       gens.each do |gen|
         next if gen.current
 
-        if (gens.count - dep_deleted) > max || (gen.date + maxAge) < Time.now
+        if (gens.count - machine_deleted) > max || (gen.date + maxAge) < Time.now
           ret << {
             host: gen.host,
             generation: gen,
           }.merge(yield(gen))
-          dep_deleted += 1
+          machine_deleted += 1
         end
 
-        break if gens.count - dep_deleted <= min
+        break if gens.count - machine_deleted <= min
       end
 
       ret
@@ -230,10 +230,10 @@ module ConfCtl::Cli
       attr_filters = AttrFilters.new(opts[:attr])
       tag_filters = TagFilters.new(opts[:tag])
 
-      machines.select do |host, d|
+      machines.select do |host, m|
         (pattern.nil? || ConfCtl::Pattern.match?(pattern, host)) \
-          && attr_filters.pass?(d) \
-          && tag_filters.pass?(d)
+          && attr_filters.pass?(m) \
+          && tag_filters.pass?(m)
       end
     end
   end

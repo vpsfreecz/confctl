@@ -5,9 +5,9 @@ module ConfCtl::Cli
       @filters = parse_all(str_filters)
     end
 
-    # @param deployment [ConfCtl::Deployment]
-    def pass?(deployment)
-      filters.all? { |f| f.call(deployment) }
+    # @param machine [ConfCtl::Machine]
+    def pass?(machine)
+      filters.all? { |f| f.call(machine) }
     end
 
     protected
@@ -19,16 +19,16 @@ module ConfCtl::Cli
       str_filters.each do |s|
         k, v = parse_one(s, '!=')
         if k
-          ret << Proc.new do |deployment|
-            deployment[k].to_s != v
+          ret << Proc.new do |machine|
+            machine[k].to_s != v
           end
           next
         end
 
         k, v = parse_one(s, '=')
         if k
-          ret << Proc.new do |deployment|
-            deployment[k].to_s == v
+          ret << Proc.new do |machine|
+            machine[k].to_s == v
           end
           next
         end

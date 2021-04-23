@@ -7,10 +7,10 @@ module ConfCtl::Cli
       parse_all(str_tags)
     end
 
-    # @param deployment [ConfCtl::Deployment]
-    def pass?(deployment)
-      must.all? { |t| deployment['tags'].include?(t) } \
-        && cant.all? { |t| !deployment['tags'].include?(t) }
+    # @param machine [ConfCtl::Machine]
+    def pass?(machine)
+      must.all? { |t| machine['tags'].include?(t) } \
+        && cant.all? { |t| !machine['tags'].include?(t) }
     end
 
     protected

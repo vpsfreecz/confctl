@@ -3,8 +3,8 @@ require 'json'
 
 module ConfCtl
   class Swpins::ClusterName
-    # @return [Deployment]
-    attr_reader :deployment
+    # @return [Machine]
+    attr_reader :machine
 
     # @return [String]
     attr_reader :name
@@ -18,16 +18,16 @@ module ConfCtl
     # @return [Array<Swpins::Channel>]
     attr_reader :channels
 
-    # @param deployment [Deployment]
+    # @param machine [Machine]
     # @param channels [Swpins::ChannelList]
-    def initialize(deployment, channels)
-      @deployment = deployment
-      @name = deployment.name
+    def initialize(machine, channels)
+      @machine = machine
+      @name = machine.name
       @path = File.join(ConfCtl::Swpins.cluster_dir, "#{name.gsub(/\//, ':')}.json")
       @channels = channels.select do |c|
-        deployment['swpins']['channels'].include?(c.name)
+        machine['swpins']['channels'].include?(c.name)
       end
-      @nix_specs = deployment['swpins']['pins']
+      @nix_specs = machine['swpins']['pins']
     end
 
     def parse
@@ -42,7 +42,7 @@ module ConfCtl
         end
       end
 
-      # Add deployment-specific specs
+      # Add machine-specific specs
       if File.exist?(path)
         @json_specs = JSON.parse(File.read(path))
       else

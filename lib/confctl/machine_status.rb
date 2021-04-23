@@ -41,8 +41,8 @@ module ConfCtl
       end
     end
 
-    # @return [Deployment]
-    attr_reader :deployment
+    # @return [Machine]
+    attr_reader :machine
 
     # @return [Boolean]
     attr_reader :status
@@ -78,10 +78,10 @@ module ConfCtl
     # @return [Hash]
     attr_reader :swpins_state
 
-    # @param deployment [Deployment]
-    def initialize(deployment)
-      @deployment = deployment
-      @mc = MachineControl.new(deployment)
+    # @param machine [Machine]
+    def initialize(machine)
+      @machine = machine
+      @mc = MachineControl.new(machine)
     end
 
     # Connect to the machine and query its state

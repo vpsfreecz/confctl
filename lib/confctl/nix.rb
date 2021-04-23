@@ -31,16 +31,16 @@ module ConfCtl
       })
     end
 
-    # Returns an array with deployment fqdns
+    # Returns an array with machine fqdns
     # @return [Array<String>]
-    def list_deployment_fqdns
+    def list_machine_fqdns
       nix_instantiate({
         confDir: conf_dir,
         build: :list,
       })['deployments']
     end
 
-    # Return deployments and their config in a hash
+    # Return machines and their config in a hash
     # @return [Hash]
     def list_machines
       nix_instantiate({
@@ -176,7 +176,7 @@ module ConfCtl
       end
     end
 
-    # @param dep [Deployment]
+    # @param machine [Machine]
     # @param toplevel [String]
     #
     # @yieldparam progress [Integer]
@@ -184,36 +184,36 @@ module ConfCtl
     # @yieldparam path [String]
     #
     # @return [Boolean]
-    def copy(dep, toplevel, &block)
-      if dep.localhost?
+    def copy(machine, toplevel, &block)
+      if machine.localhost?
         true
       else
-        cp = NixCopy.new(dep.target_host, toplevel)
+        cp = NixCopy.new(machine.target_host, toplevel)
         cp.run!(&block).success?
       end
     end
 
-    # @param dep [Deployment]
+    # @param machine [Machine]
     # @param toplevel [String]
     # @param action [String]
     # @return [Boolean]
-    def activate(dep, toplevel, action)
+    def activate(machine, toplevel, action)
       args = [File.join(toplevel, 'bin/switch-to-configuration'), action]
 
-      MachineControl.new(dep).execute!(*args).success?
+      MachineControl.new(machine).execute!(*args).success?
     end
 
-    # @param dep [Deployment]
+    # @param machine [Machine]
     # @param toplevel [String]
     # @return [Boolean]
-    def set_profile(dep, toplevel)
+    def set_profile(machine, toplevel)
       args = [
         'nix-env',
         '-p', '/nix/var/nix/profiles/system',
         '--set', toplevel,
       ]
 
-      MachineControl.new(dep).execute!(*args).success?
+      MachineControl.new(machine).execute!(*args).success?
     end
 
     # @param packages [Array<String>]

@@ -12,7 +12,7 @@ module ConfCtl
         END
       )
 
-      list = new(mc.deployment.name)
+      list = new(mc.machine.name)
       lines = out.strip.split("\n")
       current_path = lines.shift
       id_rx = /^#{Regexp.escape(profile)}\-(\d+)\-link$/
@@ -28,7 +28,7 @@ module ConfCtl
         end
 
         list << Generation::Host.new(
-          mc.deployment.name,
+          mc.machine.name,
           profile,
           id,
           path,

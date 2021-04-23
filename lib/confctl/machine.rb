@@ -1,5 +1,5 @@
 module ConfCtl
-  class Deployment
+  class Machine
     attr_reader :name, :safe_name, :managed, :spin, :opts
 
     # @param opts [Hash]

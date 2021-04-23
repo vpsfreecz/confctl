@@ -1,11 +1,11 @@
 module ConfCtl
   class MachineControl
-    # @return [Deployment]
-    attr_reader :deployment
+    # @return [Machine]
+    attr_reader :machine
 
-    # @param deployment [Deployment]
-    def initialize(deployment)
-      @deployment = deployment
+    # @param machine [Machine]
+    def initialize(machine)
+      @machine = machine
       @extra_ssh_opts = []
       @cmd = SystemCommand.new
     end
@@ -116,7 +116,7 @@ module ConfCtl
 
     def do_run_cmd(method, *command, **kwargs)
       args =
-        if deployment.localhost?
+        if machine.localhost?
           command
         else
           ssh_args + command
@@ -133,7 +133,7 @@ module ConfCtl
     end
 
     def ssh_args
-      ['ssh', '-l', 'root'] + extra_ssh_opts + [deployment.target_host]
+      ['ssh', '-l', 'root'] + extra_ssh_opts + [machine.target_host]
     end
   end
 end

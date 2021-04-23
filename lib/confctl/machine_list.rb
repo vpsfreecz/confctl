@@ -11,20 +11,20 @@ module ConfCtl
     end
 
     # @yieldparam [String] host
-    # @yieldparam [Deployment] deployment
+    # @yieldparam [Machine] machine
     def each(&block)
       machines.each(&block)
     end
 
     # @yieldparam [String] host
-    # @yieldparam [Deployment] deployment
+    # @yieldparam [Machine] machine
     # @return [MachineList]
     def select(&block)
       self.class.new(machines: machines.select(&block))
     end
 
     # @yieldparam [String] host
-    # @yieldparam [Deployment] deployment
+    # @yieldparam [Machine] machine
     # @return [Array]
     def map(&block)
       machines.map(&block)
@@ -32,12 +32,12 @@ module ConfCtl
 
     # @return [MachineList]
     def managed
-      select { |host, dep| dep.managed }
+      select { |host, machine| machine.managed }
     end
 
     # @return [MachineList]
     def unmanaged
-      select { |host, dep| !dep.managed }
+      select { |host, machine| !machine.managed }
     end
 
     # @param host [String]
@@ -60,7 +60,7 @@ module ConfCtl
 
     def parse(data)
       Hash[data.map do |host, info|
-        [host, Deployment.new(info)]
+        [host, Machine.new(info)]
       end]
     end
   end
