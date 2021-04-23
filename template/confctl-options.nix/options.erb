@@ -10,6 +10,6 @@
     *Example:* `<%= opt.nix_example %>`
 <% end -%>
 
-    *Declared by:* `<%= opt.declarations.map { |v| "`#{v}`" }.join(', ') %>`
+    *Declared by:* <%= opt.declarations.map { |v| "`#{v}`" }.join(', ') %>
 
 <% end -%>

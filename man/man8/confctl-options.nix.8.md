@@ -5,7 +5,7 @@
 
 ## DESCRIPTION
 This document describes Nix options, which can be used in confctl(8) cluster
-configurations to customize `confctl` and machines within the cluster.
+configurations to configure `confctl` and machines within the cluster.
 
 ## CONFCTL SETTINGS
 The following `confctl` settings can be configured in `configs/confctl.nix`
@@ -20,7 +20,7 @@ within the deployment configuration directory:
 
     *Default:* `30`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/generations.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/generations.nix>`
 
 `confctl.buildGenerations.maxAge`
   Delete build generations older than
@@ -34,7 +34,7 @@ within the deployment configuration directory:
 
     *Default:* `7776000`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/generations.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/generations.nix>`
 
 `confctl.buildGenerations.min`
   The minimum number of build generations to be kept.
@@ -45,7 +45,7 @@ within the deployment configuration directory:
 
     *Default:* `4`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/generations.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/generations.nix>`
 
 `confctl.hostGenerations.max`
   The maximum number of generations to be kept on machines.
@@ -56,7 +56,7 @@ within the deployment configuration directory:
 
     *Default:* `30`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/generations.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/generations.nix>`
 
 `confctl.hostGenerations.maxAge`
   Delete generations older than
@@ -71,7 +71,7 @@ within the deployment configuration directory:
 
     *Default:* `7776000`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/generations.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/generations.nix>`
 
 `confctl.hostGenerations.min`
   The minimum number of generations to be kept on machines.
@@ -82,7 +82,7 @@ within the deployment configuration directory:
 
     *Default:* `4`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/generations.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/generations.nix>`
 
 `confctl.list.columns`
   Configure which columns should `confctl ls` show.
@@ -93,7 +93,7 @@ within the deployment configuration directory:
 
     *Default:* `["host.fqdn" "name" "spin"]`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/cli.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/cli.nix>`
 
 `confctl.nix.maxJobs`
   Maximum number of build jobs, passed to `nix-build`
@@ -103,7 +103,7 @@ within the deployment configuration directory:
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/nix.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/nix.nix>`
 
 `confctl.nix.nixPath`
   List of extra paths added to environment variable
@@ -114,7 +114,7 @@ within the deployment configuration directory:
 
     *Default:* `[]`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/nix.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/nix.nix>`
 
 
 
@@ -130,7 +130,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
     *Default:* `{
 }`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.channels.<name>.<name>.git`
   This option has no description.
@@ -139,7 +139,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.channels.<name>.<name>.git.fetchSubmodules`
   Fetch git submodules
@@ -148,7 +148,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.channels.<name>.<name>.git.update.auto`
   When enabled, the pin is automatically updated to
@@ -158,7 +158,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.channels.<name>.<name>.git.update.interval`
   Number of seconds from the last update to trigger the next
@@ -168,7 +168,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `3600`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.channels.<name>.<name>.git.update.ref`
   Implicit git reference to use for both manual and automatic updates
@@ -179,7 +179,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Example:* `"refs/heads/master"`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.channels.<name>.<name>.git.url`
   URL of the git repository
@@ -190,7 +190,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Example:* `"https://github.com/vpsfreecz/vpsadminos"`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.channels.<name>.<name>.git-rev`
   This option has no description.
@@ -199,7 +199,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.channels.<name>.<name>.git-rev.fetchSubmodules`
   Fetch git submodules
@@ -208,7 +208,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.channels.<name>.<name>.git-rev.update.auto`
   When enabled, the pin is automatically updated to
@@ -218,7 +218,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.channels.<name>.<name>.git-rev.update.interval`
   Number of seconds from the last update to trigger the next
@@ -228,7 +228,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `3600`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.channels.<name>.<name>.git-rev.update.ref`
   Implicit git reference to use for both manual and automatic updates
@@ -239,7 +239,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Example:* `"refs/heads/master"`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.channels.<name>.<name>.git-rev.url`
   URL of the git repository
@@ -250,7 +250,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Example:* `"https://github.com/vpsfreecz/vpsadminos"`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.channels.<name>.<name>.type`
   This option has no description.
@@ -259,7 +259,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `"git"`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.core.channels`
   List of channels from `confctl.swpins.channels`
@@ -269,7 +269,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `[]`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.core.pins`
   Core software packages used internally by confctl
@@ -293,7 +293,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
   };
 }`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.core.pins.<name>.git`
   This option has no description.
@@ -302,7 +302,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.core.pins.<name>.git.fetchSubmodules`
   Fetch git submodules
@@ -311,7 +311,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.core.pins.<name>.git.update.auto`
   When enabled, the pin is automatically updated to
@@ -321,7 +321,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.core.pins.<name>.git.update.interval`
   Number of seconds from the last update to trigger the next
@@ -331,7 +331,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `3600`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.core.pins.<name>.git.update.ref`
   Implicit git reference to use for both manual and automatic updates
@@ -342,7 +342,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Example:* `"refs/heads/master"`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.core.pins.<name>.git.url`
   URL of the git repository
@@ -353,7 +353,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Example:* `"https://github.com/vpsfreecz/vpsadminos"`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.core.pins.<name>.git-rev`
   This option has no description.
@@ -362,7 +362,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.core.pins.<name>.git-rev.fetchSubmodules`
   Fetch git submodules
@@ -371,7 +371,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.core.pins.<name>.git-rev.update.auto`
   When enabled, the pin is automatically updated to
@@ -381,7 +381,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.core.pins.<name>.git-rev.update.interval`
   Number of seconds from the last update to trigger the next
@@ -391,7 +391,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `3600`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.core.pins.<name>.git-rev.update.ref`
   Implicit git reference to use for both manual and automatic updates
@@ -402,7 +402,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Example:* `"refs/heads/master"`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.core.pins.<name>.git-rev.url`
   URL of the git repository
@@ -413,7 +413,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Example:* `"https://github.com/vpsfreecz/vpsadminos"`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 `confctl.swpins.core.pins.<name>.type`
   This option has no description.
@@ -422,7 +422,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Default:* `"git"`
 
-    *Declared by:* ``<confctl/nix/modules/confctl/swpins.nix>``
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
 
 
@@ -437,7 +437,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.addresses.primary`
   Default address other machines should use to connect to this machine
@@ -448,7 +448,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.addresses.primary.address`
   IPv4 address
@@ -457,7 +457,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.addresses.primary.prefix`
   Prefix length
@@ -466,7 +466,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.addresses.primary.string`
   Address with prefix as string
@@ -475,7 +475,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.addresses.v4`
   List of IPv4 addresses this machine responds to
@@ -484,7 +484,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `[]`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.addresses.v4.*.address`
   IPv4 address
@@ -493,7 +493,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.addresses.v4.*.prefix`
   Prefix length
@@ -502,7 +502,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.addresses.v4.*.string`
   Address with prefix as string
@@ -511,7 +511,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.addresses.v6`
   List of IPv6 addresses this machine responds to
@@ -520,7 +520,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `[]`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.addresses.v6.*.address`
   IPv6 address
@@ -529,7 +529,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.addresses.v6.*.prefix`
   Prefix length
@@ -538,7 +538,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.addresses.v6.*.string`
   Address with prefix as string
@@ -547,7 +547,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.buildGenerations.max`
   The maximum number of build generations to be kept on the build
@@ -557,7 +557,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.buildGenerations.maxAge`
   Delete build generations older than
@@ -570,7 +570,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.buildGenerations.min`
   The minimum number of build generations to be kept on the build
@@ -580,7 +580,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.container`
   This option has no description.
@@ -589,7 +589,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.container.id`
   VPS ID in vpsAdmin
@@ -598,7 +598,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.host`
   This option has no description.
@@ -607,7 +607,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.host.domain`
   Host domain
@@ -616,7 +616,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.host.fqdn`
   Host FQDN
@@ -625,7 +625,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.host.fullDomain`
   Domain including location, i.e. FQDN without host name
@@ -634,7 +634,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.host.location`
   Host location domain
@@ -643,7 +643,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.host.name`
   Host name
@@ -652,7 +652,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.host.target`
   Address/host to which the configuration is deployed to
@@ -661,7 +661,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.hostGenerations.max`
   The maximum number of generations to be kept on the machine.
@@ -670,7 +670,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.hostGenerations.maxAge`
   Delete generations older than
@@ -683,7 +683,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.hostGenerations.min`
   The minimum number of generations to be kept on the machine.
@@ -692,7 +692,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.labels`
   Optional user-defined labels to classify the machine
@@ -702,7 +702,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
     *Default:* `{
 }`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.logging.enable`
   Send logs to central log system
@@ -711,7 +711,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `true`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.logging.isLogger`
   This system is used as a central log system
@@ -720,7 +720,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.managed`
   Determines whether the machine is managed using confctl or not
@@ -731,7 +731,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.monitoring.enable`
   Monitor this system
@@ -740,7 +740,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `true`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.monitoring.isMonitor`
   Determines if this system is monitoring other systems, or if it
@@ -750,7 +750,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.monitoring.labels`
   Custom labels added to the Prometheus target
@@ -760,7 +760,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
     *Default:* `{
 }`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.netboot.enable`
   Whether to enable Include this system on pxe servers.
@@ -771,7 +771,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Example:* `true`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.netboot.macs`
   List of MAC addresses for iPXE node auto-detection
@@ -780,7 +780,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `[]`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.nix.nixPath`
   List of extra paths added to environment variable
@@ -790,7 +790,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `[]`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.node`
   This option has no description.
@@ -799,7 +799,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.node.id`
   ID of this node in vpsAdmin
@@ -808,7 +808,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.node.role`
   Node role
@@ -817,7 +817,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode`
   This option has no description.
@@ -826,7 +826,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.bird.as`
   BGP AS for this node
@@ -835,7 +835,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.bird.bfdInterfaces`
   BFD interfaces match
@@ -846,7 +846,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Example:* `"teng*"`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.bird.bgpNeighbours.v4`
   IPv4 BGP neighbour addresses
@@ -855,7 +855,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `[]`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.bird.bgpNeighbours.v4.*.address`
   IPv4 address
@@ -864,7 +864,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.bird.bgpNeighbours.v4.*.as`
   BGP AS
@@ -873,7 +873,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.bird.bgpNeighbours.v6`
   IPv6 BGP neighbour addresses
@@ -882,7 +882,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `[]`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.bird.bgpNeighbours.v6.*.address`
   IPv6 address
@@ -891,7 +891,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.bird.bgpNeighbours.v6.*.as`
   BGP AS
@@ -900,7 +900,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.bird.enable`
   Enable BGP routing using bird
@@ -909,7 +909,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `true`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.bird.routerId`
   bird router ID
@@ -918,7 +918,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.interfaces.addresses`
   List of addresses which are added to interfaces
@@ -935,7 +935,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
   };
 }`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.interfaces.addresses.<name>.v4`
   A lisf of IPv4 addresses with prefix
@@ -944,7 +944,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `[]`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.interfaces.addresses.<name>.v4.*.address`
   IPv4 address
@@ -953,7 +953,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.interfaces.addresses.<name>.v4.*.prefix`
   Prefix length
@@ -962,7 +962,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.interfaces.addresses.<name>.v4.*.string`
   Address with prefix as string
@@ -971,7 +971,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.interfaces.addresses.<name>.v6`
   A lisf of IPv6 addresses with prefix
@@ -980,7 +980,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `[]`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.interfaces.addresses.<name>.v6.*.address`
   IPv4 address
@@ -989,7 +989,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.interfaces.addresses.<name>.v6.*.prefix`
   Prefix length
@@ -998,7 +998,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.interfaces.addresses.<name>.v6.*.string`
   Address with prefix as string
@@ -1007,7 +1007,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.interfaces.names`
   Ensure network interface names based on MAC addresses
@@ -1021,7 +1021,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
   teng0 = "00:11:22:33:44:55";
 }`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.virtIP`
   Virtual IP for dummy interface
@@ -1035,7 +1035,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
   prefix = 32;
 }`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.virtIP.address`
   IPv4 address
@@ -1044,7 +1044,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.virtIP.prefix`
   Prefix length
@@ -1053,7 +1053,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.networking.virtIP.string`
   Address with prefix as string
@@ -1062,7 +1062,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.serial.baudRate`
   Serial baudrate
@@ -1071,7 +1071,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `115200`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.osNode.serial.enable`
   Whether to enable Enable serial console output.
@@ -1082,7 +1082,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Example:* `true`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.services`
   Services published by this machine
@@ -1092,7 +1092,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
     *Default:* `{
 }`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.services.<name>.address`
   Address that other machines can access the service on
@@ -1101,7 +1101,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.services.<name>.monitor`
   What kind of monitoring this services needs
@@ -1110,7 +1110,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.services.<name>.port`
   Port the service listens on
@@ -1119,7 +1119,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.spin`
   OS type
@@ -1128,7 +1128,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.swpins.channels`
   List of channels from `confctl.swpins.channels`
@@ -1138,7 +1138,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `[]`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.swpins.pins`
   List of swpins for this machine, which can supplement or
@@ -1149,7 +1149,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
     *Default:* `{
 }`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.swpins.pins.<name>.git`
   This option has no description.
@@ -1158,7 +1158,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.swpins.pins.<name>.git.fetchSubmodules`
   Fetch git submodules
@@ -1167,7 +1167,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.swpins.pins.<name>.git.update.auto`
   When enabled, the pin is automatically updated to
@@ -1177,7 +1177,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.swpins.pins.<name>.git.update.interval`
   Number of seconds from the last update to trigger the next
@@ -1187,7 +1187,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `3600`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.swpins.pins.<name>.git.update.ref`
   Implicit git reference to use for both manual and automatic updates
@@ -1198,7 +1198,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Example:* `"refs/heads/master"`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.swpins.pins.<name>.git.url`
   URL of the git repository
@@ -1209,7 +1209,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Example:* `"https://github.com/vpsfreecz/vpsadminos"`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.swpins.pins.<name>.git-rev`
   This option has no description.
@@ -1218,7 +1218,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.swpins.pins.<name>.git-rev.fetchSubmodules`
   Fetch git submodules
@@ -1227,7 +1227,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.swpins.pins.<name>.git-rev.update.auto`
   When enabled, the pin is automatically updated to
@@ -1237,7 +1237,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.swpins.pins.<name>.git-rev.update.interval`
   Number of seconds from the last update to trigger the next
@@ -1247,7 +1247,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `3600`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.swpins.pins.<name>.git-rev.update.ref`
   Implicit git reference to use for both manual and automatic updates
@@ -1258,7 +1258,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Example:* `"refs/heads/master"`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.swpins.pins.<name>.git-rev.url`
   URL of the git repository
@@ -1269,7 +1269,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Example:* `"https://github.com/vpsfreecz/vpsadminos"`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.swpins.pins.<name>.type`
   This option has no description.
@@ -1278,7 +1278,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `"git"`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.tags`
   Optional user-defined tags to classify the machine
@@ -1287,7 +1287,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `[]`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.vzNode`
   This option has no description.
@@ -1296,7 +1296,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.vzNode.role`
   Node role
@@ -1305,14 +1305,15 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/cluster>``
+    *Declared by:* `<confctl/nix/modules/cluster>`
 
 
 
 ## SERVICES
 The following options can be configured in per-machine `config.nix` files within
 the deployment configuration directory, i.e. `cluster/<machine-name>/config.nix`,
-or any other imported Nix file:
+or any other imported Nix file. These options are added by `confctl` in addition
+to options from `NixOS` or `vpsAdminOS`.
 
 `services.netboot.acmeSSL`
   Enable ACME and SSL for netboot host
@@ -1321,7 +1322,7 @@ or any other imported Nix file:
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/services/netboot.nix>``
+    *Declared by:* `<confctl/nix/modules/services/netboot.nix>`
 
 `services.netboot.allowedIPRanges`
   Allow HTTP access for these IP ranges, if not specified
@@ -1333,7 +1334,7 @@ or any other imported Nix file:
 
     *Example:* `"10.0.0.0/24"`
 
-    *Declared by:* ``<confctl/nix/modules/services/netboot.nix>``
+    *Declared by:* `<confctl/nix/modules/services/netboot.nix>`
 
 `services.netboot.banner`
   Message to display on ipxe script load
@@ -1342,7 +1343,7 @@ or any other imported Nix file:
 
     *Default:* `"ipxe loading"`
 
-    *Declared by:* ``<confctl/nix/modules/services/netboot.nix>``
+    *Declared by:* `<confctl/nix/modules/services/netboot.nix>`
 
 `services.netboot.enable`
   Whether to enable Enable netboot server.
@@ -1353,7 +1354,7 @@ or any other imported Nix file:
 
     *Example:* `true`
 
-    *Declared by:* ``<confctl/nix/modules/services/netboot.nix>``
+    *Declared by:* `<confctl/nix/modules/services/netboot.nix>`
 
 `services.netboot.extraMappings`
   This option has no description.
@@ -1363,7 +1364,7 @@ or any other imported Nix file:
     *Default:* `{
 }`
 
-    *Declared by:* ``<confctl/nix/modules/services/netboot.nix>``
+    *Declared by:* `<confctl/nix/modules/services/netboot.nix>`
 
 `services.netboot.host`
   Hostname or IP address of the netboot server
@@ -1372,7 +1373,7 @@ or any other imported Nix file:
 
     *Default:* `null`
 
-    *Declared by:* ``<confctl/nix/modules/services/netboot.nix>``
+    *Declared by:* `<confctl/nix/modules/services/netboot.nix>`
 
 `services.netboot.includeNetbootxyz`
   Include netboot.xyz entry
@@ -1381,7 +1382,7 @@ or any other imported Nix file:
 
     *Default:* `false`
 
-    *Declared by:* ``<confctl/nix/modules/services/netboot.nix>``
+    *Declared by:* `<confctl/nix/modules/services/netboot.nix>`
 
 `services.netboot.nixosItems`
   This option has no description.
@@ -1391,7 +1392,7 @@ or any other imported Nix file:
     *Default:* `{
 }`
 
-    *Declared by:* ``<confctl/nix/modules/services/netboot.nix>``
+    *Declared by:* `<confctl/nix/modules/services/netboot.nix>`
 
 `services.netboot.password`
   IPXE menu password
@@ -1400,7 +1401,7 @@ or any other imported Nix file:
 
     *Default:* `"letmein"`
 
-    *Declared by:* ``<confctl/nix/modules/services/netboot.nix>``
+    *Declared by:* `<confctl/nix/modules/services/netboot.nix>`
 
 `services.netboot.secretsDir`
   Directory containing signing secrets
@@ -1409,7 +1410,7 @@ or any other imported Nix file:
 
     *Default:* `"/nix/store/rsl9ffhzw9zv071rvqbny97bdv36rzr8-ca"`
 
-    *Declared by:* ``<confctl/nix/modules/services/netboot.nix>``
+    *Declared by:* `<confctl/nix/modules/services/netboot.nix>`
 
 `services.netboot.vpsadminosItems`
   This option has no description.
@@ -1419,7 +1420,7 @@ or any other imported Nix file:
     *Default:* `{
 }`
 
-    *Declared by:* ``<confctl/nix/modules/services/netboot.nix>``
+    *Declared by:* `<confctl/nix/modules/services/netboot.nix>`
 
 
 
