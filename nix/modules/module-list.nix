@@ -17,4 +17,5 @@ let
 in {
   nixos = shared ++ nixos;
   vpsadminos = shared ++ vpsadminos;
+  all = shared ++ nixos ++ vpsadminos;
 }

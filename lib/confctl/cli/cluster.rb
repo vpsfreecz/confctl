@@ -8,6 +8,20 @@ require 'tty-spinner'
 module ConfCtl::Cli
   class Cluster < Command
     def list
+      if opts[:list]
+        prefix = 'cluster.<name>.'
+        nix = ConfCtl::Nix.new
+
+        puts 'name'
+
+        nix.module_options.each do |opt|
+          next unless opt['name'].start_with?(prefix)
+          puts opt['name'][prefix.length..-1]
+        end
+
+        return
+      end
+
       list_deployments(select_deployments_with_managed(args[0]))
     end
 

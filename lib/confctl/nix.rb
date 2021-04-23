@@ -22,6 +22,15 @@ module ConfCtl
       })['confctl']
     end
 
+    # Returns an array with options from all confctl modules
+    # @return [Array]
+    def module_options
+      options = nix_instantiate({
+        confDir: conf_dir,
+        build: :moduleOptions,
+      })
+    end
+
     # Returns an array with deployment fqdns
     # @return [Array<String>]
     def list_deployment_fqdns

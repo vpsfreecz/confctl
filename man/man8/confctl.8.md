@@ -69,6 +69,10 @@ information.
       and are there just for reference. This option determines what kind of
       machines should be listed.
 
+    `-L`, `--list`
+      List possible attributes that can be used with options `--output`
+      or `--attr` and exit.
+
     `-o`, `--output` *attributes*
       Comma-separated list of attributes to output. Defaults to the value
       of option `confctl.list.columns`.

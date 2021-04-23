@@ -90,19 +90,38 @@ let
   evalConfctl =
     let
       cfg = "${toString arg.confDir}/configs/confctl.nix";
-    in import <nixpkgs/nixos/lib/eval-config.nix> {
-      modules = [
-        ./modules/confctl/generations.nix
-        ./modules/confctl/cli.nix
-        ./modules/confctl/nix.nix
-        ./modules/confctl/swpins.nix
-        "${toString arg.confDir}/configs/swpins.nix"
-      ] ++ nixpkgs.lib.optional (builtins.pathExists cfg) cfg;
-    };
+    in evalNixosModules ([
+      ./modules/confctl/generations.nix
+      ./modules/confctl/cli.nix
+      ./modules/confctl/nix.nix
+      ./modules/confctl/swpins.nix
+      "${toString arg.confDir}/configs/swpins.nix"
+    ] ++ nixpkgs.lib.optional (builtins.pathExists cfg) cfg);
+
+  docToplevels = [
+    "cluster."
+    "confctl."
+    "services.netboot."
+    "serviceDefinitions."
+  ];
+
+  filterOption = o:
+    !o.internal && builtins.any (top: nixpkgs.lib.hasPrefix top o.name) docToplevels;
+
+  docModules = evalNixosModules (import ./modules/module-list.nix).all;
+
+  docOptions =
+    builtins.filter filterOption (nixpkgs.lib.optionAttrSetToDocList docModules.options);
+
+  evalNixosModules = modules:
+    import <nixpkgs/nixos/lib/eval-config.nix> { inherit modules; };
 
   build = {
     # confctl settings
     confctl = { confctl = evalConfctl.config.confctl; };
+
+    # List available nixos module options for documentation purposes
+    moduleOptions = docOptions;
 
     # List of deployment hosts
     list = { deployments = builtins.map (d: d.name) deployments; };

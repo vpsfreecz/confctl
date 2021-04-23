@@ -114,6 +114,9 @@ module ConfCtl::Cli
         c.desc 'Filter (un)managed machines'
         c.flag :managed, must_match: %w(y yes n no a all)
 
+        c.desc 'List possible attributes to output'
+        c.switch %i(L list), negatable: false
+
         c.desc 'Select attributes to output'
         c.flag %i(o output)
 
