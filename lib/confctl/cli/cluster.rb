@@ -22,22 +22,22 @@ module ConfCtl::Cli
         return
       end
 
-      list_deployments(select_deployments_with_managed(args[0]))
+      list_machines(select_machines_with_managed(args[0]))
     end
 
     def build
-      deps = select_deployments(args[0]).managed
+      deps = select_machines(args[0]).managed
 
       ask_confirmation! do
-        puts "The following deployments will be built:"
-        list_deployments(deps)
+        puts "The following machines will be built:"
+        list_machines(deps)
       end
 
       do_build(deps)
     end
 
     def deploy
-      deps = select_deployments(args[0]).managed
+      deps = select_machines(args[0]).managed
       action = args[1] || 'switch'
 
       unless %w(boot switch test dry-activate).include?(action)
@@ -53,8 +53,8 @@ module ConfCtl::Cli
       end
 
       ask_confirmation! do
-        puts "The following deployments will be deployed:"
-        list_deployments(deps)
+        puts "The following machines will be deployed:"
+        list_machines(deps)
         puts
         puts "Generation: #{opts[:generation] || 'new build'}"
         puts "Target action: #{action}#{opts[:reboot] ? ' + reboot' : ''}"
@@ -77,16 +77,16 @@ module ConfCtl::Cli
     end
 
     def status
-      deps = select_deployments(args[0]).managed
+      deps = select_machines(args[0]).managed
 
       ask_confirmation! do
         if opts[:generation]
-          puts "The following deployments will be checked:"
+          puts "The following machines will be checked:"
         else
-          puts "The following deployments will be built and then checked:"
+          puts "The following machines will be built and then checked:"
         end
 
-        list_deployments(deps)
+        list_machines(deps)
         puts
         puts "Generation: #{opts[:generation] || 'new build'}"
       end
@@ -216,11 +216,11 @@ module ConfCtl::Cli
     end
 
     def cssh
-      deps = select_deployments_with_managed(args[0])
+      deps = select_machines_with_managed(args[0])
 
       ask_confirmation! do
-        puts "Open cssh to the following deployments:"
-        list_deployments(deps)
+        puts "Open cssh to the following machines:"
+        list_machines(deps)
       end
 
       nix = ConfCtl::Nix.new
@@ -450,7 +450,7 @@ module ConfCtl::Cli
       end
     end
 
-    def select_deployments(pattern)
+    def select_machines(pattern)
       deps = ConfCtl::Deployments.new(show_trace: opts['show-trace'])
 
       attr_filters = AttrFilters.new(opts[:attr])
@@ -463,8 +463,8 @@ module ConfCtl::Cli
       end
     end
 
-    def select_deployments_with_managed(pattern)
-      selected = select_deployments(pattern)
+    def select_machines_with_managed(pattern)
+      selected = select_machines(pattern)
 
       case opts[:managed]
       when 'y', 'yes'
@@ -478,7 +478,7 @@ module ConfCtl::Cli
       end
     end
 
-    def list_deployments(deps)
+    def list_machines(deps)
       cols =
         if opts[:output]
           opts[:output].split(',')
@@ -564,7 +564,7 @@ module ConfCtl::Cli
       puts "#{Rainbow("Build log:").yellow} #{Rainbow(ConfCtl::Logger.path).cyan}"
 
       grps.each do |hosts, swpin_paths|
-        puts Rainbow("Building deployments").bright
+        puts Rainbow("Building machines").bright
         hosts.each { |h| puts "  #{h}" }
         puts "with swpins"
         swpin_paths.each { |k, v| puts "  #{k}=#{v}" }
@@ -734,11 +734,11 @@ module ConfCtl::Cli
     end
 
     def compare_swpins
-      deps = select_deployments(args[0]).managed
+      deps = select_machines(args[0]).managed
 
       ask_confirmation! do
-        puts "Compare swpins on the following deployments:"
-        list_deployments(deps)
+        puts "Compare swpins on the following machines:"
+        list_machines(deps)
         puts
         puts "Generation: #{opts[:generation] || 'current configuration'}"
       end
