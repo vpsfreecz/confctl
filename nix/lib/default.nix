@@ -38,7 +38,7 @@ in rec {
   inherit findConfig;
 
   # Return all configured machines in a list
-  getClusterDeployments = cluster:
+  getClusterMachines = cluster:
     mapAttrsToList (name: config:
       makeMachine { inherit name config; }
     ) cluster;
@@ -46,9 +46,9 @@ in rec {
   # Get IP version addresses from all machines in a cluster
   getAllAddressesOf = cluster: v:
     let
-      deps = getClusterDeployments cluster;
-      addresses = flatten (map (d:
-        map (a: d // a) d.config.addresses.${"v${toString v}"}
-      ) deps);
+      machines = getClusterMachines cluster;
+      addresses = flatten (map (machine:
+        map (addr: machine // addr) machine.config.addresses.${"v${toString v}"}
+      ) machines);
     in addresses;
 }

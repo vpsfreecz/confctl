@@ -7,7 +7,7 @@
 , nixosModules ? [] }:
 with lib;
 let
-  machines = confLib.getClusterDeployments config.cluster;
+  machines = confLib.getClusterMachines config.cluster;
 
   machineAttrs = listToAttrs (map (d: nameValuePair d.config.host.fqdn d) machines);
 
