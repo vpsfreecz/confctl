@@ -91,8 +91,8 @@ module ConfCtl::Cli
         puts "Generation: #{opts[:generation] || 'new build'}"
       end
 
-      statuses = Hash[machines.map do |host, dep|
-        [host, ConfCtl::MachineStatus.new(dep)]
+      statuses = Hash[machines.map do |host, machine|
+        [host, ConfCtl::MachineStatus.new(machine)]
       end]
 
       # Evaluate toplevels
@@ -230,8 +230,8 @@ module ConfCtl::Cli
         '-l', 'root',
       ]
 
-      machines.each do |host, dep|
-        cssh << dep.target_host
+      machines.each do |host, machine|
+        cssh << machine.target_host
       end
 
       nix.run_command_in_shell(
@@ -293,19 +293,19 @@ module ConfCtl::Cli
 
     def deploy_one_by_one(machines, host_generations, nix, action)
       host_generations.each do |host, gen|
-        dep = machines[host]
+        machine = machines[host]
 
-        if copy_to_host(nix, host, dep, gen.toplevel) == :skip
+        if copy_to_host(nix, host, machine, gen.toplevel) == :skip
           puts Rainbow("Skipping #{host}").yellow
           next
         end
 
-        if deploy_to_host(nix, host, dep, gen.toplevel, action) == :skip
+        if deploy_to_host(nix, host, machine, gen.toplevel, action) == :skip
           puts Rainbow("Skipping #{host}").yellow
           next
         end
 
-        if opts[:reboot] && reboot_host(host, dep) == :skip
+        if opts[:reboot] && reboot_host(host, machine) == :skip
           puts Rainbow("Skipping #{host}").yellow
           next
         end
@@ -314,8 +314,8 @@ module ConfCtl::Cli
       end
     end
 
-    def copy_to_host(nix, host, dep, toplevel)
-      puts Rainbow("Copying configuration to #{host} (#{dep.target_host})").yellow
+    def copy_to_host(nix, host, machine, toplevel)
+      puts Rainbow("Copying configuration to #{host} (#{machine.target_host})").yellow
 
       if opts[:interactive] && !ask_confirmation(always: true)
         return :skip
@@ -326,7 +326,7 @@ module ConfCtl::Cli
         width: 80,
       )
 
-      ret = nix.copy(dep, toplevel) do |i, n, path|
+      ret = nix.copy(machine, toplevel) do |i, n, path|
         pb.update(total: n) if pb.total != n
         pb.advance
       end
@@ -381,43 +381,43 @@ module ConfCtl::Cli
       end
     end
 
-    def deploy_to_host(nix, host, dep, toplevel, action)
+    def deploy_to_host(nix, host, machine, toplevel, action)
       if opts['dry-activate-first']
-        puts Rainbow("Trying to activate configuration on #{host} (#{dep.target_host})").yellow
+        puts Rainbow("Trying to activate configuration on #{host} (#{machine.target_host})").yellow
 
-        unless nix.activate(dep, toplevel, 'dry-activate')
+        unless nix.activate(machine, toplevel, 'dry-activate')
           fail "Error while activating configuration on #{host}"
         end
       end
 
-      puts Rainbow("Activating configuration on #{host} (#{dep.target_host}): #{action}").yellow
+      puts Rainbow("Activating configuration on #{host} (#{machine.target_host}): #{action}").yellow
 
       if opts[:interactive] && !ask_confirmation(always: true)
         return :skip
       end
 
-      unless nix.activate(dep, toplevel, action)
+      unless nix.activate(machine, toplevel, action)
         fail "Error while activating configuration on #{host}"
       end
 
-      if %w(boot switch).include?(action) && !nix.set_profile(dep, toplevel)
+      if %w(boot switch).include?(action) && !nix.set_profile(machine, toplevel)
         fail "Error while setting profile on #{host}"
       end
     end
 
-    def reboot_host(host, dep)
-      if dep.localhost?
+    def reboot_host(host, machine)
+      if machine.localhost?
         puts Rainbow("Skipping reboot of #{host} as it is localhost").yellow
         return :skip
       end
 
-      puts Rainbow("Rebooting #{host} (#{dep.target_host})").yellow
+      puts Rainbow("Rebooting #{host} (#{machine.target_host})").yellow
 
       if opts[:interactive] && !ask_confirmation(always: true)
         return :skip
       end
 
-      m = ConfCtl::MachineControl.new(dep)
+      m = ConfCtl::MachineControl.new(machine)
 
       if wait_online == :nowait
         m.reboot
@@ -446,7 +446,7 @@ module ConfCtl::Cli
           end
         end
 
-        puts Rainbow("#{host} (#{dep.target_host}) is online (took #{secs.round(1)}s to reboot)").yellow
+        puts Rainbow("#{host} (#{machine.target_host}) is online (took #{secs.round(1)}s to reboot)").yellow
       end
     end
 
@@ -743,8 +743,8 @@ module ConfCtl::Cli
         puts "Generation: #{opts[:generation] || 'current configuration'}"
       end
 
-      statuses = Hash[machines.map do |host, dep|
-        [host, ConfCtl::MachineStatus.new(dep)]
+      statuses = Hash[machines.map do |host, machine|
+        [host, ConfCtl::MachineStatus.new(machine)]
       end]
 
       if opts[:generation]
