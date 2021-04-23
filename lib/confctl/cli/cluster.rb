@@ -26,18 +26,18 @@ module ConfCtl::Cli
     end
 
     def build
-      deps = select_machines(args[0]).managed
+      machines = select_machines(args[0]).managed
 
       ask_confirmation! do
         puts "The following machines will be built:"
-        list_machines(deps)
+        list_machines(machines)
       end
 
-      do_build(deps)
+      do_build(machines)
     end
 
     def deploy
-      deps = select_machines(args[0]).managed
+      machines = select_machines(args[0]).managed
       action = args[1] || 'switch'
 
       unless %w(boot switch test dry-activate).include?(action)
@@ -54,7 +54,7 @@ module ConfCtl::Cli
 
       ask_confirmation! do
         puts "The following machines will be deployed:"
-        list_machines(deps)
+        list_machines(machines)
         puts
         puts "Generation: #{opts[:generation] || 'new build'}"
         puts "Target action: #{action}#{opts[:reboot] ? ' + reboot' : ''}"
@@ -62,22 +62,22 @@ module ConfCtl::Cli
 
       host_generations =
         if opts[:generation]
-          find_generations(deps, opts[:generation])
+          find_generations(machines, opts[:generation])
         else
-          do_build(deps)
+          do_build(machines)
         end
 
       nix = ConfCtl::Nix.new(show_trace: opts['show-trace'])
 
       if opts['one-by-one']
-        deploy_one_by_one(deps, host_generations, nix, action)
+        deploy_one_by_one(machines, host_generations, nix, action)
       else
-        deploy_in_bulk(deps, host_generations, nix, action)
+        deploy_in_bulk(machines, host_generations, nix, action)
       end
     end
 
     def status
-      deps = select_machines(args[0]).managed
+      machines = select_machines(args[0]).managed
 
       ask_confirmation! do
         if opts[:generation]
@@ -86,12 +86,12 @@ module ConfCtl::Cli
           puts "The following machines will be built and then checked:"
         end
 
-        list_machines(deps)
+        list_machines(machines)
         puts
         puts "Generation: #{opts[:generation] || 'new build'}"
       end
 
-      statuses = Hash[deps.map do |host, dep|
+      statuses = Hash[machines.map do |host, dep|
         [host, ConfCtl::MachineStatus.new(dep)]
       end]
 
@@ -99,14 +99,14 @@ module ConfCtl::Cli
       if opts[:generation] == 'none'
         host_generations = nil
       elsif opts[:generation]
-        host_generations = find_generations(deps, opts[:generation])
+        host_generations = find_generations(machines, opts[:generation])
 
         # Ignore statuses when no generation was found
         statuses.delete_if do |host, st|
           !host_generations.has_key?(host)
         end
       else
-        host_generations = do_build(deps)
+        host_generations = do_build(machines)
         puts
       end
 
@@ -118,7 +118,7 @@ module ConfCtl::Cli
         end
       else
         # We're not comparing a system generation, only configured swpins
-        ConfCtl::Swpins::ClusterNameList.new(deployments: deps).each do |cn|
+        ConfCtl::Swpins::ClusterNameList.new(machines: machines).each do |cn|
           cn.parse
 
           statuses[cn.name].target_swpin_specs = cn.specs
@@ -126,7 +126,7 @@ module ConfCtl::Cli
       end
 
       # Check runtime status
-      tw = ConfCtl::ParallelExecutor.new(deps.length)
+      tw = ConfCtl::ParallelExecutor.new(machines.length)
 
       statuses.each do |host, st|
         tw.add do
@@ -216,11 +216,11 @@ module ConfCtl::Cli
     end
 
     def cssh
-      deps = select_machines_with_managed(args[0])
+      machines = select_machines_with_managed(args[0])
 
       ask_confirmation! do
         puts "Open cssh to the following machines:"
-        list_machines(deps)
+        list_machines(machines)
       end
 
       nix = ConfCtl::Nix.new
@@ -230,7 +230,7 @@ module ConfCtl::Cli
         '-l', 'root',
       ]
 
-      deps.each do |host, dep|
+      machines.each do |host, dep|
         cssh << dep.target_host
       end
 
@@ -243,19 +243,19 @@ module ConfCtl::Cli
     protected
     attr_reader :wait_online
 
-    def deploy_in_bulk(deps, host_generations, nix, action)
+    def deploy_in_bulk(machines, host_generations, nix, action)
       skipped_copy = []
       skipped_activation = []
 
       if opts[:interactive]
         host_generations.each do |host, gen|
-          if copy_to_host(nix, host, deps[host], gen.toplevel) == :skip
+          if copy_to_host(nix, host, machines[host], gen.toplevel) == :skip
             puts Rainbow("Skipping #{host}").yellow
             skipped_copy << host
           end
         end
       else
-        concurrent_copy(deps, host_generations, nix)
+        concurrent_copy(machines, host_generations, nix)
       end
 
       host_generations.each do |host, gen|
@@ -265,7 +265,7 @@ module ConfCtl::Cli
           next
         end
 
-        if deploy_to_host(nix, host, deps[host], gen.toplevel, action) == :skip
+        if deploy_to_host(nix, host, machines[host], gen.toplevel, action) == :skip
           puts Rainbow("Skipping #{host}").yellow
           skipped_activation << host
           next
@@ -281,7 +281,7 @@ module ConfCtl::Cli
             next
           end
 
-          if reboot_host(host, deps[host]) == :skip
+          if reboot_host(host, machines[host]) == :skip
             puts "Skipping #{host}"
             next
           end
@@ -291,9 +291,9 @@ module ConfCtl::Cli
       end
     end
 
-    def deploy_one_by_one(deps, host_generations, nix, action)
+    def deploy_one_by_one(machines, host_generations, nix, action)
       host_generations.each do |host, gen|
-        dep = deps[host]
+        dep = machines[host]
 
         if copy_to_host(nix, host, dep, gen.toplevel) == :skip
           puts Rainbow("Skipping #{host}").yellow
@@ -338,7 +338,7 @@ module ConfCtl::Cli
       true
     end
 
-    def concurrent_copy(deps, host_generations, nix)
+    def concurrent_copy(machines, host_generations, nix)
       multibar = TTY::ProgressBar::Multi.new(
         "Copying [:bar] :current/:total (:percent)",
         width: 80,
@@ -351,7 +351,7 @@ module ConfCtl::Cli
         )
 
         executor.add do
-          ret = nix.copy(deps[host], gen.toplevel) do |i, n, path|
+          ret = nix.copy(machines[host], gen.toplevel) do |i, n, path|
             if pb.total != n
               pb.update(total: n)
               multibar.top_bar.resume if multibar.top_bar.done?
@@ -451,12 +451,12 @@ module ConfCtl::Cli
     end
 
     def select_machines(pattern)
-      deps = ConfCtl::Deployments.new(show_trace: opts['show-trace'])
+      machines = ConfCtl::MachineList.new(show_trace: opts['show-trace'])
 
       attr_filters = AttrFilters.new(opts[:attr])
       tag_filters = TagFilters.new(opts[:tag])
 
-      deps.select do |host, d|
+      machines.select do |host, d|
         (pattern.nil? || ConfCtl::Pattern.match?(pattern, host)) \
           && attr_filters.pass?(d) \
           && tag_filters.pass?(d)
@@ -478,7 +478,7 @@ module ConfCtl::Cli
       end
     end
 
-    def list_machines(deps)
+    def list_machines(machines)
       cols =
         if opts[:output]
           opts[:output].split(',')
@@ -486,7 +486,7 @@ module ConfCtl::Cli
           ConfCtl::Settings.instance.list_columns
         end
 
-      rows = deps.map do |host, d|
+      rows = machines.map do |host, d|
         Hash[cols.map { |c| [c, d[c]] }]
       end
 
@@ -498,11 +498,11 @@ module ConfCtl::Cli
       )
     end
 
-    def find_generations(deps, generation_name)
+    def find_generations(machines, generation_name)
       host_generations = {}
       missing_hosts = []
 
-      deps.each do |host, d|
+      machines.each do |host, d|
         list = ConfCtl::Generation::BuildList.new(host)
 
         gen =
@@ -535,28 +535,28 @@ module ConfCtl::Cli
       host_generations
     end
 
-    def do_build(deps)
+    def do_build(machines)
       nix = ConfCtl::Nix.new(
         show_trace: opts['show-trace'],
         max_jobs: opts['max-jobs'],
       )
       host_swpin_paths = {}
 
-      autoupdate_swpins(deps)
-      host_swpin_specs = check_swpins(deps)
+      autoupdate_swpins(machines)
+      host_swpin_specs = check_swpins(machines)
 
       unless host_swpin_specs
         fail 'one or more swpins need to be updated'
       end
 
-      deps.each do |host, d|
+      machines.each do |host, d|
         puts Rainbow("Evaluating swpins for #{host}...").bright
         host_swpin_paths[host] = nix.eval_host_swpins(host).update(d.nix_paths)
       end
 
       grps = swpin_build_groups(host_swpin_paths)
       puts
-      puts "Deployments will be built in #{grps.length} groups"
+      puts "Machines will be built in #{grps.length} groups"
       puts
       host_generations = {}
       time = Time.now
@@ -623,7 +623,7 @@ module ConfCtl::Cli
       host_generations
     end
 
-    def autoupdate_swpins(deps)
+    def autoupdate_swpins(machines)
       puts Rainbow("Running swpins auto updates...").bright
       channels_update = []
 
@@ -633,7 +633,7 @@ module ConfCtl::Cli
         channels_update << c unless channels_update.include?(c)
       end
 
-      cluster_names = ConfCtl::Swpins::ClusterNameList.new(deployments: deps)
+      cluster_names = ConfCtl::Swpins::ClusterNameList.new(machines: machines)
 
       cluster_names.each do |cn|
         cn.parse
@@ -687,7 +687,7 @@ module ConfCtl::Cli
       end
     end
 
-    def check_swpins(deps)
+    def check_swpins(machines)
       ret = {}
       valid = true
 
@@ -699,7 +699,7 @@ module ConfCtl::Cli
         valid = false unless s.valid?
       end
 
-      ConfCtl::Swpins::ClusterNameList.new(deployments: deps).each do |cn|
+      ConfCtl::Swpins::ClusterNameList.new(machines: machines).each do |cn|
         cn.parse
 
         puts Rainbow("Checking swpins for #{cn.name}...").bright
@@ -734,21 +734,21 @@ module ConfCtl::Cli
     end
 
     def compare_swpins
-      deps = select_machines(args[0]).managed
+      machines = select_machines(args[0]).managed
 
       ask_confirmation! do
         puts "Compare swpins on the following machines:"
-        list_machines(deps)
+        list_machines(machines)
         puts
         puts "Generation: #{opts[:generation] || 'current configuration'}"
       end
 
-      statuses = Hash[deps.map do |host, dep|
+      statuses = Hash[machines.map do |host, dep|
         [host, ConfCtl::MachineStatus.new(dep)]
       end]
 
       if opts[:generation]
-        host_generations = find_generations(deps, opts[:generation])
+        host_generations = find_generations(machines, opts[:generation])
 
         host_generations.each do |host, gen|
           statuses[host].target_swpin_specs = gen.swpin_specs
@@ -759,7 +759,7 @@ module ConfCtl::Cli
           !host_generations.has_key?(host)
         end
       else
-        ConfCtl::Swpins::ClusterNameList.new(deployments: deps).each do |cn|
+        ConfCtl::Swpins::ClusterNameList.new(machines: machines).each do |cn|
           cn.parse
 
           statuses[cn.name].target_swpin_specs = cn.specs

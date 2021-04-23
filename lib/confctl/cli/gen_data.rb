@@ -14,21 +14,21 @@ module ConfCtl::Cli
     def vpsadmin_containers
       api = get_vpsadmin_client
 
-      deployments = ConfCtl::Deployments.new
+      machines = ConfCtl::MachineList.new
       data = {}
 
-      deployments.each do |host, d|
-        next if d['container'].nil?
+      machines.each do |host, m|
+        next if m['container'].nil?
 
         ct = api.vps.show(
-          d['container.id'],
+          m['container.id'],
           meta: {includes: 'node__location__environment'},
         )
 
         ct_fqdn = [
-          d['host.name'],
-          d['host.location'],
-          d['host.domain'],
+          m['host.name'],
+          m['host.location'],
+          m['host.domain'],
         ].compact.join('.')
 
         data[ct_fqdn] = {

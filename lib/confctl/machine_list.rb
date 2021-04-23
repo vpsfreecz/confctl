@@ -1,61 +1,61 @@
 require 'json'
 
 module ConfCtl
-  class Deployments
+  class MachineList
     # @param opts [Hash]
     # @option opts [Boolean] :show_trace
-    # @option opts [Boolean] :deployments
+    # @option opts [Boolean] :machines
     def initialize(opts = {})
       @opts = opts
-      @deployments = opts[:deployments] || parse(extract)
+      @machines = opts[:machines] || parse(extract)
     end
 
     # @yieldparam [String] host
     # @yieldparam [Deployment] deployment
     def each(&block)
-      deployments.each(&block)
+      machines.each(&block)
     end
 
     # @yieldparam [String] host
     # @yieldparam [Deployment] deployment
-    # @return [Deployments]
+    # @return [MachineList]
     def select(&block)
-      self.class.new(deployments: deployments.select(&block))
+      self.class.new(machines: machines.select(&block))
     end
 
     # @yieldparam [String] host
     # @yieldparam [Deployment] deployment
     # @return [Array]
     def map(&block)
-      deployments.map(&block)
+      machines.map(&block)
     end
 
-    # @return [Deployments]
+    # @return [MachineList]
     def managed
       select { |host, dep| dep.managed }
     end
 
-    # @return [Deployments]
+    # @return [MachineList]
     def unmanaged
       select { |host, dep| !dep.managed }
     end
 
     # @param host [String]
     def [](host)
-      @deployments[host]
+      @machines[host]
     end
 
     # @return [Integer]
     def length
-      @deployments.length
+      @machines.length
     end
 
     protected
-    attr_reader :opts, :deployments
+    attr_reader :opts, :machines
 
     def extract
       nix = Nix.new
-      nix.list_deployments
+      nix.list_machines
     end
 
     def parse(data)

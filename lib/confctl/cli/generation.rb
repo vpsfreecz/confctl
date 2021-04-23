@@ -3,14 +3,14 @@ require 'time'
 module ConfCtl::Cli
   class Generation < Command
     def list
-      deps = select_deployments(args[0])
-      gens = select_generations(deps, args[1])
+      machines = select_machines(args[0])
+      gens = select_generations(machines, args[1])
       list_generations(gens)
     end
 
     def remove
-      deps = select_deployments(args[0])
-      gens = select_generations(deps, args[1])
+      machines = select_machines(args[0])
+      gens = select_generations(machines, args[1])
 
       if gens.empty?
         puts 'No generations found'
@@ -29,16 +29,16 @@ module ConfCtl::Cli
     end
 
     def rotate
-      deps = select_deployments(args[0])
+      machines = select_machines(args[0])
 
       to_delete = []
 
       if opts[:remote]
-        to_delete.concat(host_generations_rotate(deps))
+        to_delete.concat(host_generations_rotate(machines))
       end
 
       if opts[:local] || (!opts[:local] && !opts[:remote])
-        to_delete.concat(build_generations_rotate(deps))
+        to_delete.concat(build_generations_rotate(machines))
       end
 
       if to_delete.empty?
@@ -58,16 +58,16 @@ module ConfCtl::Cli
     end
 
     protected
-    def select_generations(deps, pattern)
+    def select_generations(machines, pattern)
       gens = ConfCtl::Generation::UnifiedList.new
       include_remote = opts[:remote]
       include_local = opts[:local] || (!opts[:remote] && !opts[:local])
 
       if include_remote
-        tw = ConfCtl::ParallelExecutor.new(deps.length)
+        tw = ConfCtl::ParallelExecutor.new(machines.length)
         statuses = {}
 
-        deps.each do |host, dep|
+        machines.each do |host, dep|
           st = ConfCtl::MachineStatus.new(dep)
           statuses[host] = st
 
@@ -84,7 +84,7 @@ module ConfCtl::Cli
       end
 
       if include_local
-        deps.each do |host, dep|
+        machines.each do |host, dep|
           gens.add_build_generations(ConfCtl::Generation::BuildList.new(host))
         end
       end
@@ -102,11 +102,11 @@ module ConfCtl::Cli
       gens
     end
 
-    def build_generations_rotate(deps)
+    def build_generations_rotate(machines)
       global = ConfCtl::Settings.instance.build_generations
       ret = []
 
-      deps.each do |host, dep|
+      machines.each do |host, dep|
         to_delete = generations_rotate(
           ConfCtl::Generation::BuildList.new(host),
           min: dep['buildGenerations']['min'] || global['min'],
@@ -125,14 +125,14 @@ module ConfCtl::Cli
       ret
     end
 
-    def host_generations_rotate(deps)
+    def host_generations_rotate(machines)
       global = ConfCtl::Settings.instance.host_generations
       ret = []
 
-      tw = ConfCtl::ParallelExecutor.new(deps.length)
+      tw = ConfCtl::ParallelExecutor.new(machines.length)
       statuses = {}
 
-      deps.each do |host, dep|
+      machines.each do |host, dep|
         st = ConfCtl::MachineStatus.new(dep)
         statuses[host] = st
 
@@ -224,13 +224,13 @@ module ConfCtl::Cli
       )
     end
 
-    def select_deployments(pattern)
-      deps = ConfCtl::Deployments.new(show_trace: opts['show-trace'])
+    def select_machines(pattern)
+      machines = ConfCtl::MachineList.new(show_trace: opts['show-trace'])
 
       attr_filters = AttrFilters.new(opts[:attr])
       tag_filters = TagFilters.new(opts[:tag])
 
-      deps.select do |host, d|
+      machines.select do |host, d|
         (pattern.nil? || ConfCtl::Pattern.match?(pattern, host)) \
           && attr_filters.pass?(d) \
           && tag_filters.pass?(d)

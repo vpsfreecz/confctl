@@ -42,7 +42,7 @@ module ConfCtl
 
     # Return deployments and their config in a hash
     # @return [Hash]
-    def list_deployments
+    def list_machines
       nix_instantiate({
         confDir: conf_dir,
         build: :info,
@@ -176,7 +176,7 @@ module ConfCtl
       end
     end
 
-    # @param dep [Deployments::Deployment]
+    # @param dep [Deployment]
     # @param toplevel [String]
     #
     # @yieldparam progress [Integer]
@@ -193,7 +193,7 @@ module ConfCtl
       end
     end
 
-    # @param dep [Deployments::Deployment]
+    # @param dep [Deployment]
     # @param toplevel [String]
     # @param action [String]
     # @return [Boolean]
@@ -203,7 +203,7 @@ module ConfCtl
       MachineControl.new(dep).execute!(*args).success?
     end
 
-    # @param dep [Deployments::Deployment]
+    # @param dep [Deployment]
     # @param toplevel [String]
     # @return [Boolean]
     def set_profile(dep, toplevel)
