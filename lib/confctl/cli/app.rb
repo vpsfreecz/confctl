@@ -106,7 +106,7 @@ module ConfCtl::Cli
       end
 
       desc 'List configured machines'
-      arg_name '[host-pattern]'
+      arg_name '[machine-pattern]'
       command :ls do |c|
         c.desc 'Enable traces in Nix'
         c.switch 'show-trace'
@@ -133,7 +133,7 @@ module ConfCtl::Cli
       end
 
       desc 'Build target systems'
-      arg_name '[host-pattern]'
+      arg_name '[machine-pattern]'
       command :build do |c|
         c.desc 'Enable traces in Nix'
         c.switch 'show-trace'
@@ -153,7 +153,7 @@ module ConfCtl::Cli
       end
 
       desc 'Deploy target systems'
-      arg_name '[host-pattern [switch-action]]'
+      arg_name '[machine-pattern [switch-action]]'
       command :deploy do |c|
         c.desc 'Enable traces in Nix'
         c.switch 'show-trace'
@@ -186,7 +186,7 @@ module ConfCtl::Cli
         c.desc 'Reboot target systems after deployment'
         c.switch :reboot
 
-        c.desc 'Wait for the host to boot'
+        c.desc 'Wait for the machine to boot'
         c.flag 'wait-online', default_value: '600'
 
         nix_build_options(c)
@@ -194,8 +194,8 @@ module ConfCtl::Cli
         c.action &Command.run(c, Cluster, :deploy)
       end
 
-      desc 'Check host status'
-      arg_name '[host-pattern]'
+      desc 'Check machine status'
+      arg_name '[machine-pattern]'
       command :status do |c|
         c.desc 'Filter by attribute'
         c.flag %i(a attr), multiple: true
@@ -213,7 +213,7 @@ module ConfCtl::Cli
       end
 
       desc 'Changelog between deployed and configured swpins'
-      arg_name '[host-pattern [sw-pattern]]'
+      arg_name '[machine-pattern [sw-pattern]]'
       command :changelog do |c|
         c.desc 'Filter by attribute'
         c.flag %i(a attr), multiple: true
@@ -242,7 +242,7 @@ module ConfCtl::Cli
       end
 
       desc 'Diff between deployed and configured swpins'
-      arg_name '[host-pattern [sw-pattern]]'
+      arg_name '[machine-pattern [sw-pattern]]'
       command :diff do |c|
         c.desc 'Filter by attribute'
         c.flag %i(a attr), multiple: true
@@ -265,7 +265,7 @@ module ConfCtl::Cli
       end
 
       desc 'Open ClusterSSH'
-      arg_name '[host-pattern]'
+      arg_name '[machine-pattern]'
       command :cssh do |c|
         c.desc 'Filter (un)managed machines'
         c.flag :managed, must_match: %w(y yes n no a all)
@@ -282,10 +282,10 @@ module ConfCtl::Cli
         c.action &Command.run(c, Cluster, :cssh)
       end
 
-      desc 'Manage built host generations'
+      desc 'Manage built machine generations'
       command :generation do |gen|
-        gen.desc 'List host generations'
-        gen.arg_name '[host-pattern [generation-pattern]]'
+        gen.desc 'List machine generations'
+        gen.arg_name '[machine-pattern [generation-pattern]]'
         gen.command :ls do |c|
           c.desc 'Filter by attribute'
           c.flag %i(a attr), multiple: true
@@ -296,14 +296,14 @@ module ConfCtl::Cli
           c.desc 'List local build generations'
           c.switch %i(l local)
 
-          c.desc 'List remote host generations'
+          c.desc 'List remote machine generations'
           c.switch %i(r remote)
 
           c.action &Command.run(c, Generation, :list)
         end
 
-        gen.desc 'Remove host generations'
-        gen.arg_name '[host-pattern [generation-pattern|old]]'
+        gen.desc 'Remove machine generations'
+        gen.arg_name '[machine-pattern [generation-pattern|old]]'
         gen.command :rm do |c|
           c.desc 'Filter by attribute'
           c.flag %i(a attr), multiple: true
@@ -314,7 +314,7 @@ module ConfCtl::Cli
           c.desc 'List local build generations'
           c.switch %i(l local)
 
-          c.desc 'List remote host generations'
+          c.desc 'List remote machine generations'
           c.switch %i(r remote)
 
           c.desc 'Assume the answer to confirmations is yes'
@@ -323,8 +323,8 @@ module ConfCtl::Cli
           c.action &Command.run(c, Generation, :remove)
         end
 
-        gen.desc 'Auto-remove old host generations'
-        gen.arg_name '[host-pattern]'
+        gen.desc 'Auto-remove old machine generations'
+        gen.arg_name '[machine-pattern]'
         gen.command :rotate do |c|
           c.desc 'Filter by attribute'
           c.flag %i(a attr), multiple: true
@@ -335,7 +335,7 @@ module ConfCtl::Cli
           c.desc 'List local build generations'
           c.switch %i(l local)
 
-          c.desc 'List remote host generations'
+          c.desc 'List remote machine generations'
           c.switch %i(r remote)
 
           c.desc 'Assume the answer to confirmations is yes'

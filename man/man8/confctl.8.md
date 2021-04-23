@@ -58,8 +58,8 @@ information.
   Auto-discover machines within the `cluster/` directory and generate a list
   of their modules in `cluster/cluster.nix`.
 
-`confctl ls` [*options*] [*host-pattern*]
-  List matching hosts available for deployment.
+`confctl ls` [*options*] [*machine-pattern*]
+  List matching machines available for deployment.
 
     `--show-trace`
       Enable traces in Nix.
@@ -89,11 +89,11 @@ information.
       Filter machines that have *tag* set. If the tag begins with `^`, then
       filter machines that do not have *tag* set.
 
-`confctl build` [*options*] [*host-pattern*]
-  Build matching hosts. The result of a build is one generation for each built
-  host. Subsequent builds either return an existing generation if there had been
-  no changes for a host or a new generation is created. Built generations can
-  be managed using `confctl generation` command family.
+`confctl build` [*options*] [*machine-pattern*]
+  Build matching machines. The result of a build is one generation for each
+  built machine. Subsequent builds either return an existing generation if there
+  had been no changes for a machine or a new generation is created. Built
+  generations can be managed using `confctl generation` command family.
 
     `--show-trace`
       Enable traces in Nix.
@@ -113,11 +113,11 @@ information.
     `-j`, `--max-jobs` *number*
       Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
 
-`confctl deploy` [*options*] [*host-pattern* [`boot`|`switch`|`test`|`dry-activate`]]
-  Deploy either a new or an existing build generation to matching hosts.
+`confctl deploy` [*options*] [*machine-pattern* [`boot`|`switch`|`test`|`dry-activate`]]
+  Deploy either a new or an existing build generation to matching machines.
 
   *switch-action* is the argument to `switch-to-configuration` called on
-  the target host. The default action is `switch`.
+  the target machine. The default action is `switch`.
 
     `--show-trace`
       Enable traces in Nix.
@@ -138,34 +138,34 @@ information.
       Do not build a new generation, but deploy an existing generation.
 
     `-i`, `--interactive`
-      Deploy hosts one by one while asking for confirmation for activation.
+      Deploy machines one by one while asking for confirmation for activation.
 
     `--dry-activate-first`
-      After the new system is copied to the target host, try to switch the
+      After the new system is copied to the target machine, try to switch the
       configuration using *dry-activate* action to see what would happen before
       the real switch.
 
     `--one-by-one`
-      Instead of copying the systems to all hosts in bulk before actiovations,
-      copy and deploy hosts one by one.
+      Instead of copying the systems to all machines in bulk before activations,
+      copy and deploy machines one by one.
 
     `--max-concurrent-copy` *n*
       Use at most *n* concurrent nix-copy-closure processes to deploy closures
-      to the target hosts. Defaults to `5`.
+      to the target machines. Defaults to `5`.
 
     `--reboot`
-      Applicable only when *switch-action* is `boot`. Reboot the host after the
+      Applicable only when *switch-action* is `boot`. Reboot the machine after the
       configuration is activated.
 
     `--wait-online` [*seconds* | `wait` | `nowait`]
-      Determines whether to wait for the hosts to come back online if `--reboot`
-      is used. `confctl` will wait for `600 seconds` by default.
+      Determines whether to wait for the machines to come back online
+      if `--reboot` is used. `confctl` will wait for `600 seconds` by default.
 
     `-j`, `--max-jobs` *number*
       Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
 
-`confctl status` [*options*] [*host-pattern*]
-  Probe managed hosts and determine their status.
+`confctl status` [*options*] [*machine-pattern*]
+  Probe managed machines and determine their status.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
       Filter machines by selected attribute, which is either tested for
@@ -187,14 +187,14 @@ information.
     `-j`, `--max-jobs` *number*
       Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
 
-`confctl changelog` [*options*] [*host-pattern* [*sw-pattern*]]
+`confctl changelog` [*options*] [*machine-pattern* [*sw-pattern*]]
   Show differences in deployed and configured software pins. For git software
   pins, it's a git log.
 
   By default, `confctl` assumes that the configuration contains upgraded
   software pins, i.e. that the configuration is equal to or ahead of the deployed
-  hosts. `confctl changelog` then prints a lists of changes that are missing from
-  the deployed hosts. Too see a changelog for downgrade, use option
+  machines. `confctl changelog` then prints a lists of changes that are missing
+  from the deployed machines. Too see a changelog for downgrade, use option
   `-d`, `--downgrade`.
 
   `confctl changelog` will not show changes to the deployment configuration
@@ -217,9 +217,9 @@ information.
       of the current configuration.
 
     `-d`, `--downgrade`
-      Use when the configuration has older software pins than deployed hosts,
+      Use when the configuration has older software pins than deployed machines,
       e.g. when doing a downgrade. Show a list of changes that are deployed
-      on the hosts and are missing in the configured software pins.
+      on the machines and are missing in the configured software pins.
 
     `-v`, `--verbose`
       Show full-length changelog descriptions.
@@ -230,14 +230,14 @@ information.
     `-j`, `--max-jobs` *number*
       Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
 
-`confctl diff` [*options*] [*host-pattern* [*sw-pattern*]]
+`confctl diff` [*options*] [*machine-pattern* [*sw-pattern*]]
   Show differences in deployed and configured software pins. For git software
   pins, it's a git diff.
 
   By default, `confctl` assumes that the configuration contains upgraded
   software pins, i.e. that the configuration is equal to or ahead of the deployed
-  hosts. `confctl diff` then considers changes that are missing from the deployed
-  hosts. Too see a diff for downgrade, use option
+  machines. `confctl diff` then considers changes that are missing from the
+  deployed machines. Too see a diff for downgrade, use option
   `-d`, `--downgrade`.
 
   `confctl diff` will not show changes to the deployment configuration
@@ -260,15 +260,15 @@ information.
       of the current configuration.
 
     `-d`, `--downgrade`
-      Use when the configuration has older software pins than deployed hosts,
+      Use when the configuration has older software pins than deployed machines,
       e.g. when doing a downgrade. Show a list of changes that are deployed
-      on the hosts and are missing in the configured software pins.
+      on the machines and are missing in the configured software pins.
 
     `-j`, `--max-jobs` *number*
       Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
 
-`confctl cssh` [*options*] [*host-pattern*]
-  Open ClusterSSH on selected or all hosts.
+`confctl cssh` [*options*] [*machine-pattern*]
+  Open ClusterSSH to selected or all machines.
 
     `--managed` `y`|`yes`|`n`|`no`|`a`|`all`
       The configuration can contain machines which are not managed by confctl
@@ -287,7 +287,7 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
-`confctl generation ls` [*host-pattern* [*generation-pattern*]]
+`confctl generation ls` [*machine-pattern* [*generation-pattern*]]
   List all or selected generations. By default only local build generations
   are listed.
 
@@ -304,9 +304,9 @@ information.
       List build generations.
 
     `-r`, `--remote`
-      List remote generations found on deployed hosts.
+      List remote generations found on deployed machines.
 
-`confctl generation rm` [*host-pattern* [*generation-pattern*|`old`]]
+`confctl generation rm` [*machine-pattern* [*generation-pattern*|`old`]]
   Remove selected generations.
 
   `old` will remove all generations except the current one, i.e. the one that
@@ -327,13 +327,13 @@ information.
       Consider local build generations.
 
     `-r`, `--remote`
-      Consider generations found on deployed hosts.
+      Consider generations found on deployed machines.
 
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
-`confctl generation rotate` [*options*] [*host-pattern*]
-  Delete old build generations of all or selected hosts. Old generations are
+`confctl generation rotate` [*options*] [*machine-pattern*]
+  Delete old build generations of all or selected machines. Old generations are
   deleted based on rules configured in `configs/confctl.nix`.
 
   This command deletes old build generations from `confctl`. To remove them
@@ -355,7 +355,7 @@ information.
       Consider local build generations.
 
     `-r`, `--remote`
-      Consider generations found on deployed hosts.
+      Consider generations found on deployed machines.
 
 `confctl gen-data vpsadmin all`
   Generate all required data files from vpsAdmin API.
