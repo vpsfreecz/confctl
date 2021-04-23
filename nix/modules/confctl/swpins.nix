@@ -3,7 +3,7 @@ with lib;
 let
   swpinOptions = import ../../lib/swpins/options.nix { inherit lib; };
 
-  deploymentSwpinsInfo = pkgs.writeText "swpins-info.json" (builtins.toJSON swpinsInfo);
+  machineSwpinsInfo = pkgs.writeText "swpins-info.json" (builtins.toJSON swpinsInfo);
 in {
   options = {
     confctl = {
@@ -25,7 +25,7 @@ in {
             Core software packages used internally by confctl
 
             It has to contain package <literal>nixpkgs</literal>, which is used
-            to resolve other software pins from channels or cluster deployments.
+            to resolve other software pins from channels or cluster machines.
           '';
         };
 
@@ -50,6 +50,6 @@ in {
   };
 
   config = {
-    environment.etc."confctl/swpins-info.json".source = deploymentSwpinsInfo;
+    environment.etc."confctl/swpins-info.json".source = machineSwpinsInfo;
   };
 }

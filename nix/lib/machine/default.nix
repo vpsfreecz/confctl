@@ -19,7 +19,7 @@ let
   makeImports = spin: extraImports: [
     ({ config, pkgs, lib, confMachine, ... }:
     {
-      _file = "confctl/nix/lib/deployment/default.nix";
+      _file = "confctl/nix/lib/machine/default.nix";
 
       _module.args = {
         inherit confDir;

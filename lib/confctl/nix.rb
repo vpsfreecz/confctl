@@ -37,7 +37,7 @@ module ConfCtl
       nix_instantiate({
         confDir: conf_dir,
         build: :list,
-      })['deployments']
+      })['machines']
     end
 
     # Return machines and their config in a hash
@@ -91,7 +91,7 @@ module ConfCtl
       with_argument({
         confDir: conf_dir,
         build: :evalHostSwpins,
-        deployments: [host],
+        machines: [host],
       }, core_swpins: true) do |arg|
         out_link = File.join(
           cache_dir,
@@ -131,7 +131,7 @@ module ConfCtl
       with_argument({
         confDir: conf_dir,
         build: :toplevel,
-        deployments: hosts,
+        machines: hosts,
       }) do |arg|
         time ||= Time.now
         ret_generations = {}

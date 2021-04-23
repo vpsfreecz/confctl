@@ -7,15 +7,15 @@
 , nixosModules ? [] }:
 with lib;
 let
-  deployments = confLib.getClusterDeployments config.cluster;
+  machines = confLib.getClusterDeployments config.cluster;
 
-  deploymentAttrs = listToAttrs (map (d: nameValuePair d.config.host.fqdn d) deployments);
+  machineAttrs = listToAttrs (map (d: nameValuePair d.config.host.fqdn d) machines);
 
-  netbootable = filterAttrs (k: v: v.config.netboot.enable) deploymentAttrs;
+  netbootable = filterAttrs (k: v: v.config.netboot.enable) machineAttrs;
 
-  filterDeployments = filter: filterAttrs (k: v: filter v) netbootable;
+  filterMachines = filter: filterAttrs (k: v: filter v) netbootable;
 
-  filterNodes = filter: filterDeployments (v: !isNull v.config.node && (filter v));
+  filterNodes = filter: filterMachines (v: !isNull v.config.node && (filter v));
 
   selectNodes = filter: mapAttrs (k: v: nodeImage v) (filterNodes filter);
 

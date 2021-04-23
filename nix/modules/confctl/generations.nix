@@ -43,7 +43,7 @@ with lib;
           type = types.int;
           default = 4;
           description = ''
-            The minimum number of generations to be kept on deployed hosts.
+            The minimum number of generations to be kept on machines.
 
             This is the default value, which can be overriden per host.
           '';
@@ -53,7 +53,7 @@ with lib;
           type = types.int;
           default = 30;
           description = ''
-            The maximum number of generations to be kept on deployed hosts.
+            The maximum number of generations to be kept on machines.
 
             This is the default value, which can be overriden per host.
           '';
@@ -65,7 +65,7 @@ with lib;
           description = ''
             Delete generations older than
             <option>confctl.hostGenerations.maxAge</option> seconds from
-            deployed hosts. Old generations
+            machines. Old generations
             are deleted even if <option>confctl.hostGenerations.max</option> is
             not reached.
 

@@ -32,7 +32,7 @@ let
       };
   };
 
-  deployment =
+  machine =
     { config, ...}:
     {
       options = {
@@ -44,9 +44,9 @@ let
             else if elem config.spin [ "nixos" "vpsadminos" ] then true
             else false;
           description = ''
-            Determines whether the deployment is managed using confctl or not
+            Determines whether the machine is managed using confctl or not
 
-            By default, NixOS and vpsAdminOS deployments are managed by confctl.
+            By default, NixOS and vpsAdminOS machines are managed by confctl.
           '';
         };
 
@@ -61,7 +61,7 @@ let
             default = [];
             description = ''
               List of channels from <option>confctl.swpins.channels</option>
-              to use on this deployment
+              to use on this machine
             '';
           };
 
@@ -69,7 +69,7 @@ let
             type = types.attrsOf (types.submodule swpinOptions.specModule);
             default = {};
             description = ''
-              List of swpins for this deployment, which can supplement or
+              List of swpins for this machine, which can supplement or
               override swpins from configured channels
             '';
           };
@@ -119,7 +119,7 @@ let
           type = types.attrs;
           default = {};
           description = ''
-            Optional user-defined labels to classify the deployment
+            Optional user-defined labels to classify the machine
           '';
         };
 
@@ -127,7 +127,7 @@ let
           type = types.listOf types.str;
           default = [];
           description = ''
-            Optional user-defined tags to classify the deployment
+            Optional user-defined tags to classify the machine
           '';
         };
 
@@ -179,7 +179,7 @@ let
             type = types.nullOr types.int;
             default = null;
             description = ''
-              The minimum number of generations to be kept on the deployed host.
+              The minimum number of generations to be kept on the machine.
             '';
           };
 
@@ -187,7 +187,7 @@ let
             type = types.nullOr types.int;
             default = null;
             description = ''
-              The maximum number of generations to be kept on the deployed host.
+              The maximum number of generations to be kept on the machine.
             '';
           };
 
@@ -197,7 +197,7 @@ let
             description = ''
               Delete generations older than
               <option>cluster.&lt;name&gt;.hostGenerations.maxAge</option>
-              seconds from the deployed host. Old generations are deleted even
+              seconds from the machine. Old generations are deleted even
               if <option>cluster.&lt;name&gt;.hostGenerations.max</option> is
               not reached.
             '';
@@ -431,7 +431,7 @@ let
 in {
   options = {
     cluster = mkOption {
-      type = types.attrsOf (types.submodule deployment);
+      type = types.attrsOf (types.submodule machine);
       default = {};
     };
   };

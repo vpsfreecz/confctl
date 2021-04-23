@@ -10,27 +10,27 @@ let
     else
       import <nixpkgs> {};
 
-  deployments = import ./deployments.nix {
+  machines = import ./machines.nix {
     inherit (arg) confDir;
     inherit corePkgs coreLib;
   };
 
-  nameValuePairs = builtins.map (d: {
-    name = d.name;
+  nameValuePairs = builtins.map (m: {
+    name = m.name;
     value = {
-      inherit (d) name;
-      inherit (d.config) managed spin swpins host addresses netboot labels tags;
-      inherit (d.config) nix buildGenerations hostGenerations;
-      inherit (d.config) container node osNode vzNode;
+      inherit (m) name;
+      inherit (m.config) managed spin swpins host addresses netboot labels tags;
+      inherit (m.config) nix buildGenerations hostGenerations;
+      inherit (m.config) container node osNode vzNode;
     };
-  }) deployments;
+  }) machines;
 
-  deploymentsAttrs = builtins.listToAttrs nameValuePairs;
+  machinesAttrs = builtins.listToAttrs nameValuePairs;
 
-  fullDeploymentsAttrs = builtins.listToAttrs (builtins.map (d: {
-    name = d.name;
-    value = d;
-  }) deployments);
+  fullMachinesAttrs = builtins.listToAttrs (builtins.map (m: {
+    name = m.name;
+    value = m;
+  }) machines);
 
   coreSwpins =
     import ./lib/swpins/eval.nix {
@@ -52,11 +52,11 @@ let
 
   coreLib = corePkgs.lib;
 
-  deploymentSwpins = d:
+  machineSwpins = m:
     import ./lib/swpins/eval.nix {
       inherit (arg) confDir;
-      name = d.name;
-      channels = d.config.swpins.channels;
+      name = m.name;
+      channels = m.config.swpins.channels;
       pkgs = corePkgs.pkgs;
       lib = corePkgs.lib;
     };
@@ -65,25 +65,25 @@ let
 
   selectedSwpinsAttrs = builtins.listToAttrs (builtins.map (host: {
     name = host;
-    value = (deploymentSwpins fullDeploymentsAttrs.${host}).evaluated;
-  }) arg.deployments);
+    value = (machineSwpins fullMachinesAttrs.${host}).evaluated;
+  }) arg.machines);
 
   selectedToplevels = builtins.listToAttrs (builtins.map (host: {
     name = host;
-    value = buildToplevel fullDeploymentsAttrs.${host};
-  }) arg.deployments);
+    value = buildToplevel fullMachinesAttrs.${host};
+  }) arg.machines);
 
-  buildToplevel = d: (evalDeployment d).config.system.build.toplevel;
+  buildToplevel = m: (evalMachine m).config.system.build.toplevel;
 
-  evalDeployment = d:
+  evalMachine = m:
     let
       importPath = {
         nixos = <nixpkgs/nixos/lib/eval-config.nix>;
         vpsadminos = <vpsadminos/os/default.nix>;
       };
 
-      evalConfig = import importPath.${d.config.spin} {
-        modules = [ d.build.toplevel ];
+      evalConfig = import importPath.${m.config.spin} {
+        modules = [ m.build.toplevel ];
       };
     in evalConfig;
 
@@ -123,11 +123,11 @@ let
     # List available nixos module options for documentation purposes
     moduleOptions = docOptions;
 
-    # List of deployment hosts
-    list = { deployments = builtins.map (d: d.name) deployments; };
+    # List of machines
+    list = { machines = builtins.map (m: m.name) machines; };
 
-    # List of deployments in an attrset: host => config
-    info = deploymentsAttrs;
+    # List of machines in an attrset: host => config
+    info = machinesAttrs;
 
     # Nix configuration of swpins channels
     listSwpinsChannels = evalConfctl.config.confctl.swpins.channels;
@@ -135,10 +135,10 @@ let
     # JSON file with core swpins
     evalCoreSwpins = corePkgs.writeText "swpins.json" (builtins.toJSON coreSwpinsAttrs);
 
-    # JSON file with swpins for selected deployments
+    # JSON file with swpins for selected machines
     evalHostSwpins = corePkgs.writeText "swpins.json" (builtins.toJSON selectedSwpinsAttrs);
 
-    # JSON file with system.build.toplevel for selected deployments, this must
+    # JSON file with system.build.toplevel for selected machines, this must
     # be run with proper NIX_PATH with swpins
     toplevel = corePkgs.writeText "toplevels.json" (builtins.toJSON selectedToplevels);
   };

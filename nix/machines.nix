@@ -15,5 +15,5 @@ let
 
   cluster = evalConfig.config.cluster;
 
-  allDeployments = confLib.getClusterDeployments cluster;
-in allDeployments
+  allMachines = confLib.getClusterDeployments cluster;
+in allMachines

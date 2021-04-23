@@ -57,7 +57,7 @@ rec {
             default = false;
             description = ''
               When enabled, the pin is automatically updated to
-              <literal>ref</literal> before building deployments.
+              <literal>ref</literal> before building machines.
             '';
           };
 

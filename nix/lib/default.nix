@@ -1,13 +1,13 @@
 { confDir, coreLib, corePkgs }:
 with coreLib;
 let
-  deployment = import ./deployment { inherit confDir corePkgs coreLib findConfig; };
+  machine = import ./machine { inherit confDir corePkgs coreLib findConfig; };
 
   findConfig =
     { cluster, name }:
     cluster.${name};
 
-  makeDeployment =
+  makeMachine =
     { name, config }:
     {
       inherit name config;
@@ -19,9 +19,9 @@ let
     if !config.managed then
       null
     else if config.spin == "nixos" then
-      deployment.nixos { inherit name config; }
+      machine.nixos { inherit name config; }
     else if config.spin == "vpsadminos" then
-      deployment.vpsadminos { inherit name config; }
+      machine.vpsadminos { inherit name config; }
     else
       null;
 in rec {
@@ -37,10 +37,10 @@ in rec {
 
   inherit findConfig;
 
-  # Return all configured deployments in a list
+  # Return all configured machines in a list
   getClusterDeployments = cluster:
     mapAttrsToList (name: config:
-      makeDeployment { inherit name config; }
+      makeMachine { inherit name config; }
     ) cluster;
 
   # Get IP version addresses from all machines in a cluster
