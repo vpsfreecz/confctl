@@ -39,7 +39,7 @@ module ConfCtl
     protected
     def read_settings
       if @settings.nil?
-        nix = Nix.new(max_jobs: 'auto')
+        nix = Nix.stateless
         @settings = nix.confctl_settings
       end
 

@@ -6,6 +6,13 @@ require 'tempfile'
 
 module ConfCtl
   class Nix
+    # Create a new instance without access to {ConfCtl::Settings}, i.e. when
+    # called outside of cluster configuration directory.
+    # @return [Nix]
+    def self.stateless(show_trace: false, max_jobs: 'auto')
+      new(show_trace: show_trace, max_jobs: max_jobs)
+    end
+
     include Utils::File
 
     def initialize(conf_dir: nil, show_trace: false, max_jobs: nil)

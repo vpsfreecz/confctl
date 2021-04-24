@@ -23,7 +23,7 @@ desc 'Generate man/man8/confctl-options.nix.8.md'
 task 'confctl-options' do
   ConfCtl::Logger.open('rake', output: STDOUT)
 
-  opts = ConfCtl::ModuleOptions.new(nix: ConfCtl::Nix.new(max_jobs: 'auto'))
+  opts = ConfCtl::ModuleOptions.new(nix: ConfCtl::Nix.stateless)
   opts.read
 
   ConfCtl::ErbTemplate.render_to('confctl-options.nix/main', {
