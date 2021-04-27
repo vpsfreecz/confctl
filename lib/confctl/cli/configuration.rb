@@ -10,7 +10,7 @@ module ConfCtl::Cli
       dir = File.realpath(Dir.pwd)
 
       Dir.entries(dir).each do |v|
-        if !%w(. .. shell.nix .gems).include?(v)
+        if !%w(. .. shell.nix .confctl .gems).include?(v)
           fail 'init must be called in an empty directory'
         end
       end
