@@ -64,7 +64,7 @@ from confctl:
 ```
 cd cluster-configuration
 cat > shell.nix <<EOF
-import "/the-location-of-your-confctl-repository/shell.nix"
+import /the-location-of-your-confctl-repository/shell.nix
 EOF
 ```
 
