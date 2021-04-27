@@ -7,7 +7,7 @@ module ConfCtl
   class Logger
     class << self
       %i(open close unlink close_and_unlink io path).each do |v|
-        define_method(v) { |*args, **kwargs| instance.send(v, *args, **kwargs) }
+        define_method(v) { |*args| instance.send(v, *args) }
       end
     end
 
