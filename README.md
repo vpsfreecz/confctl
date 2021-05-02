@@ -39,7 +39,7 @@ EOF
 
   - Alternatively you can symlink `shell.nix` into new directory from confctl instead of importing that file
 ```
-cd ../confctl/shell.nix
+cd cluster-configuration
 ln -s ../confctl/shell.nix shell.nix
 ```
 
