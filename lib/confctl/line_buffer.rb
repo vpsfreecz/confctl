@@ -1,42 +1,52 @@
 module ConfCtl
+  # Feed string data and get output as lines
   class LineBuffer
-    # @yieldparam out [String, nil]
-    # @yieldparam err [String, nil]
+    # If instantiated with a block, the block is invoked for each read line
+    # @yieldparam line [String]
     def initialize(&block)
-      @out_buffer = ''
-      @err_buffer = ''
+      @buffer = ''
       @block = block
     end
 
-    def feed_block
-      Proc.new do |stdout, stderr|
-        out_buffer << stdout if stdout
-        err_buffer << stderr if stderr
+    # Feed string
+    # @param str [String]
+    def <<(str)
+      buffer << str
+      return if block.nil?
 
-        loop do
-          out_line, @out_buffer = get_line(@out_buffer)
-          err_line, @err_buffer = get_line(@err_buffer)
-          break if out_line.nil? && err_line.nil?
+      loop do
+        out_line = get_line
+        break if out_line.nil?
 
-          block.call(out_line, err_line)
-        end
+        block.call(out_line)
       end
     end
 
+    # Read one line if there is one
+    # @return [String, nil]
+    def get_line
+      nl = buffer.index("\n")
+      return if nl.nil?
+
+      line = buffer[0..nl]
+      @buffer = buffer[nl+1..-1]
+      line
+    end
+
+    # Return the buffer's contents and flush it
+    #
+    # If block was given to {LineBuffer}, it will be invoked with the buffer
+    # contents.
+    #
+    # @return [String]
     def flush
-      block.call(out_buffer, err_buffer)
-      out_buffer.clear
-      err_buffer.clear
+      ret = buffer.clone
+      buffer.clear
+      block.call(ret) if block
+      ret
     end
 
     protected
-    attr_reader :out_buffer, :err_buffer, :block
-
-    def get_line(buf)
-      nl = buf.index("\n")
-      return nil, buf if nl.nil?
-
-      [buf[0..nl], buf[nl+1..-1]]
-    end
+    attr_reader :buffer, :block
   end
 end

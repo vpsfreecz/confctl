@@ -18,7 +18,7 @@ module ConfCtl
     def run(&block)
       cmd = SystemCommand.new
 
-      line_buf = LineBuffer.new do |out, err|
+      line_buf = StdLineBuffer.new do |out, err|
         parse_line(err, &block) if err && block
       end
 
