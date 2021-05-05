@@ -563,11 +563,30 @@ module ConfCtl::Cli
 
       puts "#{Rainbow("Build log:").yellow} #{Rainbow(ConfCtl::Logger.path).cyan}"
 
-      grps.each do |hosts, swpin_paths|
+      grps.each_with_index do |grp, i|
+        hosts, swpin_paths = grp
+
         puts Rainbow("Building machines").bright
         hosts.each { |h| puts "  #{h}" }
         puts "with swpins"
         swpin_paths.each { |k, v| puts "  #{k}=#{v}" }
+
+        header = '' \
+          << Rainbow("Build group:").bright \
+          << " #{i+1}/#{grps.length} (#{hosts.length} machines)" \
+          << "\n" \
+          << Rainbow("Full log:   ").bright \
+          << " #{ConfCtl::Logger.relative_path}" \
+          << "\n\n"
+
+        lw = LogView.new(
+          header: header,
+          title: Rainbow("Live view").bright,
+        )
+        lw.start
+
+        lb = ConfCtl::LineBuffer.new { |line| lw << line }
+        ConfCtl::Logger.instance.add_reader(lb)
 
         multibar = TTY::ProgressBar::Multi.new(
           "nix-build [:bar] :current/:total (:percent)",
@@ -582,8 +601,6 @@ module ConfCtl::Cli
           "Fetching [:bar] :current/:total (:percent)",
         )
 
-        multibar.start
-
         built_generations = nix.build_toplevels(
           hosts: hosts,
           swpin_paths: swpin_paths,
@@ -591,19 +608,27 @@ module ConfCtl::Cli
           host_swpin_specs: host_swpin_specs,
         ) do |type, i, n, path|
           if type == :build
-            build_pb.update(total: n) if n > 0 && build_pb.total.nil?
-            build_pb.advance
+            lw.sync_console do
+              build_pb.update(total: n) if n > 0 && build_pb.total.nil?
+              build_pb.advance
+            end
           elsif type == :fetch
-            fetch_pb.update(total: n) if n > 0 && fetch_pb.total.nil?
-            fetch_pb.advance
+            lw.sync_console do
+              fetch_pb.update(total: n) if n > 0 && fetch_pb.total.nil?
+              fetch_pb.advance
+            end
           end
 
           if build_pb.total && fetch_pb.total && multibar.top_bar.total.nil?
-            multibar.top_bar.update(total: multibar.total)
+            lw.sync_console do
+              multibar.top_bar.update(total: multibar.total)
+            end
           end
         end
 
         host_generations.update(built_generations)
+        lw.stop
+        ConfCtl::Logger.instance.remove_reader(lb)
       end
 
       generation_hosts = {}

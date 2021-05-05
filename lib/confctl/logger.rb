@@ -1,4 +1,5 @@
 require 'fileutils'
+require 'pathname'
 require 'pp'
 require 'singleton'
 require 'thread'
@@ -6,7 +7,7 @@ require 'thread'
 module ConfCtl
   class Logger
     class << self
-      %i(open close unlink close_and_unlink io path).each do |v|
+      %i(open close unlink close_and_unlink io path relative_path).each do |v|
         define_method(v) { |*args| instance.send(v, *args) }
       end
     end
@@ -15,6 +16,7 @@ module ConfCtl
 
     def initialize
       @mutex = Mutex.new
+      @readers = []
     end
 
     def open(name, output: nil)
@@ -47,6 +49,14 @@ module ConfCtl
       @io.path
     end
 
+    def relative_path
+      return @relative_path if @relative_path
+
+      abs = Pathname.new(path)
+      dir = Pathname.new(ConfDir.path)
+      abs.relative_path_from(dir).to_s
+    end
+
     def unlink
       fail 'log file not open' if @io.nil?
       File.unlink(@io.path)
@@ -62,6 +72,8 @@ module ConfCtl
         @io << str
         @io.flush
       end
+
+      readers.each { |r| r << str }
     end
 
     def <<(str)
@@ -79,8 +91,18 @@ module ConfCtl
       end
     end
 
+    # @param obj [#<<]
+    def add_reader(obj)
+      @readers << obj
+    end
+
+    # @param obj [#<<]
+    def remove_reader(obj)
+      @readers.delete(obj)
+    end
+
     protected
-    attr_reader :mutex
+    attr_reader :mutex, :readers
 
     def sync
       if mutex.owned?
