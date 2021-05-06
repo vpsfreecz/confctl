@@ -183,6 +183,9 @@ module ConfCtl::Cli
         c.flag 'max-concurrent-copy', arg_name: 'n', type: Integer,
           default_value: 5
 
+        c.desc 'Do not activate copied closures'
+        c.switch 'copy-only', negatable: false
+
         c.desc 'Reboot target systems after deployment'
         c.switch :reboot
 

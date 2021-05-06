@@ -153,6 +153,9 @@ information.
       Use at most *n* concurrent nix-copy-closure processes to deploy closures
       to the target machines. Defaults to `5`.
 
+    `--copy-only`
+      Do not activate the copied closures.
+
     `--reboot`
       Applicable only when *switch-action* is `boot`. Reboot the machine after the
       configuration is activated.

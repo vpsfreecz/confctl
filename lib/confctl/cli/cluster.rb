@@ -258,6 +258,8 @@ module ConfCtl::Cli
         concurrent_copy(machines, host_generations, nix)
       end
 
+      return if opts['copy-only']
+
       host_generations.each do |host, gen|
         if skipped_copy.include?(host)
           puts Rainbow("Copy to #{host} was skipped, skipping activation as well").yellow
@@ -299,6 +301,8 @@ module ConfCtl::Cli
           puts Rainbow("Skipping #{host}").yellow
           next
         end
+
+        next if opts['copy-only']
 
         if deploy_to_host(nix, host, machine, gen.toplevel, action) == :skip
           puts Rainbow("Skipping #{host}").yellow
