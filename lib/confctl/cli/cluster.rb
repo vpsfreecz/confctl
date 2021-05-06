@@ -321,15 +321,27 @@ module ConfCtl::Cli
         return :skip
       end
 
+      lw = LogView.new(
+        header: Rainbow("Copying to").bright + ' ' + host + "\n",
+        title: Rainbow("Live view").bright,
+      )
+      lw.start
+
       pb = TTY::ProgressBar.new(
         "Copying [:bar] :current/:total (:percent)",
         width: 80,
       )
 
       ret = nix.copy(machine, toplevel) do |i, n, path|
-        pb.update(total: n) if pb.total != n
-        pb.advance
+        lw << "[#{i}/#{n}] #{path}"
+
+        lw.sync_console do
+          pb.update(total: n) if pb.total != n
+          pb.advance
+        end
       end
+
+      lw.stop
 
       unless ret
         fail "Error while copying system to #{host}"
@@ -339,6 +351,12 @@ module ConfCtl::Cli
     end
 
     def concurrent_copy(machines, host_generations, nix)
+      lw = LogView.new(
+        header: Rainbow("Copying to #{host_generations.length} machines").bright + "\n",
+        title: Rainbow("Live view").bright,
+      )
+      lw.start
+
       multibar = TTY::ProgressBar::Multi.new(
         "Copying [:bar] :current/:total (:percent)",
         width: 80,
@@ -352,21 +370,29 @@ module ConfCtl::Cli
 
         executor.add do
           ret = nix.copy(machines[host], gen.toplevel) do |i, n, path|
-            if pb.total != n
-              pb.update(total: n)
-              multibar.top_bar.resume if multibar.top_bar.done?
-              multibar.top_bar.update(total: multibar.total)
-            end
+            lw << "#{host}> [#{i}/#{n}] #{path}"
 
-            pb.advance
+            lw.sync_console do
+              if pb.total != n
+                pb.update(total: n)
+                multibar.top_bar.resume if multibar.top_bar.done?
+                multibar.top_bar.update(total: multibar.total)
+              end
+
+              pb.advance
+            end
           end
 
           if !ret
-            pb.format = "#{host}: error occurred"
-            pb.advance
+            lw.sync_console do
+              pb.format = "#{host}: error occurred"
+              pb.advance
+            end
           elsif pb.total.nil?
-            pb.format = "#{host}: nothing to do"
-            pb.advance
+            lw.sync_console do
+              pb.format = "#{host}: nothing to do"
+              pb.advance
+            end
           end
 
           ret ? nil : host
@@ -375,6 +401,7 @@ module ConfCtl::Cli
 
       retvals = executor.run
       failed = retvals.compact
+      lw.stop
 
       if failed.any?
         fail "Copy failed to: #{failed.join(', ')}"
