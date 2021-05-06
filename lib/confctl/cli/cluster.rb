@@ -321,105 +321,94 @@ module ConfCtl::Cli
         return :skip
       end
 
-      lw = LogView.new(
+      LogView.open(
         header: Rainbow("Copying to").bright + ' ' + host + "\n",
         title: Rainbow("Live view").bright,
-      )
-      lw.start
+      ) do |lw|
+        pb = TTY::ProgressBar.new(
+          "Copying [:bar] :current/:total (:percent)",
+          width: 80,
+        )
 
-      pb = TTY::ProgressBar.new(
-        "Copying [:bar] :current/:total (:percent)",
-        width: 80,
-      )
+        ret = nix.copy(machine, toplevel) do |i, n, path|
+          lw << "[#{i}/#{n}] #{path}"
 
-      ret = nix.copy(machine, toplevel) do |i, n, path|
-        lw << "[#{i}/#{n}] #{path}"
-
-        lw.sync_console do
-          pb.update(total: n) if pb.total != n
-          pb.advance
+          lw.sync_console do
+            pb.update(total: n) if pb.total != n
+            pb.advance
+          end
         end
-      end
 
-      lw.stop
-
-      unless ret
-        fail "Error while copying system to #{host}"
+        unless ret
+          fail "Error while copying system to #{host}"
+        end
       end
 
       true
     end
 
     def concurrent_copy(machines, host_generations, nix)
-      lw = LogView.new(
+      LogView.open(
         header: Rainbow("Copying to #{host_generations.length} machines").bright + "\n",
         title: Rainbow("Live view").bright,
-      )
-      lw.start
-
-      multibar = TTY::ProgressBar::Multi.new(
-        "Copying [:bar] :current/:total (:percent)",
-        width: 80,
-      )
-      executor = ConfCtl::ParallelExecutor.new(opts['max-concurrent-copy'])
-
-      host_generations.each do |host, gen|
-        pb = multibar.register(
-          "#{host} [:bar] :current/:total (:percent)"
+      ) do |lw|
+        multibar = TTY::ProgressBar::Multi.new(
+          "Copying [:bar] :current/:total (:percent)",
+          width: 80,
         )
+        executor = ConfCtl::ParallelExecutor.new(opts['max-concurrent-copy'])
 
-        executor.add do
-          ret = nix.copy(machines[host], gen.toplevel) do |i, n, path|
-            lw << "#{host}> [#{i}/#{n}] #{path}"
+        host_generations.each do |host, gen|
+          pb = multibar.register(
+            "#{host} [:bar] :current/:total (:percent)"
+          )
 
-            lw.sync_console do
-              if pb.total != n
-                pb.update(total: n)
-                multibar.top_bar.resume if multibar.top_bar.done?
-                multibar.top_bar.update(total: multibar.total)
+          executor.add do
+            ret = nix.copy(machines[host], gen.toplevel) do |i, n, path|
+              lw << "#{host}> [#{i}/#{n}] #{path}"
+
+              lw.sync_console do
+                if pb.total != n
+                  pb.update(total: n)
+                  multibar.top_bar.resume if multibar.top_bar.done?
+                  multibar.top_bar.update(total: multibar.total)
+                end
+
+                pb.advance
               end
-
-              pb.advance
             end
+
+            if !ret
+              lw.sync_console do
+                pb.format = "#{host}: error occurred"
+                pb.advance
+              end
+            elsif pb.total.nil?
+              lw.sync_console do
+                pb.format = "#{host}: nothing to do"
+                pb.advance
+              end
+            end
+
+            ret ? nil : host
           end
-
-          if !ret
-            lw.sync_console do
-              pb.format = "#{host}: error occurred"
-              pb.advance
-            end
-          elsif pb.total.nil?
-            lw.sync_console do
-              pb.format = "#{host}: nothing to do"
-              pb.advance
-            end
-          end
-
-          ret ? nil : host
         end
-      end
 
-      retvals = executor.run
-      failed = retvals.compact
-      lw.stop
+        retvals = executor.run
+        failed = retvals.compact
 
-      if failed.any?
-        fail "Copy failed to: #{failed.join(', ')}"
+        if failed.any?
+          fail "Copy failed to: #{failed.join(', ')}"
+        end
       end
     end
 
     def deploy_to_host(nix, host, machine, toplevel, action)
-      lw = LogView.new(
+      LogView.open_with_logger(
         header: "#{Rainbow("Deploying to").bright} #{Rainbow(host).yellow}\n",
         title: Rainbow("Live view").bright,
         size: 15,
-      )
-      lw.start
-
-      lb = ConfCtl::LineBuffer.new { |line| lw << line }
-      ConfCtl::Logger.instance.add_reader(lb)
-
-      begin
+      ) do |lw|
         if opts['dry-activate-first']
           lw.sync_console do
             puts Rainbow(
@@ -451,10 +440,6 @@ module ConfCtl::Cli
         if %w(boot switch).include?(action) && !nix.set_profile(machine, toplevel)
           fail "Error while setting profile on #{host}"
         end
-
-      ensure
-        ConfCtl::Logger.instance.remove_reader(lb)
-        lw.stop
       end
     end
 
@@ -615,32 +600,59 @@ module ConfCtl::Cli
       time = Time.now
 
       puts "#{Rainbow("Build log:").yellow} #{Rainbow(ConfCtl::Logger.path).cyan}"
+      puts
 
       grps.each_with_index do |grp, i|
         hosts, swpin_paths = grp
 
-        puts Rainbow("Building machines").bright
-        hosts.each { |h| puts "  #{h}" }
-        puts "with swpins"
-        swpin_paths.each { |k, v| puts "  #{k}=#{v}" }
-
-        header = '' \
-          << Rainbow("Build group:").bright \
-          << " #{i+1}/#{grps.length} (#{hosts.length} machines)" \
-          << "\n" \
-          << Rainbow("Full log:   ").bright \
-          << " #{ConfCtl::Logger.relative_path}" \
-          << "\n\n"
-
-        lw = LogView.new(
-          header: header,
-          title: Rainbow("Live view").bright,
+        built_generations = do_build_group(
+          i,
+          grps.length,
+          hosts,
+          swpin_paths,
+          host_swpin_specs,
+          nix,
+          time,
         )
-        lw.start
 
-        lb = ConfCtl::LineBuffer.new { |line| lw << line }
-        ConfCtl::Logger.instance.add_reader(lb)
+        host_generations.update(built_generations)
+      end
 
+      generation_hosts = {}
+
+      host_generations.each do |host, gen|
+        generation_hosts[gen.name] ||= []
+        generation_hosts[gen.name] << host
+      end
+
+      puts
+      puts Rainbow("Built generations:").bright
+      generation_hosts.each do |gen, hosts|
+        puts Rainbow(gen).cyan
+        hosts.each { |host| puts "  #{host}" }
+      end
+
+      host_generations
+    end
+
+    def do_build_group(i, n, hosts, swpin_paths, host_swpin_specs, nix, time)
+      puts Rainbow("Building machines").bright
+      hosts.each { |h| puts "  #{h}" }
+      puts "with swpins"
+      swpin_paths.each { |k, v| puts "  #{k}=#{v}" }
+
+      header = '' \
+        << Rainbow("Build group:").bright \
+        << " #{i+1}/#{n} (#{hosts.length} machines)" \
+        << "\n" \
+        << Rainbow("Full log:   ").bright \
+        << " #{ConfCtl::Logger.relative_path}" \
+        << "\n\n"
+
+      LogView.open_with_logger(
+        header: header,
+        title: Rainbow("Live view").bright,
+      ) do |lw|
         multibar = TTY::ProgressBar::Multi.new(
           "nix-build [:bar] :current/:total (:percent)",
           width: 80,
@@ -679,26 +691,8 @@ module ConfCtl::Cli
           end
         end
 
-        host_generations.update(built_generations)
-        lw.stop
-        ConfCtl::Logger.instance.remove_reader(lb)
+        built_generations
       end
-
-      generation_hosts = {}
-
-      host_generations.each do |host, gen|
-        generation_hosts[gen.name] ||= []
-        generation_hosts[gen.name] << host
-      end
-
-      puts
-      puts Rainbow("Built generations:").bright
-      generation_hosts.each do |gen, hosts|
-        puts Rainbow(gen).cyan
-        hosts.each { |host| puts "  #{host}" }
-      end
-
-      host_generations
     end
 
     def autoupdate_swpins(machines)

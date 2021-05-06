@@ -13,6 +13,37 @@ module ConfCtl::Cli
       CONSOLE_LOCK.synchronize(&block)
     end
 
+    # Instantiate {LogView}, yield and then cleanup
+    # @yieldparam log_view [LogView]
+    def self.open(*args)
+      lw = new(*args)
+      lw.start
+
+      begin
+        yield(lw)
+      ensure
+        lw.stop
+      end
+    end
+
+    # Instantiate {LogView} with feed from {ConfCtl::Logger}, yield
+    # and then cleanup
+    # @yieldparam log_view [LogView]
+    def self.open_with_logger(*args)
+      lw = new(*args)
+      lw.start
+
+      lb = ConfCtl::LineBuffer.new { |line| lw << line }
+      ConfCtl::Logger.instance.add_reader(lb)
+
+      begin
+        yield(lw)
+      ensure
+        ConfCtl::Logger.instance.remove_reader(lb)
+        lw.stop
+      end
+    end
+
     # @param header [String]
     #   optional string outputted above the box, must have new lines
     # @param title [String]
