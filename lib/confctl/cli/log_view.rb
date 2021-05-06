@@ -117,7 +117,9 @@ module ConfCtl::Cli
         break if stop?
 
         sync_outlines do
-          outlines << line
+          # TABs have variable width, there's no way to correctly determine
+          # their size, so we replace them with spaces.
+          outlines << line.gsub("\t", "  ")
           outlines.shift if outlines.length > size
           @generation += 1
         end
@@ -215,8 +217,8 @@ module ConfCtl::Cli
     end
 
     def fit_line(line)
-      if line.length >= (cols - 6)
-        line[0..(cols-6)] + "..."
+      if line.length >= (cols - 4)
+        line[0..(cols-4)] + "..."
       else
         line
       end
