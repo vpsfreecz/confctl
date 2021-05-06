@@ -409,26 +409,52 @@ module ConfCtl::Cli
     end
 
     def deploy_to_host(nix, host, machine, toplevel, action)
-      if opts['dry-activate-first']
-        puts Rainbow("Trying to activate configuration on #{host} (#{machine.target_host})").yellow
+      lw = LogView.new(
+        header: "#{Rainbow("Deploying to").bright} #{Rainbow(host).yellow}\n",
+        title: Rainbow("Live view").bright,
+        size: 15,
+      )
+      lw.start
 
-        unless nix.activate(machine, toplevel, 'dry-activate')
+      lb = ConfCtl::LineBuffer.new { |line| lw << line }
+      ConfCtl::Logger.instance.add_reader(lb)
+
+      begin
+        if opts['dry-activate-first']
+          lw.sync_console do
+            puts Rainbow(
+              "Trying to activate configuration on #{host} "+
+              "(#{machine.target_host})"
+            ).yellow
+          end
+
+          unless nix.activate(machine, toplevel, 'dry-activate')
+            fail "Error while activating configuration on #{host}"
+          end
+        end
+
+        lw.sync_console do
+          puts Rainbow(
+            "Activating configuration on #{host} (#{machine.target_host}): "+
+            "#{action}"
+          ).yellow
+        end
+
+        if opts[:interactive] && !ask_confirmation(always: true)
+          return :skip
+        end
+
+        unless nix.activate(machine, toplevel, action)
           fail "Error while activating configuration on #{host}"
         end
-      end
 
-      puts Rainbow("Activating configuration on #{host} (#{machine.target_host}): #{action}").yellow
+        if %w(boot switch).include?(action) && !nix.set_profile(machine, toplevel)
+          fail "Error while setting profile on #{host}"
+        end
 
-      if opts[:interactive] && !ask_confirmation(always: true)
-        return :skip
-      end
-
-      unless nix.activate(machine, toplevel, action)
-        fail "Error while activating configuration on #{host}"
-      end
-
-      if %w(boot switch).include?(action) && !nix.set_profile(machine, toplevel)
-        fail "Error while setting profile on #{host}"
+      ensure
+        ConfCtl::Logger.instance.remove_reader(lb)
+        lw.stop
       end
     end
 
