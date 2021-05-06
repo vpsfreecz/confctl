@@ -50,7 +50,8 @@ module ConfCtl::Cli
     #   optional box title
     # @param size [Integer]
     #   number of lines to show
-    def initialize(header: nil, title: nil, size: 10)
+    # @param output [IO]
+    def initialize(header: nil, title: nil, size: 10, output: STDOUT)
       @cursor = TTY::Cursor
       @outmutex = Mutex.new
       @inlines = Queue.new
@@ -58,6 +59,8 @@ module ConfCtl::Cli
       @header = header
       @title = title || 'Log'
       @size = size
+      @output = output
+      @enabled = output.respond_to?(:tty?) && output.tty?
       @resized = false
       @stop = false
       @generation = 0
@@ -65,6 +68,9 @@ module ConfCtl::Cli
     end
 
     def start
+      return unless enabled?
+
+      @stop = false
       fetch_size
       init
       render_inplace(outlines)
@@ -78,6 +84,8 @@ module ConfCtl::Cli
     end
 
     def stop
+      return if @stop || !enabled?
+
       @stop = true
       inlines.clear
       inlines << :stop
@@ -94,8 +102,12 @@ module ConfCtl::Cli
       self.class.sync_console(&block)
     end
 
+    def enabled?
+      @enabled
+    end
+
     protected
-    attr_reader :cursor, :outmutex, :inlines, :outlines, :size,
+    attr_reader :output, :cursor, :outmutex, :inlines, :outlines, :size,
       :feeder, :renderer, :rows, :cols, :header, :title,
       :generation, :rendered
 
@@ -132,7 +144,7 @@ module ConfCtl::Cli
         if do_render
           sync_console do
             if resized?
-              print cursor.clear_screen
+              output.print(cursor.clear_screen)
               @resized = false
             end
 
@@ -147,18 +159,18 @@ module ConfCtl::Cli
 
     def init
       sync_console do
-        rows.times { puts }
-        print cursor.clear_screen
-        print cursor.move_to
+        rows.times { output.puts }
+        output.print(cursor.clear_screen)
+        output.print(cursor.move_to)
       end
     end
 
     def render_scoped(lines)
       sync_console do
-        print cursor.save
-        print cursor.move_to
+        output.print(cursor.save)
+        output.print(cursor.move_to)
         render_inplace(lines)
-        print cursor.restore
+        output.print(cursor.restore)
       end
     end
 
@@ -166,28 +178,28 @@ module ConfCtl::Cli
       sync_console do
         if header
           header.each_line do |line|
-            print cursor.clear_line
-            print line
+            output.print(cursor.clear_line)
+            output.print(line)
           end
         end
 
-        print cursor.clear_line
-        puts title_bar(title)
+        output.print(cursor.clear_line)
+        output.puts(title_bar(title))
 
         size.times do |i|
-          print cursor.clear_line
+          output.print(cursor.clear_line)
 
           if lines[i].nil?
-            puts
+            output.puts
             next
           end
 
-          puts(fit_line(lines[i]))
+          output.puts(fit_line(lines[i]))
         end
 
-        print cursor.clear_line
-        puts '<' + '-' * (cols-1)
-        puts
+        output.print(cursor.clear_line)
+        output.puts('<' + '-' * (cols-1))
+        output.puts
       end
     end
 
