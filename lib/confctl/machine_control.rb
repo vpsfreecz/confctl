@@ -100,7 +100,7 @@ module ConfCtl
 
     # @param script [String]
     def bash_script(script)
-      cmd.run('bash', '--norc', input: script)
+      run_cmd('bash', '--norc', input: script)
     end
 
     protected
