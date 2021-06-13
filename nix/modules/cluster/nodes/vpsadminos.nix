@@ -73,15 +73,6 @@ let
           example = { address = "10.0.0.100"; prefix = 32; };
         };
       };
-
-      serial = {
-        enable = mkEnableOption "Enable serial console output";
-        baudRate = mkOption {
-          type = types.ints.positive;
-          description = "Serial baudrate";
-          default = 115200;
-        };
-      };
     };
   };
 
