@@ -51,4 +51,33 @@ in rec {
         map (addr: machine // addr) machine.config.addresses.${"v${toString v}"}
       ) machines);
     in addresses;
+
+  mkOptions = {
+    addresses = v:
+      { config, ... }:
+      {
+        options = {
+          address = mkOption {
+            type = types.str;
+            description = "IPv${toString v} address";
+          };
+
+          prefix = mkOption {
+            type = types.ints.positive;
+            description = "Prefix length";
+          };
+
+          string = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            apply = v:
+              if isNull v then
+                "${config.address}/${toString config.prefix}"
+              else
+                v;
+            description = "Address with prefix as string";
+          };
+        };
+      };
+  };
 }

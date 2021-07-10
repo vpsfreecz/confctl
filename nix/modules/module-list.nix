@@ -5,7 +5,6 @@ let
     ./confctl/cli.nix
     ./confctl/nix.nix
     ./confctl/swpins.nix
-    ./service-definitions.nix
   ];
 
   nixos = [

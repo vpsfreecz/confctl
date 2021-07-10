@@ -95,21 +95,22 @@ for a full-featured cluster configuration.
 ## Configuration directory structure
 `confctl` configurations should adhere to the following structure:
 
-    cluster-configuration/     # Configuration root
-    ├── cluster/               # Machine configurations
-    │   ├── <name>/            # Single machine, can be nested directories
-    │   │   ├── config.nix     # Standard NixOS system configuration
-    │   │   └── module.nix     # Config with machine metadata used by confctl
-    │   ├── cluster.nix        # confctl-generated list of machines
-    │   └── module-list.nix    # List of all machine modules (including those in cluster.nix)
-    ├── configs/               # confctl and other user-defined configs
-    │   ├── confctl.nix        # Configuration for the confctl tool itself
-    │   └── swpins.nix         # User-defined software pin channels
-    ├── data/                  # User-defined datasets available in machine configurations as confData
-    ├── environments/          # Environment presets for various types of machines, optional
-    ├── modules/               # User-defined modules
-    ├── swpins/                # confctl-generated software pins configuration
-    └── shell.nix              # Nix expression for nix-shell
+    cluster-configuration/      # Configuration root
+    ├── cluster/                # Machine configurations
+    │   ├── <name>/             # Single machine, can be nested directories
+    │   │   ├── config.nix      # Standard NixOS system configuration
+    │   │   └── module.nix      # Config with machine metadata used by confctl
+    │   ├── cluster.nix         # confctl-generated list of machines
+    │   └── module-list.nix     # List of all machine modules (including those in cluster.nix)
+    ├── configs/                # confctl and other user-defined configs
+    │   ├── confctl.nix         # Configuration for the confctl tool itself
+    │   └── swpins.nix          # User-defined software pin channels
+    ├── data/                   # User-defined datasets available in machine configurations as confData
+    ├── environments/           # Environment presets for various types of machines, optional
+    ├── modules/                # User-defined modules
+    │   └── cluster/default.nix # User-defined extensions of `cluster.` options used in `<machine>/module.nix` files
+    ├── swpins/                 # confctl-generated software pins configuration
+    └── shell.nix               # Nix expression for nix-shell
 
 ## Software pins
 Software pins in confctl allow you to use specific revisions of
@@ -308,3 +309,39 @@ The `confctl` utility itself can be configured using `configs/confctl.nix`:
   };
 }
 ```
+
+## Extending machine metadata
+To define your own options to be used within the `cluster.<name>` modules in
+`cluster/<machine>/module.nix` files, create file `modules/cluster/default.nix`,
+e.g.:
+
+```nix
+{ config, lib, ... }:
+with lib;
+let
+  myMachine =
+    { config, ... }:
+    {
+      options = {
+        myParameter = mkOption { ... };
+      };
+    };
+in {
+  options = {
+    cluster = mkOption {
+      type = types.attrsOf (types.submodule myMachine);
+    };
+  };
+}
+```
+
+Then you can use it in machine module as:
+
+```nix
+cluster."my-machine" = {
+  myParameter = "1234";
+};
+```
+
+Note that these modules are self-contained. They are not evaluated with the full
+set of NixOS modules. You have to import modules that you need.

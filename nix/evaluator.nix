@@ -19,10 +19,7 @@ let
     name = m.name;
     value = {
       inherit (m) name;
-      inherit (m.config) managed spin swpins host addresses netboot labels tags;
-      inherit (m.config) nix buildGenerations hostGenerations;
-      inherit (m.config) container node osNode vzNode;
-    };
+    } // m.config;
   }) machines;
 
   machinesAttrs = builtins.listToAttrs nameValuePairs;
@@ -102,19 +99,38 @@ let
     "cluster."
     "confctl."
     "services.netboot."
-    "serviceDefinitions."
   ];
 
   filterOption = o:
     !o.internal && builtins.any (top: nixpkgs.lib.hasPrefix top o.name) docToplevels;
 
-  docModules = evalNixosModules (import ./modules/module-list.nix).all;
+  docModules =
+    let
+      userModules = "${toString arg.confDir}/modules/cluster/default.nix";
+    in evalNixosModules (
+      (import ./modules/module-list.nix).all
+      ++
+      (nixpkgs.lib.optional (builtins.pathExists userModules) userModules)
+    );
 
   docOptions =
     builtins.filter filterOption (nixpkgs.lib.optionAttrSetToDocList docModules.options);
 
   evalNixosModules = modules:
-    import <nixpkgs/nixos/lib/eval-config.nix> { inherit modules; };
+    import <nixpkgs/nixos/lib/eval-config.nix> {
+      modules = modules ++ [
+        ({ ... }:
+        {
+          _module.args = {
+            confLib = import ./lib {
+              confDir = "${toString arg.confDir}";
+              coreLib = nixpkgs.lib;
+              corePkgs = nixpkgs.pkgs;
+            };
+          };
+        })
+      ];
+    };
 
   build = {
     # confctl settings
