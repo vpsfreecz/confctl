@@ -39,7 +39,6 @@ let
         system = "x86_64-linux";
         configuration = {};
         modules = modules;
-        inherit vpsadmin;
       };
 
   vpsadminos = {modules ? [], ...}@args: vpsadminosCustom {
