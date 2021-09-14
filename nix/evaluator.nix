@@ -98,7 +98,6 @@ let
   docToplevels = [
     "cluster."
     "confctl."
-    "services.netboot."
   ];
 
   filterOption = o:

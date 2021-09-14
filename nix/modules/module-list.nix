@@ -8,7 +8,6 @@ let
   ];
 
   nixos = [
-    ./services/netboot.nix
   ];
 
   vpsadminos = [
