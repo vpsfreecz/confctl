@@ -49,7 +49,7 @@ module ConfCtl::Cli
     end
 
     def vpsadmin_network
-      network_containers
+      vpsadmin_network_containers
     end
 
     def vpsadmin_network_containers
