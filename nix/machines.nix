@@ -24,7 +24,6 @@ let
     prefix = [];
     check = true;
     modules = baseModules;
-    args = {};
   };
 
   cluster = evalConfig.config.cluster;
