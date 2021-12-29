@@ -22,7 +22,6 @@ let
 
   evalConfig = corePkgs.lib.evalModules {
     prefix = [];
-    check = true;
     modules = baseModules;
   };
 
