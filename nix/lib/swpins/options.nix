@@ -6,8 +6,13 @@ rec {
     {
       options = {
         type = mkOption {
-          type = types.enum [ "git" "git-rev" ];
+          type = types.enum [ "directory" "git" "git-rev" ];
           default = "git";
+        };
+
+        directory = mkOption {
+          type = types.nullOr (types.submodule directorySpec);
+          default = null;
         };
 
         git = mkOption {
@@ -18,6 +23,20 @@ rec {
         git-rev = mkOption {
           type = types.nullOr (types.submodule gitSpec);
           default = null;
+        };
+      };
+    };
+
+  directorySpec =
+    { config, ... }:
+    {
+      options = {
+        path = mkOption {
+          type = types.str;
+          description = ''
+            Absolute path to the directory
+          '';
+          example = "/opt/my-swpin";
         };
       };
     };

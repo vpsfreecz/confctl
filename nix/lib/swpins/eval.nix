@@ -30,6 +30,9 @@ let
     fetchers.${fetcher.type} fetcher.options;
 
   fetchers = rec {
+    directory = opts:
+      opts.path;
+
     git = opts:
       let
         filter = lib.filterAttrs (k: v: builtins.elem k [
