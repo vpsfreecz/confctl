@@ -10,8 +10,28 @@ module ConfCtl
       get.pattern(pattern)
     end
 
+    def self.refresh
+      get.refresh
+    end
+
     # @param pattern [String]
     def initialize(pattern: '*')
+      parse(pattern: pattern)
+    end
+
+    # @param pattern [String]
+    # @return [Array<Swpins::Channel>]
+    def pattern(pattern)
+      select { |c| Pattern.match?(pattern, c.name) }
+    end
+
+    def refresh
+      clear
+      parse
+    end
+
+    protected
+    def parse(pattern: '*')
       nix = Nix.new
       nix.list_swpins_channels.each do |name, nix_specs|
         next unless Pattern.match?(pattern, name)
@@ -19,12 +39,6 @@ module ConfCtl
         c.parse
         self << c
       end
-    end
-
-    # @param pattern [String]
-    # @return [Array<Swpins::Channel>]
-    def pattern(pattern)
-      select { |c| Pattern.match?(pattern, c.name) }
     end
   end
 end

@@ -702,6 +702,7 @@ module ConfCtl::Cli
     def autoupdate_swpins(machines)
       puts Rainbow("Running swpins auto updates...").bright
       channels_update = []
+      any_updated = false
 
       core = ConfCtl::Swpins::Core.get
 
@@ -730,7 +731,10 @@ module ConfCtl::Cli
           end
         end
 
-        c.save if updated
+        if updated
+          c.save
+          any_updated = true
+        end
       end
 
       core_updated = false
@@ -759,7 +763,14 @@ module ConfCtl::Cli
           end
         end
 
-        cn.save if updated
+        if updated
+          cn.save
+          any_updated = true
+        end
+      end
+
+      if any_updated || core_updated
+        ConfCtl::Swpins::ChannelList.refresh
       end
     end
 
