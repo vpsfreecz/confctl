@@ -656,6 +656,8 @@ module ConfCtl::Cli
       LogView.open_with_logger(
         header: header,
         title: Rainbow("Live view").bright,
+        size: :auto,
+        reserved_lines: 10,
       ) do |lw|
         multibar = TTY::ProgressBar::Multi.new(
           "nix-build [:bar] :current/:total (:percent)",

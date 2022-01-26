@@ -48,10 +48,12 @@ module ConfCtl::Cli
     #   optional string outputted above the box, must have new lines
     # @param title [String]
     #   optional box title
-    # @param size [Integer]
+    # @param size [Integer, :auto]
     #   number of lines to show
+    # @param reserved_lines [Integer]
+    #   number of reserved lines below the box when `size` is `:auto`
     # @param output [IO]
-    def initialize(header: nil, title: nil, size: 10, output: STDOUT)
+    def initialize(header: nil, title: nil, size: 10, reserved_lines: 0, output: STDOUT)
       @cursor = TTY::Cursor
       @outmutex = Mutex.new
       @inlines = Queue.new
@@ -59,6 +61,8 @@ module ConfCtl::Cli
       @header = header
       @title = title || 'Log'
       @size = size
+      @current_size = size if size != :auto
+      @reserved_lines = reserved_lines
       @output = output
       @enabled = output.respond_to?(:tty?) && output.tty?
       @resized = false
@@ -108,7 +112,7 @@ module ConfCtl::Cli
 
     protected
     attr_reader :output, :cursor, :outmutex, :inlines, :outlines, :size,
-      :feeder, :renderer, :rows, :cols, :header, :title,
+      :current_size, :reserved_lines, :feeder, :renderer, :rows, :cols, :header, :title,
       :generation, :rendered
 
     def feeder_loop
@@ -120,7 +124,7 @@ module ConfCtl::Cli
           # TABs have variable width, there's no way to correctly determine
           # their size, so we replace them with spaces.
           outlines << line.gsub("\t", "  ")
-          outlines.shift if outlines.length > size
+          outlines.shift while outlines.length > current_size
           @generation += 1
         end
       end
@@ -188,7 +192,7 @@ module ConfCtl::Cli
         output.print(cursor.clear_line)
         output.puts(title_bar(title))
 
-        size.times do |i|
+        current_size.times do |i|
           output.print(cursor.clear_line)
 
           if lines[i].nil?
@@ -226,6 +230,13 @@ module ConfCtl::Cli
 
     def fetch_size
       @rows, @cols = IO.console.winsize
+
+      if size == :auto
+        new_size = rows
+        new_size -= header.lines.count if header
+        new_size -= reserved_lines
+        @current_size = [new_size, 10].max
+      end
     end
 
     def sync_outlines(&block)
