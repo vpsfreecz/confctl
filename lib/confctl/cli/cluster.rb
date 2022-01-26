@@ -646,6 +646,9 @@ module ConfCtl::Cli
       swpin_paths.each { |k, v| puts "  #{k}=#{v}" }
 
       header = '' \
+        << Rainbow("Command:").bright \
+        << " #{format_command(10)}" \
+        << "\n" \
         << Rainbow("Build group:").bright \
         << " #{i+1}/#{n} (#{hosts.length} machines)" \
         << "\n" \
@@ -894,6 +897,18 @@ module ConfCtl::Cli
         else
           raise GLI::BadCommandLine, 'invalid value of --wait-online'
         end
+    end
+
+    def format_command(reserved_cols = 0)
+      cmd = "#{$0.split('/').last} #{ARGV.join(' ')}"
+      _, cols = IO.console.winsize
+      max_length = cols - reserved_cols
+
+      if cmd.length > max_length
+        cmd[0..(max_length - 4)] + "..."
+      else
+        cmd
+      end
     end
 
     def format_duration(interval)
