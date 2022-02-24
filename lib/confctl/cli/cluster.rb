@@ -215,6 +215,37 @@ module ConfCtl::Cli
       end
     end
 
+    def test_connection
+      machines = select_machines_with_managed(args[0])
+
+      ask_confirmation! do
+        puts "Test SSH connection to the following machines:"
+        list_machines(machines)
+      end
+
+      succeeded = []
+      failed = []
+
+      machines.each do |host, machine|
+        mc = ConfCtl::MachineControl.new(machine)
+
+        begin
+          mc.test_connection
+          succeeded << host
+        rescue TTY::Command::ExitError => e
+          puts "Unable to connect to #{host}: #{e.message}"
+          puts
+          failed << host
+        end
+      end
+
+      puts
+      puts "Result: #{succeeded.length} successful, #{failed.length} failed"
+      puts
+      puts "Failed machines:"
+      failed.each { |host| puts "  #{host}" }
+    end
+
     def cssh
       machines = select_machines_with_managed(args[0])
 

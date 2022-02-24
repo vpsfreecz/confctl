@@ -10,6 +10,16 @@ module ConfCtl
       @cmd = SystemCommand.new
     end
 
+    # Try to open SSH connection
+    # @raise [TTY::Command::ExitError]
+    def test_connection
+      with_ssh_opts(
+        '-o', 'ConnectTimeout=3',
+        '-o', 'ServerAliveInterval=3',
+        '-o', 'ServerAliveCountMax=1',
+      ) { get_uptime }
+    end
+
     # Reboot the machine
     def reboot
       execute!('reboot')

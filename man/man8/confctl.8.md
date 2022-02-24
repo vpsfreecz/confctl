@@ -270,6 +270,27 @@ information.
     `-j`, `--max-jobs` *number*
       Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
 
+`confctl test-connection` [*options*] [*machine-pattern*]
+  Try to open a SSH connection to the selected machines. This command can be
+  used to confirm SSH host keys of the selected machines.
+
+    `--managed` `y`|`yes`|`n`|`no`|`a`|`all`
+      The configuration can contain machines which are not managed by confctl
+      and are there just for reference. This option determines what kind of
+      machines should be selected.
+
+    `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
+      Filter machines by selected attribute, which is either tested for
+      equality or inequality. Any attribute from configuration module
+      `cluster.<name>` can be tested.
+
+    `-t`, `--tag` *tag*|`^`*tag*
+      Filter machines that have *tag* set. If the tag begins with `^`, then
+      filter machines that do not have *tag* set.
+
+    `-y`, `--yes`
+      Do not ask for confirmation on standard input, assume the answer is yes.
+
 `confctl cssh` [*options*] [*machine-pattern*]
   Open ClusterSSH to selected or all machines.
 

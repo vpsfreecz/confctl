@@ -267,6 +267,24 @@ module ConfCtl::Cli
         c.action &Command.run(c, Cluster, :diff)
       end
 
+      desc 'Test SSH connection'
+      arg_name '[machine-pattern]'
+      command :'test-connection' do |c|
+        c.desc 'Filter (un)managed machines'
+        c.flag :managed, must_match: %w(y yes n no a all)
+
+        c.desc 'Filter by attribute'
+        c.flag %i(a attr), multiple: true
+
+        c.desc 'Filter by tag'
+        c.flag %i(t tag), multiple: true
+
+        c.desc 'Assume the answer to confirmations is yes'
+        c.switch %w(y yes)
+
+        c.action &Command.run(c, Cluster, :test_connection)
+      end
+
       desc 'Open ClusterSSH'
       arg_name '[machine-pattern]'
       command :cssh do |c|
