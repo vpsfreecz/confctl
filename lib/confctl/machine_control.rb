@@ -1,3 +1,5 @@
+require 'etc'
+
 module ConfCtl
   class MachineControl
     # @return [Machine]
@@ -18,6 +20,14 @@ module ConfCtl
         '-o', 'ServerAliveInterval=3',
         '-o', 'ServerAliveCountMax=1',
       ) { get_uptime }
+    end
+
+    def interactive_shell
+      if machine.localhost?
+        Kernel.system(Etc.getpwuid(0).shell)
+      else
+        Kernel.system(*ssh_args)
+      end
     end
 
     # Reboot the machine
@@ -99,13 +109,13 @@ module ConfCtl
 
     # Execute command, raises exception on error
     # @raise [TTY::Command::ExitError]
-    def execute(*command)
-      run_cmd(*command)
+    def execute(*command, **options)
+      run_cmd(*command, **options)
     end
 
     # Execute command, no exception raised on error
-    def execute!(*command)
-      run_cmd!(*command)
+    def execute!(*command, **options)
+      run_cmd!(*command, **options)
     end
 
     # @param script [String]

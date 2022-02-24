@@ -285,6 +285,36 @@ module ConfCtl::Cli
         c.action &Command.run(c, Cluster, :test_connection)
       end
 
+      desc 'Run command over SSH'
+      arg_name '[machine-pattern [command [arguments...]]]'
+      command :ssh do |c|
+        c.desc 'Filter (un)managed machines'
+        c.flag :managed, must_match: %w(y yes n no a all)
+
+        c.desc 'Filter by attribute'
+        c.flag %i(a attr), multiple: true
+
+        c.desc 'Filter by tag'
+        c.flag %i(t tag), multiple: true
+
+        c.desc 'Assume the answer to confirmations is yes'
+        c.switch %w(y yes)
+
+        c.desc 'Run command in parallel on all machines at once'
+        c.switch %i(p parallel)
+
+        c.desc 'Aggregate identical command output'
+        c.switch %i(g aggregate)
+
+        c.desc 'Data passed to standard input'
+        c.flag %i(i input-string)
+
+        c.desc 'File passed to standard input'
+        c.flag %i(f input-file)
+
+        c.action &Command.run(c, Cluster, :ssh)
+      end
+
       desc 'Open ClusterSSH'
       arg_name '[machine-pattern]'
       command :cssh do |c|

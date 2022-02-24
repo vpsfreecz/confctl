@@ -98,6 +98,10 @@ module ConfCtl::Cli
       Signal.trap('WINCH', 'DEFAULT')
     end
 
+    def flush
+      sleep(1)
+    end
+
     def <<(line)
       inlines << line.strip
     end

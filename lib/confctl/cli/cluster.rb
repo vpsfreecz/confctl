@@ -246,6 +246,25 @@ module ConfCtl::Cli
       failed.each { |host| puts "  #{host}" }
     end
 
+    def ssh
+      machines = select_machines_with_managed(args[0])
+
+      if opts['input-string'] && opts['input-file']
+        raise GLI::BadCommandLine, 'use one of --input-string or --input-file'
+      end
+
+      if args.length == 1
+        if machines.length == 1
+          run_ssh_interactive(machines)
+          return
+        else
+          raise GLI::BadCommandLine, 'missing command'
+        end
+      end
+
+      run_ssh_command(machines, args[1..-1])
+    end
+
     def cssh
       machines = select_machines_with_managed(args[0])
 
@@ -520,6 +539,147 @@ module ConfCtl::Cli
         end
 
         puts Rainbow("#{host} (#{machine.target_host}) is online (took #{secs.round(1)}s to reboot)").yellow
+      end
+    end
+
+    def run_ssh_interactive(machines)
+      raise ArgumentError if machines.length != 1
+
+      ask_confirmation! do
+        puts "Open interactive shell on the following machine:"
+        list_machines(machines)
+      end
+
+      machines.each do |host, machine|
+        mc = ConfCtl::MachineControl.new(machine)
+        mc.interactive_shell
+        return
+      end
+    end
+
+    def run_ssh_command(machines, cmd)
+      ask_confirmation! do
+        puts "Run command over SSH on the following machines:"
+        list_machines(machines)
+        puts
+        puts "Command: #{cmd.map(&:inspect).join(' ')}"
+      end
+
+      if opts[:parallel]
+        run_ssh_command_in_parallel(machines, cmd)
+      else
+        run_ssh_command_one_by_one(machines, cmd)
+      end
+    end
+
+    def run_ssh_command_one_by_one(machines, cmd)
+      aggregate = opts[:aggregate]
+      results = {}
+
+      machines.each do |host, machine|
+        mc = ConfCtl::MachineControl.new(machine)
+
+        begin
+          puts "#{host}:" unless aggregate
+
+          result = run_ssh_command_on_machine(mc, cmd)
+
+          if aggregate
+            results[host] = result
+          else
+            puts result.out
+          end
+        rescue TTY::Command::ExitError => e
+          if aggregate
+            results[host] = e
+          else
+            puts "#{e.message}"
+          end
+        end
+
+        puts unless aggregate
+      end
+
+      return unless aggregate
+
+      process_aggregated_results(results)
+    end
+
+    def run_ssh_command_in_parallel(machines, cmd)
+      aggregate = opts[:aggregate]
+      results = {}
+      tw = ConfCtl::ParallelExecutor.new(machines.length)
+
+      LogView.open_with_logger(
+        header: Rainbow("Executing").bright + " #{cmd.join(' ')}\n",
+        title: Rainbow("Live view").bright,
+        size: :auto,
+        reserved_lines: 10,
+      ) do |lw|
+        pb = TTY::ProgressBar.new(
+          "Command [:bar] :current/:total (:percent)",
+          width: 80,
+          total: machines.length,
+        )
+
+        machines.each do |host, machine|
+          tw.add do
+            mc = ConfCtl::MachineControl.new(machine)
+
+            begin
+              result = run_ssh_command_on_machine(mc, cmd)
+              results[host] = result
+            rescue TTY::Command::ExitError => e
+              results[host] = e
+            end
+
+            lw.sync_console { pb.advance }
+          end
+        end
+
+        tw.run
+        lw.flush
+      end
+
+      if aggregate
+        process_aggregated_results(results)
+        return
+      end
+
+      results.each do |host, result|
+        puts "#{host}:"
+        puts result.out
+        puts
+      end
+    end
+
+    def run_ssh_command_on_machine(mc, cmd)
+      cmd_opts = {err: :out}
+
+      if opts['input-string']
+        cmd_opts[:input] = opts['input-string']
+      elsif opts['input-file']
+        cmd_opts[:in] = opts['input-file']
+      end
+
+      mc.execute(*cmd, **cmd_opts)
+    end
+
+    def process_aggregated_results(results)
+      groups = {}
+
+      results.each do |host, result|
+        key = [result.exit_status, result.out]
+        groups[key] ||= []
+        groups[key] << host
+      end
+
+      groups.each do |key, hosts|
+        exit_status, out = key
+        puts "#{hosts.sort.join(', ')}:"
+        puts "Exit status: #{exit_status}"
+        puts out
+        puts
       end
     end
 

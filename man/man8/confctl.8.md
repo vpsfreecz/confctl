@@ -291,6 +291,42 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
+`confctl ssh` [*options*] [*machine-pattern* [*command* [*arguments...*]]]
+  Run command over SSH on the selected machines. If *machine-pattern* matches
+  only one machine and no *command* is provided, an interactive shell is started.
+
+    `--managed` `y`|`yes`|`n`|`no`|`a`|`all`
+      The configuration can contain machines which are not managed by confctl
+      and are there just for reference. This option determines what kind of
+      machines should be selected.
+
+    `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
+      Filter machines by selected attribute, which is either tested for
+      equality or inequality. Any attribute from configuration module
+      `cluster.<name>` can be tested.
+
+    `-t`, `--tag` *tag*|`^`*tag*
+      Filter machines that have *tag* set. If the tag begins with `^`, then
+      filter machines that do not have *tag* set.
+
+    `-y`, `--yes`
+      Do not ask for confirmation on standard input, assume the answer is yes.
+
+    `-p`, `--parallel`
+      Run the command on all machines in parallel. By default, the command is run
+      on machines sequentially.
+
+    `-g`, `--aggregate`
+      If the command has the same output and exit status on a group of one or more
+      machines, print it just once for the group. This option suppresses output
+      until the command has been run on all machines.
+
+    `-i`, `--input-string` *data*
+      Data passed to the executed command on standard input.
+
+    `-f`, `--input-file` *file*
+      Pass *file* as standard input to the executed command.
+
 `confctl cssh` [*options*] [*machine-pattern*]
   Open ClusterSSH to selected or all machines.
 
