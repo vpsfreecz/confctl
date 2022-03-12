@@ -26,7 +26,7 @@ module ConfCtl::Cli
     end
 
     def set
-      require_args!('cluster-name', 'sw', 'version...')
+      require_args!('cluster-name', 'sw', 'version...', strict: false)
       cluster_names = []
 
       each_cluster_name_spec(args[0], args[1]) do |cluster_name, spec|

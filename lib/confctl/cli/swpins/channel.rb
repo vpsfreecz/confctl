@@ -25,7 +25,7 @@ module ConfCtl::Cli
     end
 
     def set
-      require_args!('channel-pattern', 'sw-pattern', 'version...')
+      require_args!('channel-pattern', 'sw-pattern', 'version...', strict: false)
       channels = []
 
       each_channel_spec(args[0], args[1]) do |chan, spec|

@@ -29,7 +29,7 @@ module ConfCtl::Cli
     end
 
     def set
-      require_args!('sw', 'version...')
+      require_args!('sw', 'version...', strict: false)
 
       core = ConfCtl::Swpins::Core.get
 
