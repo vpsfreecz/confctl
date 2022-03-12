@@ -33,8 +33,7 @@ module ConfCtl::Cli
         if spec.from_channel?
           puts "Skipping #{spec.name} as it comes from channel #{spec.channel}"
         else
-          puts "Configuring #{spec.name} in #{cluster_name.name}"
-          spec.prefetch_set(args[2..-1])
+          spec_set_msg(cluster_name, spec) { spec.prefetch_set(args[2..-1]) }
           cluster_names << cluster_name unless cluster_names.include?(cluster_name)
         end
       end
@@ -49,8 +48,7 @@ module ConfCtl::Cli
         if spec.from_channel?
           puts "Skipping #{spec.name} as it comes from channel #{spec.channel}"
         elsif spec.can_update?
-          puts "Updating #{spec.name} in #{cluster_name.name}"
-          spec.prefetch_update
+          spec_update_msg(cluster_name, spec) { spec.prefetch_update }
           cluster_names << cluster_name unless cluster_names.include?(cluster_name)
         else
           puts "#{spec.name} not configured for update"
