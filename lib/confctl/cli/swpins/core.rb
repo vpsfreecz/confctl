@@ -46,6 +46,7 @@ module ConfCtl::Cli
     end
 
     def update
+      require_args!(optional: %w(sw))
       core = ConfCtl::Swpins::Core.get
 
       core.specs.each do |name, spec|

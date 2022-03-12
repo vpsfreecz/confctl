@@ -42,6 +42,7 @@ module ConfCtl::Cli
     end
 
     def update
+      require_args!(optional: %w(cluster-name sw))
       cluster_names = []
 
       each_cluster_name_spec(args[0] || '*', args[1] || '*') do |cluster_name, spec|

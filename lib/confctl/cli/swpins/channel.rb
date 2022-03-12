@@ -37,6 +37,7 @@ module ConfCtl::Cli
     end
 
     def update
+      require_args!(optional: %w(channel-pattern sw-pattern))
       channels = []
 
       each_channel_spec(args[0] || '*', args[1] || '*') do |chan, spec|
