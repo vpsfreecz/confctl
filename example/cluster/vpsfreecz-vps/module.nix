@@ -2,7 +2,7 @@
 {
   cluster."vpsfreecz-vps" = {
     spin = "nixos";
-    swpins.channels = [ "nixos-unstable" "vpsadminos-master" ];
+    swpins.channels = [ "nixos-unstable" "vpsadminos-staging" ];
     host.target = "<ip address>";
   };
 }

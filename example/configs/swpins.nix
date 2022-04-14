@@ -23,6 +23,6 @@ in {
 
     # nixos-stable = { nixpkgs = nixpkgsBranch "nixos-20.09"; };
 
-    vpsadminos-master = { vpsadminos = vpsadminosBranch "master"; };
+    vpsadminos-staging = { vpsadminos = vpsadminosBranch "staging"; };
   };
 }
