@@ -158,14 +158,14 @@ Software pin channels are defined in file `confctl/swpins.nix`:
       };
     };
 
-    # Channel for vpsAdminOS master
-    vpsadminos-master = {
+    # Channel for vpsAdminOS staging
+    vpsadminos-staging = {
       vpsadminos = {
         type = "git-rev";
 
         git-rev = {
           url = "https://github.com/vpsfreecz/vpsadminos";
-          update.ref = "refs/heads/master";
+          update.ref = "refs/heads/staging";
 	  update.auto = true;
         };
       };
@@ -184,7 +184,7 @@ in JSON files in the `swpins/` directory.
 $ confctl swpins channel ls
 CHANNEL             SW           TYPE      PIN
 nixos-unstable      nixpkgs      git-rev   1f77a4c8
-vpsadminos-master   vpsadminos   git-rev   9c9a7bcb
+vpsadminos-staging  vpsadminos   git-rev   9c9a7bcb
 
 # Update channels with update.auto = true to reference in update.ref
 $ confctl swpins channel update
