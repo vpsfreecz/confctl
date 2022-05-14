@@ -461,7 +461,8 @@ module ConfCtl::Cli
       LogView.open_with_logger(
         header: "#{Rainbow("Deploying to").bright} #{Rainbow(host).yellow}\n",
         title: Rainbow("Live view").bright,
-        size: 15,
+        size: :auto,
+        reserved_lines: 10,
       ) do |lw|
         if opts['dry-activate-first']
           lw.sync_console do
