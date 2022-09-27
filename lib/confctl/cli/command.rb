@@ -73,11 +73,20 @@ module ConfCtl::Cli
       return true if !always && opts[:yes]
 
       yield if block_given?
-      STDOUT.write("\nContinue? [y/N]: ")
-      STDOUT.flush
-      ret = STDIN.readline.strip.downcase == 'y'
-      puts
-      ret
+
+      loop do
+        STDOUT.write("\nContinue? [y/N]: ")
+        STDOUT.flush
+
+        case STDIN.readline.strip.downcase
+        when 'y'
+          puts
+          return true
+        when 'n'
+          puts
+          return false
+        end
+      end
     end
 
     def ask_confirmation!(**kwargs, &block)
