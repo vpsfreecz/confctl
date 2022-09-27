@@ -28,6 +28,8 @@ module ConfCtl::Cli
     def build
       machines = select_machines(args[0]).managed
 
+      fail 'No machines to build' if machines.empty?
+
       ask_confirmation! do
         puts "The following machines will be built:"
         list_machines(machines)
@@ -51,6 +53,8 @@ module ConfCtl::Cli
 
         parse_wait_online
       end
+
+      fail 'No machines to deploy' if machines.empty?
 
       ask_confirmation! do
         puts "The following machines will be deployed:"
@@ -78,6 +82,7 @@ module ConfCtl::Cli
 
     def status
       machines = select_machines(args[0]).managed
+      fail 'No machines to check' if machines.empty?
 
       ask_confirmation! do
         if opts[:generation]
@@ -217,6 +222,7 @@ module ConfCtl::Cli
 
     def test_connection
       machines = select_machines_with_managed(args[0])
+      fail 'No machines to test' if machines.empty?
 
       ask_confirmation! do
         puts "Test SSH connection to the following machines:"
@@ -248,6 +254,7 @@ module ConfCtl::Cli
 
     def ssh
       machines = select_machines_with_managed(args[0])
+      fail 'No machines to ssh to' if machines.empty?
 
       if opts['input-string'] && opts['input-file']
         raise GLI::BadCommandLine, 'use one of --input-string or --input-file'
@@ -267,6 +274,7 @@ module ConfCtl::Cli
 
     def cssh
       machines = select_machines_with_managed(args[0])
+      fail 'No machines to open cssh to' if machines.empty?
 
       ask_confirmation! do
         puts "Open cssh to the following machines:"

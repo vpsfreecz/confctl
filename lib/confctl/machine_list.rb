@@ -50,6 +50,10 @@ module ConfCtl
       @machines.length
     end
 
+    def empty?
+      @machines.empty?
+    end
+
     protected
     attr_reader :opts, :machines
 
