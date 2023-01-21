@@ -417,6 +417,10 @@ module ConfCtl::Cli
         end
       end
 
+      ConfCtl::UserScripts.each do |script|
+        script.setup_cli(self)
+      end
+
       on_error do |exception|
         log = ConfCtl::Logger.instance
         warn "\nLog file: #{log.path}" if log.open?

@@ -37,5 +37,9 @@ module ConfCtl
     def self.log_dir
       @log_dir ||= File.join(cache_dir, 'logs')
     end
+
+    def self.user_script_dir
+      @user_script_dir ||= File.join(path, 'scripts')
+    end
   end
 end

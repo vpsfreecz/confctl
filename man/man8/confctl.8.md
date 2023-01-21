@@ -137,6 +137,15 @@ information.
     `-g`, `--generation` *generation*|`current`
       Do not build a new generation, but deploy an existing generation.
 
+    `--outdated`
+      Run `confctl status` and deploy only outdated machines. `confctl` will
+      first build machines described by *machine-pattern* and then check
+      their status.
+
+    `--outdated-swpins`
+      Run `confctl status -g none` and deploy only machines that have outdated
+      software pins.
+
     `-i`, `--interactive`
       Deploy machines one by one while asking for confirmation for activation.
 
@@ -470,6 +479,32 @@ information.
 `confctl swpins reconfigure`
   Regenerate all confctl-managed software pin files according to the Nix
   configuration.
+
+## USER-DEFINED COMMANDS
+User-defined Ruby scripts can be placed in directory `scripts`. Each script
+should create a subclass of `ConfCtl::UserScript` and call class-method `register`.
+Scripts can define their own `confctl` subcommands.
+
+### Example user script
+
+```
+class MyScript < ConfCtl::UserScript
+  register
+
+  def setup_cli(app)
+    app.desc 'My CLI command'
+    app.command 'my-command' do |c|
+      c.action &ConfCtl::Cli::Command.run(c, MyCommand, :run)
+    end
+  end
+end
+
+class MyCommand < ConfCtl::Cli::Command
+  def run
+    puts 'Hello world'
+  end
+end
+```
 
 ## SEE ALSO
 confctl-options.nix(8)

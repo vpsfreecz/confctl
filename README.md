@@ -109,6 +109,7 @@ for a full-featured cluster configuration.
     ├── environments/           # Environment presets for various types of machines, optional
     ├── modules/                # User-defined modules
     │   └── cluster/default.nix # User-defined extensions of `cluster.` options used in `<machine>/module.nix` files
+    ├── scripts/                # User-defined scripts
     ├── swpins/                 # confctl-generated software pins configuration
     └── shell.nix               # Nix expression for nix-shell
 
@@ -345,3 +346,29 @@ cluster."my-machine" = {
 
 Note that these modules are self-contained. They are not evaluated with the full
 set of NixOS modules. You have to import modules that you need.
+
+## User-defined confctl commands 
+User-defined Ruby scripts can be placed in directory `scripts`. Each script
+should create a subclass of `ConfCtl::UserScript` and call class-method `register`.
+Scripts can define their own `confctl` subcommands.
+
+### Example user script
+
+```ruby
+class MyScript < ConfCtl::UserScript
+  register
+
+  def setup_cli(app)
+    app.desc 'My CLI command'
+    app.command 'my-command' do |c|
+      c.action &ConfCtl::Cli::Command.run(c, MyCommand, :run)
+    end
+  end
+end
+
+class MyCommand < ConfCtl::Cli::Command
+  def run
+    puts 'Hello world'
+  end
+end
+```
