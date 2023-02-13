@@ -1,4 +1,5 @@
 require_relative 'command'
+require_relative '../hook'
 require 'json'
 require 'rainbow'
 require 'tty-pager'
@@ -7,6 +8,8 @@ require 'tty-spinner'
 
 module ConfCtl::Cli
   class Cluster < Command
+    ConfCtl::Hook.register :cluster_deploy
+
     def list
       if opts[:list]
         prefix = 'cluster.<name>.'
@@ -63,6 +66,13 @@ module ConfCtl::Cli
         puts "Generation: #{opts[:generation] || 'new build'}"
         puts "Target action: #{action}#{opts[:reboot] ? ' + reboot' : ''}"
       end
+
+      ConfCtl::Hook.call(:cluster_deploy, kwargs: {
+        machines: machines,
+        generation: opts[:generation],
+        action: opts[:action],
+        opts: opts,
+      })
 
       host_generations =
         if opts[:generation]
