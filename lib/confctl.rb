@@ -38,3 +38,4 @@ require_rel 'confctl/utils'
 require_rel 'confctl/generation'
 
 ConfCtl::UserScripts.load_scripts
+ConfCtl::UserScripts.setup_all

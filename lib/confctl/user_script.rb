@@ -4,6 +4,11 @@ module ConfCtl
       UserScripts.register(self)
     end
 
+    # @param hooks [Hook]
+    def setup_hooks(hooks)
+
+    end
+
     # @param app [GLI::App]
     def setup_cli(app)
 

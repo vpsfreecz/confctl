@@ -22,6 +22,12 @@ module ConfCtl
       @scripts << klass.new
     end
 
+    def self.setup_all
+      each do |script|
+        script.setup_hooks(Hook)
+      end
+    end
+
     # @return [Array<UserScript>]
     def self.get
       (@scripts || [])
