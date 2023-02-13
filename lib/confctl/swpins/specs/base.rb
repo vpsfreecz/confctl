@@ -99,7 +99,7 @@ module ConfCtl
     # @option opts [Boolean] :verbose
     # @option opts [Boolean] :patch
     # @return [String, nil]
-    def string_changelog_info(type, other_info, opts = {})
+    def string_changelog_info(type, other_info, **opts)
       raise NotImplementedError
     end
 
@@ -109,7 +109,7 @@ module ConfCtl
     # @param opts [Hash] options
     # @option opts [Boolean] :color
     # @return [String, nil]
-    def string_diff_info(type, other_info, opts = {})
+    def string_diff_info(type, other_info, **opts)
       raise NotImplementedError
     end
 

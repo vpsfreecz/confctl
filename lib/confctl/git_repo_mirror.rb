@@ -43,11 +43,11 @@ module ConfCtl
 
     # @param from_ref [String]
     # @param to_ref [String]
-    def diff(from_ref, to_ref)
+    def diff(from_ref, to_ref, opts: [])
       ret = "git diff for #{from_ref}..#{to_ref}\n"
       ret << git_repo(
         'diff',
-        opts: [],
+        opts: opts,
         args: ["#{from_ref}..#{to_ref}"]
       )
       ret

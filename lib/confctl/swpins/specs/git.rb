@@ -64,7 +64,7 @@ module ConfCtl
       end
     end
 
-    def string_diff_info(type, other_info, opts = {})
+    def string_diff_info(type, other_info, color: false, **opts)
       gitopts = []
       gitopts << '--color=always' if color
 
