@@ -41,6 +41,22 @@ module ConfCtl
       # summary lines are printed. Therefore we report progress with total=0
       # (indeterminate) until the total becomes known.
 
+      # Nix >= around 2.11
+      if /^this derivation will be built:/ =~ line
+        @build_total = 1
+        return
+      elsif /^these (\d+) derivations will be built:/ =~ line
+        @build_total = $1.to_i
+        return
+      elsif /^this path will be fetched / =~ line
+        @fetch_total = 1
+        return
+      elsif /^these (\d+) paths will be fetched / =~ line
+        @fetch_total = $1.to_i
+        return
+      end
+
+      # Nix < around 2.11, we can drop this in the future
       if /^these derivations will be built:/ =~ line
         @in_derivation_list = true
         @in_fetch_list = false
