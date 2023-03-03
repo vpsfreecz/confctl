@@ -89,10 +89,20 @@ module ConfCtl::Cli
         end
       end
 
+      select_old = pattern == 'old'
+      select_older_than =
+        if !select_old && /\A(\d+)d\Z/ =~ pattern
+          Time.now - ($1.to_i * 24*60*60)
+        else
+          nil
+        end
+
       if pattern
         gens.delete_if do |gen|
-          if pattern == 'old'
+          if select_old
             gen.current
+          elsif select_older_than
+            gen.date >= select_older_than
           else
             !ConfCtl::Pattern.match?(pattern, gen.name)
           end

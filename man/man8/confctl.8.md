@@ -356,7 +356,7 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
-`confctl generation ls` [*machine-pattern* [*generation-pattern*]]
+`confctl generation ls` [*machine-pattern* [*generation-pattern*]|*n*`d`|`old`]
   List all or selected generations. By default only local build generations
   are listed.
 
@@ -375,8 +375,10 @@ information.
     `-r`, `--remote`
       List remote generations found on deployed machines.
 
-`confctl generation rm` [*machine-pattern* [*generation-pattern*|`old`]]
+`confctl generation rm` [*machine-pattern* [*generation-pattern*|*n*`d`|`old`]]
   Remove selected generations.
+
+  *n*`d` will remove generations older than *n* days.
 
   `old` will remove all generations except the current one, i.e. the one that
   was built by `confctl build` the last.
