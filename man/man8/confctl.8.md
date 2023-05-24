@@ -176,6 +176,24 @@ information.
     `-j`, `--max-jobs` *number*
       Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
 
+`confctl health-check` [*options*] [*machine-pattern*]
+  Run health checks on all or selected machines.
+
+    `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
+      Filter machines by selected attribute, which is either tested for
+      equality or inequality. Any attribute from configuration module
+      `cluster.<name>` can be tested.
+
+    `-t`, `--tag` *tag*|`^`*tag*
+      Filter machines that have *tag* set. If the tag begins with `^`, then
+      filter machines that do not have *tag* set.
+
+    `-y`, `--yes`
+      Do not ask for confirmation on standard input, assume the answer is yes.
+
+    `-j`, `--max-jobs` *number*
+      Maximum number of check jobs, defaults to `5`.
+
 `confctl status` [*options*] [*machine-pattern*]
   Probe managed machines and determine their status.
 

@@ -1,4 +1,4 @@
-# confctl-options.nix 8           2021-07-10                             master
+# confctl-options.nix 8           2023-05-24                             master
 
 ## NAME
 `confctl-options.nix` - confctl configuration documentation
@@ -89,7 +89,7 @@ within the deployment configuration directory:
   Names correspond to options within `cluster.<name>`
   module.
 
-    *Type:* list of strings
+    *Type:* list of string
 
     *Default:* `["host.fqdn" "name" "spin"]`
 
@@ -99,7 +99,7 @@ within the deployment configuration directory:
   Maximum number of build jobs, passed to `nix-build`
   commands.
 
-    *Type:* null or signed integer or one of "auto"
+    *Type:* null or signed integer or value "auto" (singular enum)
 
     *Default:* `null`
 
@@ -110,7 +110,7 @@ within the deployment configuration directory:
   `NIX_PATH` for all `nix-build`
   invokations
 
-    *Type:* list of strings
+    *Type:* list of string
 
     *Default:* `[]`
 
@@ -125,17 +125,37 @@ in `configs/swpins.nix` within the deployment configuration directory:
 `confctl.swpins.channels`
   Software pin channels
 
-    *Type:* attribute set of attribute set of submoduless
+    *Type:* attribute set of attribute set of (submodule)
 
     *Default:* `{
 }`
 
     *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
+`confctl.swpins.channels.<name>.<name>.directory`
+  This option has no description.
+
+    *Type:* null or (submodule)
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
+
+`confctl.swpins.channels.<name>.<name>.directory.path`
+  Absolute path to the directory
+
+    *Type:* string
+
+    *Default:* `null`
+
+    *Example:* `"/opt/my-swpin"`
+
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
+
 `confctl.swpins.channels.<name>.<name>.git`
   This option has no description.
 
-    *Type:* null or submodule
+    *Type:* null or (submodule)
 
     *Default:* `null`
 
@@ -195,7 +215,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 `confctl.swpins.channels.<name>.<name>.git-rev`
   This option has no description.
 
-    *Type:* null or submodule
+    *Type:* null or (submodule)
 
     *Default:* `null`
 
@@ -255,7 +275,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 `confctl.swpins.channels.<name>.<name>.type`
   This option has no description.
 
-    *Type:* one of "git", "git-rev"
+    *Type:* one of "directory", "git", "git-rev"
 
     *Default:* `"git"`
 
@@ -265,7 +285,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
   List of channels from `confctl.swpins.channels`
   to use for core swpins
 
-    *Type:* list of strings
+    *Type:* list of string
 
     *Default:* `[]`
 
@@ -277,7 +297,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
   It has to contain package `nixpkgs`, which is used
   to resolve other software pins from channels or cluster machines.
 
-    *Type:* attribute set of submodules
+    *Type:* attribute set of (submodule)
 
     *Default:* `{
   nixpkgs = {
@@ -295,10 +315,30 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
+`confctl.swpins.core.pins.<name>.directory`
+  This option has no description.
+
+    *Type:* null or (submodule)
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
+
+`confctl.swpins.core.pins.<name>.directory.path`
+  Absolute path to the directory
+
+    *Type:* string
+
+    *Default:* `null`
+
+    *Example:* `"/opt/my-swpin"`
+
+    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
+
 `confctl.swpins.core.pins.<name>.git`
   This option has no description.
 
-    *Type:* null or submodule
+    *Type:* null or (submodule)
 
     *Default:* `null`
 
@@ -358,7 +398,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 `confctl.swpins.core.pins.<name>.git-rev`
   This option has no description.
 
-    *Type:* null or submodule
+    *Type:* null or (submodule)
 
     *Default:* `null`
 
@@ -418,7 +458,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 `confctl.swpins.core.pins.<name>.type`
   This option has no description.
 
-    *Type:* one of "git", "git-rev"
+    *Type:* one of "directory", "git", "git-rev"
 
     *Default:* `"git"`
 
@@ -433,7 +473,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 `cluster.<name>.addresses`
   IP addresses
 
-    *Type:* null or submodule
+    *Type:* null or (submodule)
 
     *Default:* `null`
 
@@ -444,7 +484,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
   
   Defaults to the first IPv4 address if not set
 
-    *Type:* null or submodule
+    *Type:* null or (submodule)
 
     *Default:* `null`
 
@@ -480,7 +520,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 `cluster.<name>.addresses.v4`
   List of IPv4 addresses this machine responds to
 
-    *Type:* list of submodules
+    *Type:* list of (submodule)
 
     *Default:* `[]`
 
@@ -516,7 +556,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 `cluster.<name>.addresses.v6`
   List of IPv6 addresses this machine responds to
 
-    *Type:* list of submodules
+    *Type:* list of (submodule)
 
     *Default:* `[]`
 
@@ -582,10 +622,82 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
+`cluster.<name>.healthChecks.systemd.enable`
+  Enable systemd checks, enabled by default
+
+    *Type:* boolean
+
+    *Default:* `true`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.systemd.systemProperties`
+  Check systemd manager properties reported by systemctl show
+
+    *Type:* list of (submodule)
+
+    *Default:* `[{
+  property = "SystemState";
+  value = "running";
+}]`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.systemd.systemProperties.*.property`
+  systemd property name
+
+    *Type:* string
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.systemd.systemProperties.*.value`
+  value to be checked
+
+    *Type:* string
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.systemd.unitProperties`
+  Check systemd unit properties reported by systemctl show <unit>
+
+    *Type:* attribute set of list of (submodule)
+
+    *Default:* `{
+}`
+
+    *Example:* `{
+  _type = "literalExpression";
+  text = "{\n  \"firewall.service\" = [\n    { property = \"ActiveState\"; value = \"active\"; }\n  ];\n}\n";
+}`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.systemd.unitProperties.<name>.*.property`
+  systemd property name
+
+    *Type:* string
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.systemd.unitProperties.<name>.*.value`
+  value to be checked
+
+    *Type:* string
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
 `cluster.<name>.host`
   This option has no description.
 
-    *Type:* null or submodule
+    *Type:* null or (submodule)
 
     *Default:* `null`
 
@@ -711,7 +823,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 `cluster.<name>.netboot.macs`
   List of MAC addresses for iPXE node auto-detection
 
-    *Type:* list of strings
+    *Type:* list of string
 
     *Default:* `[]`
 
@@ -721,7 +833,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
   List of extra paths added to environment variable
   `NIX_PATH` for `nix-build`
 
-    *Type:* list of strings
+    *Type:* list of string
 
     *Default:* `[]`
 
@@ -740,7 +852,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
   List of channels from `confctl.swpins.channels`
   to use on this machine
 
-    *Type:* list of strings
+    *Type:* list of string
 
     *Default:* `[]`
 
@@ -750,17 +862,37 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
   List of swpins for this machine, which can supplement or
   override swpins from configured channels
 
-    *Type:* attribute set of submodules
+    *Type:* attribute set of (submodule)
 
     *Default:* `{
 }`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
+`cluster.<name>.swpins.pins.<name>.directory`
+  This option has no description.
+
+    *Type:* null or (submodule)
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.swpins.pins.<name>.directory.path`
+  Absolute path to the directory
+
+    *Type:* string
+
+    *Default:* `null`
+
+    *Example:* `"/opt/my-swpin"`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
 `cluster.<name>.swpins.pins.<name>.git`
   This option has no description.
 
-    *Type:* null or submodule
+    *Type:* null or (submodule)
 
     *Default:* `null`
 
@@ -820,7 +952,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 `cluster.<name>.swpins.pins.<name>.git-rev`
   This option has no description.
 
-    *Type:* null or submodule
+    *Type:* null or (submodule)
 
     *Default:* `null`
 
@@ -880,7 +1012,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 `cluster.<name>.swpins.pins.<name>.type`
   This option has no description.
 
-    *Type:* one of "git", "git-rev"
+    *Type:* one of "directory", "git", "git-rev"
 
     *Default:* `"git"`
 
@@ -889,7 +1021,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 `cluster.<name>.tags`
   Optional user-defined tags to classify the machine
 
-    *Type:* list of strings
+    *Type:* list of string
 
     *Default:* `[]`
 

@@ -156,6 +156,43 @@ let
             '';
           };
         };
+
+        healthChecks = {
+          systemd = {
+            enable = mkOption {
+              type = types.bool;
+              default = true;
+              description = ''
+                Enable systemd checks, enabled by default
+              '';
+            };
+
+            systemProperties = mkOption {
+              type = types.listOf (types.submodule systemdProperty);
+              default = [
+                { property = "SystemState"; value = "running"; }
+              ];
+              description = ''
+                Check systemd manager properties reported by systemctl show
+              '';
+            };
+
+            unitProperties = mkOption {
+              type = types.attrsOf (types.listOf (types.submodule systemdProperty));
+              default = {};
+              example = literalExpression ''
+                {
+                  "firewall.service" = [
+                    { property = "ActiveState"; value = "active"; }
+                  ];
+                }
+              '';
+              description = ''
+                Check systemd unit properties reported by systemctl show <unit>
+              '';
+            };
+          };
+        };
       };
     };
 
@@ -266,6 +303,22 @@ let
           description = ''
             Address/host to which the configuration is deployed to
           '';
+        };
+      };
+    };
+
+  systemdProperty =
+    { config, ... }:
+    {
+      options = {
+        property = mkOption {
+          type = types.str;
+          description = "systemd property name";
+        };
+
+        value = mkOption {
+          type = types.str;
+          description = "value to be checked";
         };
       };
     };

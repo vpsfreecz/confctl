@@ -197,6 +197,24 @@ module ConfCtl::Cli
         c.action &Command.run(c, Cluster, :deploy)
       end
 
+      desc 'Run machine health-checks'
+      arg_name '[machine-pattern]'
+      command :'health-check' do |c|
+        c.desc 'Filter by attribute'
+        c.flag %i(a attr), multiple: true
+
+        c.desc 'Filter by tag'
+        c.flag %i(t tag), multiple: true
+
+        c.desc 'Assume the answer to confirmations is yes'
+        c.switch %w(y yes)
+
+        c.desc 'Maximum number of health-check jobs'
+        c.flag %w(j max-jobs), arg_name: 'number', type: Integer, default_value: 5
+
+        c.action &Command.run(c, Cluster, :health_check)
+      end
+
       desc 'Check machine status'
       arg_name '[machine-pattern]'
       command :status do |c|

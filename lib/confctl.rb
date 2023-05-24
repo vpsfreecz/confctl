@@ -34,6 +34,8 @@ module ConfCtl
 end
 
 require_rel 'confctl/*.rb'
+require_rel 'confctl/health_checks'
+require_rel 'confctl/health_checks/systemd'
 require_rel 'confctl/utils'
 require_rel 'confctl/generation'
 

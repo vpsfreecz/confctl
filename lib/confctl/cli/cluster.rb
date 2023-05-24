@@ -90,6 +90,28 @@ module ConfCtl::Cli
       end
     end
 
+    def health_check
+      machines = select_machines(args[0]).managed
+      fail 'No machines to check' if machines.empty?
+
+      checks = []
+
+      machines.each do |host, machine|
+        checks.concat(machine.health_checks)
+      end
+
+      ask_confirmation! do
+        puts "Health-checks will be run on the following machines:"
+
+        list_machines(machines)
+        puts
+        puts "#{checks.length} checks in total"
+        puts
+      end
+
+      run_health_checks(machines, checks)
+    end
+
     def status
       machines = select_machines(args[0]).managed
       fail 'No machines to check' if machines.empty?
@@ -558,6 +580,47 @@ module ConfCtl::Cli
         end
 
         puts Rainbow("#{host} (#{machine.target_host}) is online (took #{secs.round(1)}s to reboot)").yellow
+      end
+    end
+
+    def run_health_checks(machines, checks)
+      tw = ConfCtl::ParallelExecutor.new(opts['max-jobs'] || 5)
+
+      checks.each do |check|
+        tw.add { check.run }
+      end
+
+      tw.run
+
+      successful = []
+      failed = []
+
+      checks.each do |check|
+        if check.successful?
+          successful << check
+        else
+          failed << check
+        end
+      end
+
+      puts "#{successful.length} checks passed, #{failed.length} failed"
+      puts
+
+      failed_by_machine = {}
+
+      failed.each do |check|
+        failed_by_machine[check.machine] ||= []
+        failed_by_machine[check.machine] << check
+      end
+
+      failed_by_machine.each do |machine, checks|
+        puts "#{machine}: #{checks.length} failures"
+
+        checks.each do |check|
+          puts "  #{check.message}"
+        end
+
+        puts
       end
     end
 

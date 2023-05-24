@@ -27,6 +27,39 @@ module ConfCtl
       end]
     end
 
+    def health_checks
+      return @health_checks if @health_checks
+
+      @health_checks = []
+
+      opts['healthChecks'].each do |type, checks|
+        case type
+        when 'systemd'
+          next if !checks['enable'] || spin != 'nixos'
+
+          if checks['systemProperties'].any?
+            @health_checks << HealthChecks::Systemd::SystemProperties.new(
+              self,
+              checks['systemProperties'].map { |v| HealthChecks::Systemd::PropertyCheck.new(v) },
+            )
+          end
+
+          checks['unitProperties'].each do |unit_name, prop_checks|
+            health_checks << HealthChecks::Systemd::UnitProperties.new(
+              self,
+              unit_name,
+              prop_checks.map { |v| HealthChecks::Systemd::PropertyCheck.new(v) },
+            )
+          end
+
+        else
+          fail "Unsupported health-check type #{type.inspect}"
+        end
+      end
+
+      @health_checks
+    end
+
     def [](key)
       if key.index('.')
         get(opts, key.split('.'))
