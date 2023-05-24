@@ -13,7 +13,16 @@ module ConfCtl
     end
 
     def run
-      raise NotImplementedError
+      @started_at = Time.now
+      now = @started_at
+
+      until timeout?(now) do
+        @errors.clear
+        run_check
+        break if successful?
+        sleep(cooldown)
+        now = Time.now
+      end
     end
 
     def successful?
@@ -25,6 +34,20 @@ module ConfCtl
     end
 
     protected
+    attr_reader :started_at
+
+    def run_check
+      raise NotImplementedError
+    end
+
+    def timeout?(time)
+      true
+    end
+
+    def cooldown
+      1
+    end
+
     def add_error(msg)
       @errors << msg
     end

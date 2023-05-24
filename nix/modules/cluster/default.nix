@@ -320,6 +320,18 @@ let
           type = types.str;
           description = "value to be checked";
         };
+
+        timeout = mkOption {
+          type = types.ints.unsigned;
+          default = 60;
+          description = "Max number of seconds to wait for the check to pass";
+        };
+
+        cooldown = mkOption {
+          type = types.ints.unsigned;
+          default = 3;
+          description = "Number of seconds in between check attempts";
+        };
       };
     };
 in {

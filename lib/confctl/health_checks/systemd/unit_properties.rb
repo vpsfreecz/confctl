@@ -9,9 +9,28 @@ module ConfCtl
       super(machine)
       @unit = unit
       @property_checks = property_checks
+      @shortest_timeout = property_checks.inject(nil) do |acc, check|
+        if acc.nil? || check.timeout < acc
+          check.timeout
+        else
+          acc
+        end
+      end
+      @shortest_cooldown = property_checks.inject(nil) do |acc, check|
+        if acc.nil? || check.cooldown < acc
+          check.cooldown
+        else
+          acc
+        end
+      end
     end
 
-    def run
+    def message
+      "#{@unit}: #{super}"
+    end
+
+    protected
+    def run_check
       mc = MachineControl.new(machine)
       result = mc.execute!('systemctl', 'show', @unit)
 
@@ -36,8 +55,12 @@ module ConfCtl
       end
     end
 
-    def message
-      "#{@unit}: #{super}"
+    def timeout?(time)
+      started_at + @shortest_timeout < time
+    end
+
+    def cooldown
+      @shortest_cooldown
     end
   end
 end

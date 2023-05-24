@@ -643,12 +643,30 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
+`cluster.<name>.healthChecks.systemd.systemProperties.*.cooldown`
+  Number of seconds in between check attempts
+
+    *Type:* unsigned integer, meaning >=0
+
+    *Default:* `3`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
 `cluster.<name>.healthChecks.systemd.systemProperties.*.property`
   systemd property name
 
     *Type:* string
 
     *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.systemd.systemProperties.*.timeout`
+  Max number of seconds to wait for the check to pass
+
+    *Type:* unsigned integer, meaning >=0
+
+    *Default:* `60`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -676,12 +694,30 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
+`cluster.<name>.healthChecks.systemd.unitProperties.<name>.*.cooldown`
+  Number of seconds in between check attempts
+
+    *Type:* unsigned integer, meaning >=0
+
+    *Default:* `3`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
 `cluster.<name>.healthChecks.systemd.unitProperties.<name>.*.property`
   systemd property name
 
     *Type:* string
 
     *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.systemd.unitProperties.<name>.*.timeout`
+  Max number of seconds to wait for the check to pass
+
+    *Type:* unsigned integer, meaning >=0
+
+    *Default:* `60`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 

@@ -6,9 +6,17 @@ module ConfCtl
     # @return [String]
     attr_reader :value
 
+    # @return [Integer]
+    attr_reader :timeout
+
+    # @return [Integer]
+    attr_reader :cooldown
+
     def initialize(opts)
       @property = opts['property']
       @value = opts['value']
+      @timeout = opts['timeout']
+      @cooldown = opts['cooldown']
     end
 
     # @return [Boolean]
