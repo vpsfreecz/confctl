@@ -390,6 +390,46 @@ let
           description = "Expected exit status";
         };
 
+        standardOutput = {
+          match = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = "Standard output must match this string";
+          };
+
+          include = mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = "Strings that must be included in standard output";
+          };
+
+          exclude = mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = "Strings that must not be included in standard output";
+          };
+        };
+
+        standardError = {
+          match = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = "Standard error must match this string";
+          };
+
+          include = mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = "String that must be included in standard error";
+          };
+
+          exclude = mkOption {
+            type = types.listOf types.str;
+            default = [];
+            description = "String that must not be included in standard error";
+          };
+        };
+
         timeout = mkOption {
           type = types.ints.unsigned;
           default = 60;

@@ -676,6 +676,60 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
+`cluster.<name>.healthChecks.builderCommands.*.standardError.exclude`
+  String that must not be included in standard error
+
+    *Type:* list of string
+
+    *Default:* `[]`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.builderCommands.*.standardError.include`
+  String that must be included in standard error
+
+    *Type:* list of string
+
+    *Default:* `[]`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.builderCommands.*.standardError.match`
+  Standard error must match this string
+
+    *Type:* null or string
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.builderCommands.*.standardOutput.exclude`
+  Strings that must not be included in standard output
+
+    *Type:* list of string
+
+    *Default:* `[]`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.builderCommands.*.standardOutput.include`
+  Strings that must be included in standard output
+
+    *Type:* list of string
+
+    *Default:* `[]`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.builderCommands.*.standardOutput.match`
+  Standard output must match this string
+
+    *Type:* null or string
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
 `cluster.<name>.healthChecks.builderCommands.*.timeout`
   Max number of seconds to wait for the check to pass
 
@@ -738,6 +792,60 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
     *Type:* unsigned integer, meaning >=0
 
     *Default:* `0`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.machineCommands.*.standardError.exclude`
+  String that must not be included in standard error
+
+    *Type:* list of string
+
+    *Default:* `[]`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.machineCommands.*.standardError.include`
+  String that must be included in standard error
+
+    *Type:* list of string
+
+    *Default:* `[]`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.machineCommands.*.standardError.match`
+  Standard error must match this string
+
+    *Type:* null or string
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.machineCommands.*.standardOutput.exclude`
+  Strings that must not be included in standard output
+
+    *Type:* list of string
+
+    *Default:* `[]`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.machineCommands.*.standardOutput.include`
+  Strings that must be included in standard output
+
+    *Type:* list of string
+
+    *Default:* `[]`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.machineCommands.*.standardOutput.match`
+  Standard output must match this string
+
+    *Type:* null or string
+
+    *Default:* `null`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
