@@ -52,6 +52,15 @@ module ConfCtl
             )
           end
 
+        when 'builderCommands', 'machineCommands'
+          checks.each do |cmd|
+            health_checks << HealthChecks::RunCommand.new(
+              self,
+              HealthChecks::RunCommand::Command.new(self, cmd),
+              remote: type == 'machineCommands',
+            )
+          end
+
         else
           fail "Unsupported health-check type #{type.inspect}"
         end

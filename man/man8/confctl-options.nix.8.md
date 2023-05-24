@@ -622,6 +622,116 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
+`cluster.<name>.healthChecks.builderCommands`
+  Check commands run on the build machine
+
+    *Type:* list of (submodule)
+
+    *Default:* `[]`
+
+    *Example:* `{
+  _type = "literalExpression";
+  text = "[\n  { description = \"ping\"; command = [ \"ping\" \"-c1\" \"{host.fqdn}\" ]; }\n]\n";
+}`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.builderCommands.*.command`
+  Command and its arguments
+  
+  It is possible to access machine attributes as from CLI using curly
+  brackets. For example, {host.fqdn} would be replaced by machine FQDN.
+  See confctl ls -L for a list of available attributes.
+
+    *Type:* list of string
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.builderCommands.*.cooldown`
+  Number of seconds in between check attempts
+
+    *Type:* unsigned integer, meaning >=0
+
+    *Default:* `3`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.builderCommands.*.description`
+  Command description
+
+    *Type:* string
+
+    *Default:* `""`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.builderCommands.*.timeout`
+  Max number of seconds to wait for the check to pass
+
+    *Type:* unsigned integer, meaning >=0
+
+    *Default:* `60`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.machineCommands`
+  Check commands run on the target machine
+  
+  Note that the commands have to be available on the machine.
+
+    *Type:* list of (submodule)
+
+    *Default:* `[]`
+
+    *Example:* `{
+  _type = "literalExpression";
+  text = "[\n  { description = \"curl\"; command = [ \"curl\" \"-s\" \"http://localhost:80\" ]; }\n]\n";
+}`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.machineCommands.*.command`
+  Command and its arguments
+  
+  It is possible to access machine attributes as from CLI using curly
+  brackets. For example, {host.fqdn} would be replaced by machine FQDN.
+  See confctl ls -L for a list of available attributes.
+
+    *Type:* list of string
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.machineCommands.*.cooldown`
+  Number of seconds in between check attempts
+
+    *Type:* unsigned integer, meaning >=0
+
+    *Default:* `3`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.machineCommands.*.description`
+  Command description
+
+    *Type:* string
+
+    *Default:* `""`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.machineCommands.*.timeout`
+  Max number of seconds to wait for the check to pass
+
+    *Type:* unsigned integer, meaning >=0
+
+    *Default:* `60`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
 `cluster.<name>.healthChecks.systemd.enable`
   Enable systemd checks, enabled by default
 

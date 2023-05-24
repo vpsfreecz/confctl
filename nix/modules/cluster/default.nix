@@ -192,6 +192,34 @@ let
               '';
             };
           };
+
+          builderCommands = mkOption {
+            type = types.listOf (types.submodule checkCommand);
+            default = [];
+            example = literalExpression ''
+              [
+                { description = "ping"; command = [ "ping" "-c1" "{host.fqdn}" ]; }
+              ]
+            '';
+            description = ''
+              Check commands run on the build machine
+            '';
+          };
+
+          machineCommands = mkOption {
+            type = types.listOf (types.submodule checkCommand);
+            default = [];
+            example = literalExpression ''
+              [
+                { description = "curl"; command = [ "curl" "-s" "http://localhost:80" ]; }
+              ]
+            '';
+            description = ''
+              Check commands run on the target machine
+
+              Note that the commands have to be available on the machine.
+            '';
+          };
         };
       };
     };
@@ -319,6 +347,41 @@ let
         value = mkOption {
           type = types.str;
           description = "value to be checked";
+        };
+
+        timeout = mkOption {
+          type = types.ints.unsigned;
+          default = 60;
+          description = "Max number of seconds to wait for the check to pass";
+        };
+
+        cooldown = mkOption {
+          type = types.ints.unsigned;
+          default = 3;
+          description = "Number of seconds in between check attempts";
+        };
+      };
+    };
+
+  checkCommand =
+    { config, ... }:
+    {
+      options = {
+        description = mkOption {
+          type = types.str;
+          default = "";
+          description = "Command description";
+        };
+
+        command = mkOption {
+          type = types.listOf types.str;
+          description = ''
+            Command and its arguments
+
+            It is possible to access machine attributes as from CLI using curly
+            brackets. For example, {host.fqdn} would be replaced by machine FQDN.
+            See confctl ls -L for a list of available attributes.
+          '';
         };
 
         timeout = mkOption {
