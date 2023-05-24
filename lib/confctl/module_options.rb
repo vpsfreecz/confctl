@@ -7,7 +7,7 @@ module ConfCtl
 
       def initialize(nixos_opt)
         @name = nixos_opt['name']
-        @description = nixos_opt['description']
+        @description = nixos_opt['description'] || 'This option has no description.'
         @type = nixos_opt['type']
         @default = nixos_opt['default']
         @example = nixos_opt['example']
