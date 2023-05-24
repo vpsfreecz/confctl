@@ -10,6 +10,9 @@ module ConfCtl
       attr_reader :command
 
       # @return [Integer]
+      attr_reader :exit_status
+
+      # @return [Integer]
       attr_reader :timeout
 
       # @return [Integer]
@@ -18,6 +21,7 @@ module ConfCtl
       def initialize(machine, opts)
         @description = opts['description']
         @command = make_command(machine, opts['command'])
+        @exit_status = opts['exitStatus']
         @timeout = opts['timeout']
         @cooldown = opts['cooldown']
       end
@@ -58,7 +62,7 @@ module ConfCtl
       mc = MachineControl.new(machine)
       result = mc.execute!(*@command.command)
 
-      if result.failure?
+      if result.status != @command.exit_status
         add_error("#{@command} failed with #{result.status} (#{@command.description})")
       end
     end
@@ -67,7 +71,7 @@ module ConfCtl
       cmd = SystemCommand.new
       result = cmd.run!(*@command.command)
 
-      if result.failure?
+      if result.status != @command.exit_status
         add_error("#{@command} failed with #{result.status} (#{@command.description})")
       end
     end

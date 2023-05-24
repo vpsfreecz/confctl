@@ -667,6 +667,15 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
+`cluster.<name>.healthChecks.builderCommands.*.exitStatus`
+  Expected exit status
+
+    *Type:* unsigned integer, meaning >=0
+
+    *Default:* `0`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
 `cluster.<name>.healthChecks.builderCommands.*.timeout`
   Max number of seconds to wait for the check to pass
 
@@ -720,6 +729,15 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
     *Type:* string
 
     *Default:* `""`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.healthChecks.machineCommands.*.exitStatus`
+  Expected exit status
+
+    *Type:* unsigned integer, meaning >=0
+
+    *Default:* `0`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 

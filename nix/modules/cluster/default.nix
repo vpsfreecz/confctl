@@ -384,6 +384,12 @@ let
           '';
         };
 
+        exitStatus = mkOption {
+          type = types.ints.unsigned;
+          default = 0;
+          description = "Expected exit status";
+        };
+
         timeout = mkOption {
           type = types.ints.unsigned;
           default = 60;
