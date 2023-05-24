@@ -1,13 +1,13 @@
 require 'confctl/health_checks/base'
 
 module ConfCtl
-  class HealthChecks::Systemd::UnitProperties < HealthChecks::Base
+  class HealthChecks::Systemd::Properties < HealthChecks::Base
     # @param machine [Machine]
-    # @param unit [String]
+    # @param pattern [String, nil]
     # @param property_checks [Array<HealthChecks::Systemd::PropertyCheck>]
-    def initialize(machine, unit, property_checks)
+    def initialize(machine, pattern: nil, property_checks:)
       super(machine)
-      @unit = unit
+      @pattern = pattern
       @property_checks = property_checks
       @shortest_timeout = property_checks.inject(nil) do |acc, check|
         if acc.nil? || check.timeout < acc
@@ -26,16 +26,22 @@ module ConfCtl
     end
 
     def message
-      "#{@unit}: #{super}"
+      if @pattern
+        "#{@pattern}: #{super}"
+      else
+        super
+      end
     end
 
     protected
     def run_check
       mc = MachineControl.new(machine)
-      result = mc.execute!('systemctl', 'show', @unit)
+      cmd = %w(systemctl show)
+      cmd << @pattern if @pattern
+      result = mc.execute!(*cmd)
 
       if result.failure?
-        add_error("systemctl show #{@unit} failed with #{result.status}")
+        add_error("#{cmd.join(' ')} failed with #{result.status}")
         return
       end
 

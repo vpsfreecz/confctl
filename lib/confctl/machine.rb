@@ -38,17 +38,21 @@ module ConfCtl
           next if !checks['enable'] || spin != 'nixos'
 
           if checks['systemProperties'].any?
-            @health_checks << HealthChecks::Systemd::SystemProperties.new(
+            @health_checks << HealthChecks::Systemd::Properties.new(
               self,
-              checks['systemProperties'].map { |v| HealthChecks::Systemd::PropertyCheck.new(v) },
+              property_checks: checks['systemProperties'].map do |v|
+                HealthChecks::Systemd::PropertyCheck.new(v)
+              end,
             )
           end
 
           checks['unitProperties'].each do |unit_name, prop_checks|
-            health_checks << HealthChecks::Systemd::UnitProperties.new(
+            health_checks << HealthChecks::Systemd::Properties.new(
               self,
-              unit_name,
-              prop_checks.map { |v| HealthChecks::Systemd::PropertyCheck.new(v) },
+              pattern: unit_name,
+              property_checks: prop_checks.map do |v|
+                HealthChecks::Systemd::PropertyCheck.new(v)
+              end,
             )
           end
 
