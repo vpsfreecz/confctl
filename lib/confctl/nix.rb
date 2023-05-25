@@ -23,10 +23,31 @@ module ConfCtl
     end
 
     def confctl_settings
-      nix_instantiate({
-        confDir: conf_dir,
-        build: :confctl,
-      })['confctl']
+      out_link = File.join(
+        cache_dir,
+        'build',
+        'settings.json',
+      )
+
+      with_cache(out_link) do
+        with_argument({
+          confDir: conf_dir,
+          build: :confctl,
+        }) do |arg|
+          cmd_args = [
+            'nix-build',
+            '--arg', 'jsonArg', arg,
+            '--out-link', out_link,
+            (show_trace ? '--show-trace' : nil),
+            (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
+            ConfCtl.nix_asset('evaluator.nix'),
+          ].flatten.compact
+
+          cmd.run(*cmd_args)
+        end
+      end
+
+      demodulify(JSON.parse(File.read(out_link))['confctl'])
     end
 
     # Returns an array with options from all confctl modules
@@ -50,29 +71,31 @@ module ConfCtl
     # Return machines and their config in a hash
     # @return [Hash]
     def list_machines
-      with_argument({
-        confDir: conf_dir,
-        build: :info,
-      }, core_swpins: true) do |arg|
-        out_link = File.join(
-          cache_dir,
-          'build',
-          'machine-list.json',
-        )
+      out_link = File.join(
+        cache_dir,
+        'build',
+        'machine-list.json',
+      )
 
-        cmd_args = [
-          'nix-build',
-          '--arg', 'jsonArg', arg,
-          '--out-link', out_link,
-          (show_trace ? '--show-trace' : nil),
-          (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
-          ConfCtl.nix_asset('evaluator.nix'),
-        ].flatten.compact
+      with_cache(out_link) do
+        with_argument({
+          confDir: conf_dir,
+          build: :info,
+        }, core_swpins: true) do |arg|
+          cmd_args = [
+            'nix-build',
+            '--arg', 'jsonArg', arg,
+            '--out-link', out_link,
+            (show_trace ? '--show-trace' : nil),
+            (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
+            ConfCtl.nix_asset('evaluator.nix'),
+          ].flatten.compact
 
-        cmd.run(*cmd_args)
-
-        demodulify(JSON.parse(File.read(out_link)))
+          cmd.run(*cmd_args)
+        end
       end
+
+      demodulify(JSON.parse(File.read(out_link)))
     end
 
     def list_swpins_channels
@@ -261,6 +284,16 @@ module ConfCtl
 
     protected
     attr_reader :conf_dir, :show_trace, :max_jobs, :cmd
+
+    # Execute block only if `out_link` does not exist or conf dir has changed
+    # @param out_link [String] out link path
+    def with_cache(out_link)
+      return if File.exist?(out_link) && ConfDir.unchanged?
+
+      ret = yield
+      ConfDir.update_state
+      ret
+    end
 
     # @param hash [Hash]
     # @param core_swpins [Boolean]

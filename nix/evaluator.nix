@@ -133,7 +133,7 @@ let
 
   build = {
     # confctl settings
-    confctl = { confctl = evalConfctl.config.confctl; };
+    confctl = nixpkgs.writeText "confctl-settings.json" (builtins.toJSON { confctl = evalConfctl.config.confctl; });
 
     # List available nixos module options for documentation purposes
     moduleOptions = docOptions;

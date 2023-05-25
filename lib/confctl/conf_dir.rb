@@ -14,6 +14,9 @@ module ConfCtl
         generation_dir
         log_dir
         user_script_dir
+        changed?
+        unchanged?
+        update_state
       ).each do |v|
         define_method(v) do |*args, **kwargs, &block|
           instance.send(v, *args, **kwargs, &block)
@@ -22,7 +25,7 @@ module ConfCtl
     end
 
     def initialize
-      @cache = ConfCache.new(path)
+      @cache = ConfCache.new(self)
     end
 
     # Path to the directory containing cluster configuration
@@ -63,6 +66,18 @@ module ConfCtl
 
     def user_script_dir
       @user_script_dir ||= File.join(path, 'scripts')
+    end
+
+    def changed?
+      !unchanged?
+    end
+
+    def unchanged?
+      @cache.uptodate?
+    end
+
+    def update_state
+      @cache.update
     end
   end
 end
