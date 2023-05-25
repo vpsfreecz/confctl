@@ -105,7 +105,7 @@ module ConfCtl::Cli
         puts
       end
 
-      unless run_health_checks(machines, checks)
+      if run_health_checks(machines, checks).any?
         fail "Health checks failed"
       end
     end
@@ -390,13 +390,7 @@ module ConfCtl::Cli
           end
         end
 
-        unless run_health_checks(check_machines)
-          if opts['keep-going']
-            puts 'Health checks have failed, going on'
-          else
-            fail 'Health checks have failed'
-          end
-        end
+        run_health_check_loop(check_machines)
 
         puts if opts[:interactive]
       end
@@ -424,18 +418,7 @@ module ConfCtl::Cli
         end
 
         if opts['health-checks'] && need_health_checks?(action)
-          unless run_health_checks(MachineList.from_machine(machine))
-            if opts[:interactive]
-              puts "Health checks have failed"
-              next unless ask_confirmation(always: true)
-
-            elsif opts['keep-going']
-              puts "Health checks have failed, going on"
-
-            else
-              fail "Health checks have failed"
-            end
-          end
+          run_health_check_loop(MachineList.from_machine(machine))
         end
 
         puts if opts[:interactive]
@@ -617,6 +600,63 @@ module ConfCtl::Cli
       end
     end
 
+    def run_health_check_loop(machines)
+      all_checks = machines.health_checks
+      return if all_checks.empty?
+
+      run_checks = all_checks
+
+      if opts[:interactive]
+        if machines.length > 1
+          puts Rainbow("Running #{run_checks.length} health checks on #{machines.length.to_s} machines").yellow
+        else
+          puts Rainbow("Running #{run_checks.length} health checks on #{machines.get_one}").yellow
+        end
+
+        return unless ask_confirmation(always: true)
+      end
+
+      loop do
+        failed = run_health_checks(machines, run_checks)
+        return if failed.empty?
+
+        if opts[:interactive]
+          puts "Health checks have failed"
+
+          answer = ask_action(
+            options: {
+              'c' => 'Continue',
+              'r' => 'Retry all',
+              'f' => 'Retry failed',
+              'a' => 'Abort',
+            },
+            default: 'a',
+          )
+
+          case answer
+          when 'c'
+            return
+          when 'r'
+            run_checks = all_checks
+            next
+          when 'f'
+            run_checks = failed
+            next
+          when 'a'
+            fail 'Aborting'
+          end
+
+        elsif opts['keep-going']
+          puts "Health checks have failed, going on"
+          return
+
+        else
+          fail "Health checks have failed"
+        end
+      end
+    end
+
+    # @return [Array<HealthChecks::Base>] failed checks
     def run_health_checks(machines, checks = nil)
       checks ||= machines.health_checks
 
@@ -700,7 +740,7 @@ module ConfCtl::Cli
         puts
       end
 
-      failed.empty?
+      failed
     end
 
     def need_health_checks?(action)

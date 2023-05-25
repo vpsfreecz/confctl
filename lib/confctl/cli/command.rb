@@ -97,6 +97,39 @@ module ConfCtl::Cli
       fail 'Aborted' unless ask_confirmation(**kwargs, &block)
     end
 
+    # @param options [Hash<String, String>] key => description
+    # @param default [String] default option key
+    # @return [String] selection option key
+    def ask_action(options:, default:)
+      yield if block_given?
+
+      loop do
+        STDOUT.puts("\nOptions:\n")
+
+        options.each do |key, desc|
+          STDOUT.puts("  [#{key}] #{desc}")
+        end
+
+        keys = options.keys.map do |k|
+          if k == default
+            k.upcase
+          else
+            k
+          end
+        end.join('/')
+
+        STDOUT.write("\nAction: [#{keys}]: ")
+        STDOUT.flush
+
+        answer = STDIN.readline.strip.downcase
+
+        if options.has_key?(answer)
+          puts
+          return answer
+        end
+      end
+    end
+
     def run_method(method)
       self.method(method).call
     end
