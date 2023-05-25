@@ -109,7 +109,9 @@ module ConfCtl::Cli
         puts
       end
 
-      run_health_checks(machines, checks)
+      unless run_health_checks(machines, checks)
+        fail "Health-checks failed"
+      end
     end
 
     def status
@@ -584,13 +586,56 @@ module ConfCtl::Cli
     end
 
     def run_health_checks(machines, checks)
+      puts Rainbow("Running health-checks on #{machines.length} machines").yellow
+
       tw = ConfCtl::ParallelExecutor.new(opts['max-jobs'] || 5)
 
-      checks.each do |check|
-        tw.add { check.run }
-      end
+      header =
+        if machines.length > 1
+          Rainbow("Running health-checks on #{machines.length} machines").bright
+        else
+          Rainbow("Running health-checks on #{machines.get_one}").bright
+        end
 
-      tw.run
+      header << "\n" << Rainbow("Full log: ").bright << ConfCtl::Logger.relative_path << "\n"
+
+      LogView.open(
+        header: header,
+        title: Rainbow("Live view").bright,
+        size: :auto,
+        reserved_lines: 10,
+      ) do |lw|
+        pb = TTY::ProgressBar.new(
+          "Checks [:bar] :current/:total (:percent)",
+          width: 80,
+          total: checks.length,
+        )
+
+        checks.each_with_index do |check, i|
+          tw.add do
+            prefix = "[#{i+1}/#{checks.length}] #{check.machine}> "
+            lw << "#{prefix}#{check.description}"
+
+            check.run do |attempt, errors|
+              lw << "#{prefix}failed ##{attempt}: #{check.message}"
+              ConfCtl::Logger.keep
+            end
+
+            if check.successful?
+              lw << "#{prefix}succeeded"
+            else
+              lw << "#{prefix}error: #{check.message}"
+            end
+
+            lw.sync_console do
+              pb.advance
+            end
+          end
+        end
+
+        tw.run
+        lw.flush
+      end
 
       successful = []
       failed = []
@@ -622,6 +667,8 @@ module ConfCtl::Cli
 
         puts
       end
+
+      failed.empty?
     end
 
     def run_ssh_interactive(machines)

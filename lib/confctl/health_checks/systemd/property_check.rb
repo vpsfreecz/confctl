@@ -23,5 +23,9 @@ module ConfCtl
     def check(v)
       @value == v
     end
+
+    def to_s
+      "#{property}=#{value}"
+    end
   end
 end

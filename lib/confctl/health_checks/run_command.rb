@@ -104,6 +104,14 @@ module ConfCtl
       @remote = remote
     end
 
+    def description
+      if @command.description.empty?
+        @command.to_s
+      else
+        @command.description
+      end
+    end
+
     protected
     def run_check
       if @remote

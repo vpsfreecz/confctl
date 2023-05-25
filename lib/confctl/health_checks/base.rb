@@ -12,21 +12,30 @@ module ConfCtl
       @errors = []
     end
 
+    # @yieldparam [Integer] number of attempts
+    # @yieldparam [Array] errors
     def run
       @started_at = Time.now
       now = @started_at
+      attempt = 1
 
       until timeout?(now) do
         @errors.clear
         run_check
         break if successful?
+        yield(attempt, errors) if block_given?
         sleep(cooldown)
+        attempt += 1
         now = Time.now
       end
     end
 
     def successful?
       @errors.empty?
+    end
+
+    def description
+      raise NotImplementedError
     end
 
     def message

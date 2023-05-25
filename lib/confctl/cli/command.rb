@@ -17,7 +17,11 @@ module ConfCtl::Cli
         cmd = klass.new(global_opts, opts, args)
         cmd.run_method(method)
 
-        log.close_and_unlink
+        if log.keep?
+          log.close
+        else
+          log.close_and_unlink
+        end
       end
     end
 

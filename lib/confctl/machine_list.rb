@@ -45,6 +45,12 @@ module ConfCtl
       @machines[host]
     end
 
+    # @return [Machine]
+    def get_one
+      @machines.each { |_, machine| return machine }
+      nil
+    end
+
     # @return [Integer]
     def length
       @machines.length

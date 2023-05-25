@@ -25,6 +25,19 @@ module ConfCtl
       end
     end
 
+    def description
+      ret = ''
+
+      if @pattern
+        ret << @pattern << ': '
+      else
+        ret << 'systemd: '
+      end
+
+      ret << @property_checks.map(&:to_s).join(', ')
+      ret
+    end
+
     def message
       if @pattern
         "#{@pattern}: #{super}"
