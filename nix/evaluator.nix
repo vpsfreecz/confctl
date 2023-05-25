@@ -142,7 +142,7 @@ let
     list = { machines = builtins.map (m: m.name) machines; };
 
     # List of machines in an attrset: host => config
-    info = machinesAttrs;
+    info = corePkgs.writeText "machine-list.json" (builtins.toJSON machinesAttrs);
 
     # Nix configuration of swpins channels
     listSwpinsChannels = evalConfctl.config.confctl.swpins.channels;

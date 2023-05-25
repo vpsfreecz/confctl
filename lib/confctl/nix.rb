@@ -50,10 +50,29 @@ module ConfCtl
     # Return machines and their config in a hash
     # @return [Hash]
     def list_machines
-      nix_instantiate({
+      with_argument({
         confDir: conf_dir,
         build: :info,
-      }, core_swpins: true)
+      }, core_swpins: true) do |arg|
+        out_link = File.join(
+          cache_dir,
+          'build',
+          'machine-list.json',
+        )
+
+        cmd_args = [
+          'nix-build',
+          '--arg', 'jsonArg', arg,
+          '--out-link', out_link,
+          (show_trace ? '--show-trace' : nil),
+          (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
+          ConfCtl.nix_asset('evaluator.nix'),
+        ].flatten.compact
+
+        cmd.run(*cmd_args)
+
+        demodulify(JSON.parse(File.read(out_link)))
+      end
     end
 
     def list_swpins_channels
