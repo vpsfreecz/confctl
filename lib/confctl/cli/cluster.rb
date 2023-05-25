@@ -91,15 +91,17 @@ module ConfCtl::Cli
     end
 
     def health_check
-      machines = select_machines(args[0]).managed
-      fail 'No machines to check' if machines.empty?
+      machines = select_machines(args[0]).managed.select do |host, machine|
+        machine.health_checks.any?
+      end
+      fail 'No machines to check or no health checks configured' if machines.empty?
 
       checks = machines.health_checks
 
       ask_confirmation! do
         puts "Health checks will be run on the following machines:"
 
-        list_machines(machines)
+        list_machines(machines, prepend_cols: %w(checks))
         puts
         puts "#{checks.length} checks in total"
         puts
@@ -916,7 +918,7 @@ module ConfCtl::Cli
       end
     end
 
-    def list_machines(machines)
+    def list_machines(machines, prepend_cols: [])
       cols =
         if opts[:output]
           opts[:output].split(',')
@@ -924,8 +926,10 @@ module ConfCtl::Cli
           ConfCtl::Settings.instance.list_columns
         end
 
-      rows = machines.map do |host, d|
-        Hash[cols.map { |c| [c, d[c]] }]
+      cols = prepend_cols + cols if prepend_cols
+
+      rows = machines.map do |host, machine|
+        Hash[cols.map { |c| [c, machine[c]] }]
       end
 
       OutputFormatter.print(

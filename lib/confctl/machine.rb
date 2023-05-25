@@ -76,6 +76,8 @@ module ConfCtl
     def [](key)
       if key.index('.')
         get(opts, key.split('.'))
+      elsif key == 'checks'
+        health_checks.length
       else
         opts[key]
       end
