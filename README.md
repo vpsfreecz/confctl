@@ -11,6 +11,7 @@ machines.
 * Support for configuration interconnections (declare and access other machines'
   configurations)
 * Query machine state, view changelogs and diffs
+* Run health checks
 
 ## Requirements
 
@@ -310,6 +311,52 @@ The `confctl` utility itself can be configured using `configs/confctl.nix`:
   };
 }
 ```
+
+## Health checks
+Health checks can be used to verify that the deployed systems behave correctly,
+all services are running, etc. Health checks are run automatically after deploy
+and can also be run on demand using `confctl health-check`. Health checks are
+configured in machine metadata module, i.e. in `cluster/<machine>/module.nix`
+files.
+
+```nix
+{ config, ... }:
+{
+  cluster."my-machine" = {
+    # [...]
+
+    healthChecks = {
+      # Check that there are no failed units (this is actually done automatically
+      # by confctl, you don't need to do this yourself)
+      systemd.systemProperties = [
+        { property = "SystemState"; value = "running"; }
+      ];
+
+      # Check that the firewall is active, we can check any property of any service
+      systemd.unitProperties."firewall.service" = [
+        { property = "ActiveState"; value = "active"; }
+      ];
+
+      # Run arbitrary commands from the builder
+      builderCommands = [
+        # Ping the deployed machine
+        { command = [ "ping" "-c1" "{host.fqdn}" ]; }
+      ];
+
+      # Run commands on the deployed machine
+      machineCommands = [
+        # Try to access a fictional internal web server
+        { command = [ "curl" "-s" "http://localhost:80" ]; }
+
+        # We can also check command output
+        { command = [ "hostname" ]; standardOutput.match = "my-machine\n"; }
+      ];
+    };
+  };
+}
+```
+
+See the [man pages](./man/man8) for more information.
 
 ## Extending machine metadata
 To define your own options to be used within the `cluster.<name>` modules in
