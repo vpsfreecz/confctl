@@ -4,8 +4,6 @@ require 'confctl/conf_dir'
 
 module ConfCtl::Cli
   class GenData < Command
-    DATADIR = File.join(ConfCtl::ConfDir.path, 'data')
-
     def vpsadmin_all
       vpsadmin_containers
       vpsadmin_network
@@ -85,11 +83,15 @@ module ConfCtl::Cli
     end
 
     def update_file(relpath)
-      abs = File.join(DATADIR, relpath)
+      abs = File.join(data_dir, relpath)
       tmp = "#{abs}.new"
 
       File.open(tmp, 'w') { |f| yield(f) }
       File.rename(tmp, abs)
+    end
+
+    def data_dir
+      @data_dir ||= File.join(ConfCtl::ConfDir.path, 'data')
     end
   end
 end
