@@ -620,15 +620,13 @@ module ConfCtl::Cli
     def run_health_checks(machines, checks = nil)
       checks ||= machines.health_checks
 
-      puts Rainbow("Running health checks on #{machines.length} machines").yellow
-
       tw = ConfCtl::ParallelExecutor.new(opts['max-jobs'] || 5)
 
       header =
         if machines.length > 1
           Rainbow("Running health checks on #{machines.length} machines").bright
         else
-          Rainbow("Running health checks on #{machines.get_one}").bright
+          Rainbow("Running health checks on ").bright + Rainbow(machines.get_one.to_s).yellow
         end
 
       header << "\n" << Rainbow("Full log: ").bright << ConfCtl::Logger.relative_path << "\n"
