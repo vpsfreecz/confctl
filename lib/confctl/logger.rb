@@ -7,7 +7,17 @@ require 'thread'
 module ConfCtl
   class Logger
     class << self
-      %i(open close unlink close_and_unlink io path relative_path).each do |v|
+      %i(
+        open
+        close
+        unlink
+        close_and_unlink
+        keep?
+        keep
+        io
+        path
+        relative_path
+      ).each do |v|
         define_method(v) { |*args| instance.send(v, *args) }
       end
     end
@@ -17,6 +27,7 @@ module ConfCtl
     def initialize
       @mutex = Mutex.new
       @readers = []
+      @keep = false
     end
 
     def open(name, output: nil)
@@ -55,6 +66,14 @@ module ConfCtl
       abs = Pathname.new(path)
       dir = Pathname.new(ConfDir.path)
       abs.relative_path_from(dir).to_s
+    end
+
+    def keep?
+      @keep
+    end
+
+    def keep
+      @keep = true
     end
 
     def unlink
