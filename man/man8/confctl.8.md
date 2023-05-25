@@ -176,6 +176,13 @@ information.
     `-j`, `--max-jobs` *number*
       Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
 
+    `--no-health-checks`
+      Do not run configured health checks. Health checks are run by default
+      when *switch-action* is `switch`, `test` or `boot` with `--reboot`.
+
+    `--keep-going`
+      Do not abort when health checks fail.
+
 `confctl health-check` [*options*] [*machine-pattern*]
   Run health checks on all or selected machines.
 

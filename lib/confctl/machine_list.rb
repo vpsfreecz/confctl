@@ -2,9 +2,15 @@ require 'json'
 
 module ConfCtl
   class MachineList
+    # @param machine [Machine]
+    # @return [MachineList]
+    def self.from_machine(machine)
+      new(machines: {machine.name => machine})
+    end
+
     # @param opts [Hash]
     # @option opts [Boolean] :show_trace
-    # @option opts [Boolean] :machines
+    # @option opts [MachineList] :machines
     def initialize(opts = {})
       @opts = opts
       @machines = opts[:machines] || parse(extract)
@@ -58,6 +64,17 @@ module ConfCtl
 
     def empty?
       @machines.empty?
+    end
+
+    # @return [Array<HealthChecks::Base>]
+    def health_checks
+      checks = []
+
+      machines.each do |host, machine|
+        checks.concat(machine.health_checks)
+      end
+
+      checks
     end
 
     protected

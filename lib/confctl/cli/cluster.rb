@@ -94,11 +94,7 @@ module ConfCtl::Cli
       machines = select_machines(args[0]).managed
       fail 'No machines to check' if machines.empty?
 
-      checks = []
-
-      machines.each do |host, machine|
-        checks.concat(machine.health_checks)
-      end
+      checks = machines.health_checks
 
       ask_confirmation! do
         puts "Health checks will be run on the following machines:"
@@ -383,6 +379,27 @@ module ConfCtl::Cli
           puts if opts[:interactive]
         end
       end
+
+      if opts['health-checks'] && need_health_checks?(action)
+        check_machines = machines.select do |host, machine|
+          if skipped_activation.include?(host)
+            puts Rainbow("Activation on #{host} was skipped, skipping health checks as well").yellow
+            false
+          else
+            true
+          end
+        end
+
+        unless run_health_checks(check_machines)
+          if opts['keep-going']
+            puts 'Health checks have failed, going on'
+          else
+            fail 'Health checks have failed'
+          end
+        end
+
+        puts if opts[:interactive]
+      end
     end
 
     def deploy_one_by_one(machines, host_generations, nix, action)
@@ -404,6 +421,21 @@ module ConfCtl::Cli
         if opts[:reboot] && reboot_host(host, machine) == :skip
           puts Rainbow("Skipping #{host}").yellow
           next
+        end
+
+        if opts['health-checks'] && need_health_checks?(action)
+          unless run_health_checks(MachineList.from_machine(machine))
+            if opts[:interactive]
+              puts "Health checks have failed"
+              next unless ask_confirmation(always: true)
+
+            elsif opts['keep-going']
+              puts "Health checks have failed, going on"
+
+            else
+              fail "Health checks have failed"
+            end
+          end
         end
 
         puts if opts[:interactive]
@@ -585,7 +617,9 @@ module ConfCtl::Cli
       end
     end
 
-    def run_health_checks(machines, checks)
+    def run_health_checks(machines, checks = nil)
+      checks ||= machines.health_checks
+
       puts Rainbow("Running health checks on #{machines.length} machines").yellow
 
       tw = ConfCtl::ParallelExecutor.new(opts['max-jobs'] || 5)
@@ -669,6 +703,10 @@ module ConfCtl::Cli
       end
 
       failed.empty?
+    end
+
+    def need_health_checks?(action)
+      %w(switch test).include?(action) || (action == 'boot' && opts[:reboot])
     end
 
     def run_ssh_interactive(machines)
