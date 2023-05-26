@@ -108,17 +108,24 @@ module ConfCtl
     end
 
     # Execute command, raises exception on error
+    # @yieldparam out [String]
+    # @yieldparam err [String]
     # @raise [TTY::Command::ExitError]
-    def execute(*command, **options)
-      run_cmd(*command, **options)
+    # @return [TTY::Command::Result]
+    def execute(*command, **options, &block)
+      run_cmd(*command, **options, &block)
     end
 
     # Execute command, no exception raised on error
-    def execute!(*command, **options)
-      run_cmd!(*command, **options)
+    # @yieldparam out [String]
+    # @yieldparam err [String]
+    # @return [TTY::Command::Result]
+    def execute!(*command, **options, &block)
+      run_cmd!(*command, **options, &block)
     end
 
     # @param script [String]
+    # @return [TTY::Command::Result]
     def bash_script(script)
       run_cmd('bash', '--norc', input: script)
     end
@@ -126,15 +133,15 @@ module ConfCtl
     protected
     attr_reader :cmd, :extra_ssh_opts
 
-    def run_cmd(*command, **kwargs)
-      do_run_cmd(:run, *command, **kwargs)
+    def run_cmd(*command, **kwargs, &block)
+      do_run_cmd(:run, *command, **kwargs, &block)
     end
 
-    def run_cmd!(*command, **kwargs)
-      do_run_cmd(:run!, *command, **kwargs)
+    def run_cmd!(*command, **kwargs, &block)
+      do_run_cmd(:run!, *command, **kwargs, &block)
     end
 
-    def do_run_cmd(method, *command, **kwargs)
+    def do_run_cmd(method, *command, **kwargs, &block)
       args =
         if machine.localhost?
           command
@@ -142,7 +149,7 @@ module ConfCtl
           ssh_args + command
         end
 
-      cmd.method(method).call(*args, **kwargs)
+      cmd.method(method).call(*args, **kwargs, &block)
     end
 
     def with_ssh_opts(*opts)

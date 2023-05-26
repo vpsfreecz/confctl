@@ -282,6 +282,14 @@ module ConfCtl
       cmd.run!(*args, env: {'shellHook' => nil}).success?
     end
 
+    # @param machine [Machine]
+    # @yieldparam progress [NixCollectGarbage::Progress]
+    # @return [Boolean]
+    def collect_garbage(machine, &block)
+      gc = NixCollectGarbage.new(machine)
+      gc.run!(&block).success?
+    end
+
     protected
     attr_reader :conf_dir, :show_trace, :max_jobs, :cmd
 

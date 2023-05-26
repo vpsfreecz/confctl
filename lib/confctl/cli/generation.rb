@@ -20,11 +20,21 @@ module ConfCtl::Cli
       ask_confirmation! do
         puts 'The following generations will be removed:'
         list_generations(gens)
+        puts
+        puts "Garbage collection: #{opts[:gc] ? 'yes' : 'no'}"
       end
 
       gens.each do |gen|
         puts "Removing #{gen.presence_str} generation #{gen.host}@#{gen.name}"
         gen.destroy
+      end
+
+      if opts[:gc]
+        machines_gc = machines.select do |host, machine|
+          gens.detect { |gen| gen.host == host }
+        end
+
+        run_gc(machines_gc)
       end
     end
 
@@ -199,6 +209,66 @@ module ConfCtl::Cli
       end
 
       ret
+    end
+
+    def run_gc(machines)
+      nix = ConfCtl::Nix.new
+
+      header =
+        if machines.length > 1
+          Rainbow("Collecting garbage on #{machines.length} machines").bright
+        else
+          Rainbow("Collecting gargabe on ").bright + Rainbow(machines.get_one.to_s).yellow
+        end
+
+      LogView.open(
+        header: header + "\n",
+        title: Rainbow("Live view").bright,
+        size: :auto,
+        reserved_lines: machines.length + 8,
+      ) do |lw|
+        multibar = TTY::ProgressBar::Multi.new(
+          "Collecting garbage [:bar] :current",
+          width: 80,
+        )
+        executor = ConfCtl::ParallelExecutor.new(opts['max-concurrent-gc'])
+
+        machines.each do |host, machine|
+          pb = multibar.register(
+            "#{host} [:bar] :current"
+          )
+
+          executor.add do
+            ret = nix.collect_garbage(machine) do |progress|
+              lw << "#{host}> #{progress}"
+
+              if progress.path?
+                lw.sync_console do
+                  pb.advance
+                end
+              end
+            end
+
+            lw.sync_console do
+              if ret
+                pb.finish
+              else
+                pb.format = "#{host}: error occurred"
+                pb.advance
+              end
+            end
+
+            ret ? nil : host
+          end
+        end
+
+        retvals = executor.run
+        failed = retvals.compact
+
+        if failed.any?
+          fail "Gargabe collection failed on: #{failed.join(', ')}"
+        end
+      end
     end
 
     def list_generations(gens)

@@ -419,14 +419,22 @@ information.
       Filter machines that have *tag* set. If the tag begins with `^`, then
       filter machines that do not have *tag* set.
 
+    `-y`, `--yes`
+      Do not ask for confirmation on standard input, assume the answer is yes.
+
     `-l`, `--local`
       Consider local build generations.
 
     `-r`, `--remote`
       Consider generations found on deployed machines.
 
-    `-y`, `--yes`
-      Do not ask for confirmation on standard input, assume the answer is yes.
+    `--[no-]gc`, `--[no-]collect-garbage`
+      Run `nix-collect-garbage` to delete unreachable store paths from deployed
+      machines where generations were removed. Enabled by default.
+
+    `--max-concurrent-gc` *n*
+      Run `nix-collect-gargabe` at most on *n* machines at the same time.
+      Defaults to `5`.
 
 `confctl generation rotate` [*options*] [*machine-pattern*]
   Delete old build generations of all or selected machines. Old generations are
