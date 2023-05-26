@@ -195,10 +195,10 @@ module ConfCtl::Cli
         nix_build_options(c)
 
         c.desc 'Toggle health checks'
-        c.flag 'health-checks', default_value: true
+        c.switch 'health-checks', default_value: true
 
         c.desc 'Do not abourt on failed health checks'
-        c.flag 'keep-going', default_value: false
+        c.switch 'keep-going', default_value: false
 
         c.action &Command.run(c, Cluster, :deploy)
       end
