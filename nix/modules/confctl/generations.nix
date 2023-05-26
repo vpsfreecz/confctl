@@ -6,7 +6,7 @@ with lib;
       buildGenerations = {
         min = mkOption {
           type = types.int;
-          default = 4;
+          default = 5;
           description = ''
             The minimum number of build generations to be kept.
 
@@ -26,7 +26,7 @@ with lib;
 
         maxAge = mkOption {
           type = types.int;
-          default = 90*24*60*60;
+          default = 180*24*60*60;
           description = ''
             Delete build generations older than
             <option>confctl.buildGenerations.maxAge</option> seconds. Old generations
@@ -41,7 +41,7 @@ with lib;
       hostGenerations = {
         min = mkOption {
           type = types.int;
-          default = 4;
+          default = 5;
           description = ''
             The minimum number of generations to be kept on machines.
 
@@ -61,7 +61,7 @@ with lib;
 
         maxAge = mkOption {
           type = types.int;
-          default = 90*24*60*60;
+          default = 180*24*60*60;
           description = ''
             Delete generations older than
             <option>confctl.hostGenerations.maxAge</option> seconds from
