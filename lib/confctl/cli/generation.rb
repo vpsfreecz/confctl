@@ -166,7 +166,7 @@ module ConfCtl::Cli
       statuses.each do |host, st|
         next unless st.generations
 
-        machine = st.machineloyment
+        machine = st.machine
 
         to_delete = generations_rotate(
           st.generations,
