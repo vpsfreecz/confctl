@@ -66,6 +66,10 @@ module ConfCtl
       @machines.empty?
     end
 
+    def any?
+      !empty?
+    end
+
     # @return [Array<HealthChecks::Base>]
     def health_checks
       checks = []

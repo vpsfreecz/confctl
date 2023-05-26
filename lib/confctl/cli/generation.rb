@@ -65,6 +65,20 @@ module ConfCtl::Cli
         puts "Removing #{gen[:type]} generation #{gen[:host]}@#{gen[:name]}"
         gen[:generation].destroy
       end
+
+      global = ConfCtl::Settings.instance.host_generations
+
+      machines_gc = machines.select do |host, machine|
+        gc = machine['buildGenerations']['collectGarbage']
+
+        if gc.nil?
+          global['collectGarbage']
+        else
+          gc
+        end
+      end
+
+      run_gc(machines_gc) if machines_gc.any?
     end
 
     protected

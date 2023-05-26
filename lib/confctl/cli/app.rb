@@ -420,6 +420,10 @@ module ConfCtl::Cli
           c.desc 'List remote machine generations'
           c.switch %i(r remote)
 
+          c.desc 'Max number of concurrent nix-collect-garbage processes'
+          c.flag 'max-concurrent-gc', arg_name: 'n', type: Integer,
+            default_value: 5
+
           c.desc 'Assume the answer to confirmations is yes'
           c.switch %w(y yes)
 

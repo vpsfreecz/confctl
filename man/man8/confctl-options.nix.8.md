@@ -1,4 +1,4 @@
-# confctl-options.nix 8           2023-05-24                             master
+# confctl-options.nix 8           2023-05-26                             master
 
 ## NAME
 `confctl-options.nix` - confctl configuration documentation
@@ -32,7 +32,7 @@ within the deployment configuration directory:
 
     *Type:* signed integer
 
-    *Default:* `7776000`
+    *Default:* `15552000`
 
     *Declared by:* `<confctl/nix/modules/confctl/generations.nix>`
 
@@ -43,7 +43,16 @@ within the deployment configuration directory:
 
     *Type:* signed integer
 
-    *Default:* `4`
+    *Default:* `5`
+
+    *Declared by:* `<confctl/nix/modules/confctl/generations.nix>`
+
+`confctl.hostGenerations.collectGarbage`
+  Run nix-collect-garbage
+
+    *Type:* boolean
+
+    *Default:* `true`
 
     *Declared by:* `<confctl/nix/modules/confctl/generations.nix>`
 
@@ -69,7 +78,7 @@ within the deployment configuration directory:
 
     *Type:* signed integer
 
-    *Default:* `7776000`
+    *Default:* `15552000`
 
     *Declared by:* `<confctl/nix/modules/confctl/generations.nix>`
 
@@ -80,7 +89,7 @@ within the deployment configuration directory:
 
     *Type:* signed integer
 
-    *Default:* `4`
+    *Default:* `5`
 
     *Declared by:* `<confctl/nix/modules/confctl/generations.nix>`
 
@@ -1024,6 +1033,15 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
   Address/host to which the configuration is deployed to
 
     *Type:* null or string
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.hostGenerations.collectGarbage`
+  Run nix-collect-garbage
+
+    *Type:* null or boolean
 
     *Default:* `null`
 

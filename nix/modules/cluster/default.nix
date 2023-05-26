@@ -155,6 +155,12 @@ let
               not reached.
             '';
           };
+
+          collectGarbage = mkOption {
+            type = types.nullOr types.bool;
+            default = null;
+            description = "Run nix-collect-garbage";
+          };
         };
 
         healthChecks = {

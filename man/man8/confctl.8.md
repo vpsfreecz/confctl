@@ -461,6 +461,10 @@ information.
     `-r`, `--remote`
       Consider generations found on deployed machines.
 
+    `--max-concurrent-gc` *n*
+      Run `nix-collect-gargabe` at most on *n* machines at the same time.
+      Defaults to `5`.
+
 `confctl gen-data vpsadmin all`
   Generate all required data files from vpsAdmin API.
 

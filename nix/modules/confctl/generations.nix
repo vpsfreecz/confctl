@@ -72,6 +72,12 @@ with lib;
             This is the default value, which can be overriden per host.
           '';
         };
+
+        collectGarbage = mkOption {
+          type = types.bool;
+          default = true;
+          description = "Run nix-collect-garbage";
+        };
       };
     };
   };
