@@ -460,9 +460,12 @@ in {
 Then you can use it in machine module as:
 
 ```nix
-cluster."my-machine" = {
-  myParameter = "1234";
-};
+{ config, ... }:
+{
+  cluster."my-machine" = {
+    myParameter = "1234";
+  };
+}
 ```
 
 Note that these modules are self-contained. They are not evaluated with the full
