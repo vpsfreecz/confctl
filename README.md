@@ -356,8 +356,6 @@ files.
 }
 ```
 
-See the [man pages](./man/man8) for more information.
-
 ## Extending machine metadata
 To define your own options to be used within the `cluster.<name>` modules in
 `cluster/<machine>/module.nix` files, create file `modules/cluster/default.nix`,
@@ -419,3 +417,9 @@ class MyCommand < ConfCtl::Cli::Command
   end
 end
 ```
+
+## More information
+See the [man pages](./man/man8) for more information:
+
+* [confctl(8)](./man/man8/confctl.8.md)
+* [confctl-options.nix(8)](./man/man8/confctl-options.nix.8.md)
