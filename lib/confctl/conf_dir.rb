@@ -72,8 +72,8 @@ module ConfCtl
       !unchanged?
     end
 
-    def unchanged?
-      @cache.uptodate?
+    def unchanged?(build_file)
+      @cache.uptodate?(build_file)
     end
 
     def update_state

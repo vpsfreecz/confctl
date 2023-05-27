@@ -18,6 +18,7 @@ module ConfCtl
       @files = {}
       @loaded = false
       @uptodate = nil
+      @checked_at = nil
     end
 
     # Load file list from cache file
@@ -33,13 +34,27 @@ module ConfCtl
     end
 
     # Check if cached file list differs from files on disk
-    # @param force_negative [Boolean] force new check if we weren't cached before
-    # @param force_positive [Boolean] force new check if we were cached before
-    def uptodate?(force_negative: true, force_positive: false)
-      if !@uptodate.nil? \
-         && ((@uptodate === true && !force_positive) \
-         || (@uptodate === false && !force_negative))
-        return @uptodate
+    # @param build_file [String] path to a build artefact to check against
+    def uptodate?(build_file)
+      if !@uptodate.nil?
+        # We're not uptodate if the cache is newer than the build artefact
+        begin
+          build_st = File.lstat(build_file)
+        rescue Errno::ENOENT
+          return false
+        end
+
+        begin
+          cache_st = File.lstat(@cache_file)
+        rescue Errno::ENOENT
+          return false
+        end
+
+        if build_st.mtime >= cache_st.mtime
+          return @uptodate
+        else
+          return false
+        end
       end
 
       @uptodate = check_uptodate

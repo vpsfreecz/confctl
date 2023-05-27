@@ -296,11 +296,10 @@ module ConfCtl
     # Execute block only if `out_link` does not exist or conf dir has changed
     # @param out_link [String] out link path
     def with_cache(out_link)
-      return if File.exist?(out_link) && ConfDir.unchanged?
+      return if File.exist?(out_link) && ConfDir.unchanged?(out_link)
 
-      ret = yield
       ConfDir.update_state
-      ret
+      yield
     end
 
     # @param hash [Hash]
