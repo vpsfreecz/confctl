@@ -16,6 +16,7 @@ module ConfCtl
         user_script_dir
         changed?
         unchanged?
+        state_mtime
         update_state
       ).each do |v|
         define_method(v) do |*args, **kwargs, &block|
@@ -72,8 +73,12 @@ module ConfCtl
       !unchanged?
     end
 
-    def unchanged?(build_file)
-      @cache.uptodate?(build_file)
+    def unchanged?
+      @cache.uptodate?
+    end
+
+    def state_mtime
+      @cache.mtime
     end
 
     def update_state

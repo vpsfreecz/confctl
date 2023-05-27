@@ -34,29 +34,9 @@ module ConfCtl
     end
 
     # Check if cached file list differs from files on disk
-    # @param build_file [String] path to a build artefact to check against
-    def uptodate?(build_file)
-      if !@uptodate.nil?
-        # We're not uptodate if the cache is newer than the build artefact
-        begin
-          build_st = File.lstat(build_file)
-        rescue Errno::ENOENT
-          return false
-        end
-
-        begin
-          cache_st = File.lstat(@cache_file)
-        rescue Errno::ENOENT
-          return false
-        end
-
-        if build_st.mtime >= cache_st.mtime
-          return @uptodate
-        else
-          return false
-        end
-      end
-
+    # @param force [Boolean] force a new check
+    def uptodate?(force: false)
+      return @uptodate if !@uptodate.nil? && !force
       @uptodate = check_uptodate
       @uptodate
     end
@@ -85,6 +65,13 @@ module ConfCtl
       File.rename(tmp, @cache_file)
 
       @uptodate = true
+    end
+
+    # @return [Time, nil]
+    def mtime
+      File.lstat(@cache_file).mtime
+    rescue Errno::ENOENT
+      nil
     end
 
     protected

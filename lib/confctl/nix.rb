@@ -296,9 +296,35 @@ module ConfCtl
     # Execute block only if `out_link` does not exist or conf dir has changed
     # @param out_link [String] out link path
     def with_cache(out_link)
-      return if File.exist?(out_link) && ConfDir.unchanged?(out_link)
+      unchanged = false
 
-      ConfDir.update_state
+      if File.exist?(out_link)
+        unchanged = ConfDir.unchanged?
+
+        if unchanged
+          cache_mtime = ConfDir.state_mtime
+
+          if cache_mtime
+            begin
+              st = File.lstat(out_link)
+            rescue Errno::ENOENT
+              # pass
+            else
+              if st.mtime > cache_mtime
+                Logger.instance << "Using #{out_link}\n"
+                return
+              end
+            end
+          end
+        end
+      end
+
+      Logger.instance << "Building #{out_link}\n"
+
+      if !unchanged
+        Logger.instance << "Updating configuration cache\n"
+        ConfDir.update_state
+      end
       yield
     end
 
