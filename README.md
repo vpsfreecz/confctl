@@ -8,6 +8,7 @@ machines.
 * Stateless
 * Per-machine nixpkgs (both modules and packages)
 * Build generations for easy rollback
+* Rotation of old generations
 * Support for configuration interconnections (declare and access other machines'
   configurations)
 * Query machine state, view changelogs and diffs
@@ -354,6 +355,81 @@ files.
     };
   };
 }
+```
+
+## Rotate build generations
+confctl can be used to rotate old generations both on the build machine
+and on the deployed machines.
+
+Default rotation settings can be set in confctl settings at `configs/confctl.nix`:
+
+```nix
+{ config, lib, ... }:
+with lib;
+{
+  confctl = {
+    # Generations on the build machine
+    buildGenerations = {
+      # Keep at least 4 generations
+      min = mkDefault 4;
+
+      # Do not keep more than 10 generations
+      max = mkDefault 10;
+
+      # Delete generations older than 90 days
+      maxAge = mkDefault (90*24*60*60);
+    };
+
+    # The same settings can be configured for generations on the deployed machines
+    hostGenerations = {
+      min = mkDefault 40;
+      max = mkDefault 100;
+      maxAge = mkDefault (180*24*60*60);
+
+      # On the deployed machines, confctl can also run nix-collect-garbage to
+      # delete unreachable store paths
+      collectGarbage = mkDefault true;
+    };
+  };
+}
+```
+
+If these settings are not set, confctl uses its own defaults. Further, rotation
+settings can be configured on per-machine basis in machine metadata module
+at `cluster/<machine>/module.nix`:
+
+```nix
+{ config, ... }:
+{
+  cluster."my-machine" = {
+    # [...]
+
+    buildGenerations = {
+      min = 8;
+      max = 16;
+    };
+
+    hostGenerations = {
+      min = 80;
+    };
+  };
+}
+```
+
+Settings from the machine metadata modules override default confctl settings
+from `configs/confctl.nix`.
+
+To rotate the generations both on the build and deployed machines, run:
+
+```
+confctl generation rotate --local --remote
+```
+
+Generations can also be deleted manually, e.g. to delete generations older than
+90 days, run:
+
+```
+confctl generation rm --local --remote '*' 30d
 ```
 
 ## Extending machine metadata
