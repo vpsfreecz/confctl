@@ -7,21 +7,24 @@ module ConfCtl
       @out_buffer = LineBuffer.new
       @err_buffer = LineBuffer.new
       @block = block
+      @mutex = Mutex.new
     end
 
     # Get a block which can be called to feed data to the buffer
     # @return [Proc]
     def feed_block
       Proc.new do |stdout, stderr|
-        out_buffer << stdout if stdout
-        err_buffer << stderr if stderr
+        @mutex.synchronize do
+          out_buffer << stdout if stdout
+          err_buffer << stderr if stderr
 
-        loop do
-          out_line = out_buffer.get_line
-          err_line = err_buffer.get_line
-          break if out_line.nil? && err_line.nil?
+          loop do
+            out_line = out_buffer.get_line
+            err_line = err_buffer.get_line
+            break if out_line.nil? && err_line.nil?
 
-          block.call(out_line, err_line)
+            block.call(out_line, err_line)
+          end
         end
       end
     end
