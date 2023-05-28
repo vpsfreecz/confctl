@@ -278,6 +278,7 @@ module ConfCtl::Cli
 
             lw.sync_console do
               if ret
+                pb.format = "#{host}: done"
                 pb.finish
               else
                 pb.format = "#{host}: error occurred"
