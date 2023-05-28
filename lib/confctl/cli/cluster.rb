@@ -420,7 +420,7 @@ module ConfCtl::Cli
         end
 
         if opts['health-checks'] && need_health_checks?(action)
-          run_health_check_loop(MachineList.from_machine(machine))
+          run_health_check_loop(ConfCtl::MachineList.from_machine(machine))
         end
 
         puts if opts[:interactive]
