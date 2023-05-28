@@ -433,7 +433,7 @@ information.
       machines where generations were removed. Enabled by default.
 
     `--max-concurrent-gc` *n*
-      Run `nix-collect-gargabe` at most on *n* machines at the same time.
+      Run `nix-collect-garbage` at most on *n* machines at the same time.
       Defaults to `5`.
 
 `confctl generation rotate` [*options*] [*machine-pattern*]
@@ -462,7 +462,7 @@ information.
       Consider generations found on deployed machines.
 
     `--max-concurrent-gc` *n*
-      Run `nix-collect-gargabe` at most on *n* machines at the same time.
+      Run `nix-collect-garbage` at most on *n* machines at the same time.
       Defaults to `5`.
 
 `confctl collect-garbage` [*options*] [*machine-pattern*]
@@ -482,7 +482,7 @@ information.
       Do not ask for confirmation on standard input, assume the answer is yes.
 
     `--max-concurrent-gc` *n*
-      Run `nix-collect-gargabe` at most on *n* machines at the same time.
+      Run `nix-collect-garbage` at most on *n* machines at the same time.
       Defaults to `5`.
 
 `confctl gen-data vpsadmin all`
