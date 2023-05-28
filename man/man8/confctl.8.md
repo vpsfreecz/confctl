@@ -465,6 +465,26 @@ information.
       Run `nix-collect-gargabe` at most on *n* machines at the same time.
       Defaults to `5`.
 
+`confctl collect-garbage` [*options*] [*machine-pattern*]
+  Run `nix-collect-garbage` on all or selected machines to delete unreachable
+  store paths.
+
+    `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
+      Filter machines by selected attribute, which is either tested for
+      equality or inequality. Any attribute from configuration module
+      `cluster.<name>` can be tested.
+
+    `-t`, `--tag` *tag*|`^`*tag*
+      Filter machines that have *tag* set. If the tag begins with `^`, then
+      filter machines that do not have *tag* set.
+
+    `-y`, `--yes`
+      Do not ask for confirmation on standard input, assume the answer is yes.
+
+    `--max-concurrent-gc` *n*
+      Run `nix-collect-gargabe` at most on *n* machines at the same time.
+      Defaults to `5`.
+
 `confctl gen-data vpsadmin all`
   Generate all required data files from vpsAdmin API.
 

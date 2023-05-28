@@ -890,56 +890,6 @@ module ConfCtl::Cli
       end
     end
 
-    def select_machines(pattern)
-      machines = ConfCtl::MachineList.new(show_trace: opts['show-trace'])
-
-      attr_filters = AttrFilters.new(opts[:attr])
-      tag_filters = TagFilters.new(opts[:tag])
-
-      machines.select do |host, d|
-        (pattern.nil? || ConfCtl::Pattern.match?(pattern, host)) \
-          && attr_filters.pass?(d) \
-          && tag_filters.pass?(d)
-      end
-    end
-
-    def select_machines_with_managed(pattern)
-      selected = select_machines(pattern)
-
-      case opts[:managed]
-      when 'y', 'yes'
-        selected.managed
-      when 'n', 'no'
-        selected.unmanaged
-      when 'a', 'all'
-        selected
-      else
-        selected.managed
-      end
-    end
-
-    def list_machines(machines, prepend_cols: [])
-      cols =
-        if opts[:output]
-          opts[:output].split(',')
-        else
-          ConfCtl::Settings.instance.list_columns
-        end
-
-      cols = prepend_cols + cols if prepend_cols
-
-      rows = machines.map do |host, machine|
-        Hash[cols.map { |c| [c, machine[c]] }]
-      end
-
-      OutputFormatter.print(
-        rows,
-        cols,
-        header: !opts['hide-header'],
-        layout: :columns,
-      )
-    end
-
     def find_generations(machines, generation_name)
       host_generations = {}
       missing_hosts = []

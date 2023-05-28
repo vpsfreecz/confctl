@@ -81,6 +81,19 @@ module ConfCtl::Cli
       run_gc(machines_gc) if machines_gc.any?
     end
 
+    def collect_garbage
+      machines = select_machines(args[0])
+
+      fail 'No machines to collect garbage on' if machines.empty?
+
+      ask_confirmation! do
+        puts "Collect garbage on the following machines:"
+        list_machines(machines)
+      end
+
+      run_gc(machines)
+    end
+
     protected
     def select_generations(machines, pattern)
       gens = ConfCtl::Generation::UnifiedList.new
@@ -316,19 +329,6 @@ module ConfCtl::Cli
         layout: :columns,
         sort: %w(name host),
       )
-    end
-
-    def select_machines(pattern)
-      machines = ConfCtl::MachineList.new(show_trace: opts['show-trace'])
-
-      attr_filters = AttrFilters.new(opts[:attr])
-      tag_filters = TagFilters.new(opts[:tag])
-
-      machines.select do |host, m|
-        (pattern.nil? || ConfCtl::Pattern.match?(pattern, host)) \
-          && attr_filters.pass?(m) \
-          && tag_filters.pass?(m)
-      end
     end
   end
 end

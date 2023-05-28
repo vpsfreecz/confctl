@@ -431,6 +431,25 @@ module ConfCtl::Cli
         end
       end
 
+      desc 'Run nix-collect-garbage to deleted unreachable store paths'
+      arg_name '[machine-pattern]'
+      command 'collect-garbage' do |c|
+        c.desc 'Filter by attribute'
+        c.flag %i(a attr), multiple: true
+
+        c.desc 'Filter by tag'
+        c.flag %i(t tag), multiple: true
+
+        c.desc 'Max number of concurrent nix-collect-garbage processes'
+        c.flag 'max-concurrent-gc', arg_name: 'n', type: Integer,
+          default_value: 5
+
+        c.desc 'Assume the answer to confirmations is yes'
+        c.switch %w(y yes)
+
+        c.action &Command.run(c, Generation, :collect_garbage)
+      end
+
       desc 'Generate data files'
       command 'gen-data' do |gen|
         gen.desc 'Fetch data from vpsAdmin'
