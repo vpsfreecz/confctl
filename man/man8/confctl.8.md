@@ -440,8 +440,8 @@ information.
   Delete old build generations of all or selected machines. Old generations are
   deleted based on rules configured in `configs/confctl.nix`.
 
-  This command deletes old build generations from `confctl`. To remove them
-  from the Nix store, use `nix-collect-garbage` afterwards.
+  This command deletes old build generations from `confctl`, and given machine
+  configuration also runs `nix-collect-garbage`.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
       Filter machines by selected attribute, which is either tested for
