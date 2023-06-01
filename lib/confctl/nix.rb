@@ -345,8 +345,8 @@ module ConfCtl
       f.unlink
     end
 
-    def nix_instantiate(hash, opts = {})
-      with_argument(hash, opts) do |arg|
+    def nix_instantiate(hash, **opts)
+      with_argument(hash, **opts) do |arg|
         cmd_args = [
           'nix-instantiate',
           '--eval',
