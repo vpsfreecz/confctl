@@ -266,6 +266,8 @@ module ConfCtl::Cli
           )
 
           executor.add do
+            end_stats = nil
+
             ret = nix.collect_garbage(machine) do |progress|
               lw << "#{host}> #{progress}"
 
@@ -273,17 +275,20 @@ module ConfCtl::Cli
                 lw.sync_console do
                   pb.advance
                 end
+
+              elsif /^\d+ store paths deleted/ =~ progress.line
+                end_stats = progress.line
               end
             end
 
             lw.sync_console do
               if ret
-                pb.format = "#{host}: done"
-                pb.finish
+                pb.format = "#{host}: #{end_stats || 'done'}"
               else
                 pb.format = "#{host}: error occurred"
-                pb.advance
               end
+
+              pb.finish
             end
 
             ret ? nil : host
