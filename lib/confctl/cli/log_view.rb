@@ -15,8 +15,8 @@ module ConfCtl::Cli
 
     # Instantiate {LogView}, yield and then cleanup
     # @yieldparam log_view [LogView]
-    def self.open(*args)
-      lw = new(*args)
+    def self.open(**kwargs)
+      lw = new(**kwargs)
       lw.start
 
       begin
@@ -29,8 +29,8 @@ module ConfCtl::Cli
     # Instantiate {LogView} with feed from {ConfCtl::Logger}, yield
     # and then cleanup
     # @yieldparam log_view [LogView]
-    def self.open_with_logger(*args)
-      lw = new(*args)
+    def self.open_with_logger(**kwargs)
+      lw = new(**kwargs)
       lw.start
 
       lb = ConfCtl::LineBuffer.new { |line| lw << line }
