@@ -35,6 +35,10 @@ module ConfCtl
         index[gen.name] = gen
       end
 
+      generations.sort! do |a, b|
+        a.date <=> b.date
+      end
+
       current_gen =
         if File.exist?(current_symlink)
           name = File.basename(File.readlink(current_symlink))
