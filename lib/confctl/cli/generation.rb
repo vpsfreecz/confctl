@@ -59,6 +59,8 @@ module ConfCtl::Cli
       ask_confirmation! do
         puts "The following generations will be removed:"
         OutputFormatter.print(to_delete, %i(host name type id), layout: :columns)
+        puts
+        puts "Garbage collection: #{opts[:remote] ? 'when enabled in configuration' : 'no'}"
       end
 
       to_delete.each do |gen|
@@ -66,19 +68,21 @@ module ConfCtl::Cli
         gen[:generation].destroy
       end
 
-      global = ConfCtl::Settings.instance.host_generations
+      if opts[:remote]
+        global = ConfCtl::Settings.instance.host_generations
 
-      machines_gc = machines.select do |host, machine|
-        gc = machine['buildGenerations']['collectGarbage']
+        machines_gc = machines.select do |host, machine|
+          gc = machine['buildGenerations']['collectGarbage']
 
-        if gc.nil?
-          global['collectGarbage']
-        else
-          gc
+          if gc.nil?
+            global['collectGarbage']
+          else
+            gc
+          end
         end
-      end
 
-      run_gc(machines_gc) if machines_gc.any?
+        run_gc(machines_gc) if machines_gc.any?
+      end
     end
 
     def collect_garbage
