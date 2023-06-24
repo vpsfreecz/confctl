@@ -21,7 +21,7 @@ module ConfCtl::Cli
         puts 'The following generations will be removed:'
         list_generations(gens)
         puts
-        puts "Garbage collection: #{opts[:gc] ? 'yes' : 'no'}"
+        puts "Garbage collection: #{(opts[:remote] && opts[:gc]) ? 'yes' : 'no'}"
       end
 
       gens.each do |gen|
@@ -29,7 +29,7 @@ module ConfCtl::Cli
         gen.destroy
       end
 
-      if opts[:gc]
+      if opts[:remote] && opts[:gc]
         machines_gc = machines.select do |host, machine|
           gens.detect { |gen| gen.host == host }
         end
