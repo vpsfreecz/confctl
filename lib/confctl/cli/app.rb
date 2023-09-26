@@ -84,18 +84,27 @@ module ConfCtl::Cli
           core.desc 'Set to specific version'
           core.arg_name "<sw> <ref>"
           core.command :set do |c|
+            c.desc 'Commit changes to git'
+            c.switch :commit, default_value: false
+
             c.action &Command.run(c, Swpins::Core, :set)
           end
 
           core.desc 'Update to newest version'
           core.arg_name "[<sw> [<version...>]]]"
           core.command :update do |c|
+            c.desc 'Commit changes to git'
+            c.switch :commit, default_value: false
+
             c.action &Command.run(c, Swpins::Core, :update)
           end
         end
 
         pins.desc 'Update all swpins'
         pins.command :update do |c|
+          c.desc 'Commit changes to git'
+          c.switch :commit, default_value: false
+
           c.action &Command.run(c, Swpins::Base, :update)
         end
 
@@ -487,12 +496,18 @@ module ConfCtl::Cli
       cmd.desc 'Set to specific version'
       cmd.arg_name "<#{arg_name}> <sw> <ref>"
       cmd.command :set do |c|
+        c.desc 'Commit changes to git'
+        c.switch :commit, default_value: false
+
         c.action &Command.run(c, klass, :set)
       end
 
       cmd.desc 'Update to newest version'
       cmd.arg_name "[<#{arg_name}> [<sw> [<version...>]]]"
       cmd.command :update do |c|
+        c.desc 'Commit changes to git'
+        c.switch :commit, default_value: false
+
         c.action &Command.run(c, klass, :update)
       end
     end

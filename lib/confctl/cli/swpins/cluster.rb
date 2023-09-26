@@ -28,27 +28,32 @@ module ConfCtl::Cli
     def set
       require_args!('cluster-name', 'sw', 'version...', strict: false)
       cluster_names = []
+      change_set = ConfCtl::Swpins::ChangeSet.new
 
       each_cluster_name_spec(args[0], args[1]) do |cluster_name, spec|
         if spec.from_channel?
           puts "Skipping #{spec.name} as it comes from channel #{spec.channel}"
         else
+          change_set.add(cluster_name, spec)
           spec_set_msg(cluster_name, spec) { spec.prefetch_set(args[2..-1]) }
           cluster_names << cluster_name unless cluster_names.include?(cluster_name)
         end
       end
 
       cluster_names.each(&:save)
+      change_set.commit if opts[:commit]
     end
 
     def update
       require_args!(optional: %w(cluster-name sw))
       cluster_names = []
+      change_set = ConfCtl::Swpins::ChangeSet.new
 
       each_cluster_name_spec(args[0] || '*', args[1] || '*') do |cluster_name, spec|
         if spec.from_channel?
           puts "Skipping #{spec.name} as it comes from channel #{spec.channel}"
         elsif spec.can_update?
+          change_set.add(cluster_name, spec)
           spec_update_msg(cluster_name, spec) { spec.prefetch_update }
           cluster_names << cluster_name unless cluster_names.include?(cluster_name)
         else
@@ -57,6 +62,7 @@ module ConfCtl::Cli
       end
 
       cluster_names.each(&:save)
+      change_set.commit if opts[:commit]
     end
   end
 end

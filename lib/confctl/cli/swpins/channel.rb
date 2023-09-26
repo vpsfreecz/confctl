@@ -27,21 +27,26 @@ module ConfCtl::Cli
     def set
       require_args!('channel-pattern', 'sw-pattern', 'version...', strict: false)
       channels = []
+      change_set = ConfCtl::Swpins::ChangeSet.new
 
       each_channel_spec(args[0], args[1]) do |chan, spec|
+        change_set.add(chan, spec)
         spec_set_msg(chan, spec) { spec.prefetch_set(args[2..-1]) }
         channels << chan unless channels.include?(chan)
       end
 
       channels.each(&:save)
+      change_set.commit if opts[:commit]
     end
 
     def update
       require_args!(optional: %w(channel-pattern sw-pattern))
       channels = []
+      change_set = ConfCtl::Swpins::ChangeSet.new
 
       each_channel_spec(args[0] || '*', args[1] || '*') do |chan, spec|
         if spec.can_update?
+          change_set.add(chan, spec)
           spec_update_msg(chan, spec) { spec.prefetch_update }
           channels << chan unless channels.include?(chan)
         else
@@ -50,6 +55,7 @@ module ConfCtl::Cli
       end
 
       channels.each(&:save)
+      change_set.commit if opts[:commit]
     end
   end
 end

@@ -501,9 +501,15 @@ information.
   Set selected software packages to new *version*. The value of *version* depends
   on the type of the software pin, for git it is a git reference, e.g. a revision.
 
+  `--[no-]commit`
+    Commit changed swpins files to git. Disabled by default.
+
 `confctl swpins cluster update` [*name-pattern* [*sw-pattern*]]
   Update selected or all software packages that have been configured to support
   this command. The usual case for git is to pin to the current branch head.
+
+  `--[no-]commit`
+    Commit changed swpins files to git. Disabled by default.
 
 `confctl swpins channel ls` [*channel-pattern* [*sw-pattern*]]
   List existing channels with pinned software packages.
@@ -513,10 +519,16 @@ information.
   of *version* depends on the type of the software pin, for git it is a git
   reference, e.g. a revision.
 
+  `--[no-]commit`
+    Commit changed swpins files to git. Disabled by default.
+
 `confctl swpins channel update` [*channel-pattern* [*sw-pattern*]]
   Update selected or all software packages in channels that have been configured
   to support this command. The usual case for git is to pin to the current
   branch head.
+
+  `--[no-]commit`
+    Commit changed swpins files to git. Disabled by default.
 
 `confctl swpins core ls` [*sw-pattern*]
   List core software packages used internally by confctl.
@@ -526,14 +538,23 @@ information.
   of *version* depends on the type of the software pin, for git it is a git
   reference, e.g. a revision.
 
+  `--[no-]commit`
+    Commit changed swpins files to git. Disabled by default.
+
 `confctl swpins core update` [*sw-pattern*]
   Update selected or all core software packages that have been configured
   to support this command. The usual case for git is to pin to the current
   branch head.
 
+  `--[no-]commit`
+    Commit changed swpins files to git. Disabled by default.
+
 `confctl swpins update`
   Update software pins that have been configured for updates, including pins
   in all channels, all machine-specific pins and the core pins.
+
+  `--[no-]commit`
+    Commit changed swpins files to git. Disabled by default.
 
 `confctl swpins reconfigure`
   Regenerate all confctl-managed software pin files according to the Nix
