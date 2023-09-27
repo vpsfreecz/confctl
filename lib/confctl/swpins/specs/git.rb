@@ -12,7 +12,7 @@ module ConfCtl
     end
 
     def version
-      state['rev'][0..7]
+      state['rev'][0..8]
     end
 
     def auto_update?
@@ -43,7 +43,7 @@ module ConfCtl
 
     def version_info(other_info)
       return false if !other_info.is_a?(Hash) || !info.is_a?(Hash)
-      other_info['rev'] && other_info['rev'][0..7]
+      other_info['rev'] && other_info['rev'][0..8]
     end
 
     def string_changelog_info(type, other_info, verbose: false, patch: false, color: false)
