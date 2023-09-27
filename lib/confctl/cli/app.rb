@@ -87,6 +87,12 @@ module ConfCtl::Cli
             c.desc 'Commit changes to git'
             c.switch :commit, default_value: false
 
+            c.desc 'Include changelog in the commit message'
+            c.switch :changelog, default_value: true
+
+            c.desc 'Generate changelog for downgrade'
+            c.switch %i(d downgrade), default_value: false
+
             c.action &Command.run(c, Swpins::Core, :set)
           end
 
@@ -96,6 +102,12 @@ module ConfCtl::Cli
             c.desc 'Commit changes to git'
             c.switch :commit, default_value: false
 
+            c.desc 'Include changelog in the commit message'
+            c.switch :changelog, default_value: true
+
+            c.desc 'Generate changelog for downgrade'
+            c.switch %i(d downgrade), default_value: false
+
             c.action &Command.run(c, Swpins::Core, :update)
           end
         end
@@ -104,6 +116,12 @@ module ConfCtl::Cli
         pins.command :update do |c|
           c.desc 'Commit changes to git'
           c.switch :commit, default_value: false
+
+          c.desc 'Include changelog in the commit message'
+          c.switch :changelog, default_value: true
+
+          c.desc 'Generate changelog for downgrade'
+          c.switch %i(d downgrade), default_value: false
 
           c.action &Command.run(c, Swpins::Base, :update)
         end
@@ -499,6 +517,12 @@ module ConfCtl::Cli
         c.desc 'Commit changes to git'
         c.switch :commit, default_value: false
 
+        c.desc 'Include changelog in the commit message'
+        c.switch :changelog, default_value: true
+
+        c.desc 'Generate changelog for downgrade'
+        c.switch %i(d downgrade), default_value: false
+
         c.action &Command.run(c, klass, :set)
       end
 
@@ -507,6 +531,12 @@ module ConfCtl::Cli
       cmd.command :update do |c|
         c.desc 'Commit changes to git'
         c.switch :commit, default_value: false
+
+        c.desc 'Include changelog in the commit message'
+        c.switch :changelog, default_value: true
+
+        c.desc 'Generate changelog for downgrade'
+        c.switch %i(d downgrade), default_value: false
 
         c.action &Command.run(c, klass, :update)
       end

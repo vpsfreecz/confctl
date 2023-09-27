@@ -45,7 +45,13 @@ module ConfCtl::Cli
 
       core.save
       core.pre_evaluate
-      change_set.commit if opts[:commit]
+
+      if opts[:commit]
+        change_set.commit(
+          type: opts[:downgrade] ? :downgrade : :upgrade,
+          changelog: opts[:changelog],
+        )
+      end
     end
 
     def update
@@ -68,7 +74,13 @@ module ConfCtl::Cli
 
       core.save
       core.pre_evaluate
-      change_set.commit if opts[:commit]
+
+      if opts[:commit]
+        change_set.commit(
+          type: opts[:downgrade] ? :downgrade : :upgrade,
+          changelog: opts[:changelog],
+        )
+      end
     end
   end
 end

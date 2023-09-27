@@ -41,7 +41,13 @@ module ConfCtl::Cli
       end
 
       cluster_names.each(&:save)
-      change_set.commit if opts[:commit]
+
+      if opts[:commit]
+        change_set.commit(
+          type: opts[:downgrade] ? :downgrade : :upgrade,
+          changelog: opts[:changelog],
+        )
+      end
     end
 
     def update
@@ -62,7 +68,13 @@ module ConfCtl::Cli
       end
 
       cluster_names.each(&:save)
-      change_set.commit if opts[:commit]
+
+      if opts[:commit]
+        change_set.commit(
+          type: opts[:downgrade] ? :downgrade : :upgrade,
+          changelog: opts[:changelog],
+        )
+      end
     end
   end
 end

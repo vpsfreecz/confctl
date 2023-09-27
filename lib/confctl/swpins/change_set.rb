@@ -4,7 +4,7 @@ module ConfCtl
       attr_reader :name, :path
     end
 
-    SpecSet = Struct.new(:spec, :original_version, keyword_init: true) do
+    SpecSet = Struct.new(:spec, :original_version, :original_info, keyword_init: true) do
       def name
         spec.name
       end
@@ -13,8 +13,20 @@ module ConfCtl
         spec.version
       end
 
+      def new_info
+        spec.info
+      end
+
       def changed?
         original_version != new_version
+      end
+
+      def string_changelog(type)
+        if original_info
+          spec.string_changelog_info(type, original_info, color: false)
+        else
+          "Initial version\n"
+        end
       end
     end
 
@@ -26,20 +38,34 @@ module ConfCtl
     # @param spec [Swpins::Spec]
     def add(owner, spec)
       @owners[owner] ||= []
-      @owners[owner] << SpecSet.new(spec: spec, original_version: spec.version)
+      @owners[owner] << SpecSet.new(
+        spec: spec,
+        original_version: spec.version,
+        original_info: spec.info,
+      )
       nil
     end
 
-    def commit
+    # @param type [:upgrade, :downgrade]
+    # @param changelog [Boolean]
+    def commit(type: :upgrade, changelog: false)
       return if @owners.empty?
 
-      unless Kernel.system('git', 'commit', '-e', '-m', build_message, *changed_files)
+      ret = Kernel.system(
+        'git',
+        'commit',
+        '-e',
+        '-m', build_message(type, changelog),
+        *changed_files
+      )
+
+      unless ret
         fail 'git commit exited with non-zero status code'
       end
     end
 
     protected
-    def build_message
+    def build_message(type, changelog)
       msg = 'swpins: '
 
       if same_changes?
@@ -62,14 +88,20 @@ module ConfCtl
       msg << "\n\n"
 
       @owners.each do |owner, spec_sets|
-        msg << "#{owner.name}:\n"
         spec_sets.each do |spec_set|
           if spec_set.changed?
-            msg << "  #{spec_set.name}: #{spec_set.original_version} -> #{spec_set.new_version}\n"
+            msg << "#{owner.name} #{spec_set.name}: #{spec_set.original_version} -> #{spec_set.new_version}\n"
+
+            if changelog
+              msg << spec_set.string_changelog(type)
+              msg << "\n"
+            end
           else
             msg << "  #{spec_set.name}: unchanged\n"
           end
         end
+
+        msg << "\n" if changelog
       end
 
       msg

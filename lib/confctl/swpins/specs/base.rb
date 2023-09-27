@@ -20,6 +20,9 @@ module ConfCtl
     # @return [Array]
     attr_reader :errors
 
+    # @return [Hash]
+    attr_reader :info
+
     # @param name [String]
     # @param nix_opts [Hash] options from the user's nix configuration
     # @param json_opts [Hash] options from generated json file
@@ -139,9 +142,6 @@ module ConfCtl
 
     # @return [Hash]
     attr_reader :state
-
-    # @return [Hash]
-    attr_reader :info
 
     # @return [String]
     attr_reader :fetcher
