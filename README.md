@@ -30,7 +30,7 @@ stored:
 ```
 mkdir cluster-configuration
 ```
-3.Prepare `shell.nix` in the new directory, chose one option
+3. Prepare `shell.nix` in the new directory:
   - Create a `shell.nix` and import the same file from confctl:
 ```
 cd cluster-configuration
