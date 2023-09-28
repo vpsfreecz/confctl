@@ -90,9 +90,10 @@ confctl deploy my-machine
 Example configuration, which can be used as a starting point, can be found in
 directory [example/](example/).
 
-See also
-[vpsfree-cz-configuration](https://github.com/vpsfreecz/vpsfree-cz-configuration)
-for a full-featured cluster configuration.
+See also existing configurations:
+
+* [vpsfree-cz-configuration](https://github.com/vpsfreecz/vpsfree-cz-configuration)
+* [vpsadminos-org-configuration](https://github.com/vpsfreecz/vpsadminos-org-configuration)
 
 ## Configuration directory structure
 `confctl` configurations should adhere to the following structure:
