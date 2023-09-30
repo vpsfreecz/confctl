@@ -40,8 +40,8 @@ module ConfCtl
       @owners[owner] ||= []
       @owners[owner] << SpecSet.new(
         spec: spec,
-        original_version: spec.version,
-        original_info: spec.info,
+        original_version: spec.valid? ? spec.version : nil,
+        original_info: spec.valid? ? spec.info : nil,
       )
       nil
     end
@@ -90,7 +90,13 @@ module ConfCtl
       @owners.each do |owner, spec_sets|
         spec_sets.each do |spec_set|
           if spec_set.changed?
-            msg << "#{owner.name} #{spec_set.name}: #{spec_set.original_version} -> #{spec_set.new_version}\n"
+            msg << "#{owner.name} #{spec_set.name}: "
+
+            if spec_set.original_version
+              msg << "#{spec_set.original_version} -> #{spec_set.new_version}\n"
+            else
+              msg << "set to #{spec_set.new_version}\n"
+            end
 
             if changelog
               msg << spec_set.string_changelog(type)
