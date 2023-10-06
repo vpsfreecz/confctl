@@ -71,8 +71,10 @@ module ConfCtl
       if same_changes?
         spec_sets = @owners.first[1]
         msg << "#{@owners.each_key.map(&:name).sort.join(', ')}: update "
-        msg << spec_sets.map(&:name).join(', ')
-        msg << " to #{spec_sets.first.new_version}"
+
+        msg << spec_sets.map do |spec_set|
+          "#{spec_set.name} to #{spec_set.new_version}"
+        end.join(', ')
       else
         all_spec_names = []
 
