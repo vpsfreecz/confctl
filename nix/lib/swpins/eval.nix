@@ -46,7 +46,7 @@ let
     git-rev = opts:
       let
         repo = fetchers.${opts.wrapped_fetcher.type} opts.wrapped_fetcher.options;
-        shortRev = lib.substring 0 7 (opts.rev);
+        shortRev = lib.substring 0 9 (opts.rev);
       in
         pkgs.runCommand "git-${shortRev}" {} ''
           cp -a ${repo} $out
