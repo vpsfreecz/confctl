@@ -51,7 +51,7 @@ let
         pkgs.runCommand "git-${shortRev}" {} ''
           cp -a ${repo} $out
           chmod 700 $out
-          echo "${shortRev}" > $out/.git-revision
+          echo "${opts.rev}" > $out/.git-revision
           echo ".git.${shortRev}" > $out/.version-suffix
         '';
   };
