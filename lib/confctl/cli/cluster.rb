@@ -1112,7 +1112,7 @@ module ConfCtl::Cli
 
         cn.specs.each do |name, s|
           if !s.from_channel? && s.auto_update?
-            puts " updating #{c.name}.#{name}"
+            puts " updating #{cn.name}.#{name}"
             s.prefetch_update
             updated = true
           end
