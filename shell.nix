@@ -22,7 +22,7 @@ in stdenv.mkDerivation rec {
     export PATH="$BINDIR:$PATH"
     export RUBYLIB="$GEM_HOME:$CONFCTL/lib"
     export MANPATH="$CONFCTL/man:$(man --path)"
-    gem install --no-document bundler rubocop
+    gem install --no-document bundler overcommit rubocop
     pushd "$CONFCTL"
     bundle install
     bundle exec rake md2man:man
