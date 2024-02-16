@@ -93,18 +93,18 @@ module ConfCtl::Cli
       end
       raise 'No machines to check or no health checks configured' if machines.empty?
 
-      checks = machines.health_checks
+      run_checks = machines.health_checks
 
       ask_confirmation! do
         puts 'Health checks will be run on the following machines:'
 
         list_machines(machines, prepend_cols: %w[checks])
         puts
-        puts "#{checks.length} checks in total"
+        puts "#{run_checks.length} checks in total"
         puts
       end
 
-      return unless run_health_checks(machines, checks).any?
+      return unless run_health_checks(machines, run_checks).any?
 
       raise 'Health checks failed'
     end
@@ -636,8 +636,8 @@ module ConfCtl::Cli
     end
 
     # @return [Array<HealthChecks::Base>] failed checks
-    def run_health_checks(machines, checks = nil)
-      checks ||= machines.health_checks
+    def run_health_checks(machines, run_checks = nil)
+      run_checks ||= machines.health_checks
 
       tw = ConfCtl::ParallelExecutor.new(opts['max-jobs'] || 5)
 
@@ -659,12 +659,12 @@ module ConfCtl::Cli
         pb = TTY::ProgressBar.new(
           'Checks [:bar] :current/:total (:percent)',
           width: 80,
-          total: checks.length
+          total: run_checks.length
         )
 
-        checks.each_with_index do |check, i|
+        run_checks.each_with_index do |check, i|
           tw.add do
-            prefix = "[#{i + 1}/#{checks.length}] #{check.machine}> "
+            prefix = "[#{i + 1}/#{run_checks.length}] #{check.machine}> "
             lw << "#{prefix}#{check.description}"
 
             check.run do |attempt, _errors|
@@ -691,7 +691,7 @@ module ConfCtl::Cli
       successful = []
       failed = []
 
-      checks.each do |check|
+      run_checks.each do |check|
         if check.successful?
           successful << check
         else
@@ -905,7 +905,7 @@ module ConfCtl::Cli
         show_trace: opts['show-trace'],
         max_jobs: opts['max-jobs']
       )
-      host_swpin_paths = {}
+      hosts_swpin_paths = {}
 
       autoupdate_swpins(machines)
       host_swpin_specs = check_swpins(machines)
@@ -914,10 +914,10 @@ module ConfCtl::Cli
 
       machines.each do |host, d|
         puts Rainbow("Evaluating swpins for #{host}...").bright
-        host_swpin_paths[host] = nix.eval_host_swpins(host).update(d.nix_paths)
+        hosts_swpin_paths[host] = nix.eval_host_swpins(host).update(d.nix_paths)
       end
 
-      grps = swpin_build_groups(host_swpin_paths)
+      grps = swpin_build_groups(hosts_swpin_paths)
       puts
       puts "Machines will be built in #{grps.length} groups"
       puts
@@ -960,7 +960,7 @@ module ConfCtl::Cli
       host_generations
     end
 
-    def do_build_group(i, n, hosts, swpin_paths, host_swpin_specs, nix, time)
+    def do_build_group(group_index, group_count, hosts, swpin_paths, host_swpin_specs, nix, time)
       puts Rainbow('Building machines').bright
       hosts.each { |h| puts "  #{h}" }
       puts 'with swpins'
@@ -971,7 +971,7 @@ module ConfCtl::Cli
         << " #{format_command(10)}" \
         << "\n" \
         << Rainbow('Build group:').bright \
-        << " #{i + 1}/#{n} (#{hosts.length} machines)" \
+        << " #{group_index + 1}/#{group_count} (#{hosts.length} machines)" \
         << "\n" \
         << Rainbow('Full log:   ').bright \
         << " #{ConfCtl::Logger.relative_path}" \
@@ -1001,15 +1001,15 @@ module ConfCtl::Cli
           swpin_paths:,
           time:,
           host_swpin_specs:
-        ) do |type, _i, n, _path|
+        ) do |type, _progress, total, _path|
           if type == :build
             lw.sync_console do
-              build_pb.update(total: n) if n > 0 && build_pb.total.nil?
+              build_pb.update(total:) if total > 0 && build_pb.total.nil?
               build_pb.advance
             end
           elsif type == :fetch
             lw.sync_console do
-              fetch_pb.update(total: n) if n > 0 && fetch_pb.total.nil?
+              fetch_pb.update(total:) if total > 0 && fetch_pb.total.nil?
               fetch_pb.advance
             end
           end
@@ -1129,14 +1129,14 @@ module ConfCtl::Cli
       valid ? ret : false
     end
 
-    def swpin_build_groups(host_swpins)
+    def swpin_build_groups(hosts_swpins)
       ret = []
-      all_swpins = host_swpins.values.uniq
+      all_swpins = hosts_swpins.values.uniq
 
       all_swpins.each do |swpins|
         hosts = []
 
-        host_swpins.each do |host, host_swpins|
+        hosts_swpins.each do |host, host_swpins|
           hosts << host if swpins == host_swpins
         end
 

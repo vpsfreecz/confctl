@@ -67,6 +67,13 @@ module ConfCtl
     protected
 
     def build_message(type, changelog)
+      [
+        build_title(type, changelog),
+        build_description(type, changelog)
+      ].join("\n\n")
+    end
+
+    def build_title(type, changelog)
       msg = 'swpins: '
 
       if same_changes?
@@ -88,7 +95,11 @@ module ConfCtl
         msg << "#{@owners.each_key.map(&:name).join(', ')}: update #{all_spec_names.sort.join(', ')}"
       end
 
-      msg << "\n\n"
+      msg
+    end
+
+    def build_description(type, changelog)
+      msg = ''
 
       @owners.each do |owner, spec_sets|
         spec_sets.each do |spec_set|

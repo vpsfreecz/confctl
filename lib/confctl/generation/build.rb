@@ -58,11 +58,11 @@ module ConfCtl
       @swpin_paths = {}
       @swpin_specs = {}
 
-      cfg['swpins'].each do |name, swpin|
-        @swpin_names << name
-        @swpin_paths[name] = swpin['path']
-        @swpin_specs[name] = Swpins::Spec.for(swpin['spec']['type'].to_sym).new(
-          name,
+      cfg['swpins'].each do |swpin_name, swpin|
+        @swpin_names << swpin_name
+        @swpin_paths[swpin_name] = swpin['path']
+        @swpin_specs[swpin_name] = Swpins::Spec.for(swpin['spec']['type'].to_sym).new(
+          swpin_name,
           swpin['spec']['nix_options'],
           swpin['spec']
         )
