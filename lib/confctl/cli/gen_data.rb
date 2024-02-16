@@ -15,7 +15,7 @@ module ConfCtl::Cli
       machines = ConfCtl::MachineList.new
       data = {}
 
-      machines.each do |_host, m|
+      machines.each_value do |m|
         next if m['container'].nil?
 
         ct = api.vps.show(

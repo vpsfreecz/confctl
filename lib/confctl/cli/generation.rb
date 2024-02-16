@@ -116,13 +116,13 @@ module ConfCtl::Cli
 
         tw.run
 
-        statuses.each do |_host, st|
+        statuses.each_value do |st|
           gens.add_host_generations(st.generations) if st.generations
         end
       end
 
       if include_local
-        machines.each do |host, _machine|
+        machines.each_key do |host|
           gens.add_build_generations(ConfCtl::Generation::BuildList.new(host))
         end
       end
@@ -187,7 +187,7 @@ module ConfCtl::Cli
 
       tw.run
 
-      statuses.each do |_host, st|
+      statuses.each_value do |st|
         next unless st.generations
 
         machine = st.machine

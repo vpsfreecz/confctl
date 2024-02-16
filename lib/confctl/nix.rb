@@ -371,7 +371,7 @@ module ConfCtl
         value.each { |item| demodulify(item) }
       elsif value.is_a?(Hash)
         value.delete('_module')
-        value.each { |_k, v| demodulify(v) }
+        value.each_value { |v| demodulify(v) }
       end
     end
 

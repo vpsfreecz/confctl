@@ -34,7 +34,7 @@ module ConfCtl::Cli
       core = ConfCtl::Swpins::Core.get
       change_set = ConfCtl::Swpins::ChangeSet.new
 
-      core.specs.each do |_name, spec|
+      core.specs.each_value do |spec|
         if spec.from_channel?
           puts "Skipping #{spec.name} as it comes from channel #{spec.channel}"
         else

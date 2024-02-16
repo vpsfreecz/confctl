@@ -104,14 +104,14 @@ module ConfCtl
 
     def add_gcroot
       GCRoot.add(gcroot_name('toplevel'), toplevel_path)
-      swpin_paths.each do |name, _path|
+      swpin_paths.each_key do |name|
         GCRoot.add(gcroot_name("swpin.#{name}"), toplevel_path)
       end
     end
 
     def remove_gcroot
       GCRoot.remove(gcroot_name('toplevel'))
-      swpin_paths.each do |name, _path|
+      swpin_paths.each_key do |name|
         GCRoot.remove(gcroot_name("swpin.#{name}"))
       end
     end

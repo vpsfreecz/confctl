@@ -125,7 +125,7 @@ module ConfCtl
 
       expected_spec_sets = @owners.first[1]
 
-      @owners.each do |_owner, spec_sets|
+      @owners.each_value do |spec_sets|
         return false if expected_spec_sets.length != spec_sets.length
 
         spec_sets.each do |spec_set|

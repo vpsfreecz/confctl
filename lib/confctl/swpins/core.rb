@@ -116,7 +116,7 @@ module ConfCtl
 
       swpins = JSON.parse(File.read(path))
 
-      swpins.each do |_pin, path|
+      swpins.each_value do |path|
         return unless Dir.exist?(path)
       end
 

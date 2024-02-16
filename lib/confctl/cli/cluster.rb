@@ -162,7 +162,7 @@ module ConfCtl::Cli
       # Check runtime status
       tw = ConfCtl::ParallelExecutor.new(machines.length)
 
-      statuses.each do |_host, st|
+      statuses.each_value do |st|
         tw.add do
           st.query(toplevel: opts[:generation] != 'none')
         end
@@ -173,7 +173,7 @@ module ConfCtl::Cli
       # Collect all swpins
       swpins = []
 
-      statuses.each do |_host, st|
+      statuses.each_value do |st|
         st.target_swpin_specs.each_key do |name|
           swpins << name unless swpins.include?(name)
         end
@@ -310,7 +310,7 @@ module ConfCtl::Cli
         '-l', 'root'
       ]
 
-      machines.each do |_host, machine|
+      machines.each_value do |machine|
         cssh << machine.target_host
       end
 
@@ -358,7 +358,7 @@ module ConfCtl::Cli
       end
 
       if opts[:reboot]
-        host_generations.each do |host, _gen|
+        host_generations.each_key do |host|
           if skipped_activation.include?(host)
             puts Rainbow("Activation on #{host} was skipped, skipping reboot as well").yellow
             next
@@ -734,7 +734,7 @@ module ConfCtl::Cli
         list_machines(machines)
       end
 
-      machines.each do |_host, machine|
+      machines.each_value do |machine|
         mc = ConfCtl::MachineControl.new(machine)
         mc.interactive_shell
         return
@@ -871,7 +871,7 @@ module ConfCtl::Cli
       host_generations = {}
       missing_hosts = []
 
-      machines.each do |host, _d|
+      machines.each_key do |host|
         list = ConfCtl::Generation::BuildList.new(host)
 
         gen =

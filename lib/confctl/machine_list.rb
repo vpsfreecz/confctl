@@ -23,6 +23,16 @@ module ConfCtl
     end
 
     # @yieldparam [String] host
+    def each_key(&)
+      machines.each_key(&)
+    end
+
+    # @yieldparam [Machine] machine
+    def each_value(&)
+      machines.each_value(&)
+    end
+
+    # @yieldparam [String] host
     # @yieldparam [Machine] machine
     # @return [MachineList]
     def select(&)
@@ -53,7 +63,7 @@ module ConfCtl
 
     # @return [Machine]
     def get_one
-      @machines.each { |_, machine| return machine }
+      @machines.each_value { |machine| return machine }
       nil
     end
 
@@ -74,7 +84,7 @@ module ConfCtl
     def health_checks
       checks = []
 
-      machines.each do |_host, machine|
+      machines.each_value do |machine|
         checks.concat(machine.health_checks)
       end
 
