@@ -37,6 +37,7 @@ module ConfCtl
     end
 
     protected
+
     def read_settings
       if @settings.nil?
         nix = Nix.stateless

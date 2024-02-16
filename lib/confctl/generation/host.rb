@@ -1,16 +1,6 @@
 module ConfCtl
   class Generation::Host
-    attr_reader :host
-
-    attr_reader :profile
-
-    attr_reader :id
-
-    attr_reader :toplevel
-
-    attr_reader :date
-
-    attr_reader :current
+    attr_reader :host, :profile, :id, :toplevel, :date, :current
 
     # @param host [String]
     # @param profile [String]
@@ -33,12 +23,13 @@ module ConfCtl
     end
 
     def destroy
-      fail 'machine control not available' if mc.nil?
+      raise 'machine control not available' if mc.nil?
 
       mc.execute('nix-env', '-p', profile, '--delete-generations', id.to_s)
     end
 
     protected
+
     attr_reader :mc
   end
 end

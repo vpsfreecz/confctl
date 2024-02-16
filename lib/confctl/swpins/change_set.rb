@@ -39,9 +39,9 @@ module ConfCtl
     def add(owner, spec)
       @owners[owner] ||= []
       @owners[owner] << SpecSet.new(
-        spec: spec,
+        spec:,
         original_version: spec.valid? ? spec.version : nil,
-        original_info: spec.valid? ? spec.info : nil,
+        original_info: spec.valid? ? spec.info : nil
       )
       nil
     end
@@ -59,12 +59,13 @@ module ConfCtl
         *changed_files
       )
 
-      unless ret
-        fail 'git commit exited with non-zero status code'
-      end
+      return if ret
+
+      raise 'git commit exited with non-zero status code'
     end
 
     protected
+
     def build_message(type, changelog)
       msg = 'swpins: '
 
@@ -94,11 +95,11 @@ module ConfCtl
           if spec_set.changed?
             msg << "#{owner.name} #{spec_set.name}: "
 
-            if spec_set.original_version
-              msg << "#{spec_set.original_version} -> #{spec_set.new_version}\n"
-            else
-              msg << "set to #{spec_set.new_version}\n"
-            end
+            msg << if spec_set.original_version
+                     "#{spec_set.original_version} -> #{spec_set.new_version}\n"
+                   else
+                     "set to #{spec_set.new_version}\n"
+                   end
 
             if changelog
               msg << spec_set.string_changelog(type)
@@ -124,7 +125,7 @@ module ConfCtl
 
       expected_spec_sets = @owners.first[1]
 
-      @owners.each do |owner, spec_sets|
+      @owners.each do |_owner, spec_sets|
         return false if expected_spec_sets.length != spec_sets.length
 
         spec_sets.each do |spec_set|

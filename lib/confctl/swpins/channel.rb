@@ -21,11 +21,11 @@ module ConfCtl
     end
 
     def parse
-      if File.exist?(path)
-        @json_specs = JSON.parse(File.read(path))
-      else
-        @json_specs = {}
-      end
+      @json_specs = if File.exist?(path)
+                      JSON.parse(File.read(path))
+                    else
+                      {}
+                    end
 
       @specs = Hash[nix_specs.map do |name, nix_opts|
         [
@@ -33,8 +33,8 @@ module ConfCtl
           Swpins::Spec.for(nix_opts['type'].to_sym).new(
             name,
             nix_opts[nix_opts['type']],
-            json_specs[name],
-          ),
+            json_specs[name]
+          )
         ]
       end]
     end
@@ -56,6 +56,7 @@ module ConfCtl
     end
 
     protected
+
     attr_reader :nix_specs, :json_specs
   end
 end

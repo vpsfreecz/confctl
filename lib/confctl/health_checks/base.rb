@@ -19,10 +19,11 @@ module ConfCtl
       now = @started_at
       attempt = 1
 
-      until timeout?(now) do
+      until timeout?(now)
         @errors.clear
         run_check
         break if successful?
+
         yield(attempt, errors) if block_given?
         sleep(cooldown)
         attempt += 1
@@ -43,13 +44,14 @@ module ConfCtl
     end
 
     protected
+
     attr_reader :started_at
 
     def run_check
       raise NotImplementedError
     end
 
-    def timeout?(time)
+    def timeout?(_time)
       true
     end
 

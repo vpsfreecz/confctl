@@ -14,14 +14,14 @@ module ConfCtl::Cli
           sw: spec.name,
           channel: spec.channel,
           type: spec.type,
-          pin: spec.status,
+          pin: spec.status
         }
       end
 
       OutputFormatter.print(
         rows,
-        %i(cluster_name sw channel type pin),
-        layout: :columns,
+        %i[cluster_name sw channel type pin],
+        layout: :columns
       )
     end
 
@@ -42,16 +42,16 @@ module ConfCtl::Cli
 
       cluster_names.each(&:save)
 
-      if opts[:commit]
-        change_set.commit(
-          type: opts[:downgrade] ? :downgrade : :upgrade,
-          changelog: opts[:changelog],
-        )
-      end
+      return unless opts[:commit]
+
+      change_set.commit(
+        type: opts[:downgrade] ? :downgrade : :upgrade,
+        changelog: opts[:changelog]
+      )
     end
 
     def update
-      require_args!(optional: %w(cluster-name sw))
+      require_args!(optional: %w[cluster-name sw])
       cluster_names = []
       change_set = ConfCtl::Swpins::ChangeSet.new
 
@@ -69,12 +69,12 @@ module ConfCtl::Cli
 
       cluster_names.each(&:save)
 
-      if opts[:commit]
-        change_set.commit(
-          type: opts[:downgrade] ? :downgrade : :upgrade,
-          changelog: opts[:changelog],
-        )
-      end
+      return unless opts[:commit]
+
+      change_set.commit(
+        type: opts[:downgrade] ? :downgrade : :upgrade,
+        changelog: opts[:changelog]
+      )
     end
   end
 end

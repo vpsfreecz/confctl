@@ -20,7 +20,7 @@ module ConfCtl
 
       Dir.entries(dir).each do |v|
         abs_path = File.join(dir, v)
-        next if %w(. ..).include?(v) || !Dir.exist?(abs_path) || File.symlink?(abs_path)
+        next if %w[. ..].include?(v) || !Dir.exist?(abs_path) || File.symlink?(abs_path)
 
         gen = Generation::Build.new(host)
 
@@ -55,8 +55,8 @@ module ConfCtl
       index[name]
     end
 
-    def each(&block)
-      generations.each(&block)
+    def each(&)
+      generations.each(&)
     end
 
     # @return [Array<Generation::Build>]
@@ -86,6 +86,7 @@ module ConfCtl
     end
 
     protected
+
     attr_reader :generations, :index
 
     def dir

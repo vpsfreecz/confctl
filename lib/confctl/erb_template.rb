@@ -16,9 +16,7 @@ module ConfCtl
       @_tpl = ERB.new(
         File.read(
           File.join(ConfCtl.root, 'template', "#{name}.erb")
-        ),
-        0,
-        '-',
+        ), trim_mode: '-'
       )
 
       vars.each do |k, v|

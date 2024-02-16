@@ -1,5 +1,5 @@
 module ConfCtl
-  module Cli ; end
+  module Cli; end
 end
 
 require_rel 'cli'

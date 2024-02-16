@@ -52,17 +52,17 @@ module ConfCtl
       end
 
       # Add core-specific specs
-      if File.exist?(path)
-        @json_specs = JSON.parse(File.read(path))
-      else
-        @json_specs = {}
-      end
+      @json_specs = if File.exist?(path)
+                      JSON.parse(File.read(path))
+                    else
+                      {}
+                    end
 
       nix_specs.each do |name, nix_opts|
         specs[name] = Swpins::Spec.for(nix_opts['type'].to_sym).new(
           name,
           nix_opts[nix_opts['type']],
-          json_specs[name],
+          json_specs[name]
         )
       end
     end
@@ -116,7 +116,7 @@ module ConfCtl
 
       swpins = JSON.parse(File.read(path))
 
-      swpins.each do |pin, path|
+      swpins.each do |_pin, path|
         return unless Dir.exist?(path)
       end
 
@@ -124,6 +124,7 @@ module ConfCtl
     end
 
     protected
+
     attr_reader :nix_specs, :json_specs
 
     def cache_dir

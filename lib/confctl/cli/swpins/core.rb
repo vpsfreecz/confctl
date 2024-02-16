@@ -17,14 +17,14 @@ module ConfCtl::Cli
           sw: spec.name,
           channel: spec.channel,
           type: spec.type,
-          pin: spec.status,
+          pin: spec.status
         }
       end
 
       OutputFormatter.print(
         rows,
-        %i(sw channel type pin),
-        layout: :columns,
+        %i[sw channel type pin],
+        layout: :columns
       )
     end
 
@@ -34,7 +34,7 @@ module ConfCtl::Cli
       core = ConfCtl::Swpins::Core.get
       change_set = ConfCtl::Swpins::ChangeSet.new
 
-      core.specs.each do |name, spec|
+      core.specs.each do |_name, spec|
         if spec.from_channel?
           puts "Skipping #{spec.name} as it comes from channel #{spec.channel}"
         else
@@ -46,16 +46,16 @@ module ConfCtl::Cli
       core.save
       core.pre_evaluate
 
-      if opts[:commit]
-        change_set.commit(
-          type: opts[:downgrade] ? :downgrade : :upgrade,
-          changelog: opts[:changelog],
-        )
-      end
+      return unless opts[:commit]
+
+      change_set.commit(
+        type: opts[:downgrade] ? :downgrade : :upgrade,
+        changelog: opts[:changelog]
+      )
     end
 
     def update
-      require_args!(optional: %w(sw))
+      require_args!(optional: %w[sw])
       core = ConfCtl::Swpins::Core.get
       change_set = ConfCtl::Swpins::ChangeSet.new
 
@@ -75,12 +75,12 @@ module ConfCtl::Cli
       core.save
       core.pre_evaluate
 
-      if opts[:commit]
-        change_set.commit(
-          type: opts[:downgrade] ? :downgrade : :upgrade,
-          changelog: opts[:changelog],
-        )
-      end
+      return unless opts[:commit]
+
+      change_set.commit(
+        type: opts[:downgrade] ? :downgrade : :upgrade,
+        changelog: opts[:changelog]
+      )
     end
   end
 end

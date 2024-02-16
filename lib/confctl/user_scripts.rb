@@ -30,12 +30,12 @@ module ConfCtl
 
     # @return [Array<UserScript>]
     def self.get
-      (@scripts || [])
+      @scripts || []
     end
 
     # @yieldparam [UserScript]
-    def self.each(&block)
-      get.each(&block)
+    def self.each(&)
+      get.each(&)
     end
   end
 end

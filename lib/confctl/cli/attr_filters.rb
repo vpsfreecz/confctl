@@ -11,6 +11,7 @@ module ConfCtl::Cli
     end
 
     protected
+
     attr_reader :filters
 
     def parse_all(str_filters)
@@ -19,7 +20,7 @@ module ConfCtl::Cli
       str_filters.each do |s|
         k, v = parse_one(s, '!=')
         if k
-          ret << Proc.new do |machine|
+          ret << proc do |machine|
             machine[k].to_s != v
           end
           next
@@ -27,7 +28,7 @@ module ConfCtl::Cli
 
         k, v = parse_one(s, '=')
         if k
-          ret << Proc.new do |machine|
+          ret << proc do |machine|
             machine[k].to_s == v
           end
           next
@@ -44,7 +45,7 @@ module ConfCtl::Cli
       return false unless i
 
       len = sep.length
-      [v[0..i-1], v[i+len..-1]]
+      [v[0..i - 1], v[i + len..-1]]
     end
   end
 end

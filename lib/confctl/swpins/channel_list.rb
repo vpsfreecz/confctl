@@ -16,7 +16,7 @@ module ConfCtl
 
     # @param pattern [String]
     def initialize(pattern: '*')
-      parse(pattern: pattern)
+      parse(pattern:)
     end
 
     # @param pattern [String]
@@ -31,10 +31,12 @@ module ConfCtl
     end
 
     protected
+
     def parse(pattern: '*')
       nix = Nix.new
       nix.list_swpins_channels.each do |name, nix_specs|
         next unless Pattern.match?(pattern, name)
+
         c = Swpins::Channel.new(name, nix_specs)
         c.parse
         self << c

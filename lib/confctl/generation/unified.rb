@@ -77,7 +77,7 @@ module ConfCtl
       end
     end
 
-    %i(swpin_names swpin_specs).each do |v|
+    %i[swpin_names swpin_specs].each do |v|
       define_method(v) do
         build_generation ? build_generation.send(v) : []
       end
@@ -93,8 +93,6 @@ module ConfCtl
         'build'
       elsif host
         'host'
-      else
-        nil
       end
     end
 
@@ -106,7 +104,7 @@ module ConfCtl
       elsif host_generation
         'host'
       else
-        fail 'programming error'
+        raise 'programming error'
       end
     end
 

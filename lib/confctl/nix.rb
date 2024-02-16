@@ -10,7 +10,7 @@ module ConfCtl
     # called outside of cluster configuration directory.
     # @return [Nix]
     def self.stateless(show_trace: false, max_jobs: 'auto')
-      new(show_trace: show_trace, max_jobs: max_jobs)
+      new(show_trace:, max_jobs:)
     end
 
     include Utils::File
@@ -26,13 +26,13 @@ module ConfCtl
       out_link = File.join(
         cache_dir,
         'build',
-        'settings.json',
+        'settings.json'
       )
 
       with_cache(out_link) do
         with_argument({
           confDir: conf_dir,
-          build: :confctl,
+          build: :confctl
         }) do |arg|
           cmd_args = [
             'nix-build',
@@ -40,7 +40,7 @@ module ConfCtl
             '--out-link', out_link,
             (show_trace ? '--show-trace' : nil),
             (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
-            ConfCtl.nix_asset('evaluator.nix'),
+            ConfCtl.nix_asset('evaluator.nix')
           ].flatten.compact
 
           cmd.run(*cmd_args)
@@ -55,7 +55,7 @@ module ConfCtl
     def module_options
       options = nix_instantiate({
         confDir: conf_dir,
-        build: :moduleOptions,
+        build: :moduleOptions
       })
     end
 
@@ -64,7 +64,7 @@ module ConfCtl
     def list_machine_fqdns
       nix_instantiate({
         confDir: conf_dir,
-        build: :list,
+        build: :list
       })['machines']
     end
 
@@ -74,13 +74,13 @@ module ConfCtl
       out_link = File.join(
         cache_dir,
         'build',
-        'machine-list.json',
+        'machine-list.json'
       )
 
       with_cache(out_link) do
         with_argument({
           confDir: conf_dir,
-          build: :info,
+          build: :info
         }, core_swpins: true) do |arg|
           cmd_args = [
             'nix-build',
@@ -88,7 +88,7 @@ module ConfCtl
             '--out-link', out_link,
             (show_trace ? '--show-trace' : nil),
             (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
-            ConfCtl.nix_asset('evaluator.nix'),
+            ConfCtl.nix_asset('evaluator.nix')
           ].flatten.compact
 
           cmd.run(*cmd_args)
@@ -101,7 +101,7 @@ module ConfCtl
     def list_swpins_channels
       nix_instantiate({
         confDir: conf_dir,
-        build: :listSwpinsChannels,
+        build: :listSwpinsChannels
       })
     end
 
@@ -110,12 +110,12 @@ module ConfCtl
     def eval_core_swpins
       with_argument({
         confDir: conf_dir,
-        build: :evalCoreSwpins,
+        build: :evalCoreSwpins
       }) do |arg|
         out_link = File.join(
           cache_dir,
           'build',
-          'core.swpins',
+          'core.swpins'
         )
 
         cmd_args = [
@@ -124,10 +124,10 @@ module ConfCtl
           '--out-link', out_link,
           (show_trace ? '--show-trace' : nil),
           (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
-          ConfCtl.nix_asset('evaluator.nix'),
+          ConfCtl.nix_asset('evaluator.nix')
         ].flatten.compact
 
-        out, _ = cmd.run(*cmd_args).stdout
+        out, = cmd.run(*cmd_args).stdout
 
         JSON.parse(File.read(out.strip))
       end
@@ -140,12 +140,12 @@ module ConfCtl
       with_argument({
         confDir: conf_dir,
         build: :evalHostSwpins,
-        machines: [host],
+        machines: [host]
       }, core_swpins: true) do |arg|
         out_link = File.join(
           cache_dir,
           'build',
-          "#{ConfCtl.safe_host_name(host)}.swpins",
+          "#{ConfCtl.safe_host_name(host)}.swpins"
         )
 
         cmd_args = [
@@ -154,10 +154,10 @@ module ConfCtl
           '--out-link', out_link,
           (show_trace ? '--show-trace' : nil),
           (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
-          ConfCtl.nix_asset('evaluator.nix'),
+          ConfCtl.nix_asset('evaluator.nix')
         ].flatten.compact
 
-        out, _ = cmd.run(*cmd_args)
+        out, = cmd.run(*cmd_args)
 
         JSON.parse(File.read(out.strip))[host]
       end
@@ -180,7 +180,7 @@ module ConfCtl
       with_argument({
         confDir: conf_dir,
         build: :toplevel,
-        machines: hosts,
+        machines: hosts
       }) do |arg|
         time ||= Time.now
         ret_generations = {}
@@ -191,7 +191,7 @@ module ConfCtl
           '--out-link', out_link,
           (show_trace ? '--show-trace' : nil),
           (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
-          ConfCtl.nix_asset('evaluator.nix'),
+          ConfCtl.nix_asset('evaluator.nix')
         ].flatten.compact
 
         nb = NixBuild.new(cmd_args, swpin_paths)
@@ -209,7 +209,7 @@ module ConfCtl
                 toplevel,
                 swpin_paths,
                 host_swpin_specs[host],
-                date: time,
+                date: time
               )
               generation.save
             end
@@ -233,12 +233,12 @@ module ConfCtl
     # @yieldparam path [String]
     #
     # @return [Boolean]
-    def copy(machine, toplevel, &block)
+    def copy(machine, toplevel, &)
       if machine.localhost?
         true
       else
         cp = NixCopy.new(machine.target_host, toplevel)
-        cp.run!(&block).success?
+        cp.run!(&).success?
       end
     end
 
@@ -259,7 +259,7 @@ module ConfCtl
       args = [
         'nix-env',
         '-p', '/nix/var/nix/profiles/system',
-        '--set', toplevel,
+        '--set', toplevel
       ]
 
       MachineControl.new(machine).execute!(*args).success?
@@ -279,18 +279,19 @@ module ConfCtl
       args << '--command'
       args << command
 
-      cmd.run!(*args, env: {'shellHook' => nil}).success?
+      cmd.run!(*args, env: { 'shellHook' => nil }).success?
     end
 
     # @param machine [Machine]
     # @yieldparam progress [NixCollectGarbage::Progress]
     # @return [Boolean]
-    def collect_garbage(machine, &block)
+    def collect_garbage(machine, &)
       gc = NixCollectGarbage.new(machine)
-      gc.run!(&block).success?
+      gc.run!(&).success?
     end
 
     protected
+
     attr_reader :conf_dir, :show_trace, :max_jobs, :cmd
 
     # Execute block only if `out_link` does not exist or conf dir has changed
@@ -321,7 +322,7 @@ module ConfCtl
 
       Logger.instance << "Building #{out_link}\n"
 
-      if !unchanged
+      unless unchanged
         Logger.instance << "Updating configuration cache\n"
         ConfDir.update_state
       end
@@ -356,10 +357,10 @@ module ConfCtl
           '--arg', 'jsonArg', arg,
           (show_trace ? '--show-trace' : nil),
           (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
-          ConfCtl.nix_asset('evaluator.nix'),
+          ConfCtl.nix_asset('evaluator.nix')
         ].flatten.compact
 
-        out, _ = cmd.run(*cmd_args).stdout
+        out, = cmd.run(*cmd_args).stdout
 
         demodulify(JSON.parse(out))
       end
@@ -370,7 +371,7 @@ module ConfCtl
         value.each { |item| demodulify(item) }
       elsif value.is_a?(Hash)
         value.delete('_module')
-        value.each { |k, v| demodulify(v) }
+        value.each { |_k, v| demodulify(v) }
       end
     end
 

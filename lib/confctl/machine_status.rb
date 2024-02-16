@@ -49,7 +49,7 @@ module ConfCtl
 
     # @return [Boolean]
     attr_reader :online
-    alias_method :online?, :online
+    alias online? online
 
     # @return [Float]
     attr_reader :uptime
@@ -111,7 +111,7 @@ module ConfCtl
       begin
         @swpins_info = Swpins::DeployedInfo.parse!(mc.read_file('/etc/confctl/swpins-info.json'))
       rescue Error
-        return
+        nil
       end
     end
 
@@ -122,13 +122,14 @@ module ConfCtl
         swpins_state[name] = SwpinState.new(spec, swpins_info && swpins_info[name])
       end
 
-      outdated_swpins = swpins_state.detect { |k, v| v.outdated? }
+      outdated_swpins = swpins_state.detect { |_k, v| v.outdated? }
       @online = uptime ? true : false
       @status = online? && !outdated_swpins
       @status = false if target_toplevel && target_toplevel != current_toplevel
     end
 
     protected
+
     attr_reader :mc
   end
 end

@@ -5,13 +5,9 @@ module ConfCtl
     end
 
     # @param hooks [Hook]
-    def setup_hooks(hooks)
-
-    end
+    def setup_hooks(hooks); end
 
     # @param app [GLI::App]
-    def setup_cli(app)
-
-    end
+    def setup_cli(app); end
   end
 end

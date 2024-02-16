@@ -10,12 +10,13 @@ module ConfCtl
     end
 
     protected
+
     def wrap_fetcher
       set_fetcher('git-rev', {
         'rev' => state['rev'],
         'wrapped_fetcher' => {
           'type' => fetcher,
-          'options' => fetcher_opts,
+          'options' => fetcher_opts
         }
       })
     end

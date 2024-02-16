@@ -15,7 +15,7 @@ module ConfCtl
     def run!(&block)
       cmd = SystemCommand.new
 
-      line_buf = StdLineBuffer.new do |out, err|
+      line_buf = StdLineBuffer.new do |_out, err|
         parse_line(err, &block) if err && block
       end
 
@@ -31,18 +31,19 @@ module ConfCtl
     end
 
     protected
+
     attr_reader :target, :store_path
 
     def parse_line(line)
       if @total.nil? && /^copying (\d+) paths/ =~ line
-        @total = $1.to_i
+        @total = ::Regexp.last_match(1).to_i
         return
       end
 
-      if /^copying path '([^']+)/ =~ line
-        @progress += 1
-        yield(@progress, @total, $1)
-      end
+      return unless /^copying path '([^']+)/ =~ line
+
+      @progress += 1
+      yield(@progress, @total, ::Regexp.last_match(1))
     end
   end
 end

@@ -9,8 +9,8 @@ module ConfCtl::Cli
     # All writes to the console must go through this lock
     CONSOLE_LOCK = Monitor.new
 
-    def self.sync_console(&block)
-      CONSOLE_LOCK.synchronize(&block)
+    def self.sync_console(&)
+      CONSOLE_LOCK.synchronize(&)
     end
 
     # Instantiate {LogView}, yield and then cleanup
@@ -106,8 +106,8 @@ module ConfCtl::Cli
       inlines << line.strip
     end
 
-    def sync_console(&block)
-      self.class.sync_console(&block)
+    def sync_console(&)
+      self.class.sync_console(&)
     end
 
     def enabled?
@@ -115,9 +115,10 @@ module ConfCtl::Cli
     end
 
     protected
+
     attr_reader :output, :cursor, :outmutex, :inlines, :outlines, :size,
-      :current_size, :reserved_lines, :feeder, :renderer, :rows, :cols, :header, :title,
-      :generation, :rendered
+                :current_size, :reserved_lines, :feeder, :renderer, :rows, :cols, :header, :title,
+                :generation, :rendered
 
     def feeder_loop
       loop do
@@ -127,7 +128,7 @@ module ConfCtl::Cli
         sync_outlines do
           # TABs have variable width, there's no way to correctly determine
           # their size, so we replace them with spaces.
-          outlines << line.gsub("\t", "  ")
+          outlines << line.gsub("\t", '  ')
           outlines.shift while outlines.length > current_size
           @generation += 1
         end
@@ -163,6 +164,7 @@ module ConfCtl::Cli
         end
 
         return if stop?
+
         sleep(0.1)
       end
     end
@@ -208,7 +210,7 @@ module ConfCtl::Cli
         end
 
         output.print(cursor.clear_line)
-        output.puts('<' + '-' * (cols-1))
+        output.puts('<' + ('-' * (cols - 1)))
         output.puts
       end
     end
@@ -219,14 +221,14 @@ module ConfCtl::Cli
       ret = ''
       ret << s
       ret << ' '
-      ret << '-' * (cols - uncolored.length - 2)
+      ret << ('-' * (cols - uncolored.length - 2))
       ret << '>'
       ret
     end
 
     def fit_line(line)
       if line.length >= (cols - 4)
-        line[0..(cols-4)] + "..."
+        line[0..(cols - 4)] + '...'
       else
         line
       end
@@ -235,16 +237,16 @@ module ConfCtl::Cli
     def fetch_size
       @rows, @cols = IO.console.winsize
 
-      if size == :auto
-        new_size = rows
-        new_size -= header.lines.count if header
-        new_size -= reserved_lines
-        @current_size = [new_size, 10].max
-      end
+      return unless size == :auto
+
+      new_size = rows
+      new_size -= header.lines.count if header
+      new_size -= reserved_lines
+      @current_size = [new_size, 10].max
     end
 
-    def sync_outlines(&block)
-      sync_mutex(outmutex, &block)
+    def sync_outlines(&)
+      sync_mutex(outmutex, &)
     end
 
     def sync_mutex(mutex, &block)

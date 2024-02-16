@@ -37,6 +37,7 @@ module ConfCtl
     # @param force [Boolean] force a new check
     def uptodate?(force: false)
       return @uptodate if !@uptodate.nil? && !force
+
       @uptodate = check_uptodate
       @uptodate
     end
@@ -54,14 +55,14 @@ module ConfCtl
 
         @files[file] = {
           'mtime' => st.mtime.to_i,
-          'size' => st.size,
+          'size' => st.size
         }
       end
 
       tmp = "#{@cache_file}.new"
 
       FileUtils.mkpath(@cache_dir)
-      File.write(tmp, {'files' => @files}.to_json)
+      File.write(tmp, { 'files' => @files }.to_json)
       File.rename(tmp, @cache_file)
 
       @uptodate = true
@@ -75,6 +76,7 @@ module ConfCtl
     end
 
     protected
+
     def check_uptodate
       load_cache unless @loaded
       return false if @files.empty?
@@ -96,7 +98,7 @@ module ConfCtl
     end
 
     def list_files
-      out, _ = @cmd.run('git', '-C', @path, 'ls-files', '-z')
+      out, = @cmd.run('git', '-C', @path, 'ls-files', '-z')
       out.strip.split("\0")
     end
   end

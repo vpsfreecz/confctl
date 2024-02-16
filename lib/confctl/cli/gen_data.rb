@@ -15,18 +15,18 @@ module ConfCtl::Cli
       machines = ConfCtl::MachineList.new
       data = {}
 
-      machines.each do |host, m|
+      machines.each do |_host, m|
         next if m['container'].nil?
 
         ct = api.vps.show(
           m['container.id'],
-          meta: {includes: 'node__location__environment'},
+          meta: { includes: 'node__location__environment' }
         )
 
         ct_fqdn = [
           m['host.name'],
           m['host.location'],
-          m['host.domain'],
+          m['host.domain']
         ].compact.join('.')
 
         data[ct_fqdn] = {
@@ -35,8 +35,8 @@ module ConfCtl::Cli
             name: ct.node.name,
             location: ct.node.location.domain,
             domain: ct.node.location.environment.domain,
-            fqdn: "#{ct.node.domain_name}.#{ct.node.location.environment.domain}",
-          },
+            fqdn: "#{ct.node.domain_name}.#{ct.node.location.environment.domain}"
+          }
         }
       end
 
@@ -57,7 +57,7 @@ module ConfCtl::Cli
 
       [4, 6].each do |ip_v|
         data["ipv#{ip_v}"] = networks.select { |net| net.ip_version == ip_v }.map do |net|
-          {address: net.address, prefix: net.prefix}
+          { address: net.address, prefix: net.prefix }
         end
       end
 
@@ -68,8 +68,10 @@ module ConfCtl::Cli
     end
 
     protected
+
     def get_vpsadmin_client
       return @api if @api
+
       @api = VpsFree::Client.new
 
       user = ask('User name: ') { |q| q.default = nil }.to_s
@@ -78,15 +80,15 @@ module ConfCtl::Cli
         q.echo = false
       end.to_s
 
-      @api.authenticate(:basic, user: user, password: password)
+      @api.authenticate(:basic, user:, password:)
       @api
     end
 
-    def update_file(relpath)
+    def update_file(relpath, &)
       abs = File.join(data_dir, relpath)
       tmp = "#{abs}.new"
 
-      File.open(tmp, 'w') { |f| yield(f) }
+      File.open(tmp, 'w', &)
       File.rename(tmp, abs)
     end
 

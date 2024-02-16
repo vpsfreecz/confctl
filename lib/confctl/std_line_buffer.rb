@@ -13,7 +13,7 @@ module ConfCtl
     # Get a block which can be called to feed data to the buffer
     # @return [Proc]
     def feed_block
-      Proc.new do |stdout, stderr|
+      proc do |stdout, stderr|
         @mutex.synchronize do
           out_buffer << stdout if stdout
           err_buffer << stderr if stderr
@@ -34,6 +34,7 @@ module ConfCtl
     end
 
     protected
+
     attr_reader :out_buffer, :err_buffer, :block
   end
 end

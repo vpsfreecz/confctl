@@ -12,18 +12,16 @@ module ConfCtl
         @default = nixos_opt['default']
         @example = nixos_opt['example']
         @declarations = nixos_opt['declarations'].map do |v|
-          if /\/confctl\/([^$]+)/ =~ v
-            "<confctl/#{$1}>"
-          else
-            fail "unable to place module '#{v}'"
-          end
+          raise "unable to place module '#{v}'" unless %r{/confctl/([^$]+)} =~ v
+
+          "<confctl/#{::Regexp.last_match(1)}>"
         end
       end
 
       def md_description
         tagless = description
-          .gsub(/<literal>([^<]+)<\/literal>/, '`\1`')
-          .gsub(/<option>([^<]+)<\/option>/, '`\1`')
+                  .gsub(%r{<literal>([^<]+)</literal>}, '`\1`')
+                  .gsub(%r{<option>([^<]+)</option>}, '`\1`')
 
         CGI.unescapeHTML(tagless)
       end
@@ -37,6 +35,7 @@ module ConfCtl
       end
 
       protected
+
       def nixify(v)
         ConfCtl::Nixer.new(v).serialize
       end
@@ -77,6 +76,7 @@ module ConfCtl
     end
 
     protected
+
     attr_reader :nix
   end
 end

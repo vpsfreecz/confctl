@@ -21,31 +21,29 @@ module ConfCtl::Cli
       @color = color
 
       if @layout.nil?
-        if many?
-          @layout = :columns
+        @layout = if many?
+                    :columns
 
-        else
-          @layout = :rows
-        end
+                  else
+                    :rows
+                  end
       end
 
       if cols
         @cols = parse_cols(cols)
 
-      else
-        if @objects.is_a?(::Array) # A list of items
-          if @objects.count == 0
-            @cols = []
-          else
-            @cols ||= parse_cols(@objects.first.keys)
-          end
-
-        elsif @objects.is_a?(::Hash) # Single item
-          @cols ||= parse_cols(@objects.keys)
-
+      elsif @objects.is_a?(::Array)
+        if @objects.count == 0
+          @cols = []
         else
-          fail "unsupported type #{@objects.class}"
-        end
+          @cols ||= parse_cols(@objects.first.keys)
+        end # A list of items
+
+      elsif @objects.is_a?(::Hash) # Single item
+        @cols ||= parse_cols(@objects.keys)
+
+      else
+        raise "unsupported type #{@objects.class}"
       end
     end
 
@@ -61,6 +59,7 @@ module ConfCtl::Cli
     end
 
     protected
+
     def parse_cols(cols)
       ret = []
 
@@ -72,7 +71,7 @@ module ConfCtl::Cli
         if c.is_a?(::String) || c.is_a?(::Symbol)
           base.update({
               name: c,
-              label: c.to_s.upcase,
+              label: c.to_s.upcase
           })
           ret << base
 
@@ -81,7 +80,7 @@ module ConfCtl::Cli
           ret << base
 
         else
-          fail "unsupported column type #{c.class}"
+          raise "unsupported column type #{c.class}"
         end
       end
 
@@ -90,6 +89,7 @@ module ConfCtl::Cli
 
     def generate
       return if @cols.empty?
+
       prepare
 
       case @layout
@@ -100,7 +100,7 @@ module ConfCtl::Cli
         rows
 
       else
-        fail "unsupported layout '#{@layout}'"
+        raise "unsupported layout '#{@layout}'"
       end
     end
 
@@ -115,7 +115,7 @@ module ConfCtl::Cli
       if @header
         line(@cols.map.with_index do |c, i|
           fmt =
-            if i == (@cols.count-1)
+            if i == (@cols.count - 1)
               '%s'
             elsif c[:align].to_sym == :right
               "%#{c[:width]}s"
@@ -123,7 +123,7 @@ module ConfCtl::Cli
               "%-#{c[:width]}s"
             end
 
-          sprintf(fmt, c[:label])
+          format(fmt, c[:label])
         end.join('  '))
       end
 
@@ -140,18 +140,18 @@ module ConfCtl::Cli
             # unprintable characters.
             s_nocolor = Rainbow::StringUtils.uncolor(s)
 
-            if s_nocolor.length == s.length
-              w = c[:width]
+            w = if s_nocolor.length == s.length
+                  c[:width]
 
-            else
-              w = c[:width] + (s.length - s_nocolor.length)
-            end
+                else
+                  c[:width] + (s.length - s_nocolor.length)
+                end
           else
             w = c[:width]
           end
 
           fmt =
-            if i == (@cols.count-1)
+            if i == (@cols.count - 1)
               '%s'
             elsif c[:align].to_sym == :right
               "%#{w}s"
@@ -159,7 +159,7 @@ module ConfCtl::Cli
               "%-#{w}s"
             end
 
-          sprintf(fmt, s)
+          format(fmt, s)
         end.join('  '))
       end
     end
@@ -179,13 +179,13 @@ module ConfCtl::Cli
 
           if o[i].is_a?(::String) && o[i].index("\n")
             lines = o[i].split("\n")
-            v = ([lines.first] + lines[1..-1].map { |l| (' ' * (w+3)) + l }).join("\n")
+            v = ([lines.first] + lines[1..-1].map { |l| (' ' * (w + 3)) + l }).join("\n")
 
           else
             v = o[i]
           end
 
-          line sprintf("%#{w}s:  %s", c[:label], v)
+          line format("%#{w}s:  %s", c[:label], v)
         end
 
         line
@@ -208,7 +208,7 @@ module ConfCtl::Cli
         arr = []
 
         @cols.each do |c|
-          v = o[ c[:name] ]
+          v = o[c[:name]]
           str = (c[:display] ? c[:display].call(v, o) : v)
           str = @empty if !str || (str.is_a?(::String) && str.empty?)
 
@@ -221,7 +221,8 @@ module ConfCtl::Cli
       if @sort
         col_indexes = @sort.map do |s|
           i = @cols.index { |c| c[:name] == s }
-          fail "unknown sort column '#{s}'" unless i
+          raise "unknown sort column '#{s}'" unless i
+
           i
         end
 
@@ -233,6 +234,7 @@ module ConfCtl::Cli
 
           next(-1) if [nil, @empty].detect { |v| a_vals.include?(v) }
           next(1) if [nil, @empty].detect { |v| b_vals.include?(v) }
+
           0
         end
       end
@@ -244,11 +246,11 @@ module ConfCtl::Cli
       w = c[:label].to_s.length
 
       @str_objects.each do |o|
-        if @color
-          len = Rainbow::StringUtils.uncolor(o[i].to_s).length
-        else
-          len = o[i].to_s.length
-        end
+        len = if @color
+                Rainbow::StringUtils.uncolor(o[i].to_s).length
+              else
+                o[i].to_s.length
+              end
 
         w = len if len > w
       end
@@ -268,9 +270,9 @@ module ConfCtl::Cli
       w + 1
     end
 
-    def each_object
+    def each_object(&)
       if @objects.is_a?(::Array)
-        @objects.each { |v| yield(v) }
+        @objects.each(&)
 
       else
         yield(@objects)

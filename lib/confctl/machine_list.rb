@@ -5,7 +5,7 @@ module ConfCtl
     # @param machine [Machine]
     # @return [MachineList]
     def self.from_machine(machine)
-      new(machines: {machine.name => machine})
+      new(machines: { machine.name => machine })
     end
 
     # @param opts [Hash]
@@ -18,32 +18,32 @@ module ConfCtl
 
     # @yieldparam [String] host
     # @yieldparam [Machine] machine
-    def each(&block)
-      machines.each(&block)
+    def each(&)
+      machines.each(&)
     end
 
     # @yieldparam [String] host
     # @yieldparam [Machine] machine
     # @return [MachineList]
-    def select(&block)
-      self.class.new(machines: machines.select(&block))
+    def select(&)
+      self.class.new(machines: machines.select(&))
     end
 
     # @yieldparam [String] host
     # @yieldparam [Machine] machine
     # @return [Array]
-    def map(&block)
-      machines.map(&block)
+    def map(&)
+      machines.map(&)
     end
 
     # @return [MachineList]
     def managed
-      select { |host, machine| machine.managed }
+      select { |_host, machine| machine.managed }
     end
 
     # @return [MachineList]
     def unmanaged
-      select { |host, machine| !machine.managed }
+      select { |_host, machine| !machine.managed }
     end
 
     # @param host [String]
@@ -74,7 +74,7 @@ module ConfCtl
     def health_checks
       checks = []
 
-      machines.each do |host, machine|
+      machines.each do |_host, machine|
         checks.concat(machine.health_checks)
       end
 
@@ -82,6 +82,7 @@ module ConfCtl
     end
 
     protected
+
     attr_reader :opts, :machines
 
     def extract

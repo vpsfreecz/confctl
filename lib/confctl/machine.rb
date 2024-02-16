@@ -6,7 +6,7 @@ module ConfCtl
     def initialize(opts)
       @opts = opts
       @name = opts['name']
-      @safe_name = opts['name'].gsub(/\//, ':')
+      @safe_name = opts['name'].gsub('/', ':')
       @managed = opts['managed']
       @spin = opts['spin']
     end
@@ -22,8 +22,9 @@ module ConfCtl
     def nix_paths
       Hash[opts['nix']['nixPath'].map do |v|
         eq = v.index('=')
-        fail "'#{v}' is not a valid nix path entry " if eq.nil?
-        [v[0..eq-1], v[eq+1..-1]]
+        raise "'#{v}' is not a valid nix path entry " if eq.nil?
+
+        [v[0..eq - 1], v[eq + 1..-1]]
       end]
     end
 
@@ -42,7 +43,7 @@ module ConfCtl
               self,
               property_checks: checks['systemProperties'].map do |v|
                 HealthChecks::Systemd::PropertyCheck.new(v)
-              end,
+              end
             )
           end
 
@@ -52,7 +53,7 @@ module ConfCtl
               pattern: unit_name,
               property_checks: prop_checks.map do |v|
                 HealthChecks::Systemd::PropertyCheck.new(v)
-              end,
+              end
             )
           end
 
@@ -61,12 +62,12 @@ module ConfCtl
             health_checks << HealthChecks::RunCommand.new(
               self,
               HealthChecks::RunCommand::Command.new(self, cmd),
-              remote: type == 'machineCommands',
+              remote: type == 'machineCommands'
             )
           end
 
         else
-          fail "Unsupported health-check type #{type.inspect}"
+          raise "Unsupported health-check type #{type.inspect}"
         end
       end
 
@@ -88,19 +89,18 @@ module ConfCtl
     end
 
     protected
+
     def get(hash, keys)
       k = keys.shift
 
-      if hash.has_key?(k)
-        if keys.empty?
-          hash[k]
-        elsif hash[k].nil?
-          nil
-        else
-          get(hash[k], keys)
-        end
-      else
+      return unless hash.has_key?(k)
+
+      if keys.empty?
+        hash[k]
+      elsif hash[k].nil?
         nil
+      else
+        get(hash[k], keys)
       end
     end
   end

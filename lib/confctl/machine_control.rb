@@ -18,7 +18,7 @@ module ConfCtl
       with_ssh_opts(
         '-o', 'ConnectTimeout=3',
         '-o', 'ServerAliveInterval=3',
-        '-o', 'ServerAliveCountMax=1',
+        '-o', 'ServerAliveCountMax=1'
       ) { get_uptime }
     end
 
@@ -53,7 +53,7 @@ module ConfCtl
           current_uptime = with_ssh_opts(
             '-o', 'ConnectTimeout=3',
             '-o', 'ServerAliveInterval=3',
-            '-o', 'ServerAliveCountMax=1',
+            '-o', 'ServerAliveCountMax=1'
           ) { get_uptime }
 
           if current_uptime < initial_uptime
@@ -72,7 +72,8 @@ module ConfCtl
         if timeout
           timeleft = (t + timeout) - Time.now
 
-          fail 'timeout' if timeleft <= 0
+          raise 'timeout' if timeleft <= 0
+
           yield state, timeleft if block_given?
         elsif block_given?
           yield state, nil
@@ -89,21 +90,21 @@ module ConfCtl
 
     # @return [Array<String>]
     def get_timezone
-      out, _ = run_cmd('date', '+%Z;%z')
+      out, = run_cmd('date', '+%Z;%z')
       out.strip.split(';')
     end
 
     # @param path [String]
     # @return [String]
     def read_file(path)
-      out, _ = run_cmd('cat', path)
+      out, = run_cmd('cat', path)
       out
     end
 
     # @param path [String]
     # @return [String]
     def read_symlink(path)
-      out, _ = run_cmd('readlink', path)
+      out, = run_cmd('readlink', path)
       out.strip
     end
 
@@ -112,16 +113,16 @@ module ConfCtl
     # @yieldparam err [String]
     # @raise [TTY::Command::ExitError]
     # @return [TTY::Command::Result]
-    def execute(*command, **options, &block)
-      run_cmd(*command, **options, &block)
+    def execute(...)
+      run_cmd(...)
     end
 
     # Execute command, no exception raised on error
     # @yieldparam out [String]
     # @yieldparam err [String]
     # @return [TTY::Command::Result]
-    def execute!(*command, **options, &block)
-      run_cmd!(*command, **options, &block)
+    def execute!(...)
+      run_cmd!(...)
     end
 
     # @param script [String]
@@ -131,17 +132,20 @@ module ConfCtl
     end
 
     protected
+
     attr_reader :cmd, :extra_ssh_opts
 
-    def run_cmd(*command, **kwargs, &block)
-      do_run_cmd(:run, *command, **kwargs, &block)
+    def run_cmd(...)
+      do_run_cmd(:run, ...)
     end
 
-    def run_cmd!(*command, **kwargs, &block)
-      do_run_cmd(:run!, *command, **kwargs, &block)
+    def run_cmd!(...)
+      do_run_cmd(:run!, ...)
     end
 
-    def do_run_cmd(method, *command, **kwargs, &block)
+    # rubocop:disable Style/ArgumentsForwarding
+
+    def do_run_cmd(method, *command, **kwargs, &)
       args =
         if machine.localhost?
           command
@@ -149,8 +153,10 @@ module ConfCtl
           ssh_args + command
         end
 
-      cmd.method(method).call(*args, **kwargs, &block)
+      cmd.method(method).call(*args, **kwargs, &)
     end
+
+    # rubocop:enable Style/ArgumentsForwarding
 
     def with_ssh_opts(*opts)
       @extra_ssh_opts = opts

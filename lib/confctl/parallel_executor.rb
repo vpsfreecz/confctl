@@ -26,6 +26,7 @@ module ConfCtl
     end
 
     protected
+
     attr_reader :threads, :queue, :mutex, :retvals
 
     def worker

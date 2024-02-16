@@ -1,7 +1,7 @@
 module ConfCtl::Cli
   module Swpins::Utils
     def cluster_name_list(pattern)
-      ConfCtl::Swpins::ClusterNameList.new(pattern: pattern)
+      ConfCtl::Swpins::ClusterNameList.new(pattern:)
     end
 
     def each_cluster_name(cn_pattern)

@@ -21,7 +21,7 @@ module ConfCtl::Cli
         puts 'The following generations will be removed:'
         list_generations(gens)
         puts
-        puts "Garbage collection: #{(opts[:remote] && opts[:gc]) ? 'yes' : 'no'}"
+        puts "Garbage collection: #{opts[:remote] && opts[:gc] ? 'yes' : 'no'}"
       end
 
       gens.each do |gen|
@@ -29,13 +29,13 @@ module ConfCtl::Cli
         gen.destroy
       end
 
-      if opts[:remote] && opts[:gc]
-        machines_gc = machines.select do |host, machine|
-          gens.detect { |gen| gen.host == host }
-        end
+      return unless opts[:remote] && opts[:gc]
 
-        run_gc(machines_gc)
+      machines_gc = machines.select do |host, _machine|
+        gens.detect { |gen| gen.host == host }
       end
+
+      run_gc(machines_gc)
     end
 
     def rotate
@@ -43,13 +43,9 @@ module ConfCtl::Cli
 
       to_delete = []
 
-      if opts[:remote]
-        to_delete.concat(host_generations_rotate(machines))
-      end
+      to_delete.concat(host_generations_rotate(machines)) if opts[:remote]
 
-      if opts[:local] || (!opts[:local] && !opts[:remote])
-        to_delete.concat(build_generations_rotate(machines))
-      end
+      to_delete.concat(build_generations_rotate(machines)) if opts[:local] || (!opts[:local] && !opts[:remote])
 
       if to_delete.empty?
         puts 'No generations to delete'
@@ -57,8 +53,8 @@ module ConfCtl::Cli
       end
 
       ask_confirmation! do
-        puts "The following generations will be removed:"
-        OutputFormatter.print(to_delete, %i(host name type id), layout: :columns)
+        puts 'The following generations will be removed:'
+        OutputFormatter.print(to_delete, %i[host name type id], layout: :columns)
         puts
         puts "Garbage collection: #{opts[:remote] ? 'when enabled in configuration' : 'no'}"
       end
@@ -68,30 +64,30 @@ module ConfCtl::Cli
         gen[:generation].destroy
       end
 
-      if opts[:remote]
-        global = ConfCtl::Settings.instance.host_generations
+      return unless opts[:remote]
 
-        machines_gc = machines.select do |host, machine|
-          gc = machine['buildGenerations']['collectGarbage']
+      global = ConfCtl::Settings.instance.host_generations
 
-          if gc.nil?
-            global['collectGarbage']
-          else
-            gc
-          end
+      machines_gc = machines.select do |_host, machine|
+        gc = machine['buildGenerations']['collectGarbage']
+
+        if gc.nil?
+          global['collectGarbage']
+        else
+          gc
         end
-
-        run_gc(machines_gc) if machines_gc.any?
       end
+
+      run_gc(machines_gc) if machines_gc.any?
     end
 
     def collect_garbage
       machines = select_machines(args[0])
 
-      fail 'No machines to collect garbage on' if machines.empty?
+      raise 'No machines to collect garbage on' if machines.empty?
 
       ask_confirmation! do
-        puts "Collect garbage on the following machines:"
+        puts 'Collect garbage on the following machines:'
         list_machines(machines)
       end
 
@@ -99,6 +95,7 @@ module ConfCtl::Cli
     end
 
     protected
+
     def select_generations(machines, pattern)
       gens = ConfCtl::Generation::UnifiedList.new
       include_remote = opts[:remote]
@@ -119,24 +116,20 @@ module ConfCtl::Cli
 
         tw.run
 
-        statuses.each do |host, st|
+        statuses.each do |_host, st|
           gens.add_host_generations(st.generations) if st.generations
         end
       end
 
       if include_local
-        machines.each do |host, machine|
+        machines.each do |host, _machine|
           gens.add_build_generations(ConfCtl::Generation::BuildList.new(host))
         end
       end
 
       select_old = pattern == 'old'
       select_older_than =
-        if !select_old && /\A(\d+)d\Z/ =~ pattern
-          Time.now - ($1.to_i * 24*60*60)
-        else
-          nil
-        end
+        (Time.now - (::Regexp.last_match(1).to_i * 24 * 60 * 60) if !select_old && /\A(\d+)d\Z/ =~ pattern)
 
       if pattern
         gens.delete_if do |gen|
@@ -162,11 +155,11 @@ module ConfCtl::Cli
           ConfCtl::Generation::BuildList.new(host),
           min: machine['buildGenerations']['min'] || global['min'],
           max: machine['buildGenerations']['max'] || global['max'],
-          maxAge: machine['buildGenerations']['maxAge'] || global['maxAge'],
+          maxAge: machine['buildGenerations']['maxAge'] || global['maxAge']
         ) do |gen|
           {
             name: gen.name,
-            type: 'build',
+            type: 'build'
           }
         end
 
@@ -194,7 +187,7 @@ module ConfCtl::Cli
 
       tw.run
 
-      statuses.each do |host, st|
+      statuses.each do |_host, st|
         next unless st.generations
 
         machine = st.machine
@@ -203,12 +196,12 @@ module ConfCtl::Cli
           st.generations,
           min: machine['hostGenerations']['min'] || global['min'],
           max: machine['hostGenerations']['max'] || global['max'],
-          maxAge: machine['hostGenerations']['maxAge'] || global['maxAge'],
+          maxAge: machine['hostGenerations']['maxAge'] || global['maxAge']
         ) do |gen|
           {
             type: 'host',
             name: gen.approx_name,
-            id: gen.id,
+            id: gen.id
           }
         end
 
@@ -231,7 +224,7 @@ module ConfCtl::Cli
         if (gens.count - machine_deleted) > max || (gen.date + maxAge) < Time.now
           ret << {
             host: gen.host,
-            generation: gen,
+            generation: gen
           }.merge(yield(gen))
           machine_deleted += 1
         end
@@ -249,18 +242,18 @@ module ConfCtl::Cli
         if machines.length > 1
           Rainbow("Collecting garbage on #{machines.length} machines").bright
         else
-          Rainbow("Collecting garbage on ").bright + Rainbow(machines.get_one.to_s).yellow
+          Rainbow('Collecting garbage on ').bright + Rainbow(machines.get_one.to_s).yellow
         end
 
       LogView.open(
         header: header + "\n",
-        title: Rainbow("Live view").bright,
+        title: Rainbow('Live view').bright,
         size: :auto,
-        reserved_lines: machines.length + 8,
+        reserved_lines: machines.length + 8
       ) do |lw|
         multibar = TTY::ProgressBar::Multi.new(
-          "Collecting garbage [:bar] :current",
-          width: 80,
+          'Collecting garbage [:bar] :current',
+          width: 80
         )
         executor = ConfCtl::ParallelExecutor.new(opts['max-concurrent-gc'])
 
@@ -286,11 +279,11 @@ module ConfCtl::Cli
             end
 
             lw.sync_console do
-              if ret
-                pb.format = "#{host}: #{end_stats || 'done'}"
-              else
-                pb.format = "#{host}: error occurred"
-              end
+              pb.format = if ret
+                            "#{host}: #{end_stats || 'done'}"
+                          else
+                            "#{host}: error occurred"
+                          end
 
               pb.finish
             end
@@ -302,9 +295,7 @@ module ConfCtl::Cli
         retvals = executor.run
         failed = retvals.compact
 
-        if failed.any?
-          fail "Gargabe collection failed on: #{failed.join(', ')}"
-        end
+        raise "Gargabe collection failed on: #{failed.join(', ')}" if failed.any?
       end
     end
 
@@ -323,7 +314,7 @@ module ConfCtl::Cli
           'name' => gen.name,
           'id' => gen.id,
           'presence' => gen.presence_str,
-          'current' => gen.current_str,
+          'current' => gen.current_str
         }
 
         gen.swpin_specs.each do |name, spec|
@@ -335,9 +326,9 @@ module ConfCtl::Cli
 
       OutputFormatter.print(
         rows,
-        %w(host name id presence current) + swpin_names,
+        %w[host name id presence current] + swpin_names,
         layout: :columns,
-        sort: %w(name host),
+        sort: %w[name host]
       )
     end
   end

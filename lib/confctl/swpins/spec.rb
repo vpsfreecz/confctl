@@ -14,7 +14,7 @@ module ConfCtl
     end
   end
 
-  module Swpins::Specs ; end
+  module Swpins::Specs; end
 end
 
 require_rel 'specs'

@@ -1,5 +1,5 @@
 module ConfCtl
   module HealthChecks
-    module Systemd ; end
+    module Systemd; end
   end
 end

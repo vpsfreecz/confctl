@@ -23,30 +23,28 @@ module ConfCtl
     end
 
     def prefetch_set(args)
-      if args.any?
-        fail "spec #{name} does not accept any arguments"
-      end
+      raise "spec #{name} does not accept any arguments" if args.any?
 
-      set_fetcher(:directory, {path: nix_opts['path']})
+      set_fetcher(:directory, { path: nix_opts['path'] })
     end
 
     def prefetch_update
-      set_fetcher(:directory, {path: nix_opts['path']})
+      set_fetcher(:directory, { path: nix_opts['path'] })
     end
 
-    def check_info(other_info)
+    def check_info(_other_info)
       false
     end
 
-    def version_info(other_info)
+    def version_info(_other_info)
       'directory'
     end
 
-    def string_changelog_info(type, other_info, verbose: false, patch: false, color: false)
+    def string_changelog_info(_type, _other_info, verbose: false, patch: false, color: false)
       nil
     end
 
-    def string_diff_info(type, other_info, opts = {})
+    def string_diff_info(_type, _other_info, _opts = {})
       nil
     end
   end

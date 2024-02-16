@@ -18,14 +18,14 @@ module ConfCtl
     def run(&block)
       cmd = SystemCommand.new
 
-      line_buf = StdLineBuffer.new do |out, err|
+      line_buf = StdLineBuffer.new do |_out, err|
         parse_line(err, &block) if err && block
       end
 
       ret = cmd.run(
         'nix-build',
         *args,
-        env: {'NIX_PATH' => build_nix_path(swpin_paths)},
+        env: { 'NIX_PATH' => build_nix_path(swpin_paths) },
         &line_buf.feed_block
       )
 
@@ -34,6 +34,7 @@ module ConfCtl
     end
 
     protected
+
     attr_reader :args, :swpin_paths
 
     def parse_line(line)
@@ -46,13 +47,13 @@ module ConfCtl
         @build_total = 1
         return
       elsif /^these (\d+) derivations will be built:/ =~ line
-        @build_total = $1.to_i
+        @build_total = ::Regexp.last_match(1).to_i
         return
       elsif /^this path will be fetched / =~ line
         @fetch_total = 1
         return
       elsif /^these (\d+) paths will be fetched / =~ line
-        @fetch_total = $1.to_i
+        @fetch_total = ::Regexp.last_match(1).to_i
         return
       end
 
@@ -68,7 +69,7 @@ module ConfCtl
       end
 
       if @in_derivation_list
-        if /^\s+\/nix\/store\// =~ line
+        if %r{^\s+/nix/store/} =~ line
           @build_total += 1
           return
         else
@@ -77,7 +78,7 @@ module ConfCtl
         end
 
       elsif @in_fetch_list
-        if /^\s+\/nix\/store\// =~ line
+        if %r{^\s+/nix/store/} =~ line
           @fetch_total += 1
           return
         else
@@ -88,10 +89,10 @@ module ConfCtl
 
       if /^building '([^']+)/ =~ line
         @build_progress += 1
-        yield(:build, @build_progress, @build_total, $1)
-      elsif/^copying path '([^']+)/ =~ line
+        yield(:build, @build_progress, @build_total, ::Regexp.last_match(1))
+      elsif /^copying path '([^']+)/ =~ line
         @fetch_progress += 1
-        yield(:fetch, @fetch_progress, @fetch_total, $1)
+        yield(:fetch, @fetch_progress, @fetch_total, ::Regexp.last_match(1))
       end
     end
 

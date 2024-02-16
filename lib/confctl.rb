@@ -1,8 +1,8 @@
 require 'require_all'
 
 module ConfCtl
-  module Generation ; end
-  module Utils ; end
+  module Generation; end
+  module Utils; end
 
   # Root of confctl repository
   # @return [String]
@@ -14,7 +14,7 @@ module ConfCtl
   # @return [String]
   def self.cache_dir
     @cache_dir ||= File.join(
-      ENV['XDG_CACHE_HOME'] || File.join(ENV['HOME'], '.cache'),
+      ENV['XDG_CACHE_HOME'] || File.join(ENV.fetch('HOME', nil), '.cache'),
       'confctl'
     )
   end
@@ -29,7 +29,7 @@ module ConfCtl
   # Return host name without slashes
   # @return [String]
   def self.safe_host_name(host)
-    host.gsub(/\//, ':')
+    host.gsub('/', ':')
   end
 end
 

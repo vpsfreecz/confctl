@@ -7,7 +7,7 @@ require 'thread'
 module ConfCtl
   class Logger
     class << self
-      %i(
+      %i[
         open
         close
         unlink
@@ -17,7 +17,7 @@ module ConfCtl
         io
         path
         relative_path
-      ).each do |v|
+      ].each do |v|
         define_method(v) { |*args| instance.send(v, *args) }
       end
     end
@@ -46,17 +46,20 @@ module ConfCtl
     end
 
     def close
-      fail 'log file not open' if @io.nil?
+      raise 'log file not open' if @io.nil?
+
       @io.close
     end
 
     def io
-      fail 'log file not open' if @io.nil?
+      raise 'log file not open' if @io.nil?
+
       @io
     end
 
     def path
-      fail 'log file not open' if @io.nil?
+      raise 'log file not open' if @io.nil?
+
       @io.path
     end
 
@@ -77,7 +80,8 @@ module ConfCtl
     end
 
     def unlink
-      fail 'log file not open' if @io.nil?
+      raise 'log file not open' if @io.nil?
+
       File.unlink(@io.path)
     end
 
@@ -105,7 +109,7 @@ module ConfCtl
           command: cmd,
           global_options: prune_opts(gopts.clone),
           command_options: prune_opts(opts.clone),
-          arguments: args,
+          arguments: args
         }, @io)
       end
     end
@@ -121,13 +125,14 @@ module ConfCtl
     end
 
     protected
+
     attr_reader :mutex, :readers
 
-    def sync
+    def sync(&)
       if mutex.owned?
         yield
       else
-        mutex.synchronize { yield }
+        mutex.synchronize(&)
       end
     end
 
@@ -135,13 +140,13 @@ module ConfCtl
       n = [
         Time.now.strftime('%Y-%m-%d--%H-%M-%S'),
         'confctl',
-        name,
+        name
       ].compact.join('-')
       "#{n}.log"
     end
 
     def prune_opts(hash)
-      hash.delete_if { |k, v| k.is_a?(::Symbol) }
+      hash.delete_if { |k, _v| k.is_a?(::Symbol) }
     end
   end
 end

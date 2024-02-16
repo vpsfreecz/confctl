@@ -4,14 +4,14 @@ require 'rainbow'
 module ConfCtl::Cli
   class Command
     def self.run(gli_cmd, klass, method)
-      Proc.new do |global_opts, opts, args|
+      proc do |global_opts, opts, args|
         log = ConfCtl::Logger.instance
         log.open(gli_cmd.name_for_help.join('-'))
         log.cli(
           gli_cmd.name_for_help,
           global_opts,
           opts,
-          args,
+          args
         )
 
         cmd = klass.new(global_opts, opts, args)
@@ -35,31 +35,28 @@ module ConfCtl::Cli
       @use_pager = determine_pager
     end
 
-
     # @param v [Array] list of required arguments
     # @param optional [Array] list of optional arguments
     # @param strict [Boolean] do not allow more arguments than specified
     def require_args!(*required, optional: [], strict: true)
       if args.count < required.count
-        arg = required[ args.count ]
+        arg = required[args.count]
         raise GLI::BadCommandLine, "missing argument <#{arg}>"
 
       elsif strict && args.count > (required.count + optional.count)
-        unknown = args[ (required.count + optional.count) .. -1 ]
+        unknown = args[(required.count + optional.count)..-1]
 
         msg = ''
 
-        if unknown.count > 1
-          msg << 'unknown arguments: '
-        else
-          msg << 'unknown argument: '
-        end
+        msg << if unknown.count > 1
+                 'unknown arguments: '
+               else
+                 'unknown argument: '
+               end
 
         msg << unknown.join(' ')
 
-        if unknown.detect { |v| v.start_with?('-') }
-          msg << ' (note that options must come before arguments)'
-        end
+        msg << ' (note that options must come before arguments)' if unknown.detect { |v| v.start_with?('-') }
 
         raise GLI::BadCommandLine, msg
       end
@@ -93,8 +90,8 @@ module ConfCtl::Cli
       end
     end
 
-    def ask_confirmation!(**kwargs, &block)
-      fail 'Aborted' unless ask_confirmation(**kwargs, &block)
+    def ask_confirmation!(...)
+      raise 'Aborted' unless ask_confirmation(...)
     end
 
     # @param options [Hash<String, String>] key => description
@@ -135,6 +132,7 @@ module ConfCtl::Cli
     end
 
     protected
+
     def run_command(klass, method)
       c = klass.new(gopts, opts, args)
       c.run_method(method)
@@ -154,7 +152,7 @@ module ConfCtl::Cli
     end
 
     def determine_pager
-      ENV['PAGER'] && ENV['PAGER'].strip != ''
+      ENV.fetch('PAGER', nil) && ENV['PAGER'].strip != ''
     end
 
     def select_machines(pattern)
@@ -195,7 +193,7 @@ module ConfCtl::Cli
 
       cols = prepend_cols + cols if prepend_cols
 
-      rows = machines.map do |host, machine|
+      rows = machines.map do |_host, machine|
         Hash[cols.map { |c| [c, machine[c]] }]
       end
 
@@ -203,7 +201,7 @@ module ConfCtl::Cli
         rows,
         cols,
         header: !opts['hide-header'],
-        layout: :columns,
+        layout: :columns
       )
     end
   end

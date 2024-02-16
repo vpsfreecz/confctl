@@ -5,7 +5,7 @@ module ConfCtl
     # @param machine [Machine]
     # @param pattern [String, nil]
     # @param property_checks [Array<HealthChecks::Systemd::PropertyCheck>]
-    def initialize(machine, pattern: nil, property_checks:)
+    def initialize(machine, property_checks:, pattern: nil)
       super(machine)
       @pattern = pattern
       @property_checks = property_checks
@@ -47,9 +47,10 @@ module ConfCtl
     end
 
     protected
+
     def run_check
       mc = MachineControl.new(machine)
-      cmd = %w(systemctl show)
+      cmd = %w[systemctl show]
       cmd << @pattern if @pattern
       result = mc.execute!(*cmd)
 
@@ -68,9 +69,7 @@ module ConfCtl
           next
         end
 
-        unless check.check(v)
-          add_error("#{check.property}=#{v}, expected #{check.value}")
-        end
+        add_error("#{check.property}=#{v}, expected #{check.value}") unless check.check(v)
       end
     end
 

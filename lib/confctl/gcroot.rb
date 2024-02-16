@@ -10,7 +10,7 @@ module ConfCtl
       File.join(
         '/nix/var/nix/gcroots/per-user',
         Etc.getlogin,
-        "confctl-#{ConfDir.short_hash}",
+        "confctl-#{ConfDir.short_hash}"
       )
     end
 

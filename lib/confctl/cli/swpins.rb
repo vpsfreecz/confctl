@@ -1,5 +1,5 @@
 module ConfCtl::Cli
-  module Swpins ; end
+  module Swpins; end
 end
 
 require_rel 'swpins'

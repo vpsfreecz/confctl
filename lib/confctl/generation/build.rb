@@ -64,13 +64,12 @@ module ConfCtl
         @swpin_specs[name] = Swpins::Spec.for(swpin['spec']['type'].to_sym).new(
           name,
           swpin['spec']['nix_options'],
-          swpin['spec'],
+          swpin['spec']
         )
       end
 
       @date = Time.iso8601(cfg['date'])
-
-    rescue => e
+    rescue StandardError => e
       raise Error, "invalid generation '#{name}': #{e.message}"
     end
 
@@ -85,10 +84,10 @@ module ConfCtl
       File.open(config_path, 'w') do |f|
         f.puts(JSON.pretty_generate({
           date: date.iso8601,
-          toplevel: toplevel,
+          toplevel:,
           swpins: Hash[swpin_paths.map do |name, path|
-            [name, {path: path, spec: swpin_specs[name].as_json}]
-          end],
+            [name, { path:, spec: swpin_specs[name].as_json }]
+          end]
         }))
       end
 
@@ -105,14 +104,14 @@ module ConfCtl
 
     def add_gcroot
       GCRoot.add(gcroot_name('toplevel'), toplevel_path)
-      swpin_paths.each do |name, path|
+      swpin_paths.each do |name, _path|
         GCRoot.add(gcroot_name("swpin.#{name}"), toplevel_path)
       end
     end
 
     def remove_gcroot
       GCRoot.remove(gcroot_name('toplevel'))
-      swpin_paths.each do |name, path|
+      swpin_paths.each do |name, _path|
         GCRoot.remove(gcroot_name("swpin.#{name}"))
       end
     end
@@ -122,6 +121,7 @@ module ConfCtl
     end
 
     protected
+
     def config_path
       @config_path ||= File.join(dir, 'generation.json')
     end

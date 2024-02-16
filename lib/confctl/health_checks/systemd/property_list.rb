@@ -8,8 +8,8 @@ module ConfCtl
         eq = line.index('=')
         next if eq.nil?
 
-        k = line[0..(eq-1)]
-        v = line[(eq+1)..-1]
+        k = line[0..(eq - 1)]
+        v = line[(eq + 1)..-1]
 
         hash[k] = v
       end

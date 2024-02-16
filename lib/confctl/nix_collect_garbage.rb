@@ -13,19 +13,18 @@ module ConfCtl
       end
 
       # @return [String, nil]
-      def path
-        @path
-      end
+      attr_reader :path
 
       def to_s
         @line
       end
 
       protected
+
       def parse
-        if /^deleting '(\/nix\/store\/[^']+)'$/ =~ @line
-          @path = $1
-        end
+        return unless %r{^deleting '(/nix/store/[^']+)'$} =~ @line
+
+        @path = ::Regexp.last_match(1)
       end
     end
 
@@ -59,6 +58,7 @@ module ConfCtl
     end
 
     protected
+
     attr_reader :machine
   end
 end

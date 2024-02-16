@@ -10,9 +10,7 @@ module ConfCtl
     def self.subscribe(name, &block)
       subscribers = (@hooks || {})[name]
 
-      if subscribers.nil?
-        fail "hook #{name.inspect} not registered"
-      end
+      raise "hook #{name.inspect} not registered" if subscribers.nil?
 
       subscribers << block
       nil

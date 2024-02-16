@@ -32,7 +32,7 @@ module ConfCtl
       # @return [String, nil]
       def check_include(str)
         @include.each do |inc|
-          return inc if !str.include?(inc)
+          return inc unless str.include?(inc)
         end
 
         nil
@@ -86,10 +86,11 @@ module ConfCtl
       end
 
       protected
+
       def make_command(machine, args)
         args.map do |arg|
           arg.gsub(/\{([^\}]+)\}/) do
-            machine[$1]
+            machine[::Regexp.last_match(1)]
           end
         end
       end
@@ -113,6 +114,7 @@ module ConfCtl
     end
 
     protected
+
     def run_check
       if @remote
         run_remote_check

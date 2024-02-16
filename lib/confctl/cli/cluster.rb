@@ -19,6 +19,7 @@ module ConfCtl::Cli
 
         nix.module_options.each do |opt|
           next unless opt['name'].start_with?(prefix)
+
           puts opt['name'][prefix.length..-1]
         end
 
@@ -31,10 +32,10 @@ module ConfCtl::Cli
     def build
       machines = select_machines(args[0]).managed
 
-      fail 'No machines to build' if machines.empty?
+      raise 'No machines to build' if machines.empty?
 
       ask_confirmation! do
-        puts "The following machines will be built:"
+        puts 'The following machines will be built:'
         list_machines(machines)
       end
 
@@ -45,22 +46,18 @@ module ConfCtl::Cli
       machines = select_machines(args[0]).managed
       action = args[1] || 'switch'
 
-      unless %w(boot switch test dry-activate).include?(action)
-        raise GLI::BadCommandLine, "invalid action '#{action}'"
-      end
+      raise GLI::BadCommandLine, "invalid action '#{action}'" unless %w[boot switch test dry-activate].include?(action)
 
       if opts[:reboot]
-        if action != 'boot'
-          raise GLI::BadCommandLine, '--reboot can be used only with switch-action boot'
-        end
+        raise GLI::BadCommandLine, '--reboot can be used only with switch-action boot' if action != 'boot'
 
         parse_wait_online
       end
 
-      fail 'No machines to deploy' if machines.empty?
+      raise 'No machines to deploy' if machines.empty?
 
       ask_confirmation! do
-        puts "The following machines will be deployed:"
+        puts 'The following machines will be deployed:'
         list_machines(machines)
         puts
         puts "Generation: #{opts[:generation] || 'new build'}"
@@ -68,10 +65,10 @@ module ConfCtl::Cli
       end
 
       ConfCtl::Hook.call(:cluster_deploy, kwargs: {
-        machines: machines,
+        machines:,
         generation: opts[:generation],
         action: opts[:action],
-        opts: opts,
+        opts:
       })
 
       host_generations =
@@ -91,36 +88,36 @@ module ConfCtl::Cli
     end
 
     def health_check
-      machines = select_machines(args[0]).managed.select do |host, machine|
+      machines = select_machines(args[0]).managed.select do |_host, machine|
         machine.health_checks.any?
       end
-      fail 'No machines to check or no health checks configured' if machines.empty?
+      raise 'No machines to check or no health checks configured' if machines.empty?
 
       checks = machines.health_checks
 
       ask_confirmation! do
-        puts "Health checks will be run on the following machines:"
+        puts 'Health checks will be run on the following machines:'
 
-        list_machines(machines, prepend_cols: %w(checks))
+        list_machines(machines, prepend_cols: %w[checks])
         puts
         puts "#{checks.length} checks in total"
         puts
       end
 
-      if run_health_checks(machines, checks).any?
-        fail "Health checks failed"
-      end
+      return unless run_health_checks(machines, checks).any?
+
+      raise 'Health checks failed'
     end
 
     def status
       machines = select_machines(args[0]).managed
-      fail 'No machines to check' if machines.empty?
+      raise 'No machines to check' if machines.empty?
 
       ask_confirmation! do
         if opts[:generation]
-          puts "The following machines will be checked:"
+          puts 'The following machines will be checked:'
         else
-          puts "The following machines will be built and then checked:"
+          puts 'The following machines will be built and then checked:'
         end
 
         list_machines(machines)
@@ -139,7 +136,7 @@ module ConfCtl::Cli
         host_generations = find_generations(machines, opts[:generation])
 
         # Ignore statuses when no generation was found
-        statuses.delete_if do |host, st|
+        statuses.delete_if do |host, _st|
           !host_generations.has_key?(host)
         end
       else
@@ -155,7 +152,7 @@ module ConfCtl::Cli
         end
       else
         # We're not comparing a system generation, only configured swpins
-        ConfCtl::Swpins::ClusterNameList.new(machines: machines).each do |cn|
+        ConfCtl::Swpins::ClusterNameList.new(machines:).each do |cn|
           cn.parse
 
           statuses[cn.name].target_swpin_specs = cn.specs
@@ -165,7 +162,7 @@ module ConfCtl::Cli
       # Check runtime status
       tw = ConfCtl::ParallelExecutor.new(machines.length)
 
-      statuses.each do |host, st|
+      statuses.each do |_host, st|
         tw.add do
           st.query(toplevel: opts[:generation] != 'none')
         end
@@ -176,7 +173,7 @@ module ConfCtl::Cli
       # Collect all swpins
       swpins = []
 
-      statuses.each do |host, st|
+      statuses.each do |_host, st|
         st.target_swpin_specs.each_key do |name|
           swpins << name unless swpins.include?(name)
         end
@@ -185,7 +182,7 @@ module ConfCtl::Cli
       end
 
       # Render results
-      cols = %w(host online uptime status generations) + swpins
+      cols = %w[host online uptime status generations] + swpins
       rows = []
 
       statuses.each do |host, st|
@@ -196,7 +193,7 @@ module ConfCtl::Cli
           'online' => st.online? && Rainbow('yes').green,
           'uptime' => st.uptime && format_duration(st.uptime),
           'status' => st.status ? Rainbow('ok').green : Rainbow('outdated').red,
-          'generations' => "#{build_generations.count}:#{st.generations && st.generations.count}",
+          'generations' => "#{build_generations.count}:#{st.generations && st.generations.count}"
         }
 
         swpins.each do |name|
@@ -205,10 +202,8 @@ module ConfCtl::Cli
           row[name] =
             if swpin_state
               Rainbow(swpin_state.current_version).color(
-                swpin_state.uptodate? ? :green : :red,
+                swpin_state.uptodate? ? :green : :red
               )
-            else
-              nil
             end
         end
 
@@ -219,45 +214,41 @@ module ConfCtl::Cli
     end
 
     def changelog
-      compare_swpins do |io, host, status, sw_name, spec|
-        begin
-          s = spec.string_changelog_info(
-            opts[:downgrade] ? :downgrade : :upgrade,
-            status.swpins_info[sw_name],
-            color: use_color?,
-            verbose: opts[:verbose],
-            patch: opts[:patch],
-          )
-        rescue ConfCtl::Error => e
-          io.puts e.message
-        else
-          io.puts (s || 'no changes')
-        end
+      compare_swpins do |io, _host, status, sw_name, spec|
+        s = spec.string_changelog_info(
+          opts[:downgrade] ? :downgrade : :upgrade,
+          status.swpins_info[sw_name],
+          color: use_color?,
+          verbose: opts[:verbose],
+          patch: opts[:patch]
+        )
+      rescue ConfCtl::Error => e
+        io.puts e.message
+      else
+        io.puts(s || 'no changes')
       end
     end
 
     def diff
-      compare_swpins do |io, host, status, sw_name, spec|
-        begin
-          s = spec.string_diff_info(
-            opts[:downgrade] ? :downgrade : :upgrade,
-            status.swpins_info[sw_name],
-            color: use_color?,
-          )
-        rescue ConfCtl::Error => e
-          io.puts e.message
-        else
-          io.puts (s || 'no changes')
-        end
+      compare_swpins do |io, _host, status, sw_name, spec|
+        s = spec.string_diff_info(
+          opts[:downgrade] ? :downgrade : :upgrade,
+          status.swpins_info[sw_name],
+          color: use_color?
+        )
+      rescue ConfCtl::Error => e
+        io.puts e.message
+      else
+        io.puts(s || 'no changes')
       end
     end
 
     def test_connection
       machines = select_machines_with_managed(args[0])
-      fail 'No machines to test' if machines.empty?
+      raise 'No machines to test' if machines.empty?
 
       ask_confirmation! do
-        puts "Test SSH connection to the following machines:"
+        puts 'Test SSH connection to the following machines:'
         list_machines(machines)
       end
 
@@ -280,25 +271,24 @@ module ConfCtl::Cli
       puts
       puts "Result: #{succeeded.length} successful, #{failed.length} failed"
       puts
-      puts "Failed machines:"
+      puts 'Failed machines:'
       failed.each { |host| puts "  #{host}" }
     end
 
     def ssh
       machines = select_machines_with_managed(args[0])
-      fail 'No machines to ssh to' if machines.empty?
+      raise 'No machines to ssh to' if machines.empty?
 
       if opts['input-string'] && opts['input-file']
         raise GLI::BadCommandLine, 'use one of --input-string or --input-file'
       end
 
       if args.length == 1
-        if machines.length == 1
-          run_ssh_interactive(machines)
-          return
-        else
-          raise GLI::BadCommandLine, 'missing command'
-        end
+        raise GLI::BadCommandLine, 'missing command' unless machines.length == 1
+
+        run_ssh_interactive(machines)
+        return
+
       end
 
       run_ssh_command(machines, args[1..-1])
@@ -306,10 +296,10 @@ module ConfCtl::Cli
 
     def cssh
       machines = select_machines_with_managed(args[0])
-      fail 'No machines to open cssh to' if machines.empty?
+      raise 'No machines to open cssh to' if machines.empty?
 
       ask_confirmation! do
-        puts "Open cssh to the following machines:"
+        puts 'Open cssh to the following machines:'
         list_machines(machines)
       end
 
@@ -317,20 +307,21 @@ module ConfCtl::Cli
 
       cssh = [
         'cssh',
-        '-l', 'root',
+        '-l', 'root'
       ]
 
-      machines.each do |host, machine|
+      machines.each do |_host, machine|
         cssh << machine.target_host
       end
 
       nix.run_command_in_shell(
         packages: ['perlPackages.AppClusterSSH'],
-        command: cssh.join(' '),
+        command: cssh.join(' ')
       )
     end
 
     protected
+
     attr_reader :wait_online
 
     def deploy_in_bulk(machines, host_generations, nix, action)
@@ -367,7 +358,7 @@ module ConfCtl::Cli
       end
 
       if opts[:reboot]
-        host_generations.each do |host, gen|
+        host_generations.each do |host, _gen|
           if skipped_activation.include?(host)
             puts Rainbow("Activation on #{host} was skipped, skipping reboot as well").yellow
             next
@@ -382,20 +373,20 @@ module ConfCtl::Cli
         end
       end
 
-      if opts['health-checks'] && need_health_checks?(action)
-        check_machines = machines.select do |host, machine|
-          if skipped_activation.include?(host)
-            puts Rainbow("Activation on #{host} was skipped, skipping health checks as well").yellow
-            false
-          else
-            true
-          end
+      return unless opts['health-checks'] && need_health_checks?(action)
+
+      check_machines = machines.select do |host, _machine|
+        if skipped_activation.include?(host)
+          puts Rainbow("Activation on #{host} was skipped, skipping health checks as well").yellow
+          false
+        else
+          true
         end
-
-        run_health_check_loop(check_machines)
-
-        puts if opts[:interactive]
       end
+
+      run_health_check_loop(check_machines)
+
+      puts if opts[:interactive]
     end
 
     def deploy_one_by_one(machines, host_generations, nix, action)
@@ -430,17 +421,15 @@ module ConfCtl::Cli
     def copy_to_host(nix, host, machine, toplevel)
       puts Rainbow("Copying configuration to #{host} (#{machine.target_host})").yellow
 
-      if opts[:interactive] && !ask_confirmation(always: true)
-        return :skip
-      end
+      return :skip if opts[:interactive] && !ask_confirmation(always: true)
 
       LogView.open(
-        header: Rainbow("Copying to").bright + ' ' + host + "\n",
-        title: Rainbow("Live view").bright,
+        header: Rainbow('Copying to').bright + ' ' + host + "\n",
+        title: Rainbow('Live view').bright
       ) do |lw|
         pb = TTY::ProgressBar.new(
-          "Copying [:bar] :current/:total (:percent)",
-          width: 80,
+          'Copying [:bar] :current/:total (:percent)',
+          width: 80
         )
 
         ret = nix.copy(machine, toplevel) do |i, n, path|
@@ -452,9 +441,7 @@ module ConfCtl::Cli
           end
         end
 
-        unless ret
-          fail "Error while copying system to #{host}"
-        end
+        raise "Error while copying system to #{host}" unless ret
       end
 
       true
@@ -463,11 +450,11 @@ module ConfCtl::Cli
     def concurrent_copy(machines, host_generations, nix)
       LogView.open(
         header: Rainbow("Copying to #{host_generations.length} machines").bright + "\n",
-        title: Rainbow("Live view").bright,
+        title: Rainbow('Live view').bright
       ) do |lw|
         multibar = TTY::ProgressBar::Multi.new(
-          "Copying [:bar] :current/:total (:percent)",
-          width: 80,
+          'Copying [:bar] :current/:total (:percent)',
+          width: 80
         )
         executor = ConfCtl::ParallelExecutor.new(opts['max-concurrent-copy'])
 
@@ -510,49 +497,41 @@ module ConfCtl::Cli
         retvals = executor.run
         failed = retvals.compact
 
-        if failed.any?
-          fail "Copy failed to: #{failed.join(', ')}"
-        end
+        raise "Copy failed to: #{failed.join(', ')}" if failed.any?
       end
     end
 
     def deploy_to_host(nix, host, machine, toplevel, action)
       LogView.open_with_logger(
-        header: "#{Rainbow("Deploying to").bright} #{Rainbow(host).yellow}\n",
-        title: Rainbow("Live view").bright,
+        header: "#{Rainbow('Deploying to').bright} #{Rainbow(host).yellow}\n",
+        title: Rainbow('Live view').bright,
         size: :auto,
-        reserved_lines: 10,
+        reserved_lines: 10
       ) do |lw|
         if opts['dry-activate-first']
           lw.sync_console do
             puts Rainbow(
-              "Trying to activate configuration on #{host} "+
+              "Trying to activate configuration on #{host} " +
               "(#{machine.target_host})"
             ).yellow
           end
 
-          unless nix.activate(machine, toplevel, 'dry-activate')
-            fail "Error while activating configuration on #{host}"
-          end
+          raise "Error while activating configuration on #{host}" unless nix.activate(machine, toplevel, 'dry-activate')
         end
 
         lw.sync_console do
           puts Rainbow(
-            "Activating configuration on #{host} (#{machine.target_host}): "+
+            "Activating configuration on #{host} (#{machine.target_host}): " +
             "#{action}"
           ).yellow
         end
 
-        if opts[:interactive] && !ask_confirmation(always: true)
-          return :skip
-        end
+        return :skip if opts[:interactive] && !ask_confirmation(always: true)
 
-        unless nix.activate(machine, toplevel, action)
-          fail "Error while activating configuration on #{host}"
-        end
+        raise "Error while activating configuration on #{host}" unless nix.activate(machine, toplevel, action)
 
-        if %w(boot switch).include?(action) && !nix.set_profile(machine, toplevel)
-          fail "Error while setting profile on #{host}"
+        if %w[boot switch].include?(action) && !nix.set_profile(machine, toplevel)
+          raise "Error while setting profile on #{host}"
         end
       end
     end
@@ -565,9 +544,7 @@ module ConfCtl::Cli
 
       puts Rainbow("Rebooting #{host} (#{machine.target_host})").yellow
 
-      if opts[:interactive] && !ask_confirmation(always: true)
-        return :skip
-      end
+      return :skip if opts[:interactive] && !ask_confirmation(always: true)
 
       m = ConfCtl::MachineControl.new(machine)
 
@@ -578,12 +555,12 @@ module ConfCtl::Cli
         spinner = nil
 
         secs = m.reboot_and_wait(
-          timeout: wait_online == :wait ? nil : wait_online,
+          timeout: wait_online == :wait ? nil : wait_online
         ) do |state, timeleft|
           if state == :reboot
             spinner = TTY::Spinner.new(
               ":spinner Waiting for #{host} (:seconds s)",
-              format: :classic,
+              format: :classic
             )
             spinner.auto_spin
           elsif state == :is_up
@@ -610,7 +587,7 @@ module ConfCtl::Cli
 
       if opts[:interactive]
         if machines.length > 1
-          puts Rainbow("Running #{run_checks.length} health checks on #{machines.length.to_s} machines").yellow
+          puts Rainbow("Running #{run_checks.length} health checks on #{machines.length} machines").yellow
         else
           puts Rainbow("Running #{run_checks.length} health checks on #{machines.get_one}").yellow
         end
@@ -623,16 +600,16 @@ module ConfCtl::Cli
         return if failed.empty?
 
         if opts[:interactive]
-          puts "Health checks have failed"
+          puts 'Health checks have failed'
 
           answer = ask_action(
             options: {
               'c' => 'Continue',
               'r' => 'Retry all',
               'f' => 'Retry failed',
-              'a' => 'Abort',
+              'a' => 'Abort'
             },
-            default: 'a',
+            default: 'a'
           )
 
           case answer
@@ -645,15 +622,15 @@ module ConfCtl::Cli
             run_checks = failed
             next
           when 'a'
-            fail 'Aborting'
+            raise 'Aborting'
           end
 
         elsif opts['keep-going']
-          puts "Health checks have failed, going on"
+          puts 'Health checks have failed, going on'
           return
 
         else
-          fail "Health checks have failed"
+          raise 'Health checks have failed'
         end
       end
     end
@@ -668,38 +645,38 @@ module ConfCtl::Cli
         if machines.length > 1
           Rainbow("Running health checks on #{machines.length} machines").bright
         else
-          Rainbow("Running health checks on ").bright + Rainbow(machines.get_one.to_s).yellow
+          Rainbow('Running health checks on ').bright + Rainbow(machines.get_one.to_s).yellow
         end
 
-      header << "\n" << Rainbow("Full log: ").bright << ConfCtl::Logger.relative_path << "\n"
+      header << "\n" << Rainbow('Full log: ').bright << ConfCtl::Logger.relative_path << "\n"
 
       LogView.open(
-        header: header,
-        title: Rainbow("Live view").bright,
+        header:,
+        title: Rainbow('Live view').bright,
         size: :auto,
-        reserved_lines: 10,
+        reserved_lines: 10
       ) do |lw|
         pb = TTY::ProgressBar.new(
-          "Checks [:bar] :current/:total (:percent)",
+          'Checks [:bar] :current/:total (:percent)',
           width: 80,
-          total: checks.length,
+          total: checks.length
         )
 
         checks.each_with_index do |check, i|
           tw.add do
-            prefix = "[#{i+1}/#{checks.length}] #{check.machine}> "
+            prefix = "[#{i + 1}/#{checks.length}] #{check.machine}> "
             lw << "#{prefix}#{check.description}"
 
-            check.run do |attempt, errors|
+            check.run do |attempt, _errors|
               lw << "#{prefix}failed ##{attempt}: #{check.message}"
               ConfCtl::Logger.keep
             end
 
-            if check.successful?
-              lw << "#{prefix}succeeded"
-            else
-              lw << "#{prefix}error: #{check.message}"
-            end
+            lw << if check.successful?
+                    "#{prefix}succeeded"
+                  else
+                    "#{prefix}error: #{check.message}"
+                  end
 
             lw.sync_console do
               pb.advance
@@ -746,18 +723,18 @@ module ConfCtl::Cli
     end
 
     def need_health_checks?(action)
-      %w(switch test).include?(action) || (action == 'boot' && opts[:reboot])
+      %w[switch test].include?(action) || (action == 'boot' && opts[:reboot])
     end
 
     def run_ssh_interactive(machines)
       raise ArgumentError if machines.length != 1
 
       ask_confirmation! do
-        puts "Open interactive shell on the following machine:"
+        puts 'Open interactive shell on the following machine:'
         list_machines(machines)
       end
 
-      machines.each do |host, machine|
+      machines.each do |_host, machine|
         mc = ConfCtl::MachineControl.new(machine)
         mc.interactive_shell
         return
@@ -766,7 +743,7 @@ module ConfCtl::Cli
 
     def run_ssh_command(machines, cmd)
       ask_confirmation! do
-        puts "Run command over SSH on the following machines:"
+        puts 'Run command over SSH on the following machines:'
         list_machines(machines)
         puts
         puts "Command: #{cmd.map(&:inspect).join(' ')}"
@@ -818,15 +795,15 @@ module ConfCtl::Cli
       tw = ConfCtl::ParallelExecutor.new(machines.length)
 
       LogView.open_with_logger(
-        header: Rainbow("Executing").bright + " #{cmd.join(' ')}\n",
-        title: Rainbow("Live view").bright,
+        header: Rainbow('Executing').bright + " #{cmd.join(' ')}\n",
+        title: Rainbow('Live view').bright,
         size: :auto,
-        reserved_lines: 10,
+        reserved_lines: 10
       ) do |lw|
         pb = TTY::ProgressBar.new(
-          "Command [:bar] :current/:total (:percent)",
+          'Command [:bar] :current/:total (:percent)',
           width: 80,
-          total: machines.length,
+          total: machines.length
         )
 
         machines.each do |host, machine|
@@ -861,7 +838,7 @@ module ConfCtl::Cli
     end
 
     def run_ssh_command_on_machine(mc, cmd)
-      cmd_opts = {err: :out}
+      cmd_opts = { err: :out }
 
       if opts['input-string']
         cmd_opts[:input] = opts['input-string']
@@ -894,7 +871,7 @@ module ConfCtl::Cli
       host_generations = {}
       missing_hosts = []
 
-      machines.each do |host, d|
+      machines.each do |host, _d|
         list = ConfCtl::Generation::BuildList.new(host)
 
         gen =
@@ -911,16 +888,14 @@ module ConfCtl::Cli
         end
       end
 
-      if host_generations.empty?
-        fail 'No generation found'
-      end
+      raise 'No generation found' if host_generations.empty?
 
       if missing_hosts.any?
         ask_confirmation! do
           puts "Generation '#{generation_name}' was not found on the following hosts:"
           missing_hosts.each { |host| puts "  #{host}" }
           puts
-          puts "These hosts will be ignored."
+          puts 'These hosts will be ignored.'
         end
       end
 
@@ -930,16 +905,14 @@ module ConfCtl::Cli
     def do_build(machines)
       nix = ConfCtl::Nix.new(
         show_trace: opts['show-trace'],
-        max_jobs: opts['max-jobs'],
+        max_jobs: opts['max-jobs']
       )
       host_swpin_paths = {}
 
       autoupdate_swpins(machines)
       host_swpin_specs = check_swpins(machines)
 
-      unless host_swpin_specs
-        fail 'one or more swpins need to be updated'
-      end
+      raise 'one or more swpins need to be updated' unless host_swpin_specs
 
       machines.each do |host, d|
         puts Rainbow("Evaluating swpins for #{host}...").bright
@@ -953,7 +926,7 @@ module ConfCtl::Cli
       host_generations = {}
       time = Time.now
 
-      puts "#{Rainbow("Build log:").yellow} #{Rainbow(ConfCtl::Logger.path).cyan}"
+      puts "#{Rainbow('Build log:').yellow} #{Rainbow(ConfCtl::Logger.path).cyan}"
       puts
 
       grps.each_with_index do |grp, i|
@@ -966,7 +939,7 @@ module ConfCtl::Cli
           swpin_paths,
           host_swpin_specs,
           nix,
-          time,
+          time
         )
 
         host_generations.update(built_generations)
@@ -980,7 +953,7 @@ module ConfCtl::Cli
       end
 
       puts
-      puts Rainbow("Built generations:").bright
+      puts Rainbow('Built generations:').bright
       generation_hosts.each do |gen, hosts|
         puts Rainbow(gen).cyan
         hosts.each { |host| puts "  #{host}" }
@@ -990,47 +963,47 @@ module ConfCtl::Cli
     end
 
     def do_build_group(i, n, hosts, swpin_paths, host_swpin_specs, nix, time)
-      puts Rainbow("Building machines").bright
+      puts Rainbow('Building machines').bright
       hosts.each { |h| puts "  #{h}" }
-      puts "with swpins"
+      puts 'with swpins'
       swpin_paths.each { |k, v| puts "  #{k}=#{v}" }
 
       header = '' \
-        << Rainbow("Command:").bright \
+        << Rainbow('Command:').bright \
         << " #{format_command(10)}" \
         << "\n" \
-        << Rainbow("Build group:").bright \
-        << " #{i+1}/#{n} (#{hosts.length} machines)" \
+        << Rainbow('Build group:').bright \
+        << " #{i + 1}/#{n} (#{hosts.length} machines)" \
         << "\n" \
-        << Rainbow("Full log:   ").bright \
+        << Rainbow('Full log:   ').bright \
         << " #{ConfCtl::Logger.relative_path}" \
         << "\n\n"
 
       LogView.open_with_logger(
-        header: header,
-        title: Rainbow("Live view").bright,
+        header:,
+        title: Rainbow('Live view').bright,
         size: :auto,
-        reserved_lines: 10,
+        reserved_lines: 10
       ) do |lw|
         multibar = TTY::ProgressBar::Multi.new(
-          "nix-build [:bar] :current/:total (:percent)",
-          width: 80,
+          'nix-build [:bar] :current/:total (:percent)',
+          width: 80
         )
 
         build_pb = multibar.register(
-          "Building [:bar] :current/:total (:percent)",
+          'Building [:bar] :current/:total (:percent)'
         )
 
         fetch_pb = multibar.register(
-          "Fetching [:bar] :current/:total (:percent)",
+          'Fetching [:bar] :current/:total (:percent)'
         )
 
         built_generations = nix.build_toplevels(
-          hosts: hosts,
-          swpin_paths: swpin_paths,
-          time: time,
-          host_swpin_specs: host_swpin_specs,
-        ) do |type, i, n, path|
+          hosts:,
+          swpin_paths:,
+          time:,
+          host_swpin_specs:
+        ) do |type, _i, n, _path|
           if type == :build
             lw.sync_console do
               build_pb.update(total: n) if n > 0 && build_pb.total.nil?
@@ -1055,7 +1028,7 @@ module ConfCtl::Cli
     end
 
     def autoupdate_swpins(machines)
-      puts Rainbow("Running swpins auto updates...").bright
+      puts Rainbow('Running swpins auto updates...').bright
       channels_update = []
       any_updated = false
 
@@ -1065,7 +1038,7 @@ module ConfCtl::Cli
         channels_update << c unless channels_update.include?(c)
       end
 
-      cluster_names = ConfCtl::Swpins::ClusterNameList.new(machines: machines)
+      cluster_names = ConfCtl::Swpins::ClusterNameList.new(machines:)
 
       cluster_names.each do |cn|
         cn.parse
@@ -1079,11 +1052,11 @@ module ConfCtl::Cli
         updated = false
 
         c.specs.each do |name, s|
-          if s.auto_update?
-            puts " updating #{c.name}.#{name}"
-            s.prefetch_update
-            updated = true
-          end
+          next unless s.auto_update?
+
+          puts " updating #{c.name}.#{name}"
+          s.prefetch_update
+          updated = true
         end
 
         if updated
@@ -1095,11 +1068,11 @@ module ConfCtl::Cli
       core_updated = false
 
       core.specs.each do |name, s|
-        if !s.from_channel? && s.auto_update?
-          puts " updating #{core.name}.#{name}"
-          s.prefetch_update
-          core_updated = true
-        end
+        next unless !s.from_channel? && s.auto_update?
+
+        puts " updating #{core.name}.#{name}"
+        s.prefetch_update
+        core_updated = true
       end
 
       if core_updated
@@ -1111,11 +1084,11 @@ module ConfCtl::Cli
         updated = false
 
         cn.specs.each do |name, s|
-          if !s.from_channel? && s.auto_update?
-            puts " updating #{cn.name}.#{name}"
-            s.prefetch_update
-            updated = true
-          end
+          next unless !s.from_channel? && s.auto_update?
+
+          puts " updating #{cn.name}.#{name}"
+          s.prefetch_update
+          updated = true
         end
 
         if updated
@@ -1124,30 +1097,30 @@ module ConfCtl::Cli
         end
       end
 
-      if any_updated || core_updated
-        ConfCtl::Swpins::ChannelList.refresh
-      end
+      return unless any_updated || core_updated
+
+      ConfCtl::Swpins::ChannelList.refresh
     end
 
     def check_swpins(machines)
       ret = {}
       valid = true
 
-      puts Rainbow("Checking core swpins...").bright
+      puts Rainbow('Checking core swpins...').bright
 
       ConfCtl::Swpins::Core.get.specs.each do |name, s|
-        puts "  #{name} ... "+
+        puts "  #{name} ... " +
              (s.valid? ? Rainbow('ok').green : Rainbow('needs update').cyan)
         valid = false unless s.valid?
       end
 
-      ConfCtl::Swpins::ClusterNameList.new(machines: machines).each do |cn|
+      ConfCtl::Swpins::ClusterNameList.new(machines:).each do |cn|
         cn.parse
 
         puts Rainbow("Checking swpins for #{cn.name}...").bright
 
         cn.specs.each do |name, s|
-          puts "  #{name} ... "+
+          puts "  #{name} ... " +
                (s.valid? ? Rainbow('ok').green : Rainbow('needs update').cyan)
           valid = false unless s.valid?
         end
@@ -1179,7 +1152,7 @@ module ConfCtl::Cli
       machines = select_machines(args[0]).managed
 
       ask_confirmation! do
-        puts "Compare swpins on the following machines:"
+        puts 'Compare swpins on the following machines:'
         list_machines(machines)
         puts
         puts "Generation: #{opts[:generation] || 'current configuration'}"
@@ -1197,11 +1170,11 @@ module ConfCtl::Cli
         end
 
         # Ignore statuses when no generation was found
-        statuses.delete_if do |host, st|
+        statuses.delete_if do |host, _st|
           !host_generations.has_key?(host)
         end
       else
-        ConfCtl::Swpins::ClusterNameList.new(machines: machines).each do |cn|
+        ConfCtl::Swpins::ClusterNameList.new(machines:).each do |cn|
           cn.parse
 
           statuses[cn.name].target_swpin_specs = cn.specs
@@ -1255,7 +1228,7 @@ module ConfCtl::Cli
       max_length = cols - reserved_cols
 
       if cmd.length > max_length
-        cmd[0..(max_length - 4)] + "..."
+        cmd[0..(max_length - 4)] + '...'
       else
         cmd
       end
@@ -1263,14 +1236,12 @@ module ConfCtl::Cli
 
     def format_duration(interval)
       {
-        'd' => 24*60*60,
-        'h' => 60*60,
+        'd' => 24 * 60 * 60,
+        'h' => 60 * 60,
         'm' => 60,
-        's' => 1,
+        's' => 1
       }.each do |unit, n|
-        if interval > n
-          return "#{(interval / n.to_f).round(1)}#{unit}"
-        end
+        return "#{(interval / n.to_f).round(1)}#{unit}" if interval > n
       end
 
       raise ArgumentError, "invalid time duration '#{interval}'"

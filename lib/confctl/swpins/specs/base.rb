@@ -124,7 +124,7 @@ module ConfCtl
       ret['info'] = info
       ret['fetcher'] = fetcher && {
         'type' => fetcher,
-        'options' => fetcher_opts,
+        'options' => fetcher_opts
       }
       ret
     end
@@ -134,6 +134,7 @@ module ConfCtl
     end
 
     protected
+
     # @return [Hash]
     attr_reader :nix_opts
 
@@ -167,10 +168,10 @@ module ConfCtl
       @state = json_opts['state']
       @info = json_opts['info']
 
-      if json_opts['fetcher']
-        @fetcher = json_opts['fetcher']['type']
-        @fetcher_opts = json_opts['fetcher']['options']
-      end
+      return unless json_opts['fetcher']
+
+      @fetcher = json_opts['fetcher']['type']
+      @fetcher_opts = json_opts['fetcher']['options']
     end
 
     def set_state(v)

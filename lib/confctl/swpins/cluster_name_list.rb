@@ -6,10 +6,8 @@ module ConfCtl
     def initialize(channels: nil, pattern: '*', machines: nil)
       channels ||= ConfCtl::Swpins::ChannelList.get
 
-      (machines || MachineList.new).each do |name, machine|
-        if Pattern.match?(pattern, machine.name)
-          self << Swpins::ClusterName.new(machine, channels)
-        end
+      (machines || MachineList.new).each do |_name, machine|
+        self << Swpins::ClusterName.new(machine, channels) if Pattern.match?(pattern, machine.name)
       end
     end
   end

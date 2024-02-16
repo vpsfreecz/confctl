@@ -15,18 +15,16 @@ module ConfCtl
     end
 
     def setup
-      begin
-        File.stat(mirror_path)
-      rescue Errno::ENOENT
-        FileUtils.mkdir_p(mirror_path)
-        git("clone", args: ["--mirror", url, mirror_path])
-      else
-        git_repo('fetch')
-      end
+      File.stat(mirror_path)
+    rescue Errno::ENOENT
+      FileUtils.mkdir_p(mirror_path)
+      git('clone', args: ['--mirror', url, mirror_path])
+    else
+      git_repo('fetch')
     end
 
     def revision_parse(str)
-      git_repo("rev-parse", args: [str])
+      git_repo('rev-parse', args: [str])
     end
 
     # @param from_ref [String]
@@ -47,13 +45,14 @@ module ConfCtl
       ret = "git diff for #{from_ref}..#{to_ref}\n"
       ret << git_repo(
         'diff',
-        opts: opts,
+        opts:,
         args: ["#{from_ref}..#{to_ref}"]
       )
       ret
     end
 
     protected
+
     attr_reader :cmd, :quiet
 
     def git_repo(git_cmd, *args, **kwargs)
@@ -63,9 +62,9 @@ module ConfCtl
     end
 
     def git(git_cmd, args: [], opts: [], gopts: [])
-      opts << '--quiet' if quiet && %w(clone fetch).include?(git_cmd)
+      opts << '--quiet' if quiet && %w[clone fetch].include?(git_cmd)
 
-      out, _ = cmd.run('git', *gopts, git_cmd, *opts, *args)
+      out, = cmd.run('git', *gopts, git_cmd, *opts, *args)
       out.strip
     end
 

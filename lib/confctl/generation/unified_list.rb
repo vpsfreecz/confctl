@@ -42,12 +42,12 @@ module ConfCtl
       true
     end
 
-    def each(&block)
-      generations.each(&block)
+    def each(&)
+      generations.each(&)
     end
 
-    def delete_if(&block)
-      generations.delete_if(&block)
+    def delete_if(&)
+      generations.delete_if(&)
     end
 
     def empty?
@@ -57,6 +57,7 @@ module ConfCtl
     include Enumerable
 
     protected
+
     attr_reader :generations
   end
 end

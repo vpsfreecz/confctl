@@ -6,7 +6,7 @@ module ConfCtl
     include Singleton
 
     class << self
-      %i(
+      %i[
         path
         hash
         short_hash
@@ -18,7 +18,7 @@ module ConfCtl
         unchanged?
         state_mtime
         update_state
-      ).each do |v|
+      ].each do |v|
         define_method(v) do |*args, **kwargs, &block|
           instance.send(v, *args, **kwargs, &block)
         end

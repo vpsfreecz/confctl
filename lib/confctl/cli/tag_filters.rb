@@ -14,6 +14,7 @@ module ConfCtl::Cli
     end
 
     protected
+
     attr_reader :must, :cant
 
     def parse_all(str_tags)
