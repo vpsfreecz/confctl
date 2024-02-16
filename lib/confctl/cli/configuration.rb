@@ -215,7 +215,7 @@ module ConfCtl::Cli
       end
 
       dst_dir = File.dirname(dst_path)
-      mkdir_p(dst_dir) unless Dir.exist?(dst_dir)
+      mkdir_p(dst_dir)
       mv(src_path, dst_path)
 
       src_swpins = File.join('swpins/cluster', "#{src.gsub('/', ':')}.json")
