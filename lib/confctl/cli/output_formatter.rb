@@ -37,7 +37,7 @@ module ConfCtl::Cli
           @cols = []
         else
           @cols ||= parse_cols(@objects.first.keys)
-        end # A list of items
+        end
 
       elsif @objects.is_a?(::Hash) # Single item
         @cols ||= parse_cols(@objects.keys)
