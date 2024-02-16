@@ -511,7 +511,7 @@ module ConfCtl::Cli
         if opts['dry-activate-first']
           lw.sync_console do
             puts Rainbow(
-              "Trying to activate configuration on #{host} " +
+              "Trying to activate configuration on #{host} " \
               "(#{machine.target_host})"
             ).yellow
           end
@@ -521,7 +521,7 @@ module ConfCtl::Cli
 
         lw.sync_console do
           puts Rainbow(
-            "Activating configuration on #{host} (#{machine.target_host}): " +
+            "Activating configuration on #{host} (#{machine.target_host}): " \
             "#{action}"
           ).yellow
         end
