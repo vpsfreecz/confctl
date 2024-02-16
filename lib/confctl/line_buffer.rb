@@ -29,7 +29,7 @@ module ConfCtl
       return if nl.nil?
 
       line = buffer[0..nl]
-      @buffer = buffer[nl + 1..-1]
+      @buffer = buffer[nl + 1..]
       line
     end
 

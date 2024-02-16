@@ -24,7 +24,7 @@ module ConfCtl
         eq = v.index('=')
         raise "'#{v}' is not a valid nix path entry " if eq.nil?
 
-        [v[0..eq - 1], v[eq + 1..-1]]
+        [v[0..eq - 1], v[eq + 1..]]
       end]
     end
 

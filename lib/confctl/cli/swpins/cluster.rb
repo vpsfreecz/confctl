@@ -35,7 +35,7 @@ module ConfCtl::Cli
           puts "Skipping #{spec.name} as it comes from channel #{spec.channel}"
         else
           change_set.add(cluster_name, spec)
-          spec_set_msg(cluster_name, spec) { spec.prefetch_set(args[2..-1]) }
+          spec_set_msg(cluster_name, spec) { spec.prefetch_set(args[2..]) }
           cluster_names << cluster_name unless cluster_names.include?(cluster_name)
         end
       end

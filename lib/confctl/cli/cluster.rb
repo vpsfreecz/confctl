@@ -20,7 +20,7 @@ module ConfCtl::Cli
         nix.module_options.each do |opt|
           next unless opt['name'].start_with?(prefix)
 
-          puts opt['name'][prefix.length..-1]
+          puts opt['name'][prefix.length..]
         end
 
         return
@@ -291,7 +291,7 @@ module ConfCtl::Cli
 
       end
 
-      run_ssh_command(machines, args[1..-1])
+      run_ssh_command(machines, args[1..])
     end
 
     def cssh

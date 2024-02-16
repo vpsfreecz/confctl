@@ -39,7 +39,7 @@ module ConfCtl::Cli
           puts "Skipping #{spec.name} as it comes from channel #{spec.channel}"
         else
           change_set.add(core, spec)
-          spec_set_msg(core, spec) { spec.prefetch_set(args[1..-1]) }
+          spec_set_msg(core, spec) { spec.prefetch_set(args[1..]) }
         end
       end
 

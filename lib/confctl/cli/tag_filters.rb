@@ -20,7 +20,7 @@ module ConfCtl::Cli
     def parse_all(str_tags)
       str_tags.each do |t|
         if t.start_with?('^')
-          cant << t[1..-1]
+          cant << t[1..]
         else
           must << t
         end

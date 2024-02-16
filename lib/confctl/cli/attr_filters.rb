@@ -45,7 +45,7 @@ module ConfCtl::Cli
       return false unless i
 
       len = sep.length
-      [v[0..i - 1], v[i + len..-1]]
+      [v[0..i - 1], v[i + len..]]
     end
   end
 end

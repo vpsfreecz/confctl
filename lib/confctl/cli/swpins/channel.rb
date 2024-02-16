@@ -31,7 +31,7 @@ module ConfCtl::Cli
 
       each_channel_spec(args[0], args[1]) do |chan, spec|
         change_set.add(chan, spec)
-        spec_set_msg(chan, spec) { spec.prefetch_set(args[2..-1]) }
+        spec_set_msg(chan, spec) { spec.prefetch_set(args[2..]) }
         channels << chan unless channels.include?(chan)
       end
 
