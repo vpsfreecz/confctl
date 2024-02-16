@@ -125,8 +125,8 @@ module ConfCtl::Cli
         puts "Generation: #{opts[:generation] || 'new build'}"
       end
 
-      statuses = machines.to_h do |host, machine|
-        [host, ConfCtl::MachineStatus.new(machine)]
+      statuses = machines.transform_values do |machine|
+        ConfCtl::MachineStatus.new(machine)
       end
 
       # Evaluate toplevels
@@ -1158,8 +1158,8 @@ module ConfCtl::Cli
         puts "Generation: #{opts[:generation] || 'current configuration'}"
       end
 
-      statuses = machines.to_h do |host, machine|
-        [host, ConfCtl::MachineStatus.new(machine)]
+      statuses = machines.transform_values do |machine|
+        ConfCtl::MachineStatus.new(machine)
       end
 
       if opts[:generation]

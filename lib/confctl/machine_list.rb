@@ -101,8 +101,8 @@ module ConfCtl
     end
 
     def parse(data)
-      data.to_h do |host, info|
-        [host, Machine.new(info)]
+      data.transform_values do |info|
+        Machine.new(info)
       end
     end
   end
