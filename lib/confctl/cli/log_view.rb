@@ -53,7 +53,7 @@ module ConfCtl::Cli
     # @param reserved_lines [Integer]
     #   number of reserved lines below the box when `size` is `:auto`
     # @param output [IO]
-    def initialize(header: nil, title: nil, size: 10, reserved_lines: 0, output: STDOUT)
+    def initialize(header: nil, title: nil, size: 10, reserved_lines: 0, output: $stdout)
       @cursor = TTY::Cursor
       @outmutex = Mutex.new
       @inlines = Queue.new

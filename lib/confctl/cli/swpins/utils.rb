@@ -39,15 +39,15 @@ module ConfCtl::Cli
     end
 
     def spec_set_msg(parent, spec)
-      STDOUT.write("Configuring #{spec.name} in #{parent.name}")
-      STDOUT.flush
+      $stdout.write("Configuring #{spec.name} in #{parent.name}")
+      $stdout.flush
       yield
       puts " -> #{spec.version}"
     end
 
     def spec_update_msg(parent, spec)
-      STDOUT.write("Updating #{spec.name} in #{parent.name}")
-      STDOUT.flush
+      $stdout.write("Updating #{spec.name} in #{parent.name}")
+      $stdout.flush
       yield
       puts " -> #{spec.version}"
     end

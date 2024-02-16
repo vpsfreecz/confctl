@@ -76,10 +76,10 @@ module ConfCtl::Cli
       yield if block_given?
 
       loop do
-        STDOUT.write("\nContinue? [y/N]: ")
-        STDOUT.flush
+        $stdout.write("\nContinue? [y/N]: ")
+        $stdout.flush
 
-        case STDIN.readline.strip.downcase
+        case $stdin.readline.strip.downcase
         when 'y'
           puts
           return true
@@ -101,10 +101,10 @@ module ConfCtl::Cli
       yield if block_given?
 
       loop do
-        STDOUT.puts("\nOptions:\n")
+        $stdout.puts("\nOptions:\n")
 
         options.each do |key, desc|
-          STDOUT.puts("  [#{key}] #{desc}")
+          $stdout.puts("  [#{key}] #{desc}")
         end
 
         keys = options.keys.map do |k|
@@ -115,10 +115,10 @@ module ConfCtl::Cli
           end
         end.join('/')
 
-        STDOUT.write("\nAction: [#{keys}]: ")
-        STDOUT.flush
+        $stdout.write("\nAction: [#{keys}]: ")
+        $stdout.flush
 
-        answer = STDIN.readline.strip.downcase
+        answer = $stdin.readline.strip.downcase
 
         if options.has_key?(answer)
           puts

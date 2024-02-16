@@ -20,7 +20,7 @@ end
 
 desc 'Generate man/man8/confctl-options.nix.8.md'
 task 'confctl-options' do
-  ConfCtl::Logger.open('rake', output: STDOUT)
+  ConfCtl::Logger.open('rake', output: $stdout)
 
   opts = ConfCtl::ModuleOptions.new(nix: ConfCtl::Nix.stateless)
   opts.read
