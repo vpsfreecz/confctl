@@ -27,7 +27,7 @@ module ConfCtl
                       {}
                     end
 
-      @specs = Hash[nix_specs.map do |name, nix_opts|
+      @specs = nix_specs.to_h do |name, nix_opts|
         [
           name,
           Swpins::Spec.for(nix_opts['type'].to_sym).new(
@@ -36,7 +36,7 @@ module ConfCtl
             json_specs[name]
           )
         ]
-      end]
+      end
     end
 
     def valid?

@@ -194,7 +194,7 @@ module ConfCtl::Cli
       cols = prepend_cols + cols if prepend_cols
 
       rows = machines.map do |_host, machine|
-        Hash[cols.map { |c| [c, machine[c]] }]
+        cols.to_h { |c| [c, machine[c]] }
       end
 
       OutputFormatter.print(

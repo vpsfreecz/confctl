@@ -85,9 +85,9 @@ module ConfCtl
         f.puts(JSON.pretty_generate({
           date: date.iso8601,
           toplevel:,
-          swpins: Hash[swpin_paths.map do |name, path|
+          swpins: swpin_paths.to_h do |name, path|
             [name, { path:, spec: swpin_specs[name].as_json }]
-          end]
+          end
         }))
       end
 

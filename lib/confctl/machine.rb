@@ -20,12 +20,12 @@ module ConfCtl
     end
 
     def nix_paths
-      Hash[opts['nix']['nixPath'].map do |v|
+      opts['nix']['nixPath'].to_h do |v|
         eq = v.index('=')
         raise "'#{v}' is not a valid nix path entry " if eq.nil?
 
         [v[0..eq - 1], v[eq + 1..]]
-      end]
+      end
     end
 
     def health_checks

@@ -91,9 +91,9 @@ module ConfCtl
     end
 
     def parse(data)
-      Hash[data.map do |host, info|
+      data.to_h do |host, info|
         [host, Machine.new(info)]
-      end]
+      end
     end
   end
 end

@@ -125,9 +125,9 @@ module ConfCtl::Cli
         puts "Generation: #{opts[:generation] || 'new build'}"
       end
 
-      statuses = Hash[machines.map do |host, machine|
+      statuses = machines.to_h do |host, machine|
         [host, ConfCtl::MachineStatus.new(machine)]
-      end]
+      end
 
       # Evaluate toplevels
       if opts[:generation] == 'none'
@@ -1158,9 +1158,9 @@ module ConfCtl::Cli
         puts "Generation: #{opts[:generation] || 'current configuration'}"
       end
 
-      statuses = Hash[machines.map do |host, machine|
+      statuses = machines.to_h do |host, machine|
         [host, ConfCtl::MachineStatus.new(machine)]
-      end]
+      end
 
       if opts[:generation]
         host_generations = find_generations(machines, opts[:generation])
