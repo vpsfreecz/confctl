@@ -777,7 +777,7 @@ module ConfCtl::Cli
           if aggregate
             results[host] = e
           else
-            puts e.message.to_s
+            puts e.message
           end
         end
 
