@@ -209,7 +209,7 @@ module ConfCtl::Cli
         end
 
         output.print(cursor.clear_line)
-        output.puts("<#{('-' * (cols - 1))}")
+        output.puts("<#{'-' * (cols - 1)}")
         output.puts
       end
     end
