@@ -1,5 +1,3 @@
-require 'thread'
-
 module ConfCtl
   class ParallelExecutor
     attr_reader :thread_count

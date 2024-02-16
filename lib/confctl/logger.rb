@@ -2,7 +2,6 @@ require 'fileutils'
 require 'pathname'
 require 'pp'
 require 'singleton'
-require 'thread'
 
 module ConfCtl
   class Logger

@@ -1,6 +1,5 @@
 require 'io/console'
 require 'rainbow'
-require 'thread'
 require 'tty-cursor'
 
 module ConfCtl::Cli
