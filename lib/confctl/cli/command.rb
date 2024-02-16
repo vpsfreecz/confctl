@@ -172,8 +172,6 @@ module ConfCtl::Cli
       selected = select_machines(pattern)
 
       case opts[:managed]
-      when 'y', 'yes'
-        selected.managed
       when 'n', 'no'
         selected.unmanaged
       when 'a', 'all'
