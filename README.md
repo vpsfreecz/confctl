@@ -271,6 +271,13 @@ The configuration is exactly the same as that of software pins in channels.
 Instead of `confctl swpins channel` commands, use `confctl swpins cluster`
 to manage configured pins.
 
+## Nix flakes
+confctl's software pins are an alternative to flakes and flakes are not supported
+by confctl at this time. Software pins are implemented by manipulating the `$NIX_PATH`
+environment variable, which is in conflict with using flakes. confctl is likely
+to be migrated to flakes when the interface will be stabilized. Since the transition
+is going to require a significant effort, there are no plans for it currently.
+
 ## Extra module arguments
 Machine configs can use the following extra module arguments:
 
