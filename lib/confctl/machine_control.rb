@@ -19,7 +19,7 @@ module ConfCtl
         '-o', 'ConnectTimeout=3',
         '-o', 'ServerAliveInterval=3',
         '-o', 'ServerAliveCountMax=1'
-      ) { get_uptime }
+      ) { uptime }
     end
 
     def interactive_shell
@@ -40,7 +40,7 @@ module ConfCtl
     # @yieldparam [:reboot, :went_down, :is_down, :is_up, :timeout] state
     # @return [Integer] seconds it took to reboot the machine
     def reboot_and_wait(timeout: nil)
-      initial_uptime = get_uptime
+      initial_uptime = uptime
       t = Time.now
       went_down = false
       reboot
@@ -54,7 +54,7 @@ module ConfCtl
             '-o', 'ConnectTimeout=3',
             '-o', 'ServerAliveInterval=3',
             '-o', 'ServerAliveCountMax=1'
-          ) { get_uptime }
+          ) { uptime }
 
           if current_uptime < initial_uptime
             yield :is_up, nil
@@ -84,12 +84,12 @@ module ConfCtl
     end
 
     # @return [Integer] uptime in seconds
-    def get_uptime
+    def uptime
       read_file('/proc/uptime').strip.split[0].to_f
     end
 
     # @return [Array<String>]
-    def get_timezone
+    def timezone
       out, = run_cmd('date', '+%Z;%z')
       out.strip.split(';')
     end

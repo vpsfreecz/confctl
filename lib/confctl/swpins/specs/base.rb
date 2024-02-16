@@ -142,7 +142,9 @@ module ConfCtl
     attr_reader :json_opts
 
     # @return [Hash]
-    attr_reader :state
+    attr_accessor :state
+
+    attr_writer :info
 
     # @return [String]
     attr_reader :fetcher
@@ -172,14 +174,6 @@ module ConfCtl
 
       @fetcher = json_opts['fetcher']['type']
       @fetcher_opts = json_opts['fetcher']['options']
-    end
-
-    def set_state(v)
-      @state = v
-    end
-
-    def set_info(v)
-      @info = v
     end
 
     def set_fetcher(name, opts)

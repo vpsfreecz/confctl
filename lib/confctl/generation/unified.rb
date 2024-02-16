@@ -49,18 +49,18 @@ module ConfCtl
     end
 
     # @param gen [Generation::Build]
-    def set_build_generation(gen)
-      @build_generation = gen
+    def build_generation=(gen)
       @name = gen.name
       @date = gen.date
       @current ||= gen.current
+      @build_generation = gen
     end
 
     # @param gen [Generation::Host]
-    def set_host_generation(gen)
-      @host_generation = gen
+    def host_generation=(gen)
       @id = gen.id
       @current ||= gen.current
+      @host_generation = gen
     end
 
     # Determines whether `gen` can be wrapped by this object

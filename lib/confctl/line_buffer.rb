@@ -15,7 +15,7 @@ module ConfCtl
       return if block.nil?
 
       loop do
-        out_line = get_line
+        out_line = read_line
         break if out_line.nil?
 
         block.call(out_line)
@@ -24,7 +24,7 @@ module ConfCtl
 
     # Read one line if there is one
     # @return [String, nil]
-    def get_line
+    def read_line
       nl = buffer.index("\n")
       return if nl.nil?
 

@@ -589,7 +589,7 @@ module ConfCtl::Cli
         if machines.length > 1
           puts Rainbow("Running #{run_checks.length} health checks on #{machines.length} machines").yellow
         else
-          puts Rainbow("Running #{run_checks.length} health checks on #{machines.get_one}").yellow
+          puts Rainbow("Running #{run_checks.length} health checks on #{machines.first}").yellow
         end
 
         return unless ask_confirmation(always: true)
@@ -645,7 +645,7 @@ module ConfCtl::Cli
         if machines.length > 1
           Rainbow("Running health checks on #{machines.length} machines").bright
         else
-          Rainbow('Running health checks on ').bright + Rainbow(machines.get_one.to_s).yellow
+          Rainbow('Running health checks on ').bright + Rainbow(machines.first.to_s).yellow
         end
 
       header << "\n" << Rainbow('Full log: ').bright << ConfCtl::Logger.relative_path << "\n"
@@ -734,7 +734,7 @@ module ConfCtl::Cli
         list_machines(machines)
       end
 
-      machine = machines.get_one
+      machine = machines.first
       mc = ConfCtl::MachineControl.new(machine)
       mc.interactive_shell
     end

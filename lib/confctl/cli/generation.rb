@@ -242,7 +242,7 @@ module ConfCtl::Cli
         if machines.length > 1
           Rainbow("Collecting garbage on #{machines.length} machines").bright
         else
-          Rainbow('Collecting garbage on ').bright + Rainbow(machines.get_one.to_s).yellow
+          Rainbow('Collecting garbage on ').bright + Rainbow(machines.first.to_s).yellow
         end
 
       LogView.open(

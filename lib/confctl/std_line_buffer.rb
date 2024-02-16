@@ -19,8 +19,8 @@ module ConfCtl
           err_buffer << stderr if stderr
 
           loop do
-            out_line = out_buffer.get_line
-            err_line = err_buffer.get_line
+            out_line = out_buffer.read_line
+            err_line = err_buffer.read_line
             break if out_line.nil? && err_line.nil?
 
             block.call(out_line, err_line)

@@ -9,7 +9,7 @@ module ConfCtl
       unified = generations.detect { |g| g.includes?(generation) }
 
       if unified
-        unified.set_build_generation(generation)
+        unified.build_generation = generation
       else
         generations << Generation::Unified.new(generation.host, build_generation: generation)
       end
@@ -28,7 +28,7 @@ module ConfCtl
       unified = generations.detect { |g| g.includes?(generation) }
 
       if unified
-        unified.set_host_generation(generation)
+        unified.host_generation = generation
       else
         generations << Generation::Unified.new(generation.host, host_generation: generation)
       end

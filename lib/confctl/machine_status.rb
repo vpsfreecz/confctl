@@ -87,7 +87,7 @@ module ConfCtl
     # Connect to the machine and query its state
     def query(toplevel: true, generations: true)
       begin
-        @uptime = mc.get_uptime
+        @uptime = mc.uptime
       rescue TTY::Command::ExitError
         return
       end

@@ -61,10 +61,9 @@ module ConfCtl
       @machines[host]
     end
 
-    # @return [Machine]
-    def get_one
-      @machines.each_value { |machine| return machine }
-      nil
+    # @return [Machine, nil]
+    def first
+      @machines.each_value.first
     end
 
     # @return [Integer]
