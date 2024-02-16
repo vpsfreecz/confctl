@@ -246,7 +246,7 @@ module ConfCtl::Cli
         end
 
       LogView.open(
-        header: header + "\n",
+        header: "#{header}\n",
         title: Rainbow('Live view').bright,
         size: :auto,
         reserved_lines: machines.length + 8

@@ -424,7 +424,7 @@ module ConfCtl::Cli
       return :skip if opts[:interactive] && !ask_confirmation(always: true)
 
       LogView.open(
-        header: Rainbow('Copying to').bright + ' ' + host + "\n",
+        header: "#{Rainbow('Copying to').bright} #{host}\n",
         title: Rainbow('Live view').bright
       ) do |lw|
         pb = TTY::ProgressBar.new(
@@ -449,7 +449,7 @@ module ConfCtl::Cli
 
     def concurrent_copy(machines, host_generations, nix)
       LogView.open(
-        header: Rainbow("Copying to #{host_generations.length} machines").bright + "\n",
+        header: "#{Rainbow("Copying to #{host_generations.length} machines").bright}\n",
         title: Rainbow('Live view').bright
       ) do |lw|
         multibar = TTY::ProgressBar::Multi.new(
@@ -1228,7 +1228,7 @@ module ConfCtl::Cli
       max_length = cols - reserved_cols
 
       if cmd.length > max_length
-        cmd[0..(max_length - 4)] + '...'
+        "#{cmd[0..(max_length - 4)]}..."
       else
         cmd
       end

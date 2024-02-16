@@ -210,7 +210,7 @@ module ConfCtl::Cli
         end
 
         output.print(cursor.clear_line)
-        output.puts('<' + ('-' * (cols - 1)))
+        output.puts("<#{('-' * (cols - 1))}")
         output.puts
       end
     end
@@ -228,7 +228,7 @@ module ConfCtl::Cli
 
     def fit_line(line)
       if line.length >= (cols - 4)
-        line[0..(cols - 4)] + '...'
+        "#{line[0..(cols - 4)]}..."
       else
         line
       end
