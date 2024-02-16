@@ -4,6 +4,7 @@ module ConfCtl
     # @param pattern [String]
     # @param machines [MachineList]
     def initialize(channels: nil, pattern: '*', machines: nil)
+      super()
       channels ||= ConfCtl::Swpins::ChannelList.get
 
       (machines || MachineList.new).each_value do |machine|

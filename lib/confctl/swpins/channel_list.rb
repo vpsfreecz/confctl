@@ -16,6 +16,7 @@ module ConfCtl
 
     # @param pattern [String]
     def initialize(pattern: '*')
+      super()
       parse(pattern:)
     end
 
