@@ -155,7 +155,7 @@ module ConfCtl::Cli
           ConfCtl::Generation::BuildList.new(host),
           min: machine['buildGenerations']['min'] || global['min'],
           max: machine['buildGenerations']['max'] || global['max'],
-          maxAge: machine['buildGenerations']['maxAge'] || global['maxAge']
+          max_age: machine['buildGenerations']['maxAge'] || global['maxAge']
         ) do |gen|
           {
             name: gen.name,
@@ -196,7 +196,7 @@ module ConfCtl::Cli
           st.generations,
           min: machine['hostGenerations']['min'] || global['min'],
           max: machine['hostGenerations']['max'] || global['max'],
-          maxAge: machine['hostGenerations']['maxAge'] || global['maxAge']
+          max_age: machine['hostGenerations']['maxAge'] || global['maxAge']
         ) do |gen|
           {
             type: 'host',
@@ -211,7 +211,7 @@ module ConfCtl::Cli
       ret
     end
 
-    def generations_rotate(gens, min: nil, max: nil, maxAge: nil)
+    def generations_rotate(gens, min: nil, max: nil, max_age: nil)
       ret = []
 
       return ret if gens.count <= min
@@ -221,7 +221,7 @@ module ConfCtl::Cli
       gens.each do |gen|
         next if gen.current
 
-        if (gens.count - machine_deleted) > max || (gen.date + maxAge) < Time.now
+        if (gens.count - machine_deleted) > max || (gen.date + max_age) < Time.now
           ret << {
             host: gen.host,
             generation: gen
