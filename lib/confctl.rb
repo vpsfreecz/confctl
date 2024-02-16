@@ -14,7 +14,7 @@ module ConfCtl
   # @return [String]
   def self.cache_dir
     @cache_dir ||= File.join(
-      ENV['XDG_CACHE_HOME'] || File.join(ENV.fetch('HOME', nil), '.cache'),
+      ENV['XDG_CACHE_HOME'] || File.join(Dir.home, '.cache'),
       'confctl'
     )
   end
