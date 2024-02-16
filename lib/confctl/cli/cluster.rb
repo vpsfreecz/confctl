@@ -734,11 +734,9 @@ module ConfCtl::Cli
         list_machines(machines)
       end
 
-      machines.each_value do |machine|
-        mc = ConfCtl::MachineControl.new(machine)
-        mc.interactive_shell
-        return
-      end
+      machine = machines.get_one
+      mc = ConfCtl::MachineControl.new(machine)
+      mc.interactive_shell
     end
 
     def run_ssh_command(machines, cmd)

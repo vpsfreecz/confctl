@@ -112,14 +112,16 @@ module ConfCtl
     end
 
     def pre_evaluated_store_paths
-      path = File.join(cache_dir, 'core.swpins')
-      return unless File.exist?(path)
+      swpins_path = File.join(cache_dir, 'core.swpins')
+      return unless File.exist?(swpins_path)
 
-      swpins = JSON.parse(File.read(path))
+      swpins = JSON.parse(File.read(swpins_path))
 
-      swpins.each_value do |path|
-        return unless Dir.exist?(path)
+      missing_path = swpins.each_value.detect do |path|
+        !Dir.exist?(path)
       end
+
+      return if missing_path
 
       swpins
     end
