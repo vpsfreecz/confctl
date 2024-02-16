@@ -147,23 +147,23 @@ module ConfCtl
 
     def check_output(result)
       # stdout
-      if fragment = @command.stdout.check_match(result.out)
+      if (fragment = @command.stdout.check_match(result.out))
         add_error("#{@command}: standard output does not match #{fragment.inspect}")
 
-      elsif fragment = @command.stdout.check_include(result.out)
+      elsif (fragment = @command.stdout.check_include(result.out))
         add_error("#{@command}: standard output does not include #{fragment.inspect}")
 
-      elsif fragment = @command.stdout.check_exclude(result.out)
+      elsif (fragment = @command.stdout.check_exclude(result.out))
         add_error("#{@command}: standard output includes #{fragment.inspect}")
 
       # stderr
-      elsif fragment = @command.stderr.check_match(result.err)
+      elsif (fragment = @command.stderr.check_match(result.err))
         add_error("#{@command}: standard error does not match #{fragment.inspect}")
 
-      elsif fragment = @command.stderr.check_include(result.err)
+      elsif (fragment = @command.stderr.check_include(result.err))
         add_error("#{@command}: standard error does not include #{fragment.inspect}")
 
-      elsif fragment = @command.stderr.check_exclude(result.err)
+      elsif (fragment = @command.stderr.check_exclude(result.err))
         add_error("#{@command}: standard error includes #{fragment.inspect}")
       end
     end
