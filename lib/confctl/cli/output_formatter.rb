@@ -2,9 +2,9 @@ require 'rainbow'
 
 module ConfCtl::Cli
   class OutputFormatter
-    def self.format(*args)
+    def self.to_s(*args)
       f = new(*args)
-      f.format
+      f.to_s
     end
 
     def self.print(*args, **kwargs)
@@ -47,7 +47,7 @@ module ConfCtl::Cli
       end
     end
 
-    def format
+    def to_s
       @out = ''
       generate
       @out
