@@ -72,6 +72,7 @@ module ConfCtl
         begin
           File.unlink(path)
         rescue Errno::ENOENT
+          # ignore
         end
       else
         tmp = "#{path}.new"
