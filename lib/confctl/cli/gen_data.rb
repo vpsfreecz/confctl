@@ -10,7 +10,7 @@ module ConfCtl::Cli
     end
 
     def vpsadmin_containers
-      api = get_vpsadmin_client
+      api = vpsadmin_client
 
       machines = ConfCtl::MachineList.new
       data = {}
@@ -51,7 +51,7 @@ module ConfCtl::Cli
     end
 
     def vpsadmin_network_containers
-      api = get_vpsadmin_client
+      api = vpsadmin_client
       networks = api.network.list
       data = {}
 
@@ -69,10 +69,10 @@ module ConfCtl::Cli
 
     protected
 
-    def get_vpsadmin_client
-      return @api if @api
+    def vpsadmin_client
+      return @vpsadmin_client if @vpsadmin_client
 
-      @api = VpsFree::Client.new
+      @vpsadmin_client = VpsFree::Client.new
 
       user = ask('User name: ') { |q| q.default = nil }.to_s
       password = ask('Password: ') do |q|
@@ -80,8 +80,8 @@ module ConfCtl::Cli
         q.echo = false
       end.to_s
 
-      @api.authenticate(:basic, user:, password:)
-      @api
+      @vpsadmin_client.authenticate(:basic, user:, password:)
+      @vpsadmin_client
     end
 
     def update_file(relpath, &)
