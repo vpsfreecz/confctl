@@ -2,7 +2,7 @@ module ConfCtl
   class Swpins::ChannelList < Array
     # @return [Swpins::ChannelList]
     def self.get
-      @instance ||= new
+      @get ||= new
     end
 
     # @param pattern [String]
