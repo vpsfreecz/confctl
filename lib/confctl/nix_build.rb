@@ -43,16 +43,17 @@ module ConfCtl
       # (indeterminate) until the total becomes known.
 
       # Nix >= around 2.11
-      if /^this derivation will be built:/ =~ line
+      case line
+      when /^this derivation will be built:/
         @build_total = 1
         return
-      elsif /^these (\d+) derivations will be built:/ =~ line
+      when /^these (\d+) derivations will be built:/
         @build_total = ::Regexp.last_match(1).to_i
         return
-      elsif /^this path will be fetched / =~ line
+      when /^this path will be fetched /
         @fetch_total = 1
         return
-      elsif /^these (\d+) paths will be fetched / =~ line
+      when /^these (\d+) paths will be fetched /
         @fetch_total = ::Regexp.last_match(1).to_i
         return
       end
