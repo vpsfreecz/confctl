@@ -17,7 +17,7 @@ module ConfCtl
         path
         relative_path
       ].each do |v|
-        define_method(v) { |*args| instance.send(v, *args) }
+        define_method(v) { |*args, **kwargs| instance.send(v, *args, **kwargs) }
       end
     end
 
