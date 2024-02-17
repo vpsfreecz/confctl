@@ -1,5 +1,4 @@
 source 'https://rubygems.org'
-gem 'bundix', github: 'manveru/bundix'
 gem 'gli', '~> 2.21.0'
 gem 'json'
 gem 'md2man'

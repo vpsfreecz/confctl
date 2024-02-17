@@ -40,9 +40,8 @@ module ConfCtl::Cli
         }
       end
 
-      nixer = ConfCtl::Nixer.new(data)
       update_file('vpsadmin/containers.nix') do |f|
-        f.puts(nixer.serialize)
+        f.puts(ConfCtl::NixFormat.to_nix(data))
       end
     end
 
@@ -61,9 +60,8 @@ module ConfCtl::Cli
         end
       end
 
-      nixer = ConfCtl::Nixer.new(data)
       update_file('vpsadmin/networks/containers.nix') do |f|
-        f.puts(nixer.serialize)
+        f.puts(ConfCtl::NixFormat.to_nix(data))
       end
     end
 

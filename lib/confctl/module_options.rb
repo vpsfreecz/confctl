@@ -37,7 +37,7 @@ module ConfCtl
       protected
 
       def nixify(v)
-        ConfCtl::Nixer.new(v).serialize
+        ConfCtl::NixFormat.to_nix(v)
       end
     end
 
