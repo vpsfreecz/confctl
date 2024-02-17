@@ -1,3 +1,4 @@
+require 'bundler/gem_tasks'
 require 'confctl'
 require 'md2man/rakefile'
 require 'md2man/roff/engine'
