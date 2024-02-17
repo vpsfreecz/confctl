@@ -1,4 +1,4 @@
-# confctl-options.nix 8           2023-05-26                             master
+# confctl-options.nix 8           2024-02-17                             master
 
 ## NAME
 `confctl-options.nix` - confctl configuration documentation
@@ -100,7 +100,11 @@ within the deployment configuration directory:
 
     *Type:* list of string
 
-    *Default:* `["host.fqdn" "name" "spin"]`
+    *Default:* `[
+  "name"
+  "spin"
+  "host.fqdn"
+]`
 
     *Declared by:* `<confctl/nix/modules/confctl/cli.nix>`
 
@@ -121,7 +125,7 @@ within the deployment configuration directory:
 
     *Type:* list of string
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/confctl/nix.nix>`
 
@@ -136,8 +140,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Type:* attribute set of attribute set of (submodule)
 
-    *Default:* `{
-}`
+    *Default:* `{ }`
 
     *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
@@ -296,7 +299,7 @@ in `configs/swpins.nix` within the deployment configuration directory:
 
     *Type:* list of string
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
 
@@ -531,7 +534,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of (submodule)
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -567,7 +570,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of (submodule)
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -636,12 +639,11 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of (submodule)
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
-    *Example:* `{
-  _type = "literalExpression";
-  text = "[\n  { description = \"ping\"; command = [ \"ping\" \"-c1\" \"{host.fqdn}\" ]; }\n]\n";
-}`
+    *Example:* `[
+  { description = "ping"; command = [ "ping" "-c1" "{host.fqdn}" ]; }
+]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -690,7 +692,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of string
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -699,7 +701,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of string
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -717,7 +719,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of string
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -726,7 +728,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of string
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -755,12 +757,11 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of (submodule)
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
-    *Example:* `{
-  _type = "literalExpression";
-  text = "[\n  { description = \"curl\"; command = [ \"curl\" \"-s\" \"http://localhost:80\" ]; }\n]\n";
-}`
+    *Example:* `[
+  { description = "curl"; command = [ "curl" "-s" "http://localhost:80" ]; }
+]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -809,7 +810,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of string
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -818,7 +819,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of string
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -836,7 +837,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of string
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -845,7 +846,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of string
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -881,10 +882,12 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of (submodule)
 
-    *Default:* `[{
-  property = "SystemState";
-  value = "running";
-}]`
+    *Default:* `[
+  {
+    property = "SystemState";
+    value = "running";
+  }
+]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -929,12 +932,12 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* attribute set of list of (submodule)
 
-    *Default:* `{
-}`
+    *Default:* `{ }`
 
     *Example:* `{
-  _type = "literalExpression";
-  text = "{\n  \"firewall.service\" = [\n    { property = \"ActiveState\"; value = \"active\"; }\n  ];\n}\n";
+  "firewall.service" = [
+    { property = "ActiveState"; value = "active"; }
+  ];
 }`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
@@ -1083,8 +1086,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* attribute set
 
-    *Default:* `{
-}`
+    *Default:* `{ }`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -1115,7 +1117,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of string
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -1125,7 +1127,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of string
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -1144,7 +1146,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of string
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -1154,8 +1156,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* attribute set of (submodule)
 
-    *Default:* `{
-}`
+    *Default:* `{ }`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -1313,7 +1314,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Type:* list of string
 
-    *Default:* `[]`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 

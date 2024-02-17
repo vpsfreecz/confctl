@@ -9,8 +9,8 @@ module ConfCtl
         @name = nixos_opt['name']
         @description = nixos_opt['description'] || 'This option has no description.'
         @type = nixos_opt['type']
-        @default = nixos_opt['default']
-        @example = nixos_opt['example']
+        @default = extract_expression(nixos_opt['default'])
+        @example = extract_expression(nixos_opt['example'])
         @declarations = nixos_opt['declarations'].map do |v|
           raise "unable to place module '#{v}'" unless %r{/confctl/([^$]+)} =~ v
 
@@ -35,6 +35,19 @@ module ConfCtl
       end
 
       protected
+
+      def extract_expression(v)
+        if v.is_a?(Hash)
+          case v['_type']
+          when 'literalExpression'
+            NixLiteralExpression.new(v['text'])
+          else
+            raise "Unsupported expression type #{v['_type'].inspect}"
+          end
+        else
+          v
+        end
+      end
 
       def nixify(v)
         ConfCtl::NixFormat.to_nix(v)
