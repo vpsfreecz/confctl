@@ -19,10 +19,20 @@ machines.
 * [Nix](https://nixos.org)
 
 ## Quick start
-1. There are no releases or packages yet, so first clone the repository:
+1. Either install confctl as a gem:
+```
+gem install confctl
+```
+
+Or clone this repository:
+
 ```
 git clone https://github.com/vpsfreecz/confctl
 ```
+
+This guide assumes you have cloned the repository, because otherwise man will
+not find confctl's manual pages. If you install confctl using gem, you can
+ignore steps with `shell.nix`.
 
 2. Create a new directory, where your confctl-managed configuration will be
 stored:
