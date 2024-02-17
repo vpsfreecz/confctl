@@ -29,5 +29,5 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency 'tty-pager', '~> 0.14.0'
   s.add_runtime_dependency 'tty-progressbar', '~> 0.18.2'
   s.add_runtime_dependency 'tty-spinner', '~> 0.9.3'
-  s.add_runtime_dependency 'vpsfree-client', '~> 0.17.1'
+  s.add_runtime_dependency 'vpsfree-client', '~> 0.18.0'
 end
