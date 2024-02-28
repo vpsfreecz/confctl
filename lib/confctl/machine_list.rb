@@ -46,6 +46,12 @@ module ConfCtl
       machines.map(&)
     end
 
+    # @yieldparam [Machine] machine
+    # @return [Hash]
+    def transform_values(&)
+      machines.transform_values(&)
+    end
+
     # @return [MachineList]
     def managed
       select { |_host, machine| machine.managed }
