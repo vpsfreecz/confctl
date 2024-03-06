@@ -15,7 +15,7 @@ Gem::Specification.new do |s|
   s.executables = s.files.grep(%r{^bin/}) { |f| File.basename(f) }
   s.license     = 'GPL-3.0-only'
 
-  s.required_ruby_version = ">= #{File.read('.ruby-version').strip}"
+  s.required_ruby_version = '>= 3.1.0'
 
   s.add_runtime_dependency 'curses'
   s.add_runtime_dependency 'gli', '~> 2.21.0'
