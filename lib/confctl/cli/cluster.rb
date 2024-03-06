@@ -761,22 +761,16 @@ module ConfCtl::Cli
       machines.each do |host, machine|
         mc = ConfCtl::MachineControl.new(machine)
 
-        begin
-          puts "#{host}:" unless aggregate
+        puts "#{host}:" unless aggregate
 
-          result = run_ssh_command_on_machine(mc, cmd)
+        result = run_ssh_command_on_machine(mc, cmd)
 
-          if aggregate
-            results[host] = result
-          else
-            puts result.out
-          end
-        rescue TTY::Command::ExitError => e
-          if aggregate
-            results[host] = e
-          else
-            puts e.message
-          end
+        if aggregate
+          results[host] = result
+        elsif result.success?
+          puts result.out
+        else
+          puts result.err
         end
 
         puts unless aggregate
@@ -808,12 +802,8 @@ module ConfCtl::Cli
           tw.add do
             mc = ConfCtl::MachineControl.new(machine)
 
-            begin
-              result = run_ssh_command_on_machine(mc, cmd)
-              results[host] = result
-            rescue TTY::Command::ExitError => e
-              results[host] = e
-            end
+            result = run_ssh_command_on_machine(mc, cmd)
+            results[host] = result
 
             lw.sync_console { pb.advance }
           end
@@ -830,7 +820,13 @@ module ConfCtl::Cli
 
       results.each do |host, result|
         puts "#{host}:"
-        puts result.out
+
+        if result.success?
+          puts result.out
+        else
+          puts result.err
+        end
+
         puts
       end
     end
@@ -844,7 +840,7 @@ module ConfCtl::Cli
         cmd_opts[:in] = opts['input-file']
       end
 
-      mc.execute(*cmd, **cmd_opts)
+      mc.execute!(*cmd, **cmd_opts)
     end
 
     def process_aggregated_results(results)
