@@ -251,8 +251,8 @@ module ConfCtl::Cli
 
         entry_rel_path = File.join(*[rel_path, v].compact)
 
-        if File.exist?(File.join(entry_abs_path, 'module.nix')) \
-           && File.exist?(File.join(entry_abs_path, 'config.nix'))
+        if File.exist?(File.join(entry_abs_path, 'module.nix')) &&
+           File.exist?(File.join(entry_abs_path, 'config.nix'))
           ret << entry_rel_path
         end
 

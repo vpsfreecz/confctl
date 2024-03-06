@@ -966,6 +966,7 @@ module ConfCtl::Cli
       puts 'with swpins'
       swpin_paths.each { |k, v| puts "  #{k}=#{v}" }
 
+      # rubocop:disable Style/RedundantLineContinuation
       header = '' \
         << Rainbow('Command:').bright \
         << " #{format_command(10)}" \
@@ -976,6 +977,7 @@ module ConfCtl::Cli
         << Rainbow('Full log:   ').bright \
         << " #{ConfCtl::Logger.relative_path}" \
         << "\n\n"
+      # rubocop:enable Style/RedundantLineContinuation
 
       LogView.open_with_logger(
         header:,
