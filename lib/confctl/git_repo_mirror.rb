@@ -20,7 +20,7 @@ module ConfCtl
       FileUtils.mkdir_p(mirror_path)
       git('clone', args: ['--mirror', url, mirror_path])
     else
-      git_repo('fetch')
+      git_repo('fetch', opts: ['--no-show-forced-updates'])
     end
 
     def revision_parse(str)
