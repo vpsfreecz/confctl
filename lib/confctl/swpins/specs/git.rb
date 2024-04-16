@@ -103,7 +103,7 @@ module ConfCtl
 
     def prefetch_github(ref)
       mirror = GitRepoMirror.new(nix_opts['url'])
-      mirror.setup
+      mirror.setup(ref:)
 
       rev = mirror.revision_parse(ref)
       url = File.join(nix_opts['url'], 'archive', "#{rev}.tar.gz")

@@ -14,13 +14,13 @@ module ConfCtl
       @cmd = SystemCommand.new
     end
 
-    def setup
+    def setup(ref: nil)
       File.stat(mirror_path)
     rescue Errno::ENOENT
       FileUtils.mkdir_p(mirror_path)
       git('clone', args: ['--mirror', url, mirror_path])
     else
-      git_repo('fetch', opts: ['--no-show-forced-updates'])
+      git_repo('fetch', opts: ['--no-show-forced-updates'], args: (ref ? ['origin', ref] : []))
     end
 
     def revision_parse(str)
