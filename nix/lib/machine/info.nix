@@ -1,5 +1,5 @@
-{ config, spin, name, findConfig, ... }:
-({ inherit name; } // findConfig {
-  inherit (config) cluster;
+{ metaConfig, spin, name, findMetaConfig, ... }:
+({ inherit name; } // findMetaConfig {
+  inherit (metaConfig) cluster;
   inherit name;
 })

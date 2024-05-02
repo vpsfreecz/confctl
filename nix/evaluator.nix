@@ -18,8 +18,7 @@ let
   nameValuePairs = builtins.map (m: {
     name = m.name;
     value = {
-      inherit (m) name carrier;
-      metaConfig = m.config;
+      inherit (m) name carrier metaConfig;
     };
   }) machines;
 
@@ -54,7 +53,7 @@ let
     import ./lib/swpins/eval.nix {
       inherit (arg) confDir;
       name = m.name;
-      channels = m.config.swpins.channels;
+      channels = m.metaConfig.swpins.channels;
       pkgs = corePkgs.pkgs;
       lib = corePkgs.lib;
     };
@@ -91,7 +90,7 @@ let
         vpsadminos = <vpsadminos/os/default.nix>;
       };
 
-      evalConfig = import importPath.${m.config.spin} {
+      evalConfig = import importPath.${m.metaConfig.spin} {
         modules = [ m.build.toplevel ];
       };
     in evalConfig;

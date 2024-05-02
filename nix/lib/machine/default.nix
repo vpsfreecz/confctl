@@ -1,19 +1,19 @@
-{ confDir, corePkgs, coreLib, findConfig }:
+{ confDir, corePkgs, coreLib, findMetaConfig }:
 let
   swpinsFor =
-    { name, config }:
+    { name, metaConfig }:
     import ../swpins/eval.nix {
       inherit confDir name;
-      channels = config.swpins.channels;
+      channels = metaConfig.swpins.channels;
       pkgs = corePkgs;
       lib = coreLib;
     };
 
   makeModuleArgs =
-    { config, swpins, spin, name }@args: {
+    { metaConfig, swpins, spin, name }@args: {
       swpins = swpins.evaluated;
       swpinsInfo = swpins.infos;
-      confMachine = import ./info.nix (args // { inherit findConfig; });
+      confMachine = import ./info.nix (args // { inherit findMetaConfig; });
     };
 
   makeImports = spin: extraImports: [
@@ -38,14 +38,15 @@ let
     ++ (import "${toString confDir}/cluster/module-list.nix")
     ++ extraImports;
 in rec {
-  nixos = { name, config }:
+  nixos = { name, metaConfig }:
     let
-      swpins = swpinsFor { inherit name config; };
+      swpins = swpinsFor { inherit name metaConfig; };
     in
       { config, pkgs, ... }@args:
       {
         _module.args = makeModuleArgs {
-          inherit config swpins;
+          metaConfig = config;
+          inherit swpins;
           spin = "nixos";
           inherit name;
         };
@@ -55,14 +56,15 @@ in rec {
         ];
       };
 
-  vpsadminos = { name, config }:
+  vpsadminos = { name, metaConfig }:
     let
-      swpins = swpinsFor { inherit name config; };
+      swpins = swpinsFor { inherit name metaConfig; };
     in
       { config, pkgs, ... }@args:
       {
         _module.args = makeModuleArgs {
-          inherit config swpins;
+          metaConfig = config;
+          inherit swpins;
           spin = "vpsadminos";
           inherit name;
         };

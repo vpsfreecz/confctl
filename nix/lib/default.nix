@@ -1,39 +1,39 @@
 { confDir, coreLib, corePkgs }:
 with coreLib;
 let
-  machine = import ./machine { inherit confDir corePkgs coreLib findConfig; };
+  machine = import ./machine { inherit confDir corePkgs coreLib findMetaConfig; };
 
-  findConfig =
+  findMetaConfig =
     { cluster, name }:
     cluster.${name};
 
   makeMachine =
-    { name, config, carrier ? null, clusterName ? null, buildAttribute ? null }:
+    { name, metaConfig, carrier ? null, clusterName ? null, buildAttribute ? null }:
     let
       ensuredClusterName = if isNull clusterName then name else clusterName;
     in {
-      inherit name config carrier;
+      inherit name metaConfig carrier;
       clusterName = ensuredClusterName;
 
       build = {
-        attribute = if isNull buildAttribute then config.buildAttribute else buildAttribute;
-        toplevel = buildConfig { name = ensuredClusterName; inherit config; };
+        attribute = if isNull buildAttribute then metaConfig.buildAttribute else buildAttribute;
+        toplevel = buildConfig { name = ensuredClusterName; inherit metaConfig; };
       };
     };
 
   buildConfig =
-    { name, config }:
-    if !config.managed then
+    { name, metaConfig }:
+    if !metaConfig.managed then
       null
-    else if config.spin == "nixos" then
-      machine.nixos { inherit name config; }
-    else if config.spin == "vpsadminos" then
-      machine.vpsadminos { inherit name config; }
+    else if metaConfig.spin == "nixos" then
+      machine.nixos { inherit name metaConfig; }
+    else if metaConfig.spin == "vpsadminos" then
+      machine.vpsadminos { inherit name metaConfig; }
     else
       null;
 
   expandCarriers = machineAttrs: flatten (mapAttrsToList (name: m:
-    if m.config.carrier.enable then
+    if m.metaConfig.carrier.enable then
       [ m ] ++ (expandCarrier machineAttrs m)
     else
       m
@@ -45,9 +45,9 @@ let
       clusterName = cm.machine;
       carrier = carrierMachine.name;
       buildAttribute = cm.buildAttribute;
-      config = machineAttrs.${cm.machine}.config;
+      metaConfig = machineAttrs.${cm.machine}.metaConfig;
     }
-  ) carrierMachine.config.carrier.machines;
+  ) carrierMachine.metaConfig.carrier.machines;
 in rec {
   inherit corePkgs coreLib;
 
@@ -59,13 +59,13 @@ in rec {
     mkNetUdevRule name mac
   ) rs);
 
-  inherit findConfig;
+  inherit findMetaConfig;
 
   # Return all configured machines in a list
   getClusterMachines = cluster:
     let
-      machineAttrs = mapAttrs (name: config:
-        makeMachine { inherit name config; }
+      machineAttrs = mapAttrs (name: metaConfig:
+        makeMachine { inherit name metaConfig; }
       ) cluster;
     in expandCarriers machineAttrs;
 
@@ -74,7 +74,7 @@ in rec {
     let
       machines = getClusterMachines cluster;
       addresses = flatten (map (machine:
-        map (addr: machine // addr) machine.config.addresses.${"v${toString v}"}
+        map (addr: machine // addr) machine.metaConfig.addresses.${"v${toString v}"}
       ) machines);
     in addresses;
 
