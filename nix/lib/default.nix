@@ -8,10 +8,17 @@ let
     cluster.${name};
 
   makeMachine =
-    { name, config }:
-    {
-      inherit name config;
-      build.toplevel = buildConfig { inherit name config; };
+    { name, config, carrier ? null, clusterName ? null, buildAttribute ? null }:
+    let
+      ensuredClusterName = if isNull clusterName then name else clusterName;
+    in {
+      inherit name config carrier;
+      clusterName = ensuredClusterName;
+
+      build = {
+        attribute = if isNull buildAttribute then config.buildAttribute else buildAttribute;
+        toplevel = buildConfig { name = ensuredClusterName; inherit config; };
+      };
     };
 
   buildConfig =
@@ -24,6 +31,23 @@ let
       machine.vpsadminos { inherit name config; }
     else
       null;
+
+  expandCarriers = machineAttrs: flatten (mapAttrsToList (name: m:
+    if m.config.carrier.enable then
+      [ m ] ++ (expandCarrier machineAttrs m)
+    else
+      m
+  ) machineAttrs);
+
+  expandCarrier = machineAttrs: carrierMachine: map (cm:
+    makeMachine {
+      name = "${carrierMachine.name}#${if isNull cm.alias then cm.machine else cm.alias}";
+      clusterName = cm.machine;
+      carrier = carrierMachine.name;
+      buildAttribute = cm.buildAttribute;
+      config = machineAttrs.${cm.machine}.config;
+    }
+  ) carrierMachine.config.carrier.machines;
 in rec {
   inherit corePkgs coreLib;
 
@@ -39,9 +63,11 @@ in rec {
 
   # Return all configured machines in a list
   getClusterMachines = cluster:
-    mapAttrsToList (name: config:
-      makeMachine { inherit name config; }
-    ) cluster;
+    let
+      machineAttrs = mapAttrs (name: config:
+        makeMachine { inherit name config; }
+      ) cluster;
+    in expandCarriers machineAttrs;
 
   # Get IP version addresses from all machines in a cluster
   getAllAddressesOf = cluster: v:

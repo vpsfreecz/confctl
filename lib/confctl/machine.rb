@@ -1,18 +1,45 @@
 module ConfCtl
   class Machine
-    attr_reader :name, :safe_name, :managed, :spin, :opts
+    CarriedMachine = Struct.new(
+      :carrier,
+      :name,
+      :alias,
+      :attribute,
+      keyword_init: true
+    )
+
+    attr_reader :name, :safe_name, :managed, :spin, :carrier_name, :meta
 
     # @param opts [Hash]
     def initialize(opts)
-      @opts = opts
+      @meta = opts['metaConfig']
       @name = opts['name']
-      @safe_name = opts['name'].gsub('/', ':')
-      @managed = opts['managed']
-      @spin = opts['spin']
+      @safe_name = name.gsub('/', ':')
+      @managed = meta['managed']
+      @spin = meta['spin']
+      @is_carrier = meta.fetch('carrier', {}).fetch('enable', false)
+      @carrier_name = opts['carrier']
+    end
+
+    # True if this machine carries other machines
+    def carrier?
+      @is_carrier
+    end
+
+    # @return [Array<CarriedMachine>]
+    def carried_machines
+      meta.fetch('carrier', {}).fetch('machines', []).map do |m|
+        CarriedMachine.new(
+          carrier: self,
+          name: m['machine'],
+          alias: m['alias'] || m['machine'],
+          attribute: m['attribute']
+        )
+      end
     end
 
     def target_host
-      (opts['host'] && opts['host']['target']) || name
+      meta.fetch('host', {}).fetch('target', name)
     end
 
     def localhost?
@@ -20,7 +47,7 @@ module ConfCtl
     end
 
     def nix_paths
-      opts['nix']['nixPath'].to_h do |v|
+      meta['nix']['nixPath'].to_h do |v|
         eq = v.index('=')
         raise "'#{v}' is not a valid nix path entry " if eq.nil?
 
@@ -33,7 +60,7 @@ module ConfCtl
 
       @health_checks = []
 
-      opts['healthChecks'].each do |type, checks|
+      meta['healthChecks'].each do |type, checks|
         case type
         when 'systemd'
           next if !checks['enable'] || spin != 'nixos'
@@ -76,11 +103,13 @@ module ConfCtl
 
     def [](key)
       if key.index('.')
-        get(opts, key.split('.'))
+        get(meta, key.split('.'))
+      elsif key == 'name'
+        name
       elsif key == 'checks'
         health_checks.length
       else
-        opts[key]
+        meta[key]
       end
     end
 

@@ -18,8 +18,9 @@ let
   nameValuePairs = builtins.map (m: {
     name = m.name;
     value = {
-      inherit (m) name;
-    } // m.config;
+      inherit (m) name carrier;
+      metaConfig = m.config;
+    };
   }) machines;
 
   machinesAttrs = builtins.listToAttrs nameValuePairs;
@@ -70,7 +71,18 @@ let
     value = buildToplevel fullMachinesAttrs.${host};
   }) arg.machines);
 
-  buildToplevel = m: (evalMachine m).config.system.build.toplevel;
+  buildToplevel = m:
+    let
+      machineConfig = (evalMachine m).config;
+
+      buildAttr = coreLib.attrByPath m.build.attribute null machineConfig;
+
+      result =
+        if isNull buildAttr then
+          abort "Attribute 'config.${coreLib.concatStringsSep "." m.build.attribute}' not found on machine ${m.name}"
+        else
+          buildAttr;
+    in result;
 
   evalMachine = m:
     let

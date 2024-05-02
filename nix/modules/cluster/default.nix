@@ -63,6 +63,37 @@ let
           };
         };
 
+        buildAttribute = mkOption {
+          type = types.listOf types.str;
+          default = [ "system" "build" "toplevel" ];
+          description = ''
+            Path to the attribute in machine system config that should be built
+
+            For example, `[ "system" "build" "toplevel" ]` will select attribute
+            `config.system.build.toplevel`.
+          '';
+        };
+
+        carrier = {
+          enable = mkEnableOption "This machine is a carrier for other machines";
+
+          machines = mkOption {
+            type = types.listOf (types.submodule carriedMachine);
+            default = [];
+            description = ''
+              List of carried machines
+            '';
+          };
+
+          # onDeploy = mkOption {
+          #   type = types.nullOr types.str;
+          #   default = null;
+          #   description = ''
+          #     Path to an executable that is run when carried systems are deployed
+          #   '';
+          # };
+        };
+
         host = mkOption {
           type = types.nullOr (types.submodule host);
           default = null;
@@ -337,6 +368,39 @@ let
           description = ''
             Address/host to which the configuration is deployed to
           '';
+        };
+      };
+    };
+
+  carriedMachine =
+    { config, ... }:
+    {
+      options = {
+        machine = mkOption {
+          type = types.str;
+          description = "Machine name";
+        };
+
+        alias = mkOption {
+          type = types.nullOr types.str;
+          description = "Alias for carried machine name";
+        };
+
+        buildAttribute = mkOption {
+          type = types.listOf types.str;
+          default = [ "system" "build" "toplevel" ];
+          description = ''
+            Path to the attribute in machine system config that should be built
+
+            For example, `[ "system" "build" "toplevel" ]` will select attribute
+            `config.system.build.toplevel`.
+          '';
+        };
+
+        extraOpts = mkOption {
+          type = types.attrs;
+          default = {};
+          description = "Custom options";
         };
       };
     };

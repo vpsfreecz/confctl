@@ -165,7 +165,7 @@ module ConfCtl
 
     # Build config.system.build.toplevel for selected hosts
     #
-    # @param hosts [Array<String>]
+    # @param hosts [Array<Machine>]
     # @param swpin_paths [Hash]
     # @param host_swpin_specs [Hash]
     # @param time [Time]
@@ -176,7 +176,7 @@ module ConfCtl
     # @yieldparam path [String]
     #
     # @return [Hash<String, Generation::Build>]
-    def build_toplevels(hosts: [], swpin_paths: {}, host_swpin_specs: {}, time: nil, &block)
+    def build_attributes(hosts: [], swpin_paths: {}, host_swpin_specs: {}, time: nil, &block)
       with_argument({
         confDir: conf_dir,
         build: :toplevel,

@@ -992,7 +992,7 @@ module ConfCtl::Cli
           'Fetching [:bar] :current/:total (:percent)'
         )
 
-        built_generations = nix.build_toplevels(
+        built_generations = nix.build_attributes(
           hosts:,
           swpin_paths:,
           time:,
