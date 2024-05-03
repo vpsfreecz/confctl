@@ -18,7 +18,7 @@ let
   nameValuePairs = builtins.map (m: {
     name = m.name;
     value = {
-      inherit (m) name carrier metaConfig;
+      inherit (m) name clusterName carrier metaConfig;
     };
   }) machines;
 

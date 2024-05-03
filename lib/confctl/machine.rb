@@ -8,7 +8,29 @@ module ConfCtl
       keyword_init: true
     )
 
-    attr_reader :name, :safe_name, :managed, :spin, :carrier_name, :meta
+    # @return [String]
+    attr_reader :name
+
+    # @return [String]
+    attr_reader :safe_name
+
+    # @return [Boolean]
+    attr_reader :managed
+
+    # @return [String]
+    attr_reader :spin
+
+    # @return [String]
+    attr_reader :carrier_name
+
+    # @return [String]
+    attr_reader :cluster_name
+
+    # @return [String]
+    attr_reader :safe_cluster_name
+
+    # @return [Hash] machine metadata
+    attr_reader :meta
 
     # @param opts [Hash]
     def initialize(opts)
@@ -19,6 +41,8 @@ module ConfCtl
       @spin = meta['spin']
       @is_carrier = meta.fetch('carrier', {}).fetch('enable', false)
       @carrier_name = opts['carrier']
+      @cluster_name = opts['clusterName']
+      @safe_cluster_name = cluster_name.gsub('/', ':')
     end
 
     # True if this machine carries other machines
