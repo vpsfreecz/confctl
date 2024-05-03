@@ -90,6 +90,8 @@ module ConfCtl
       checks = []
 
       machines.each_value do |machine|
+        next if machine.carried?
+
         checks.concat(machine.health_checks)
       end
 
