@@ -236,6 +236,9 @@ module ConfCtl
     def copy(machine, toplevel, &)
       if machine.localhost?
         true
+      elsif machine.carried?
+        cp = NixCopy.new(machine.carrier_machine.target_host, toplevel)
+        cp.run!(&).success?
       else
         cp = NixCopy.new(machine.target_host, toplevel)
         cp.run!(&).success?
@@ -263,6 +266,19 @@ module ConfCtl
       ]
 
       MachineControl.new(machine).execute!(*args).success?
+    end
+
+    # @param machine [Machine]
+    # @param toplevel [String]
+    # @return [Boolean]
+    def set_carried_profile(machine, toplevel)
+      args = [
+        'nix-env',
+        '-p', "/nix/var/nix/profiles/confctl-#{machine.safe_carried_alias}",
+        '--set', toplevel
+      ]
+
+      MachineControl.new(machine.carrier_machine).execute!(*args).success?
     end
 
     # @param packages [Array<String>]

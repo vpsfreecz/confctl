@@ -8,11 +8,11 @@ let
     cluster.${name};
 
   makeMachine =
-    { name, metaConfig, carrier ? null, clusterName ? null, extraModules ? [], buildAttribute ? null }:
+    { name, metaConfig, carrier ? null, alias ? null, clusterName ? null, extraModules ? [], buildAttribute ? null }:
     let
       ensuredClusterName = if isNull clusterName then name else clusterName;
     in {
-      inherit name metaConfig carrier extraModules;
+      inherit name alias metaConfig carrier extraModules;
       clusterName = ensuredClusterName;
 
       build = {
@@ -42,6 +42,7 @@ let
   expandCarrier = machineAttrs: carrierMachine: map (cm:
     makeMachine {
       name = "${carrierMachine.name}#${if isNull cm.alias then cm.machine else cm.alias}";
+      alias = cm.alias;
       clusterName = cm.machine;
       carrier = carrierMachine.name;
       extraModules = cm.extraModules;

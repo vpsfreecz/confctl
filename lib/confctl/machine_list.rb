@@ -107,7 +107,7 @@ module ConfCtl
 
     def parse(data)
       data.transform_values do |info|
-        Machine.new(info)
+        Machine.new(info, machine_list: self)
       end
     end
   end

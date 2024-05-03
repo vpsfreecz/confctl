@@ -29,11 +29,20 @@ module ConfCtl
     # @return [String]
     attr_reader :safe_cluster_name
 
+    # Alias for this machine on the carrier
+    # @return [String]
+    attr_reader :carried_alias
+
+    # Alias for this machine on the carrier
+    # @return [String]
+    attr_reader :safe_carried_alias
+
     # @return [Hash] machine metadata
     attr_reader :meta
 
     # @param opts [Hash]
-    def initialize(opts)
+    # @param machine_list [MachineList]
+    def initialize(opts, machine_list:)
       @meta = opts['metaConfig']
       @name = opts['name']
       @safe_name = name.gsub('/', ':')
@@ -43,6 +52,9 @@ module ConfCtl
       @carrier_name = opts['carrier']
       @cluster_name = opts['clusterName']
       @safe_cluster_name = cluster_name.gsub('/', ':')
+      @carried_alias = opts['alias'] || @cluster_name
+      @safe_carried_alias = @carried_alias.gsub('/', ':')
+      @machine_list = machine_list
     end
 
     # True if this machine carries other machines
@@ -60,6 +72,22 @@ module ConfCtl
           attribute: m['attribute']
         )
       end
+    end
+
+    # True if this machine is on a carrier
+    def carried?
+      !@carrier_name.nil?
+    end
+
+    # @return [Machine] carrier
+    def carrier_machine
+      carrier = @machine_list[@carrier_name]
+
+      if carrier.nil?
+        raise "Carrier #{@carrier_name} not found in machine list"
+      end
+
+      carrier
     end
 
     def target_host

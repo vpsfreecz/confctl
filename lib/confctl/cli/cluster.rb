@@ -508,37 +508,64 @@ module ConfCtl::Cli
         size: :auto,
         reserved_lines: 10
       ) do |lw|
-        if opts['dry-activate-first']
-          lw.sync_console do
-            puts Rainbow(
-              "Trying to activate configuration on #{host} " \
-              "(#{machine.target_host})"
-            ).yellow
-          end
-
-          raise "Error while activating configuration on #{host}" unless nix.activate(machine, toplevel, 'dry-activate')
+        if machine.carried?
+          deploy_carried_to_host(lw, nix, host, machine, toplevel, action)
+        else
+          deploy_standalone_to_host(lw, nix, host, machine, toplevel, action)
         end
+      end
+    end
 
+    def deploy_standalone_to_host(lw, nix, host, machine, toplevel, action)
+      if opts['dry-activate-first']
         lw.sync_console do
           puts Rainbow(
-            "Activating configuration on #{host} (#{machine.target_host}): " \
-            "#{action}"
+            "Trying to activate configuration on #{host} " \
+            "(#{machine.target_host})"
           ).yellow
         end
 
-        return :skip if opts[:interactive] && !ask_confirmation(always: true)
-
-        raise "Error while activating configuration on #{host}" unless nix.activate(machine, toplevel, action)
-
-        if %w[boot switch].include?(action) && !nix.set_profile(machine, toplevel)
-          raise "Error while setting profile on #{host}"
-        end
+        raise "Error while activating configuration on #{host}" unless nix.activate(machine, toplevel, 'dry-activate')
       end
+
+      lw.sync_console do
+        puts Rainbow(
+          "Activating configuration on #{host} (#{machine.target_host}): " \
+          "#{action}"
+        ).yellow
+      end
+
+      return :skip if opts[:interactive] && !ask_confirmation(always: true)
+
+      # rubocop:disable Style/GuardClause
+
+      unless nix.activate(machine, toplevel, action)
+        raise "Error while activating configuration on #{host}"
+      end
+
+      if %w[boot switch].include?(action) && !nix.set_profile(machine, toplevel)
+        raise "Error while setting profile on #{host}"
+      end
+
+      # rubocop:enable Style/GuardClause
+    end
+
+    def deploy_carried_to_host(lw, nix, host, machine, toplevel, action)
+      return unless %w[boot switch].include?(action)
+
+      # rubocop:disable Style/GuardClause
+      unless nix.set_carried_profile(machine, toplevel)
+        raise "Error while setting carried profile for #{host} on #{machine.carrier_machine}"
+      end
+      # rubocop:enable Style/GuardClause
     end
 
     def reboot_host(host, machine)
       if machine.localhost?
         puts Rainbow("Skipping reboot of #{host} as it is localhost").yellow
+        return :skip
+      elsif machine.carried?
+        puts Rainbow("Skipping reboot of carried machine #{host}").yellow
         return :skip
       end
 
