@@ -386,6 +386,14 @@ let
           description = "Alias for carried machine name";
         };
 
+        extraModules = mkOption {
+          type = types.listOf types.path;
+          default = [];
+          description = ''
+            A list of additional NixOS modules to be imported for this machine
+          '';
+        };
+
         buildAttribute = mkOption {
           type = types.listOf types.str;
           default = [ "system" "build" "toplevel" ];

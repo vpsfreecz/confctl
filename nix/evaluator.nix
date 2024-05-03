@@ -70,28 +70,28 @@ let
     value = buildToplevel fullMachinesAttrs.${host};
   }) arg.machines);
 
-  buildToplevel = m:
+  buildToplevel = machine:
     let
-      machineConfig = (evalMachine m).config;
+      machineConfig = (evalMachine machine).config;
 
-      buildAttr = coreLib.attrByPath m.build.attribute null machineConfig;
+      buildAttr = coreLib.attrByPath machine.build.attribute null machineConfig;
 
       result =
         if isNull buildAttr then
-          abort "Attribute 'config.${coreLib.concatStringsSep "." m.build.attribute}' not found on machine ${m.name}"
+          abort "Attribute 'config.${coreLib.concatStringsSep "." machine.build.attribute}' not found on machine ${machine.name}"
         else
           buildAttr;
     in result;
 
-  evalMachine = m:
+  evalMachine = machine:
     let
       importPath = {
         nixos = <nixpkgs/nixos/lib/eval-config.nix>;
         vpsadminos = <vpsadminos/os/default.nix>;
       };
 
-      evalConfig = import importPath.${m.metaConfig.spin} {
-        modules = [ m.build.toplevel ];
+      evalConfig = import importPath.${machine.metaConfig.spin} {
+        modules = machine.extraModules ++ [ machine.build.toplevel ];
       };
     in evalConfig;
 

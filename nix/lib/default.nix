@@ -8,11 +8,11 @@ let
     cluster.${name};
 
   makeMachine =
-    { name, metaConfig, carrier ? null, clusterName ? null, buildAttribute ? null }:
+    { name, metaConfig, carrier ? null, clusterName ? null, extraModules ? [], buildAttribute ? null }:
     let
       ensuredClusterName = if isNull clusterName then name else clusterName;
     in {
-      inherit name metaConfig carrier;
+      inherit name metaConfig carrier extraModules;
       clusterName = ensuredClusterName;
 
       build = {
@@ -44,6 +44,7 @@ let
       name = "${carrierMachine.name}#${if isNull cm.alias then cm.machine else cm.alias}";
       clusterName = cm.machine;
       carrier = carrierMachine.name;
+      extraModules = cm.extraModules;
       buildAttribute = cm.buildAttribute;
       metaConfig = machineAttrs.${cm.machine}.metaConfig;
     }
