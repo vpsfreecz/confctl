@@ -513,6 +513,8 @@ module ConfCtl::Cli
         else
           deploy_standalone_to_host(lw, nix, host, machine, toplevel, action)
         end
+
+        lw.flush
       end
     end
 
