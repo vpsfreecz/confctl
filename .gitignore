@@ -5,4 +5,5 @@ man/*.html
 man/**/*.html
 man/man?/*.?
 html_doc
+.gems
 .yardoc
