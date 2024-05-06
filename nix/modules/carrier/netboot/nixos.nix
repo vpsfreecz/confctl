@@ -15,6 +15,7 @@ let
 
   builder = pkgs.substituteAll {
     src = ./build-netboot-server.rb;
+    name = "build-netboot-server";
     dir = "bin";
     isExecutable = true;
     ruby = pkgs.ruby;
@@ -122,6 +123,16 @@ in {
   };
 
   config = mkIf cfg.enable {
+    confctl.carrier.onChangeCommands = ''
+      ${builder}/bin/build-netboot-server
+      rc=$?
+
+      if [ $rc != 0 ] ; then
+        echo "build-netboot-server failed with $rc"
+        exit 1
+      fi
+    '';
+
     environment.systemPackages = [ builder ];
 
     networking.firewall = {

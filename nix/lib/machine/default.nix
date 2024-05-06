@@ -34,6 +34,7 @@ let
         lib.mkIf (confMachine.host != null) (lib.mkDefault confMachine.host.fullDomain);
     })
   ] ++ (import ../../modules/module-list.nix).${spin}
+    ++ (import ../../modules/system-list.nix).${spin}
     ++ (import "${toString confDir}/modules/module-list.nix").${spin}
     ++ (import "${toString confDir}/cluster/module-list.nix")
     ++ extraImports;
