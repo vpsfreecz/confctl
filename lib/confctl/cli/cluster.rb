@@ -244,7 +244,7 @@ module ConfCtl::Cli
     end
 
     def test_connection
-      machines = select_machines_with_managed(args[0])
+      machines = select_machines_with_managed(args[0]).runnable
       raise 'No machines to test' if machines.empty?
 
       ask_confirmation! do
@@ -276,7 +276,7 @@ module ConfCtl::Cli
     end
 
     def ssh
-      machines = select_machines_with_managed(args[0])
+      machines = select_machines_with_managed(args[0]).runnable
       raise 'No machines to ssh to' if machines.empty?
 
       if opts['input-string'] && opts['input-file']
@@ -295,7 +295,7 @@ module ConfCtl::Cli
     end
 
     def cssh
-      machines = select_machines_with_managed(args[0])
+      machines = select_machines_with_managed(args[0]).runnable
       raise 'No machines to open cssh to' if machines.empty?
 
       ask_confirmation! do

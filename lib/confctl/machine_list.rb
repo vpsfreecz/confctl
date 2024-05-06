@@ -62,6 +62,11 @@ module ConfCtl
       select { |_host, machine| !machine.managed }
     end
 
+    # @return [MachineList]
+    def runnable
+      select { |_host, machine| !machine.carried? }
+    end
+
     # @param host [String]
     def [](host)
       @machines[host]
