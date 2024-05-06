@@ -81,7 +81,7 @@ module ConfCtl
     # @param machine [Machine]
     def initialize(machine)
       @machine = machine
-      @mc = MachineControl.new(machine)
+      @mc = MachineControl.new(machine.carried? ? machine.carrier_machine : machine)
     end
 
     # Connect to the machine and query its state
@@ -94,22 +94,29 @@ module ConfCtl
 
       if toplevel
         begin
-          @current_toplevel = mc.read_symlink('/run/current-system')
+          @current_toplevel = query_toplevel
         rescue TTY::Command::ExitError
           return
         end
       end
 
       if generations
+        profile =
+          if machine.carried?
+            "/nix/var/nix/profiles/confctl-#{machine.safe_carried_alias}"
+          else
+            '/nix/var/nix/profiles/system'
+          end
+
         begin
-          @generations = Generation::HostList.fetch(mc)
+          @generations = Generation::HostList.fetch(mc, profile:)
         rescue TTY::Command::ExitError
           return
         end
       end
 
       begin
-        @swpins_info = Swpins::DeployedInfo.parse!(mc.read_file('/etc/confctl/swpins-info.json'))
+        @swpins_info = query_swpins
       rescue Error
         nil
       end
@@ -131,5 +138,24 @@ module ConfCtl
     protected
 
     attr_reader :mc
+
+    def query_toplevel
+      path =
+        if machine.carried?
+          "/nix/var/nix/profiles/confctl-#{machine.safe_carried_alias}"
+        else
+          '/run/current-system'
+        end
+
+      mc.read_symlink(path)
+    end
+
+    def query_swpins
+      if machine.carried?
+        nil
+      else
+        Swpins::DeployedInfo.parse!(mc.read_file('/etc/confctl/swpins-info.json'))
+      end
+    end
   end
 end
