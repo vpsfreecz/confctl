@@ -1,8 +1,11 @@
+require_relative '../hook'
 require 'fileutils'
 require 'securerandom'
 
 module ConfCtl::Cli
   class Configuration < Command
+    ConfCtl::Hook.register :configuration_rediscover
+
     DIR_MODE = 0o755
     FILE_MODE = 0o644
 
@@ -238,6 +241,8 @@ module ConfCtl::Cli
 
         f.puts(']')
       end
+
+      ConfCtl::Hook.call(:configuration_rediscover)
     end
 
     protected
