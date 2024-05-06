@@ -84,14 +84,6 @@ let
               List of carried machines
             '';
           };
-
-          # onDeploy = mkOption {
-          #   type = types.nullOr types.str;
-          #   default = null;
-          #   description = ''
-          #     Path to an executable that is run when carried systems are deployed
-          #   '';
-          # };
         };
 
         host = mkOption {
@@ -403,12 +395,6 @@ let
             For example, `[ "system" "build" "toplevel" ]` will select attribute
             `config.system.build.toplevel`.
           '';
-        };
-
-        extraOpts = mkOption {
-          type = types.attrs;
-          default = {};
-          description = "Custom options";
         };
       };
     };
