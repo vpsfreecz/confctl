@@ -13,6 +13,7 @@ machines.
   configurations)
 * Query machine state, view changelogs and diffs
 * Run health checks
+* Support for creating netboot servers, see [docs/carrier.md](docs/carrier.md)
 
 ## Requirements
 
@@ -489,7 +490,7 @@ Then you can use it in machine module as:
 Note that these modules are self-contained. They are not evaluated with the full
 set of NixOS modules. You have to import modules that you need.
 
-## User-defined confctl commands 
+## User-defined confctl commands
 User-defined Ruby scripts can be placed in directory `scripts`. Each script
 should create a subclass of `ConfCtl::UserScript` and call class-method `register`.
 Scripts can define their own `confctl` subcommands.
