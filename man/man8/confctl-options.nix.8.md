@@ -1,4 +1,4 @@
-# confctl-options.nix 8           2024-02-17                             master
+# confctl-options.nix 8           2024-05-06                             master
 
 ## NAME
 `confctl-options.nix` - confctl configuration documentation
@@ -601,6 +601,22 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
+`cluster.<name>.buildAttribute`
+  Path to the attribute in machine system config that should be built
+  
+  For example, `[ "system" "build" "toplevel" ]` will select attribute
+  `config.system.build.toplevel`.
+
+    *Type:* list of string
+
+    *Default:* `[
+  "system"
+  "build"
+  "toplevel"
+]`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
 `cluster.<name>.buildGenerations.max`
   The maximum number of build generations to be kept on the build
   machine.
@@ -631,6 +647,87 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
     *Type:* null or signed integer
 
     *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.carrier.enable`
+  Whether to enable This machine is a carrier for other machines.
+
+    *Type:* boolean
+
+    *Default:* `false`
+
+    *Example:* `true`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.carrier.machines`
+  List of carried machines
+
+    *Type:* list of (submodule)
+
+    *Default:* `[ ]`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.carrier.machines.*.alias`
+  Alias for carried machine name
+
+    *Type:* null or string
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.carrier.machines.*.buildAttribute`
+  Path to the attribute in machine system config that should be built
+  
+  For example, `[ "system" "build" "toplevel" ]` will select attribute
+  `config.system.build.toplevel`.
+
+    *Type:* list of string
+
+    *Default:* `[
+  "system"
+  "build"
+  "toplevel"
+]`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.carrier.machines.*.extraModules`
+  A list of additional NixOS modules to be imported for this machine
+
+    *Type:* list of path
+
+    *Default:* `[ ]`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.carrier.machines.*.labels`
+  Optional user-defined labels to classify the machine
+
+    *Type:* attribute set
+
+    *Default:* `{ }`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.carrier.machines.*.machine`
+  Machine name
+
+    *Type:* string
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.carrier.machines.*.tags`
+  Optional user-defined tags to classify the machine
+
+    *Type:* list of string
+
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
