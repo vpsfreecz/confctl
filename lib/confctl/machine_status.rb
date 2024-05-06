@@ -1,3 +1,4 @@
+require 'json'
 require 'tty-command'
 
 module ConfCtl
@@ -151,11 +152,38 @@ module ConfCtl
     end
 
     def query_swpins
-      if machine.carried?
-        nil
-      else
-        Swpins::DeployedInfo.parse!(mc.read_file('/etc/confctl/swpins-info.json'))
+      json =
+        if machine.carried?
+          query_carried_swpins
+        else
+          mc.read_file('/etc/confctl/swpins-info.json')
+        end
+
+      case json
+      when String
+        Swpins::DeployedInfo.parse!(json)
+      when Hash
+        json
       end
+    end
+
+    # @return [Hash, String]
+    def query_carried_swpins
+      begin
+        json = mc.read_file("/nix/var/nix/profiles/confctl-#{machine.safe_carried_alias}/machine.json")
+        parsed = JSON.parse(json)
+        return parsed['swpins-info'] if parsed['swpins-info']
+      rescue TTY::Command::ExitError
+        # pass
+      end
+
+      begin
+        return mc.read_file("/nix/var/nix/profiles/confctl-#{machine.safe_carried_alias}/etc/confctl/swpins-info.json")
+      rescue TTY::Command::ExitError
+        # pass
+      end
+
+      nil
     end
   end
 end
