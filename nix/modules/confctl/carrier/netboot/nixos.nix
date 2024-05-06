@@ -43,7 +43,7 @@ in {
         default = false;
       };
 
-      allowedIPRanges = mkOption {
+      allowedIPv4Ranges = mkOption {
         type = types.listOf types.str;
         description = ''
           Allow HTTP access for these IP ranges, if not specified
@@ -77,13 +77,13 @@ in {
     environment.systemPackages = [ builder ];
 
     networking.firewall = {
-      extraCommands = mkIf (cfg.allowedIPRanges != []) (concatNl (map (net: ''
+      extraCommands = mkIf (cfg.allowedIPv4Ranges != []) (concatNl (map (net: ''
         # Allow access from ${net} for netboot
         iptables -A nixos-fw -p udp -s ${net} ${optionalString (!isNull cfg.tftp.bindAddress) "-d ${cfg.tftp.bindAddress}"} --dport 68 -j nixos-fw-accept
         iptables -A nixos-fw -p udp -s ${net} ${optionalString (!isNull cfg.tftp.bindAddress) "-d ${cfg.tftp.bindAddress}"} --dport 69 -j nixos-fw-accept
         iptables -A nixos-fw -p tcp -s ${net} --dport 80 -j nixos-fw-accept
         ${optionalString cfg.enableACME "iptables -A nixos-fw -p tcp -s ${net} --dport 443 -j nixos-fw-accept"}
-      '') cfg.allowedIPRanges));
+      '') cfg.allowedIPv4Ranges));
     };
 
     systemd.services.netboot-atftpd = {
@@ -115,8 +115,8 @@ in {
             "/" = {
               extraConfig = ''
                 autoindex on;
-                ${optionalString (cfg.allowedIPRanges != []) ''
-                  ${concatNl (flip map cfg.allowedIPRanges (range: "allow ${range};"))}
+                ${optionalString (cfg.allowedIPv4Ranges != []) ''
+                  ${concatNl (flip map cfg.allowedIPv4Ranges (range: "allow ${range};"))}
                   deny all;
                 ''}
               '';

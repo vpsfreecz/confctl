@@ -108,7 +108,7 @@ support is integrated within confctl and it only has to be enabled.
     host = "192.168.100.5";
 
     # IP ranges that will have access to the server
-    allowedIPRanges = [
+    allowedIPv4Ranges = [
       "192.168.100.0/24"
     ];
   };
