@@ -412,6 +412,68 @@ let
             `config.system.build.toplevel`.
           '';
         };
+
+        buildGenerations = {
+          min = mkOption {
+            type = types.nullOr types.int;
+            default = null;
+            description = ''
+              The minimum number of build generations to be kept on the build
+              machine.
+            '';
+          };
+
+          max = mkOption {
+            type = types.nullOr types.int;
+            default = null;
+            description = ''
+              The maximum number of build generations to be kept on the build
+              machine.
+            '';
+          };
+
+          maxAge = mkOption {
+            type = types.nullOr types.int;
+            default = null;
+            description = ''
+              Delete build generations older than
+              <option>cluster.&lt;name&gt;.carrier.machines.*.buildGenerations.maxAge</option>
+              seconds from the build machine. Old generations are deleted even
+              if <option>cluster.&lt;name&gt;.carrier.machines.*.buildGenerations.max</option> is
+              not reached.
+            '';
+          };
+        };
+
+        hostGenerations = {
+          min = mkOption {
+            type = types.nullOr types.int;
+            default = null;
+            description = ''
+              The minimum number of generations to be kept on the machine.
+            '';
+          };
+
+          max = mkOption {
+            type = types.nullOr types.int;
+            default = null;
+            description = ''
+              The maximum number of generations to be kept on the machine.
+            '';
+          };
+
+          maxAge = mkOption {
+            type = types.nullOr types.int;
+            default = null;
+            description = ''
+              Delete generations older than
+              <option>cluster.&lt;name&gt;.carrier.machines.*.hostGenerations.maxAge</option>
+              seconds from the machine. Old generations are deleted even
+              if <option>cluster.&lt;name&gt;.carrier.machines.*.hostGenerations.max</option> is
+              not reached.
+            '';
+          };
+        };
       };
     };
 

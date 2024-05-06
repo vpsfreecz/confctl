@@ -47,7 +47,7 @@ let
       carrier = carrierMachine.name;
       extraModules = cm.extraModules;
       buildAttribute = cm.buildAttribute;
-      metaConfig = coreLib.updateManyAttrsByPath [
+      metaConfig = coreLib.updateManyAttrsByPath ([
         {
           path = [ "labels" ];
           update = old: old // cm.labels;
@@ -56,9 +56,19 @@ let
           path = [ "tags" ];
           update = old: old ++ cm.tags;
         }
-      ] machineAttrs.${cm.machine}.metaConfig;
+      ] ++ (generationUpdates cm)) machineAttrs.${cm.machine}.metaConfig;
     }
   ) carrierMachine.metaConfig.carrier.machines;
+
+  generationUpdates = cm:
+    flatten (map (generations:
+      map (attr: {
+        path = [ generations attr ];
+        update = old:
+          let v = cm.${generations}.${attr};
+          in if isNull v then old else v;
+      }) [ "min" "max" "maxAge" ]
+    ) [ "buildGenerations" "hostGenerations" ]);
 in rec {
   inherit corePkgs coreLib;
 
