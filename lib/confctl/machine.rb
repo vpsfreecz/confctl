@@ -98,6 +98,15 @@ module ConfCtl
       target_host == 'localhost'
     end
 
+    # @return [String] path to nix-env managed profile
+    def profile
+      if carried?
+        "/nix/var/nix/profiles/confctl-#{safe_carried_alias}"
+      else
+        '/nix/var/nix/profiles/system'
+      end
+    end
+
     def nix_paths
       meta['nix']['nixPath'].to_h do |v|
         eq = v.index('=')

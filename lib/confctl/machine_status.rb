@@ -102,15 +102,8 @@ module ConfCtl
       end
 
       if generations
-        profile =
-          if machine.carried?
-            "/nix/var/nix/profiles/confctl-#{machine.safe_carried_alias}"
-          else
-            '/nix/var/nix/profiles/system'
-          end
-
         begin
-          @generations = Generation::HostList.fetch(mc, profile:)
+          @generations = Generation::HostList.fetch(mc, profile: machine.profile)
         rescue TTY::Command::ExitError
           return
         end
@@ -143,7 +136,7 @@ module ConfCtl
     def query_toplevel
       path =
         if machine.carried?
-          "/nix/var/nix/profiles/confctl-#{machine.safe_carried_alias}"
+          machine.profile
         else
           '/run/current-system'
         end
@@ -170,7 +163,7 @@ module ConfCtl
     # @return [Hash, String]
     def query_carried_swpins
       begin
-        json = mc.read_file("/nix/var/nix/profiles/confctl-#{machine.safe_carried_alias}/machine.json")
+        json = mc.read_file(File.join(machine.profile, 'machine.json'))
         parsed = JSON.parse(json)
         return parsed['swpins-info'] if parsed['swpins-info']
       rescue TTY::Command::ExitError
@@ -178,7 +171,7 @@ module ConfCtl
       end
 
       begin
-        return mc.read_file("/nix/var/nix/profiles/confctl-#{machine.safe_carried_alias}/etc/confctl/swpins-info.json")
+        return mc.read_file(File.join(machine.profile, '/etc/confctl/swpins-info.json'))
       rescue TTY::Command::ExitError
         # pass
       end

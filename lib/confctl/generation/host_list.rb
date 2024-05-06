@@ -1,16 +1,16 @@
 module ConfCtl
   class Generation::HostList
     # @param mc [MachineControl]
+    # @param profile [String]
     # @return [Generation::HostList]
-    def self.fetch(mc, profile: '/nix/var/nix/profiles/system')
-      out, = mc.bash_script(<<-END
+    def self.fetch(mc, profile:)
+      out, = mc.bash_script(<<~END)
         realpath #{profile}
 
         for generation in `ls -d -1 #{profile}-*-link` ; do
           echo "$generation;$(readlink $generation);$(stat --format=%Y $generation)"
         done
       END
-                           )
 
       list = new(mc.machine.name)
       lines = out.strip.split("\n")

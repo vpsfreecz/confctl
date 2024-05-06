@@ -261,7 +261,7 @@ module ConfCtl
     def set_profile(machine, toplevel)
       args = [
         'nix-env',
-        '-p', '/nix/var/nix/profiles/system',
+        '-p', machine.profile,
         '--set', toplevel
       ]
 
@@ -274,7 +274,7 @@ module ConfCtl
     def set_carried_profile(machine, toplevel)
       args = [
         'carrier-env',
-        '-p', "/nix/var/nix/profiles/confctl-#{machine.safe_carried_alias}",
+        '-p', machine.profile,
         '--set', toplevel
       ]
 
