@@ -378,6 +378,22 @@ let
           description = "Alias for carried machine name";
         };
 
+        labels = mkOption {
+          type = types.attrs;
+          default = {};
+          description = ''
+            Optional user-defined labels to classify the machine
+          '';
+        };
+
+        tags = mkOption {
+          type = types.listOf types.str;
+          default = [];
+          description = ''
+            Optional user-defined tags to classify the machine
+          '';
+        };
+
         extraModules = mkOption {
           type = types.listOf types.path;
           default = [];

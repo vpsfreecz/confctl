@@ -47,7 +47,16 @@ let
       carrier = carrierMachine.name;
       extraModules = cm.extraModules;
       buildAttribute = cm.buildAttribute;
-      metaConfig = machineAttrs.${cm.machine}.metaConfig;
+      metaConfig = coreLib.updateManyAttrsByPath [
+        {
+          path = [ "labels" ];
+          update = old: old // cm.labels;
+        }
+        {
+          path = [ "tags" ];
+          update = old: old ++ cm.tags;
+        }
+      ] machineAttrs.${cm.machine}.metaConfig;
     }
   ) carrierMachine.metaConfig.carrier.machines;
 in rec {
