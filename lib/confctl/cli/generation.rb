@@ -31,7 +31,7 @@ module ConfCtl::Cli
 
       return unless opts[:remote] && opts[:gc]
 
-      machines_gc = machines.select do |host, _machine|
+      machines_gc = machines.runnable.select do |host, _machine|
         gens.detect { |gen| gen.host == host }
       end
 
@@ -68,7 +68,7 @@ module ConfCtl::Cli
 
       global = ConfCtl::Settings.instance.host_generations
 
-      machines_gc = machines.select do |_host, machine|
+      machines_gc = machines.runnable.select do |_host, machine|
         gc = machine['buildGenerations']['collectGarbage']
 
         if gc.nil?
@@ -82,7 +82,7 @@ module ConfCtl::Cli
     end
 
     def collect_garbage
-      machines = select_machines(args[0])
+      machines = select_machines(args[0]).runnable
 
       raise 'No machines to collect garbage on' if machines.empty?
 
