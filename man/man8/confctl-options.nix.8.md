@@ -1,4 +1,4 @@
-# confctl-options.nix 8           2024-05-06                             master
+# confctl-options.nix 8           2024-05-07                             master
 
 ## NAME
 `confctl-options.nix` - confctl configuration documentation
@@ -695,12 +695,76 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
+`cluster.<name>.carrier.machines.*.buildGenerations.max`
+  The maximum number of build generations to be kept on the build
+  machine.
+
+    *Type:* null or signed integer
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.carrier.machines.*.buildGenerations.maxAge`
+  Delete build generations older than
+  `cluster.<name>.carrier.machines.*.buildGenerations.maxAge`
+  seconds from the build machine. Old generations are deleted even
+  if `cluster.<name>.carrier.machines.*.buildGenerations.max` is
+  not reached.
+
+    *Type:* null or signed integer
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.carrier.machines.*.buildGenerations.min`
+  The minimum number of build generations to be kept on the build
+  machine.
+
+    *Type:* null or signed integer
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
 `cluster.<name>.carrier.machines.*.extraModules`
   A list of additional NixOS modules to be imported for this machine
 
     *Type:* list of path
 
     *Default:* `[ ]`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.carrier.machines.*.hostGenerations.max`
+  The maximum number of generations to be kept on the machine.
+
+    *Type:* null or signed integer
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.carrier.machines.*.hostGenerations.maxAge`
+  Delete generations older than
+  `cluster.<name>.carrier.machines.*.hostGenerations.maxAge`
+  seconds from the machine. Old generations are deleted even
+  if `cluster.<name>.carrier.machines.*.hostGenerations.max` is
+  not reached.
+
+    *Type:* null or signed integer
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.carrier.machines.*.hostGenerations.min`
+  The minimum number of generations to be kept on the machine.
+
+    *Type:* null or signed integer
+
+    *Default:* `null`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -1131,6 +1195,9 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
 `cluster.<name>.host.target`
   Address/host to which the configuration is deployed to
+  
+  Set to null if the machine is not deployable, e.g. when it is only used
+  as a carried machine.
 
     *Type:* null or string
 
