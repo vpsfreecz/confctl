@@ -110,7 +110,10 @@ module ConfCtl::Cli
     end
 
     def status
-      machines = select_machines(args[0]).managed
+      machines = select_machines(args[0]).managed.select do |_host, machine|
+        machine.target_host || machine.carried?
+      end
+
       raise 'No machines to check' if machines.empty?
 
       ask_confirmation! do
