@@ -64,6 +64,10 @@ let
     # path to the top-level derivation, needed for system boot
     toplevel = builtins.unsafeDiscardStringContext config.system.build.toplevel;
 
+    # NixOS version and git revision
+    version = config.system.nixos.version;
+    revision = config.system.nixos.revision;
+
     # MAC addresses for auto-detection
     macs = confMachine.netboot.macs;
 

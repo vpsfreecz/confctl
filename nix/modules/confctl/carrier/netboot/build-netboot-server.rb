@@ -33,7 +33,7 @@ class NetbootBuilder
       puts m.fqdn
 
       m.generations.each do |g|
-        puts "  - #{g.time}#{g.current ? ' (current)' : ''}"
+        puts "  - #{g.time_s} - #{g.version}#{g.current ? ' (current)' : ''}"
       end
 
       puts
@@ -301,7 +301,7 @@ class TftpBuilder < RootBuilder
 
       <% m.generations[1..].each do |g| -%>
       LABEL <%= m.fqdn %>-<%= g.generation %>
-        MENU LABEL Configuration <%= g.generation %> - <%= g.time %>
+        MENU LABEL Configuration <%= g.generation %> - <%= g.time_s %> - <%= g.shortrev %>
         LINUX boot/<%= m.fqdn %>/<%= g.generation %>/bzImage
         INITRD boot/<%= m.fqdn %>/<%= g.generation %>/initrd
         APPEND init=<%= g.toplevel %>/init loglevel=7
@@ -383,7 +383,7 @@ class TftpBuilder < RootBuilder
       DEFAULT menu.c32
       TIMEOUT 50
       <% end -%>
-      MENU TITLE <%= m.label %> (<%= g.generation %> - <%= g.current ? 'current' : g.time %>)
+      MENU TITLE <%= m.label %> (<%= g.generation %> - <%= g.current ? 'current' : g.time_s %> - <%= g.shortrev %>)
 
       <% variants.each do |variant, vopts| -%>
       LABEL <%= variant %>
@@ -417,7 +417,7 @@ class TftpBuilder < RootBuilder
 
       <% m.generations.each do |g| -%>
       LABEL generations
-        MENU LABEL Configuration <%= g.generation %> - <%= g.time %>
+        MENU LABEL Configuration <%= g.generation %> - <%= g.time_s %> - <%= g.shortrev %>
         KERNEL menu.c32
         APPEND pxeserver/machines/<%= m.fqdn %>/generation-<%= g.generation %>.cfg
 
@@ -554,11 +554,23 @@ class Generation
   # @return [Time]
   attr_reader :time
 
+  # @return [String]
+  attr_reader :time_s
+
   # @return [Array<String>]
   attr_reader :kernel_params
 
   # @return [String] Nix store path to `config.system.build.toplevel`
   attr_reader :toplevel
+
+  # @return [String, nil] system.nixos.version
+  attr_reader :version
+
+  # @return [String, nil] system.nixos.revision
+  attr_reader :revision
+
+  # @return [String, nil]
+  attr_reader :shortrev
 
   # @return [Array<String>]
   attr_reader :macs
@@ -576,10 +588,21 @@ class Generation
     @store_path = File.realpath(link_path)
     @generation = generation
     @time = File.lstat(link_path).mtime
+    @time_s = @time.strftime('%Y-%m-%d %H:%M:%S')
     @current = false
 
     @json = JSON.parse(File.read(File.join(link_path, 'machine.json')))
     @toplevel = json.fetch('toplevel')
+    @version = json.fetch('version', nil)
+    @revision = json.fetch('revision', nil)
+
+    @shortrev =
+      if @revision
+        @revision[0..8]
+      elsif @version
+        @version.split('.').last
+      end
+
     @macs = json.fetch('macs', [])
 
     kernel_params_file = File.join(store_path, 'kernel-params')
