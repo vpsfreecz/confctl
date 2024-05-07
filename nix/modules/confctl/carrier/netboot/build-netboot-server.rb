@@ -274,7 +274,7 @@ class TftpBuilder < RootBuilder
     ERB
 
     @spins.each do |spin, label|
-      spin_machines = machines.select { |m| m.spin == spin }
+      spin_machines = machines.select { |m| m.spin == spin }.sort { |a, b| a.name <=> b.name }
 
       render_to(tpl, { spin:, label:, spin_machines: }, "pxeserver/#{spin}.cfg")
     end
