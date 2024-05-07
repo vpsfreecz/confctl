@@ -141,7 +141,7 @@ module ConfCtl
           '/run/current-system'
         end
 
-      mc.read_symlink(path)
+      mc.read_realpath(path)
     end
 
     def query_swpins

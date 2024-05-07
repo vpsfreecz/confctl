@@ -108,6 +108,13 @@ module ConfCtl
       out.strip
     end
 
+    # @param path [String]
+    # @return [String]
+    def read_realpath(path)
+      out, = run_cmd('realpath', path)
+      out.strip
+    end
+
     # Execute command, raises exception on error
     # @yieldparam out [String]
     # @yieldparam err [String]
