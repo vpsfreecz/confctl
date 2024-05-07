@@ -64,7 +64,7 @@ class NetbootBuilder
     machines = {}
 
     Dir.entries(LINK_DIR).each do |v|
-      next if /\A#{Regexp.escape(CARRIED_PREFIX)}-([^\-]+)-(\d+)-link\z/ !~ v
+      next if /\A#{Regexp.escape(CARRIED_PREFIX)}-(.+)-(\d+)-link\z/ !~ v
 
       name = ::Regexp.last_match(1)
       generation = ::Regexp.last_match(2).to_i
