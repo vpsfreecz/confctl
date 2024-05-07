@@ -13,12 +13,20 @@ class NetbootBuilder
 
   CARRIED_PREFIX = 'confctl'.freeze
 
+  LOCK_FILE = '/run/confctl/build-netboot-server.lock'.freeze
+
   def self.run
     builder = new
     builder.run
   end
 
   def run
+    lock { safe_run }
+  end
+
+  protected
+
+  def safe_run
     machines = load_machines
 
     machines.each do |m|
@@ -43,7 +51,14 @@ class NetbootBuilder
     builders.each(&:cleanup)
   end
 
-  protected
+  def lock
+    FileUtils.mkdir_p(File.dirname(LOCK_FILE))
+
+    File.open(LOCK_FILE, 'w') do |f|
+      f.flock(File::LOCK_EX)
+      yield
+    end
+  end
 
   def load_machines
     machines = {}
