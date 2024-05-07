@@ -295,6 +295,8 @@ module ConfCtl::Cli
         retvals = executor.run
         failed = retvals.compact
 
+        lw.flush
+
         raise "Gargabe collection failed on: #{failed.join(', ')}" if failed.any?
       end
     end
