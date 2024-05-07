@@ -556,7 +556,7 @@ module ConfCtl::Cli
     end
 
     def deploy_carried_to_host(lw, nix, host, machine, toplevel, action)
-      return unless %w[boot switch].include?(action)
+      return if action != 'switch'
 
       # rubocop:disable Style/GuardClause
       unless nix.set_carried_profile(machine, toplevel)
