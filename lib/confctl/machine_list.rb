@@ -64,7 +64,7 @@ module ConfCtl
 
     # @return [MachineList]
     def runnable
-      select { |_host, machine| !machine.carried? }
+      select { |_host, machine| !machine.carried? && machine.target_host }
     end
 
     # @param host [String]

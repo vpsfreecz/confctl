@@ -359,6 +359,9 @@ let
           default = config.fqdn;
           description = ''
             Address/host to which the configuration is deployed to
+
+            Set to null if the machine is not deployable, e.g. when it is only used
+            as a carried machine.
           '';
         };
       };
