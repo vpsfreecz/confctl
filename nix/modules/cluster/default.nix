@@ -46,7 +46,7 @@ let
 
         addresses = mkOption {
           type = types.nullOr (types.submodule addresses);
-          default = null;
+          default = {};
           description = ''
             IP addresses
           '';
