@@ -344,11 +344,11 @@ let
             Host FQDN
           '';
           apply = v:
-            if isNull v && !isNull config.name && !isNull config.domain then
+            if isNull v && !isNull config.name then
               concatStringsSep "." (
                 [ config.name ]
                 ++ (optional (!isNull config.location) config.location)
-                ++ [ config.domain ]
+                ++ (optional (!isNull config.domain) config.domain)
               )
             else
               v;
