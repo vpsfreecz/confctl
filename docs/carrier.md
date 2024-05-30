@@ -55,7 +55,7 @@ let
     # machine spin, nixos/vpsadminos
     spin = "nixos";
 
-    # fully quantified domain name
+    # fully qualified domain name
     fqdn = confMachine.host.fqdn;
 
     # label used e.g. in user menus
