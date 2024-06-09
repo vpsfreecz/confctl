@@ -113,6 +113,9 @@ information.
     `-j`, `--max-jobs` *number*
       Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
 
+    `--cores` *number*
+      Number of CPU cores to use, passed to `nix-build`. See man nix-build(1).
+
 `confctl deploy` [*options*] [*machine-pattern* [`boot`|`switch`|`test`|`dry-activate`]]
   Deploy either a new or an existing build generation to matching machines.
 
@@ -176,6 +179,9 @@ information.
     `-j`, `--max-jobs` *number*
       Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
 
+    `--cores` *number*
+      Number of CPU cores to use, passed to `nix-build`. See man nix-build(1).
+
     `--no-health-checks`
       Do not run configured health checks. Health checks are run by default
       when *switch-action* is `switch`, `test` or `boot` with `--reboot`.
@@ -224,6 +230,9 @@ information.
     `-j`, `--max-jobs` *number*
       Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
 
+    `--cores` *number*
+      Number of CPU cores to use, passed to `nix-build`. See man nix-build(1).
+
 `confctl changelog` [*options*] [*machine-pattern* [*sw-pattern*]]
   Show differences in deployed and configured software pins. For git software
   pins, it's a git log.
@@ -267,6 +276,9 @@ information.
     `-j`, `--max-jobs` *number*
       Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
 
+    `--cores` *number*
+      Number of CPU cores to use, passed to `nix-build`. See man nix-build(1).
+
 `confctl diff` [*options*] [*machine-pattern* [*sw-pattern*]]
   Show differences in deployed and configured software pins. For git software
   pins, it's a git diff.
@@ -303,6 +315,9 @@ information.
 
     `-j`, `--max-jobs` *number*
       Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
+
+    `--cores` *number*
+      Number of CPU cores to use, passed to `nix-build`. See man nix-build(1).
 
 `confctl test-connection` [*options*] [*machine-pattern*]
   Try to open a SSH connection to the selected machines. This command can be
@@ -650,5 +665,5 @@ Report bugs to https://github.com/vpsfreecz/confctl/issues.
 
 ## ABOUT
 `confctl` was originally developed for the purposes of
-[vpsFree.cz](https://vpsfree.org) and its cluster 
+[vpsFree.cz](https://vpsfree.org) and its cluster
 [configuration](https://github.com/vpsfreecz/vpsfree-cz-configuration).

@@ -931,7 +931,8 @@ module ConfCtl::Cli
     def do_build(machines)
       nix = ConfCtl::Nix.new(
         show_trace: opts['show-trace'],
-        max_jobs: opts['max-jobs']
+        max_jobs: opts['max-jobs'],
+        cores: opts['cores']
       )
       hosts_swpin_paths = {}
 

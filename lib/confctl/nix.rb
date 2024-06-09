@@ -15,10 +15,11 @@ module ConfCtl
 
     include Utils::File
 
-    def initialize(conf_dir: nil, show_trace: false, max_jobs: nil)
+    def initialize(conf_dir: nil, show_trace: false, max_jobs: nil, cores: nil)
       @conf_dir = conf_dir || ConfDir.path
       @show_trace = show_trace
       @max_jobs = max_jobs || Settings.instance.max_jobs
+      @cores = cores
       @cmd = SystemCommand.new
     end
 
@@ -40,6 +41,7 @@ module ConfCtl
             '--out-link', out_link,
             (show_trace ? '--show-trace' : nil),
             (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
+            (cores ? ['--cores', cores.to_s] : nil),
             ConfCtl.nix_asset('evaluator.nix')
           ].flatten.compact
 
@@ -88,6 +90,7 @@ module ConfCtl
             '--out-link', out_link,
             (show_trace ? '--show-trace' : nil),
             (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
+            (cores ? ['--cores', cores.to_s] : nil),
             ConfCtl.nix_asset('evaluator.nix')
           ].flatten.compact
 
@@ -124,6 +127,7 @@ module ConfCtl
           '--out-link', out_link,
           (show_trace ? '--show-trace' : nil),
           (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
+          (cores ? ['--cores', cores.to_s] : nil),
           ConfCtl.nix_asset('evaluator.nix')
         ].flatten.compact
 
@@ -154,6 +158,7 @@ module ConfCtl
           '--out-link', out_link,
           (show_trace ? '--show-trace' : nil),
           (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
+          (cores ? ['--cores', cores.to_s] : nil),
           ConfCtl.nix_asset('evaluator.nix')
         ].flatten.compact
 
@@ -191,6 +196,7 @@ module ConfCtl
           '--out-link', out_link,
           (show_trace ? '--show-trace' : nil),
           (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
+          (cores ? ['--cores', cores.to_s] : nil),
           ConfCtl.nix_asset('evaluator.nix')
         ].flatten.compact
 
@@ -308,7 +314,7 @@ module ConfCtl
 
     protected
 
-    attr_reader :conf_dir, :show_trace, :max_jobs, :cmd
+    attr_reader :conf_dir, :show_trace, :max_jobs, :cores, :cmd
 
     # Execute block only if `out_link` does not exist or conf dir has changed
     # @param out_link [String] out link path
@@ -373,6 +379,7 @@ module ConfCtl
           '--arg', 'jsonArg', arg,
           (show_trace ? '--show-trace' : nil),
           (max_jobs ? ['--max-jobs', max_jobs.to_s] : nil),
+          (cores ? ['--cores', cores.to_s] : nil),
           ConfCtl.nix_asset('evaluator.nix')
         ].flatten.compact
 

@@ -546,6 +546,9 @@ module ConfCtl::Cli
     def nix_build_options(cmd)
       cmd.desc 'Maximum number of build jobs (see nix-build)'
       cmd.flag %w[j max-jobs], arg_name: 'number'
+
+      cmd.desc 'Number of CPU cores to be used (see nix-build)'
+      cmd.flag :cores, arg_name: 'number'
     end
   end
 end
