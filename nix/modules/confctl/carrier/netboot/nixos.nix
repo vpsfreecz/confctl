@@ -7,6 +7,30 @@ let
 
   cfg = config.confctl.carrier.netboot;
 
+  isoImage =
+    { config, ... }:
+    {
+      options = {
+        file = mkOption {
+          type = types.path;
+          description = ''
+            Path to the ISO image file
+
+            If it is a path, the file must be available on the build machine,
+            it will be copied into the Nix store and deployed to the target machine.
+            If it is a string, then the file must be available on the target machine
+            at the given path.
+          '';
+        };
+
+        label = mkOption {
+          type = types.str;
+          default = "";
+          description = "Menu label for this image";
+        };
+      };
+    };
+
   baseDir = "/var/lib/confctl/carrier/netboot";
 
   tftpRoot = "${baseDir}/tftp";
@@ -25,6 +49,7 @@ let
         { package = pkgs.memtest86plus; params = cfg.memtest86.params; }
       else
         null;
+    isoImages = cfg.isoImages;
   };
 
   builder = pkgs.substituteAll {
@@ -66,6 +91,12 @@ in {
           example = [ "console=ttyS0,115200" ];
           description = "See {option}`boot.loader.grub.memtest86.params`";
         };
+      };
+
+      isoImages = mkOption {
+        type = types.listOf (types.submodule isoImage);
+        default = [];
+        description = "A list of ISO images to be included in boot menu";
       };
 
       allowedIPv4Ranges = mkOption {

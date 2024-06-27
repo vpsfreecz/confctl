@@ -28,6 +28,29 @@ class Config
     end
   end
 
+  class IsoImage
+    # @return [String]
+    attr_reader :file
+
+    # @return [String]
+    attr_reader :label
+
+    # @return [String]
+    attr_reader :name
+
+    # @param cfg [Hash]
+    # @param index [Integer]
+    def initialize(cfg, index)
+      @file = cfg.fetch('file')
+      @label = cfg.fetch('label')
+
+      basename = File.basename(@file)
+
+      @label = basename if @label.empty?
+      @name = format('%02d-%s', index, basename)
+    end
+  end
+
   # @param file [String]
   def self.parse(file)
     new(JSON.parse(File.read(file)))
@@ -57,6 +80,9 @@ class Config
   # @return [Memtest]
   attr_reader :memtest
 
+  # @return [Array<IsoImage>]
+  attr_reader :iso_images
+
   # @param cfg [Hash]
   def initialize(cfg)
     @ruby = cfg.fetch('ruby')
@@ -67,6 +93,7 @@ class Config
     @host_name = cfg.fetch('hostName')
     @http_url = cfg.fetch('httpUrl')
     @memtest = Memtest.new(cfg.fetch('memtest'))
+    @iso_images = cfg.fetch('isoImages').each_with_index.map { |v, i| IsoImage.new(v, i) }
   end
 end
 
@@ -231,7 +258,7 @@ class RootBuilder
 end
 
 class TftpBuilder < RootBuilder
-  PROGRAMS = %w[pxelinux.0 ldlinux.c32 libcom32.c32 libutil.c32 menu.c32 reboot.c32].freeze
+  PROGRAMS = %w[pxelinux.0 ldlinux.c32 libcom32.c32 libutil.c32 memdisk menu.c32 reboot.c32].freeze
 
   SPIN_LABELS = {
     'nixos' => 'NixOS',
@@ -255,6 +282,7 @@ class TftpBuilder < RootBuilder
     render_default_config
     render_spin_configs
     render_machine_configs
+    render_iso_image_configs
   end
 
   protected
@@ -266,6 +294,8 @@ class TftpBuilder < RootBuilder
   end
 
   def install_boot_files
+    # rubocop:disable Style/GuardClause
+
     machines.each do |m|
       m.generations.each do |g|
         path = File.join('boot', m.fqdn, g.generation.to_s)
@@ -286,10 +316,20 @@ class TftpBuilder < RootBuilder
       end
     end
 
-    return unless @config.memtest.enable
+    if @config.memtest.enable
+      mkdir_p('boot/memtest86')
+      ln_s(File.join(@config.memtest.package, 'memtest.bin'), 'boot/memtest86/memtest.bin')
+    end
 
-    mkdir_p('boot/memtest86')
-    ln_s(File.join(@config.memtest.package, 'memtest.bin'), 'boot/memtest86/memtest.bin')
+    if @config.iso_images.any?
+      mkdir_p('boot/iso-images')
+
+      @config.iso_images.each do |img|
+        ln_s(img.file, File.join('boot/iso-images', img.name))
+      end
+    end
+
+    # rubocop:enable Style/GuardClause
   end
 
   def render_default_config
@@ -304,6 +344,13 @@ class TftpBuilder < RootBuilder
         MENU LABEL <%= label %> >
         KERNEL menu.c32
         APPEND pxeserver/<%= spin %>.cfg
+
+      <% end -%>
+      <% if iso_images.any? -%>
+      LABEL isoimages
+        MENU LABEL ISO images >
+        KERNEL menu.c32
+        APPEND pxeserver/iso-images.cfg
 
       <% end -%>
       <% if enable_memtest -%>
@@ -333,7 +380,8 @@ class TftpBuilder < RootBuilder
         hostname: @config.host_name,
         spins: @spins,
         enable_memtest: @config.memtest.enable,
-        memtest_params: @config.memtest.params_line
+        memtest_params: @config.memtest.params_line,
+        iso_images: @config.iso_images
       },
       'pxelinux.cfg/default'
     )
@@ -549,6 +597,28 @@ class TftpBuilder < RootBuilder
     ERB
 
     render_to(tpl, { m: machine }, "pxeserver/machines/#{machine.fqdn}/generations.cfg")
+  end
+
+  def render_iso_image_configs
+    return if @config.iso_images.empty?
+
+    tpl = <<~ERB
+      MENU TITLE ISO images
+
+      <% iso_images.each_with_index do |img, i| -%>
+      LABEL image<%= i %>
+        MENU LABEL <%= img.label %>
+        KERNEL memdisk
+        APPEND iso initrd=boot/iso-images/<%= img.name %> raw
+      <% end -%>
+
+      LABEL mainmenu
+        MENU LABEL < Back to Main Menu
+        KERNEL menu.c32
+        APPEND pxelinux.cfg/default
+    ERB
+
+    render_to(tpl, { iso_images: @config.iso_images }, 'pxeserver/iso-images.cfg')
   end
 
   # @param template [String]
