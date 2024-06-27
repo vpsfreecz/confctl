@@ -174,7 +174,11 @@ class TftpBuilder < RootBuilder
   SPIN_LABELS = {
     'nixos' => 'NixOS',
     'vpsadminos' => 'vpsAdminOS'
-}.freeze
+  }.freeze
+
+  MEMTEST_PACKAGE = '@memtestPackage@'.freeze
+
+  MEMTEST_PARAMS = '@memtestParams@'.freeze
 
   def build
     install_syslinux
@@ -223,6 +227,11 @@ class TftpBuilder < RootBuilder
         ln_s("../pxeserver/machines/#{m.fqdn}/auto.cfg", "pxelinux.cfg/01-#{mac.gsub(':', '-')}")
       end
     end
+
+    return unless enable_memtest?
+
+    mkdir_p('boot/memtest86')
+    ln_s(File.join(MEMTEST_PACKAGE, 'memtest.bin'), 'boot/memtest86/memtest.bin')
   end
 
   def render_default_config
@@ -239,6 +248,13 @@ class TftpBuilder < RootBuilder
         APPEND pxeserver/<%= spin %>.cfg
 
       <% end -%>
+      <% if enable_memtest -%>
+      LABEL memtest
+        MENU LABEL Memtest86
+        LINUX boot/memtest86/memtest.bin
+        APPEND <%= memtest_params %>
+
+      <% end -%>
       LABEL local_boot
         MENU LABEL Local Boot
         LOCALBOOT 0
@@ -253,7 +269,16 @@ class TftpBuilder < RootBuilder
         KERNEL reboot.c32
     ERB
 
-    render_to(tpl, { hostname: HOSTNAME, spins: @spins }, 'pxelinux.cfg/default')
+    render_to(
+      tpl,
+      {
+        hostname: HOSTNAME,
+        spins: @spins,
+        enable_memtest: enable_memtest?,
+        memtest_params: MEMTEST_PARAMS
+      },
+      'pxelinux.cfg/default'
+    )
   end
 
   def render_spin_configs
@@ -307,13 +332,28 @@ class TftpBuilder < RootBuilder
         APPEND init=<%= g.toplevel %>/init loglevel=7
 
       <% end -%>
+      <% if enable_memtest -%>
+      LABEL memtest
+        MENU LABEL Memtest86
+        LINUX boot/memtest86/memtest.bin
+        APPEND <%= memtest_params %>
+
+      <% end -%>
       LABEL mainmenu
         MENU LABEL < Back to Main Menu
         KERNEL menu.c32
         APPEND pxelinux.cfg/default
     ERB
 
-    render_to(tpl, { m: machine }, "pxeserver/machines/#{machine.fqdn}/menu.cfg")
+    render_to(
+      tpl,
+      {
+        m: machine,
+        enable_memtest: enable_memtest?,
+        memtest_params: MEMTEST_PARAMS
+      },
+      "pxeserver/machines/#{machine.fqdn}/menu.cfg"
+    )
   end
 
   def render_machine_vpsadminos(machine)
@@ -398,6 +438,13 @@ class TftpBuilder < RootBuilder
         KERNEL menu.c32
         APPEND pxeserver/machines/<%= m.fqdn %>/generations.cfg
 
+      <% if enable_memtest -%>
+      LABEL memtest
+        MENU LABEL Memtest86
+        LINUX boot/memtest86/memtest.bin
+        APPEND <%= memtest_params %>
+
+      <% end -%>
       LABEL mainmenu
         MENU LABEL < Back to Main Menu
         KERNEL menu.c32
@@ -406,7 +453,16 @@ class TftpBuilder < RootBuilder
 
     render_to(
       tpl,
-      { m: machine, g: generation, variants:, http_url: HTTP_URL, root:, timeout: },
+      {
+        m: machine,
+        g: generation,
+        variants:,
+        http_url: HTTP_URL,
+        root:,
+        timeout:,
+        enable_memtest: enable_memtest?,
+        memtest_params: MEMTEST_PARAMS
+      },
       "pxeserver/machines/#{machine.fqdn}/#{file}.cfg"
     )
   end
@@ -449,6 +505,10 @@ class TftpBuilder < RootBuilder
   # @param path [String]
   def render_to(template, vars, path)
     File.write(File.join(root, path), render(template, vars))
+  end
+
+  def enable_memtest?
+    !MEMTEST_PACKAGE.empty?
   end
 end
 

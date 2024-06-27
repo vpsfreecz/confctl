@@ -24,6 +24,16 @@ let
     inherit tftpRoot httpRoot;
     hostName = config.networking.hostName;
     httpUrl = "http://${cfg.host}";
+    memtestPackage =
+      if cfg.memtest86.enable then
+        pkgs.memtest86plus
+      else
+        "";
+    memtestParams =
+      if cfg.memtest86.enable then
+        toString cfg.memtest86.params
+      else
+        "";
   };
 in {
   options = {
@@ -41,6 +51,21 @@ in {
         type = types.bool;
         description = "Enable ACME and SSL for netboot host";
         default = false;
+      };
+
+      memtest86 = {
+        enable = mkOption {
+          type = types.bool;
+          description = "Include memtest in boot menu";
+          default = true;
+        };
+
+        params = mkOption {
+          type = types.listOf types.str;
+          default = [];
+          example = [ "console=ttyS0,115200" ];
+          description = "See {option}`boot.loader.grub.memtest86.params`";
+        };
       };
 
       allowedIPv4Ranges = mkOption {
