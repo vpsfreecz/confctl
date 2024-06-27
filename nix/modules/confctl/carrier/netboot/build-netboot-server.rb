@@ -4,10 +4,74 @@ require 'fileutils'
 require 'json'
 require 'securerandom'
 
-class NetbootBuilder
-  TFTP_ROOT = '@tftpRoot@'.freeze
+class Config
+  class Memtest
+    # @return [Boolean]
+    attr_reader :enable
 
-  HTTP_ROOT = '@httpRoot@'.freeze
+    # @return [String]
+    attr_reader :package
+
+    # @return [String]
+    attr_reader :params
+
+    # @return [String]
+    attr_reader :params_line
+
+    def initialize(cfg)
+      @enable = !cfg.nil?
+      return unless @enable
+
+      @package = cfg.fetch('package')
+      @params = cfg.fetch('params')
+      @params_line = @params.join(' ')
+    end
+  end
+
+  # @param file [String]
+  def self.parse(file)
+    new(JSON.parse(File.read(file)))
+  end
+
+  # @return [String]
+  attr_reader :ruby
+
+  # @return [String]
+  attr_reader :coreutils
+
+  # @return [String]
+  attr_reader :syslinux
+
+  # @return [String]
+  attr_reader :tftp_root
+
+  # @return [String]
+  attr_reader :http_root
+
+  # @return [String]
+  attr_reader :host_name
+
+  # @return [String]
+  attr_reader :http_url
+
+  # @return [Memtest]
+  attr_reader :memtest
+
+  # @param cfg [Hash]
+  def initialize(cfg)
+    @ruby = cfg.fetch('ruby')
+    @coreutils = cfg.fetch('coreutils')
+    @syslinux = cfg.fetch('syslinux')
+    @tftp_root = cfg.fetch('tftpRoot')
+    @http_root = cfg.fetch('httpRoot')
+    @host_name = cfg.fetch('hostName')
+    @http_url = cfg.fetch('httpUrl')
+    @memtest = Memtest.new(cfg.fetch('memtest'))
+  end
+end
+
+class NetbootBuilder
+  CONFIG_FILE = '@jsonConfig@'.freeze
 
   LINK_DIR = '/nix/var/nix/profiles'.freeze
 
@@ -16,8 +80,12 @@ class NetbootBuilder
   LOCK_FILE = '/run/confctl/build-netboot-server.lock'.freeze
 
   def self.run
-    builder = new
+    builder = new(Config.parse(CONFIG_FILE))
     builder.run
+  end
+
+  def initialize(config)
+    @config = config
   end
 
   def run
@@ -42,8 +110,8 @@ class NetbootBuilder
     random = SecureRandom.hex(3)
 
     builders = [
-      TftpBuilder.new(random, machines, TFTP_ROOT),
-      HttpBuilder.new(random, machines, HTTP_ROOT)
+      TftpBuilder.new(@config, random, machines, @config.tftp_root),
+      HttpBuilder.new(@config, random, machines, @config.http_root)
     ]
 
     builders.each(&:run)
@@ -92,18 +160,18 @@ class NetbootBuilder
 end
 
 class RootBuilder
-  COREUTILS = '@coreutils@'.freeze
-
   # @return [Array<Machine>]
   attr_reader :machines
 
   # @return [String]
   attr_reader :root
 
+  # @param config [Config]
   # @param random [String]
   # @param machines [Array<Machine>]
   # @param root [String]
-  def initialize(random, machines, root)
+  def initialize(config, random, machines, root)
+    @config = config
     @machines = machines
     @target_root = root
     @root = @new_root = "#{root}.#{random}"
@@ -131,7 +199,7 @@ class RootBuilder
   def install
     # ln -sfn is called instead of using ruby methods, because ln
     # can replace the symlink atomically.
-    return if Kernel.system(File.join(COREUTILS, 'bin/ln'), '-sfn', File.basename(@new_root), @target_root)
+    return if Kernel.system(File.join(@config.coreutils, 'bin/ln'), '-sfn', File.basename(@new_root), @target_root)
 
     raise "Failed to install new root to #{@target_root}"
   end
@@ -163,22 +231,12 @@ class RootBuilder
 end
 
 class TftpBuilder < RootBuilder
-  SYSLINUX = '@syslinux@'.freeze
-
-  HOSTNAME = '@hostName@'.freeze
-
-  HTTP_URL = '@httpUrl@'.freeze
-
   PROGRAMS = %w[pxelinux.0 ldlinux.c32 libcom32.c32 libutil.c32 menu.c32 reboot.c32].freeze
 
   SPIN_LABELS = {
     'nixos' => 'NixOS',
     'vpsadminos' => 'vpsAdminOS'
   }.freeze
-
-  MEMTEST_PACKAGE = '@memtestPackage@'.freeze
-
-  MEMTEST_PARAMS = '@memtestParams@'.freeze
 
   def build
     install_syslinux
@@ -203,7 +261,7 @@ class TftpBuilder < RootBuilder
 
   def install_syslinux
     PROGRAMS.each do |prog|
-      cp(File.join(SYSLINUX, 'share/syslinux', prog), prog)
+      cp(File.join(@config.syslinux, 'share/syslinux', prog), prog)
     end
   end
 
@@ -228,10 +286,10 @@ class TftpBuilder < RootBuilder
       end
     end
 
-    return unless enable_memtest?
+    return unless @config.memtest.enable
 
     mkdir_p('boot/memtest86')
-    ln_s(File.join(MEMTEST_PACKAGE, 'memtest.bin'), 'boot/memtest86/memtest.bin')
+    ln_s(File.join(@config.memtest.package, 'memtest.bin'), 'boot/memtest86/memtest.bin')
   end
 
   def render_default_config
@@ -272,10 +330,10 @@ class TftpBuilder < RootBuilder
     render_to(
       tpl,
       {
-        hostname: HOSTNAME,
+        hostname: @config.host_name,
         spins: @spins,
-        enable_memtest: enable_memtest?,
-        memtest_params: MEMTEST_PARAMS
+        enable_memtest: @config.memtest.enable,
+        memtest_params: @config.memtest.params_line
       },
       'pxelinux.cfg/default'
     )
@@ -349,8 +407,8 @@ class TftpBuilder < RootBuilder
       tpl,
       {
         m: machine,
-        enable_memtest: enable_memtest?,
-        memtest_params: MEMTEST_PARAMS
+        enable_memtest: @config.memtest.enable,
+        memtest_params: @config.memtest.params_line
       },
       "pxeserver/machines/#{machine.fqdn}/menu.cfg"
     )
@@ -457,11 +515,11 @@ class TftpBuilder < RootBuilder
         m: machine,
         g: generation,
         variants:,
-        http_url: HTTP_URL,
+        http_url: @config.http_url,
         root:,
         timeout:,
-        enable_memtest: enable_memtest?,
-        memtest_params: MEMTEST_PARAMS
+        enable_memtest: @config.memtest.enable,
+        memtest_params: @config.memtest.params_line
       },
       "pxeserver/machines/#{machine.fqdn}/#{file}.cfg"
     )
@@ -505,10 +563,6 @@ class TftpBuilder < RootBuilder
   # @param path [String]
   def render_to(template, vars, path)
     File.write(File.join(root, path), render(template, vars))
-  end
-
-  def enable_memtest?
-    !MEMTEST_PACKAGE.empty?
   end
 end
 

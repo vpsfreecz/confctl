@@ -13,27 +13,27 @@ let
 
   httpRoot = "${baseDir}/http";
 
-  builder = pkgs.substituteAll {
-    src = ./build-netboot-server.rb;
-    name = "build-netboot-server";
-    dir = "bin";
-    isExecutable = true;
+  builderConfig = builtins.toJSON {
     ruby = pkgs.ruby;
     coreutils = pkgs.coreutils;
     syslinux = pkgs.syslinux;
     inherit tftpRoot httpRoot;
     hostName = config.networking.hostName;
     httpUrl = "http://${cfg.host}";
-    memtestPackage =
+    memtest =
       if cfg.memtest86.enable then
-        pkgs.memtest86plus
+        { package = pkgs.memtest86plus; params = cfg.memtest86.params; }
       else
-        "";
-    memtestParams =
-      if cfg.memtest86.enable then
-        toString cfg.memtest86.params
-      else
-        "";
+        null;
+  };
+
+  builder = pkgs.substituteAll {
+    src = ./build-netboot-server.rb;
+    name = "build-netboot-server";
+    dir = "bin";
+    isExecutable = true;
+    ruby = pkgs.ruby;
+    jsonConfig = pkgs.writeText "netboot-server.json" builderConfig;
   };
 in {
   options = {
