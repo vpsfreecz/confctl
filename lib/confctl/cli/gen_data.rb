@@ -78,8 +78,26 @@ module ConfCtl::Cli
         q.echo = false
       end.to_s
 
-      @vpsadmin_client.authenticate(:basic, user:, password:)
+      @vpsadmin_client.authenticate(:token, user:, password:, lifetime: 'fixed', interval: 60) do |_action, params|
+        ret = {}
+
+        params.each do |name, desc|
+          ret[name] = read_auth_param(name, desc)
+        end
+
+        ret
+      end
+
       @vpsadmin_client
+    end
+
+    def read_auth_param(name, p)
+      prompt = "#{p[:label] || name}: "
+
+      ask(prompt) do |q|
+        q.default = nil
+        q.echo = !p[:protected]
+      end
     end
 
     def update_file(relpath, &)
