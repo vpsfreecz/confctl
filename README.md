@@ -41,19 +41,12 @@ stored:
 ```
 mkdir cluster-configuration
 ```
-3. Prepare `shell.nix` in the new directory:
-  - Create a `shell.nix` and import the same file from confctl:
+3. Create `shell.nix` and import the same file from confctl:
 ```
 cd cluster-configuration
 cat > shell.nix <<EOF
 import ../confctl/shell.nix
 EOF
-```
-
-  - Alternatively, you can symlink `shell.nix` from the confctl repository:
-```
-cd cluster-configuration
-ln -s ../confctl/shell.nix shell.nix
 ```
 
 4. Enter the `nix-shell`. This will make confctl available and install its
