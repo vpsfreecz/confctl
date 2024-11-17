@@ -18,7 +18,7 @@ Gem::Specification.new do |s|
   s.required_ruby_version = '>= 3.1.0'
 
   s.add_dependency 'curses'
-  s.add_dependency 'gli', '~> 2.21.0'
+  s.add_dependency 'gli', '~> 2.22.0'
   s.add_dependency 'json'
   s.add_dependency 'md2man'
   s.add_dependency 'rainbow', '~> 3.1.1'
@@ -29,5 +29,5 @@ Gem::Specification.new do |s|
   s.add_dependency 'tty-pager', '~> 0.14.0'
   s.add_dependency 'tty-progressbar', '~> 0.18.2'
   s.add_dependency 'tty-spinner', '~> 0.9.3'
-  s.add_dependency 'vpsfree-client', '~> 0.18.0'
+  s.add_dependency 'vpsfree-client', '~> 0.19.0'
 end
