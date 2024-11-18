@@ -13,7 +13,7 @@ or it could mean machine metadata from `module.nix`. Machine metadata
 is now accessible as `metaConfig`.
 
 - `confLib.findConfig` has been renamed to `confLib.findMetaConfig`
-- `confLib.confLib.getClusterMachines` returns a list of machines with `metaConfig` attribute
+- `confLib.getClusterMachines` returns a list of machines with `metaConfig` attribute
 
 # Sat Feb 17 2024 -- version 1.0.0
 - Initial release
