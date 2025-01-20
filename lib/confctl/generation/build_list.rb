@@ -55,6 +55,16 @@ module ConfCtl
       index[name]
     end
 
+    # @param offset [Integer] 0 = current/last, 1 = first (oldest), -1 = before last
+    # @return [Generation::Build]
+    def at_offset(offset)
+      if offset == 0
+        generations.last
+      else
+        generations[offset - 1]
+      end
+    end
+
     def each(&)
       generations.each(&)
     end

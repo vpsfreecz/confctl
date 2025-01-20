@@ -896,12 +896,15 @@ module ConfCtl::Cli
     def find_generations(machines, generation_name)
       host_generations = {}
       missing_hosts = []
+      generation_offset = generation_name.to_i if /\A-?\d+\z/ =~ generation_name
 
       machines.each_key do |host|
         list = ConfCtl::Generation::BuildList.new(host)
 
         gen =
-          if generation_name == 'current'
+          if generation_offset
+            list.at_offset(generation_offset)
+          elsif generation_name == 'current'
             list.current
           else
             list[generation_name]

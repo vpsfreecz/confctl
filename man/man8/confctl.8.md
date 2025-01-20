@@ -38,6 +38,11 @@ similarly to shell patterns, see
 <http://ruby-doc.org/core/File.html#method-c-fnmatch-3F> for more
 information.
 
+## GENERATION OFFSETS
+Generations can be selected by *offset*. `0` is the current (last) generation.
+`1` is the first generation, `2` the second generation, etc. `-1` is the generation
+before last, etc.
+
 ## GLOBAL OPTIONS
 `-c`, `--color` `always`|`never`|`auto`
   Set output color mode. Defaults to `auto`, which enables colors when
@@ -137,7 +142,7 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
-    `-g`, `--generation` *generation*|`current`
+    `-g`, `--generation` *generation*|*offset*|`current`
       Do not build a new generation, but deploy an existing generation.
 
     `--outdated`
@@ -222,7 +227,7 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
-    `-g`, `--generation` *generation*|`current`|`none`
+    `-g`, `--generation` *generation*|*offset*|`current`|`none`
       Check status against a selected generation instead of a new build. If set
       to `none`, only the currently configured software pins are checked and not
       the system version itself.
@@ -258,7 +263,7 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
-    `-g`, `--generation` *generation*|`current`
+    `-g`, `--generation` *generation*|*offset*|`current`
       Show changelog against software pins from a selected generation instead
       of the current configuration.
 
@@ -304,7 +309,7 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
-    `-g`, `--generation` *generation*|`current`
+    `-g`, `--generation` *generation*|*offset*|`current`
       Show diff against software pins from a selected generation instead
       of the current configuration.
 
@@ -396,7 +401,7 @@ information.
     `-y`, `--yes`
       Do not ask for confirmation on standard input, assume the answer is yes.
 
-`confctl generation ls` [*machine-pattern* [*generation-pattern*]|*n*`d`|`old`]
+`confctl generation ls` [*machine-pattern* [*generation-pattern*]|*n*`d`|*offset*|`old`]
   List all or selected generations. By default only local build generations
   are listed.
 
@@ -415,7 +420,7 @@ information.
     `-r`, `--remote`
       List remote generations found on deployed machines.
 
-`confctl generation rm` [*machine-pattern* [*generation-pattern*|*n*`d`|`old`]]
+`confctl generation rm` [*machine-pattern* [*generation-pattern*|*n*`d`|*offset*|`old`]]
   Remove selected generations.
 
   *n*`d` will remove generations older than *n* days.
