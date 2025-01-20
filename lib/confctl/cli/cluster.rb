@@ -919,8 +919,17 @@ module ConfCtl::Cli
 
       raise 'No generation found' if host_generations.empty?
 
+      puts 'Resolved host generations:'
+      list_generations(host_generations, missing_hosts:)
+
+      if opts[:interactive]
+        ask_confirmation!
+      else
+        puts
+      end
+
       if missing_hosts.any?
-        ask_confirmation! do
+        ask_confirmation!(always: opts[:interactive]) do
           puts "Generation '#{generation_name}' was not found on the following hosts:"
           missing_hosts.each { |host| puts "  #{host}" }
           puts
@@ -929,6 +938,40 @@ module ConfCtl::Cli
       end
 
       host_generations
+    end
+
+    def list_generations(host_generations, missing_hosts:)
+      swpin_names = []
+
+      host_generations.each_value do |gen|
+        gen.swpin_names.each do |name|
+          swpin_names << name unless swpin_names.include?(name)
+        end
+      end
+
+      rows = host_generations.map do |host, gen|
+        row = {
+          'name' => host,
+          'generation' => gen.name
+        }
+
+        gen.swpin_specs.each do |name, spec|
+          row[name] = spec.version
+        end
+
+        row
+      end
+
+      missing_hosts.each do |host|
+        rows << { 'name' => host, 'generation' => 'not found' }
+      end
+
+      OutputFormatter.print(
+        rows,
+        %w[name generation] + swpin_names,
+        layout: :columns,
+        sort: %w[name generation]
+      )
     end
 
     def do_build(machines)
