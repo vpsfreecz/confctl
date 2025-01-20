@@ -40,8 +40,8 @@ information.
 
 ## GENERATION OFFSETS
 Generations can be selected by *offset*. `0` is the current (last) generation.
-`1` is the first generation, `2` the second generation, etc. `-1` is the generation
-before last, etc.
+`1` is the first (oldest) generation, `2` the second generation, etc. `-1` is
+the generation before last and so on.
 
 ## GLOBAL OPTIONS
 `-c`, `--color` `always`|`never`|`auto`
@@ -424,6 +424,8 @@ before last, etc.
   Remove selected generations.
 
   *n*`d` will remove generations older than *n* days.
+
+  *offset* will remove generations at a specific offset, see `GENERATION OFFSETS`.
 
   `old` will remove all generations except the current one, i.e. the one that
   was built by `confctl build` the last.
