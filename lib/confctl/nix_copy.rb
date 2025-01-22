@@ -1,10 +1,10 @@
 module ConfCtl
   class NixCopy
     # @param target [String]
-    # @param store_path [String]
-    def initialize(target, store_path)
+    # @param store_paths [Array<String>]
+    def initialize(target, store_paths)
       @target = target
-      @store_path = store_path
+      @store_paths = store_paths
       @total = nil
       @progress = 0
     end
@@ -22,7 +22,7 @@ module ConfCtl
       ret = cmd.run!(
         'nix-copy-closure',
         '--to', "root@#{target}",
-        store_path,
+        *store_paths,
         &line_buf.feed_block
       )
 
@@ -32,7 +32,7 @@ module ConfCtl
 
     protected
 
-    attr_reader :target, :store_path
+    attr_reader :target, :store_paths
 
     def parse_line(line)
       if @total.nil? && /^copying (\d+) paths/ =~ line

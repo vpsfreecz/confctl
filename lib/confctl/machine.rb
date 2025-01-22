@@ -116,6 +116,10 @@ module ConfCtl
       end
     end
 
+    def auto_rollback?
+      meta.fetch('autoRollback', {}).fetch('enable', true)
+    end
+
     def health_checks
       return @health_checks if @health_checks
 

@@ -173,6 +173,12 @@ the generation before last and so on.
     `--copy-only`
       Do not activate the copied closures.
 
+    `--enable-auto-rollback`
+      Enable auto-rollback on deploy even if it is not enabled in machine configuration.
+
+    `--disable-auto-rollback`
+      Disable auto-rollback on deploy if it is enabled in machine configuration.
+
     `--reboot`
       Applicable only when *switch-action* is `boot`. Reboot the machine after the
       configuration is activated.

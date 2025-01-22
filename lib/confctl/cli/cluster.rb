@@ -351,7 +351,7 @@ module ConfCtl::Cli
           next
         end
 
-        if deploy_to_host(nix, host, machines[host], gen.toplevel, action) == :skip
+        if deploy_to_host(nix, host, machines[host], gen, action) == :skip
           puts Rainbow("Skipping #{host}").yellow
           skipped_activation << host
           next
@@ -403,7 +403,7 @@ module ConfCtl::Cli
 
         next if opts['copy-only']
 
-        if deploy_to_host(nix, host, machine, gen.toplevel, action) == :skip
+        if deploy_to_host(nix, host, machine, gen, action) == :skip
           puts Rainbow("Skipping #{host}").yellow
           next
         end
@@ -421,7 +421,7 @@ module ConfCtl::Cli
       end
     end
 
-    def copy_to_host(nix, host, machine, toplevel)
+    def copy_to_host(nix, host, machine, build_generation)
       puts Rainbow("Copying configuration to #{host} (#{machine.target_host})").yellow
 
       return :skip if opts[:interactive] && !ask_confirmation(always: true)
@@ -435,7 +435,7 @@ module ConfCtl::Cli
           width: 80
         )
 
-        ret = nix.copy(machine, toplevel) do |i, n, path|
+        ret = nix_copy(nix, machine, build_generation) do |i, n, path|
           lw << "[#{i}/#{n}] #{path}"
 
           lw.sync_console do
@@ -467,7 +467,7 @@ module ConfCtl::Cli
           )
 
           executor.add do
-            ret = nix.copy(machines[host], gen.toplevel) do |i, n, path|
+            ret = nix_copy(nix, machines[host], gen) do |i, n, path|
               lw << "#{host}> [#{i}/#{n}] #{path}"
 
               lw.sync_console do
@@ -504,7 +504,7 @@ module ConfCtl::Cli
       end
     end
 
-    def deploy_to_host(nix, host, machine, toplevel, action)
+    def deploy_to_host(nix, host, machine, generation, action)
       LogView.open_with_logger(
         header: "#{Rainbow('Deploying to').bright} #{Rainbow(host).yellow}\n",
         title: Rainbow('Live view').bright,
@@ -512,16 +512,16 @@ module ConfCtl::Cli
         reserved_lines: 10
       ) do |lw|
         if machine.carried?
-          deploy_carried_to_host(lw, nix, host, machine, toplevel, action)
+          deploy_carried_to_host(lw, nix, host, machine, generation, action)
         else
-          deploy_standalone_to_host(lw, nix, host, machine, toplevel, action)
+          deploy_standalone_to_host(lw, nix, host, machine, generation, action)
         end
 
         lw.flush
       end
     end
 
-    def deploy_standalone_to_host(lw, nix, host, machine, toplevel, action)
+    def deploy_standalone_to_host(lw, nix, host, machine, generation, action)
       if opts['dry-activate-first']
         lw.sync_console do
           puts Rainbow(
@@ -530,7 +530,9 @@ module ConfCtl::Cli
           ).yellow
         end
 
-        raise "Error while activating configuration on #{host}" unless nix.activate(machine, toplevel, 'dry-activate')
+        unless nix.activate(machine, generation, 'dry-activate')
+          raise "Error while activating configuration on #{host}"
+        end
       end
 
       lw.sync_console do
@@ -544,22 +546,27 @@ module ConfCtl::Cli
 
       # rubocop:disable Style/GuardClause
 
-      unless nix.activate(machine, toplevel, action)
-        raise "Error while activating configuration on #{host}"
-      end
+      result =
+        if %w[test switch].include?(action) && enable_auto_rollback?(machine, generation)
+          nix.activate_with_rollback(machine, generation, action)
+        else
+          nix.activate(machine, generation, action)
+        end
 
-      if %w[boot switch].include?(action) && !nix.set_profile(machine, toplevel)
+      raise "Error while activating configuration on #{host}" unless result
+
+      if %w[boot switch].include?(action) && !nix.set_profile(machine, generation.toplevel)
         raise "Error while setting profile on #{host}"
       end
 
       # rubocop:enable Style/GuardClause
     end
 
-    def deploy_carried_to_host(lw, nix, host, machine, toplevel, action)
+    def deploy_carried_to_host(lw, nix, host, machine, generation, action)
       return if action != 'switch'
 
       # rubocop:disable Style/GuardClause
-      unless nix.set_carried_profile(machine, toplevel)
+      unless nix.set_carried_profile(machine, generation.toplevel)
         raise "Error while setting carried profile for #{host} on #{machine.carrier_machine}"
       end
       # rubocop:enable Style/GuardClause
@@ -1318,6 +1325,22 @@ module ConfCtl::Cli
       end
 
       raise ArgumentError, "invalid time duration '#{interval}'"
+    end
+
+    # @param nix [Nix]
+    # @param machine [Machine]
+    # @param generation [Generation::Build]
+    def nix_copy(nix, machine, generation, &)
+      paths = [generation.toplevel]
+      paths << generation.auto_rollback if enable_auto_rollback?(machine, generation)
+
+      nix.copy(machine, paths, &)
+    end
+
+    def enable_auto_rollback?(machine, generation)
+      !opts['disable-auto-rollback'] \
+        && (opts['enable-auto-rollback'] || machine.auto_rollback?) \
+        && generation.auto_rollback
     end
   end
 end

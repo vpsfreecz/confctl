@@ -186,6 +186,26 @@ let
           };
         };
 
+        autoRollback = {
+          enable = mkOption {
+            type = types.bool;
+            default = true;
+            description = ''
+              Enable automatic rollback in case the machine is unresponsive after
+              deploy
+            '';
+          };
+
+          timeout = mkOption {
+            type = types.int;
+            default = 60;
+            description = ''
+              Number of seconds after which if the machine is unreachable, auto-rollback
+              is initiated
+            '';
+          };
+        };
+
         healthChecks = {
           systemd = {
             enable = mkOption {

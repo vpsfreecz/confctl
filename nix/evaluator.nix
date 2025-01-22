@@ -81,7 +81,15 @@ let
           abort "Attribute 'config.${coreLib.concatStringsSep "." machine.build.attribute}' not found on machine ${machine.name}"
         else
           buildAttr;
-    in result;
+    in {
+      attribute = result;
+
+      autoRollback = corePkgs.substituteAll {
+        src = ../libexec/auto-rollback.rb;
+        isExecutable = true;
+        ruby = nixpkgs.ruby;
+      };
+    };
 
   evalMachine = machine:
     let

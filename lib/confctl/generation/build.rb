@@ -16,6 +16,9 @@ module ConfCtl
     # @return [String]
     attr_reader :toplevel
 
+    # @return [String]
+    attr_reader :auto_rollback
+
     # @return [Array<String>]
     attr_reader :swpin_names
 
@@ -35,11 +38,13 @@ module ConfCtl
     end
 
     # @param toplevel [String]
+    # @param auto_rollback [String]
     # @param swpin_paths [Hash]
     # @param swpin_specs [Hash]
     # @param date [Time]
-    def create(toplevel, swpin_paths, swpin_specs, date: nil)
+    def create(toplevel, auto_rollback, swpin_paths, swpin_specs, date: nil)
       @toplevel = toplevel
+      @auto_rollback = auto_rollback
       @swpin_names = swpin_paths.keys
       @swpin_paths = swpin_paths
       @swpin_specs = swpin_specs
@@ -53,6 +58,7 @@ module ConfCtl
 
       cfg = JSON.parse(File.read(config_path))
       @toplevel = cfg['toplevel']
+      @auto_rollback = cfg['auto_rollback']
 
       @swpin_names = []
       @swpin_paths = {}
@@ -76,6 +82,7 @@ module ConfCtl
     def save
       FileUtils.mkdir_p(dir)
       File.symlink(toplevel, toplevel_path)
+      File.symlink(auto_rollback, auto_rollback_path)
 
       swpin_paths.each do |name, path|
         File.symlink(path, swpin_path(name))
@@ -85,6 +92,7 @@ module ConfCtl
         f.puts(JSON.pretty_generate({
           date: date.iso8601,
           toplevel:,
+          auto_rollback:,
           swpins: swpin_paths.to_h do |name, path|
             [name, { path:, spec: swpin_specs[name].as_json }]
           end
@@ -97,6 +105,13 @@ module ConfCtl
     def destroy
       remove_gcroot
       File.unlink(toplevel_path)
+
+      begin
+        File.unlink(auto_rollback_path)
+      rescue Errno::ENOENT
+        # Older generations might not have auto_rollback
+      end
+
       swpin_paths.each_key { |name| File.unlink(swpin_path(name)) }
       File.unlink(config_path)
       Dir.rmdir(dir)
@@ -104,6 +119,7 @@ module ConfCtl
 
     def add_gcroot
       GCRoot.add(gcroot_name('toplevel'), toplevel_path)
+      GCRoot.add(gcroot_name('auto_rollback'), auto_rollback_path)
       swpin_paths.each_key do |name|
         GCRoot.add(gcroot_name("swpin.#{name}"), toplevel_path)
       end
@@ -111,6 +127,7 @@ module ConfCtl
 
     def remove_gcroot
       GCRoot.remove(gcroot_name('toplevel'))
+      GCRoot.remove(gcroot_name('auto_rollback'))
       swpin_paths.each_key do |name|
         GCRoot.remove(gcroot_name("swpin.#{name}"))
       end
@@ -128,6 +145,10 @@ module ConfCtl
 
     def toplevel_path
       @toplevel_path ||= File.join(dir, 'toplevel')
+    end
+
+    def auto_rollback_path
+      @auto_rollback_path ||= File.join(dir, 'auto_rollback')
     end
 
     def swpin_path(name)

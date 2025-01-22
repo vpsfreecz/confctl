@@ -13,6 +13,7 @@ machines.
   configurations)
 * Query machine state, view changelogs and diffs
 * Run health checks
+* Automatically roll back faulty configurations
 * Support for creating netboot servers, see [docs/carrier.md](docs/carrier.md)
 
 ## Requirements

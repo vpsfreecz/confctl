@@ -213,6 +213,12 @@ module ConfCtl::Cli
         c.desc 'Do not activate copied closures'
         c.switch 'copy-only', negatable: false
 
+        c.desc 'Enable auto-rollback'
+        c.switch 'enable-auto-rollback', default_value: false, negatable: false
+
+        c.desc 'Disable auto-rollback'
+        c.switch 'disable-auto-rollback', default_value: false, negatable: false
+
         c.desc 'Reboot target systems after deployment'
         c.switch :reboot
 

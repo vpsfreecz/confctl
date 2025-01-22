@@ -204,15 +204,16 @@ module ConfCtl
         nb.run(&block)
 
         begin
-          host_toplevels = JSON.parse(File.read(out_link))
-          host_toplevels.each do |host, toplevel|
+          host_results = JSON.parse(File.read(out_link))
+          host_results.each do |host, result|
             host_generations = Generation::BuildList.new(host)
-            generation = host_generations.find(toplevel, swpin_paths)
+            generation = host_generations.find(result['attribute'], swpin_paths)
 
             if generation.nil?
               generation = Generation::Build.new(host)
               generation.create(
-                toplevel,
+                result['attribute'],
+                result['autoRollback'],
                 swpin_paths,
                 host_swpin_specs[host],
                 date: time
@@ -232,33 +233,72 @@ module ConfCtl
     end
 
     # @param machine [Machine]
-    # @param toplevel [String]
+    # @param paths [Array<String>]
     #
     # @yieldparam progress [Integer]
     # @yieldparam total [Integer]
     # @yieldparam path [String]
     #
     # @return [Boolean]
-    def copy(machine, toplevel, &)
+    def copy(machine, paths, &)
       if machine.localhost?
         true
       elsif machine.carried?
-        cp = NixCopy.new(machine.carrier_machine.target_host, toplevel)
+        cp = NixCopy.new(machine.carrier_machine.target_host, paths)
         cp.run!(&).success?
       else
-        cp = NixCopy.new(machine.target_host, toplevel)
+        cp = NixCopy.new(machine.target_host, paths)
         cp.run!(&).success?
       end
     end
 
     # @param machine [Machine]
-    # @param toplevel [String]
+    # @param generation [Generation::Build]
     # @param action [String]
     # @return [Boolean]
-    def activate(machine, toplevel, action)
-      args = [File.join(toplevel, 'bin/switch-to-configuration'), action]
+    def activate(machine, generation, action)
+      args = [File.join(generation.toplevel, 'bin/switch-to-configuration'), action]
 
       MachineControl.new(machine).execute!(*args).success?
+    end
+
+    # @param machine [Machine]
+    # @param generation [Generation::Build]
+    # @param action [String]
+    # @return [Boolean]
+    def activate_with_rollback(machine, generation, action)
+      check_file = File.join('/run', "confctl-confirm-#{SecureRandom.hex(3)}")
+      timeout = machine['autoRollback']['timeout']
+
+      args = [
+        generation.auto_rollback,
+        '-t', timeout,
+        generation.toplevel,
+        action,
+        check_file
+      ]
+
+      activation_success = nil
+
+      activation_thread = Thread.new do
+        activation_success = MachineControl.new(machine).execute!(*args).success?
+      end
+
+      # Wait for the configuration to be switched
+      (timeout + 10).times do
+        out, = MachineControl.new(machine).execute!('cat', check_file, '2>/dev/null')
+        break if out.strip == 'switched'
+
+        sleep(1)
+      end
+
+      # Confirm it
+      10.times do
+        break if MachineControl.new(machine).execute!('sh', '-c', "'echo confirmed > #{check_file}'").success?
+      end
+
+      activation_thread.join
+      activation_success
     end
 
     # @param machine [Machine]
