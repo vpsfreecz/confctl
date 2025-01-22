@@ -5,7 +5,7 @@ module ConfCtl
     handle :'git-rev'
 
     def prefetch_set(args)
-      super(args)
+      super
       wrap_fetcher
     end
 
