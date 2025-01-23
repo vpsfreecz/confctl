@@ -451,8 +451,10 @@ module ConfCtl::Cli
     end
 
     def concurrent_copy(machines, host_generations, nix)
+      sorted_generations = sort_generations_for_copy(machines, host_generations)
+
       LogView.open(
-        header: "#{Rainbow("Copying to #{host_generations.length} machines").bright}\n",
+        header: "#{Rainbow("Copying to #{sorted_generations.length} machines").bright}\n",
         title: Rainbow('Live view').bright
       ) do |lw|
         multibar = TTY::ProgressBar::Multi.new(
@@ -461,7 +463,7 @@ module ConfCtl::Cli
         )
         executor = ConfCtl::ParallelExecutor.new(opts['max-concurrent-copy'])
 
-        host_generations.each do |host, gen|
+        sorted_generations.each do |host, gen|
           pb = multibar.register(
             "#{host} [:bar] :current/:total (:percent)"
           )
@@ -502,6 +504,38 @@ module ConfCtl::Cli
 
         raise "Copy failed to: #{failed.join(', ')}" if failed.any?
       end
+    end
+
+    # Sort generations for copy to target machines
+    #
+    # This algorithm interleaves carried machines from different carriers,
+    # so that we copy to multiple carriers at the same time, and not many carried
+    # machines to one carrier.
+    def sort_generations_for_copy(machines, host_generations)
+      carried, standalone = machines.to_a.partition(&:carried?)
+
+      carried_groups = carried.group_by { |m| m.carrier_machine.name }
+
+      sorted_generations = standalone.map do |m|
+        [m.name, host_generations[m.name]]
+      end
+
+      until carried_groups.empty?
+        carried_groups.delete_if do |_, machines|
+          m = machines.shift
+          next(true) if m.nil?
+
+          sorted_generations << [m.name, host_generations[m.name]]
+
+          machines.empty?
+        end
+      end
+
+      if sorted_generations.length != host_generations.length
+        raise 'programming error: sorted generations length != original generations'
+      end
+
+      sorted_generations
     end
 
     def deploy_to_host(nix, host, machine, generation, action)
