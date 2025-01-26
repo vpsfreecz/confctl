@@ -333,7 +333,7 @@ module ConfCtl::Cli
 
       if opts[:interactive]
         host_generations.each do |host, gen|
-          if copy_to_host(nix, host, machines[host], gen.toplevel) == :skip
+          if copy_to_host(nix, host, machines[host], gen) == :skip
             puts Rainbow("Skipping #{host}").yellow
             skipped_copy << host
           end
@@ -396,7 +396,7 @@ module ConfCtl::Cli
       host_generations.each do |host, gen|
         machine = machines[host]
 
-        if copy_to_host(nix, host, machine, gen.toplevel) == :skip
+        if copy_to_host(nix, host, machine, gen) == :skip
           puts Rainbow("Skipping #{host}").yellow
           next
         end
