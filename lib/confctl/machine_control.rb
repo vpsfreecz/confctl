@@ -6,10 +6,11 @@ module ConfCtl
     attr_reader :machine
 
     # @param machine [Machine]
-    def initialize(machine)
+    # @param logger [#<<]
+    def initialize(machine, logger: nil)
       @machine = machine
       @extra_ssh_opts = []
-      @cmd = SystemCommand.new
+      @cmd = SystemCommand.new(logger:)
     end
 
     # Try to open SSH connection

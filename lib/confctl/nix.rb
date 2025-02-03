@@ -269,6 +269,7 @@ module ConfCtl
     def activate_with_rollback(machine, generation, action)
       check_file = File.join('/run', "confctl-confirm-#{SecureRandom.hex(3)}")
       timeout = machine['autoRollback']['timeout']
+      logger = NullLogger.new
 
       args = [
         generation.auto_rollback,
@@ -286,7 +287,7 @@ module ConfCtl
 
       # Wait for the configuration to be switched
       (timeout + 10).times do
-        out, = MachineControl.new(machine).execute!('cat', check_file, '2>/dev/null')
+        out, = MachineControl.new(machine, logger:).execute!('cat', check_file, '2>/dev/null')
         break if out.strip == 'switched'
 
         sleep(1)
@@ -294,7 +295,7 @@ module ConfCtl
 
       # Confirm it
       10.times do
-        break if MachineControl.new(machine).execute!('sh', '-c', "'echo confirmed > #{check_file}'").success?
+        break if MachineControl.new(machine, logger:).execute!('sh', '-c', "'echo confirmed > #{check_file}'").success?
       end
 
       activation_thread.join
