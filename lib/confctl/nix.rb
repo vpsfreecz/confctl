@@ -286,9 +286,12 @@ module ConfCtl
       end
 
       # Wait for the configuration to be switched
-      (timeout + 10).times do
+      t = Time.now
+
+      loop do
         out, = MachineControl.new(machine, logger:).execute!('cat', check_file, '2>/dev/null')
-        break if out.strip == 'switched'
+        stripped = out.strip
+        break if stripped == 'switched' || ((t + timeout + 10) < Time.now && stripped != 'switching')
 
         sleep(1)
       end

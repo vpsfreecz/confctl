@@ -25,6 +25,7 @@ class AutoRollback
     puts
 
     puts 'Switching to new configuration'
+    File.write(options[:check_file], 'switching')
 
     pid = Process.spawn(
       File.join(options[:toplevel], 'bin/switch-to-configuration'),
