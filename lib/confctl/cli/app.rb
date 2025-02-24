@@ -11,6 +11,13 @@ module ConfCtl::Cli
     end
 
     def self.run
+      # Workaround for nix-build error:
+      #   error: creating directory '/tmp/nix-shell-5100-0/nix-build-1986594-0': No such file or directory
+      if ENV['IN_NIX_SHELL']
+        ENV['TMP'] = '/tmp'
+        ENV['TMPDIR'] = '/tmp'
+      end
+
       cli = get
       exit(cli.run(ARGV))
     end
