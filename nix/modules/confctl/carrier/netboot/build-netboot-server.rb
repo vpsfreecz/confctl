@@ -637,19 +637,31 @@ class TftpBuilder < RootBuilder
 end
 
 class HttpBuilder < RootBuilder
+  INSTALL_FILES = %w[bzImage initrd root.squashfs].freeze
+
   def build
     machines.each do |m|
       m.generations.each do |g|
-        begin
-          rootfs = File.realpath(File.join(g.link_path, 'root.squashfs'))
-        rescue Errno::ENOENT
-          next
-        end
+        install_paths = INSTALL_FILES.to_h do |file_name|
+          file_path =
+            begin
+              File.realpath(File.join(g.link_path, file_name))
+            rescue Errno::ENOENT
+              nil
+            end
+
+          [file_name, file_path]
+        end.compact
+
+        next unless install_paths['root.squashfs']
 
         gen_path = File.join(m.fqdn, g.generation.to_s)
-
         mkdir_p(gen_path)
-        ln_s(rootfs, File.join(gen_path, 'root.squashfs'))
+
+        install_paths.each do |file_name, file_path|
+          ln_s(file_path, File.join(gen_path, file_name))
+        end
+
         ln_s(g.generation.to_s, File.join(m.fqdn, 'current')) if g.current
       end
     end
