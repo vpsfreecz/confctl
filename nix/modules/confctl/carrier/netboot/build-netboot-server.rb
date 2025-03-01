@@ -535,7 +535,7 @@ class TftpBuilder < RootBuilder
       DEFAULT menu.c32
       TIMEOUT 50
       <% end -%>
-      MENU TITLE <%= m.label %> (<%= g.generation %> - <%= g.current ? 'current' : g.time_s %> - <%= g.shortrev %>)
+      MENU TITLE <%= m.label %> (<%= g.generation %> - <%= g.current ? 'current' : g.time_s %> - <%= g.shortrev %> - <%= g.kernel_version %>)
 
       <% variants.each do |variant, vopts| -%>
       LABEL <%= variant %>
@@ -585,7 +585,7 @@ class TftpBuilder < RootBuilder
 
       <% m.generations.each do |g| -%>
       LABEL generations
-        MENU LABEL Configuration <%= g.generation %> - <%= g.time_s %> - <%= g.shortrev %>
+        MENU LABEL Configuration <%= g.generation %> - <%= g.time_s %> - <%= g.shortrev %> - <%= g.kernel_version %>
         KERNEL menu.c32
         APPEND pxeserver/machines/<%= m.fqdn %>/generation-<%= g.generation %>.cfg
 
@@ -788,6 +788,9 @@ class Generation
   # @return [String]
   attr_reader :time_s
 
+  # @return [String]
+  attr_reader :kernel_version
+
   # @return [Array<String>]
   attr_reader :kernel_params
 
@@ -841,6 +844,8 @@ class Generation
 
     @macs = json.fetch('macs', [])
 
+    @kernel_version = extract_kernel_version
+
     kernel_params_file = File.join(store_path, 'kernel-params')
 
     @kernel_params =
@@ -868,9 +873,21 @@ class Generation
       revision:,
       shortrev:,
       macs:,
+      kernel_version:,
       kernel_params:,
       swpins_info: json['swpins-info']
     }.to_json(*args)
+  end
+
+  protected
+
+  def extract_kernel_version
+    link = File.readlink(File.join(toplevel, 'kernel'))
+    return unless %r{\A/nix/store/[^-]+-linux-([^/]+)} =~ link
+
+    ::Regexp.last_match(1)
+  rescue Errno::ENOENT
+    nil
   end
 end
 
