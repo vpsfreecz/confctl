@@ -166,7 +166,7 @@ class NetbootBuilder
 
       link_path = File.join(LINK_DIR, v)
 
-      machines[name] ||= Machine.new(name)
+      machines[name] ||= Machine.new(@config, name)
       machines[name].add_generation(link_path, generation)
     end
 
@@ -254,6 +254,12 @@ class RootBuilder
     paths.each do |v|
       FileUtils.mkdir_p(File.join(root, v))
     end
+  end
+
+  # Create a file within root
+  def write_to(path, content)
+    mkdir_p(File.dirname(path))
+    File.write(File.join(root, path), content)
   end
 end
 
@@ -662,9 +668,14 @@ class HttpBuilder < RootBuilder
           ln_s(file_path, File.join(gen_path, file_name))
         end
 
+        write_to(File.join(gen_path, 'generation.json'), JSON.pretty_generate(g))
         ln_s(g.generation.to_s, File.join(m.fqdn, 'current')) if g.current
       end
+
+      write_to(File.join(m.fqdn, 'machine.json'), JSON.pretty_generate(m))
     end
+
+    write_to('machines.json', JSON.pretty_generate({ machines: }))
   end
 end
 
@@ -681,14 +692,19 @@ class Machine
   # @return [String]
   attr_reader :label
 
+  # @return [String]
+  attr_reader :url
+
   # @return [Array<Generation>]
   attr_reader :generations
 
   # @return [Generation]
   attr_reader :current
 
+  # @param config [Config]
   # @param name [String] machine name
-  def initialize(name)
+  def initialize(config, name)
+    @config = config
     @name = name
     @spin = 'nixos'
     @fqdn = name
@@ -702,13 +718,29 @@ class Machine
   # @param link_path [String] Nix store path
   # @param generation [Integer]
   def add_generation(link_path, generation)
-    @generations << Generation.new(link_path, generation)
+    @generations << Generation.new(self, link_path, generation)
     nil
   end
 
   def resolve
     sort_generations
     load_json
+
+    @url = File.join(@config.http_url, fqdn)
+    generations.each(&:resolve)
+
+    nil
+  end
+
+  def to_json(*args)
+    {
+      url:,
+      name:,
+      spin:,
+      fqdn:,
+      label:,
+      generations:
+    }.to_json(*args)
   end
 
   protected
@@ -738,6 +770,9 @@ class Machine
 end
 
 class Generation
+  # @return [Machine]
+  attr_reader :machine
+
   # @return [String]
   attr_reader :link_path
 
@@ -777,9 +812,14 @@ class Generation
   # @return [Hash] contents of `machine.json`
   attr_reader :json
 
+  # @return [String]
+  attr_reader :url
+
+  # @param machine [Machine]
   # @param link_path [String] Nix store path
   # @param generation [Integer]
-  def initialize(link_path, generation)
+  def initialize(machine, link_path, generation)
+    @machine = machine
     @link_path = link_path
     @store_path = File.realpath(link_path)
     @generation = generation
@@ -809,6 +849,28 @@ class Generation
       else
         json.fetch('kernelParams', [])
       end
+  end
+
+  def resolve
+    @url = File.join(machine.url, generation.to_s)
+  end
+
+  def to_json(*args)
+    {
+      url:,
+      store_path:,
+      generation:,
+      time: time.to_i,
+      time_s:,
+      current:,
+      toplevel:,
+      version:,
+      revision:,
+      shortrev:,
+      macs:,
+      kernel_params:,
+      swpins_info: json['swpins-info']
+    }.to_json(*args)
   end
 end
 
