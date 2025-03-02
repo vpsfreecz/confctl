@@ -307,10 +307,10 @@ class TftpBuilder < RootBuilder
         path = File.join('boot', m.fqdn, g.generation.to_s)
         mkdir_p(path)
 
-        Dir.entries(g.store_path).each do |v|
-          next unless %w[bzImage initrd].include?(v)
+        g.boot_files.each_value do |boot_file|
+          next unless %w[bzImage initrd].include?(boot_file.name)
 
-          ln_s(File.join(g.store_path, v), File.join(path, v))
+          ln_s(boot_file.path, File.join(path, boot_file.name))
         end
 
         ln_s(g.generation.to_s, File.join('boot', m.fqdn, 'current')) if g.current
@@ -542,7 +542,7 @@ class TftpBuilder < RootBuilder
         MENU LABEL <%= vopts[:label] %>
         LINUX boot/<%= m.fqdn %>/<%= g.generation %>/bzImage
         INITRD boot/<%= m.fqdn %>/<%= g.generation %>/initrd
-        APPEND httproot=<%= File.join(http_url, m.fqdn, g.generation.to_s, 'root.squashfs') %> <%= g.kernel_params.join(' ') %> runlevel=<%= vopts[:runlevel] %> <%= vopts[:kernel_params].join(' ') %>
+        APPEND httproot=<%= g.boot_files['root.squashfs'].url %> <%= g.kernel_params.join(' ') %> runlevel=<%= vopts[:runlevel] %> <%= vopts[:kernel_params].join(' ') %>
 
       <% end -%>
       LABEL <%= m.fqdn %>-generations
@@ -643,29 +643,14 @@ class TftpBuilder < RootBuilder
 end
 
 class HttpBuilder < RootBuilder
-  INSTALL_FILES = %w[bzImage initrd root.squashfs].freeze
-
   def build
     machines.each do |m|
       m.generations.each do |g|
-        install_paths = INSTALL_FILES.to_h do |file_name|
-          file_path =
-            begin
-              File.realpath(File.join(g.link_path, file_name))
-            rescue Errno::ENOENT
-              nil
-            end
-
-          [file_name, file_path]
-        end.compact
-
-        next unless install_paths['root.squashfs']
-
         gen_path = File.join(m.fqdn, g.generation.to_s)
         mkdir_p(gen_path)
 
-        install_paths.each do |file_name, file_path|
-          ln_s(file_path, File.join(gen_path, file_name))
+        g.boot_files.each_value do |boot_file|
+          ln_s(boot_file.path, File.join(gen_path, boot_file.name))
         end
 
         write_to(File.join(gen_path, 'generation.json'), JSON.pretty_generate(g))
@@ -794,6 +779,9 @@ class Generation
   # @return [Array<String>]
   attr_reader :kernel_params
 
+  # @return [Hash<String, BootFile>]
+  attr_reader :boot_files
+
   # @return [String] Nix store path to `config.system.build.toplevel`
   attr_reader :toplevel
 
@@ -858,6 +846,7 @@ class Generation
 
   def resolve
     @url = File.join(machine.url, generation.to_s)
+    @boot_files = find_boot_files
   end
 
   def to_json(*args)
@@ -875,6 +864,7 @@ class Generation
       macs:,
       kernel_version:,
       kernel_params:,
+      boot_files:,
       swpins_info: json['swpins-info']
     }.to_json(*args)
   end
@@ -888,6 +878,35 @@ class Generation
     ::Regexp.last_match(1)
   rescue Errno::ENOENT
     nil
+  end
+
+  def find_boot_files
+    %w[bzImage initrd root.squashfs].to_h do |name|
+      [name, BootFile.new(name, File.realpath(File.join(link_path, name)), File.join(url, name))]
+    rescue Errno::ENOENT
+      [name, nil]
+    end.compact
+  end
+end
+
+class BootFile
+  # @return [String]
+  attr_reader :name
+
+  # @return [String]
+  attr_reader :path
+
+  # @return [String]
+  attr_reader :url
+
+  def initialize(name, path, url)
+    @name = name
+    @path = path
+    @url = url
+  end
+
+  def to_json(*args)
+    url.to_json(*args)
   end
 end
 
