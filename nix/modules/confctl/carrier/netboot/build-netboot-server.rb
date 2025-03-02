@@ -502,34 +502,6 @@ class TftpBuilder < RootBuilder
   # @param root [Boolean] true if this is machine menu page, not generation menu
   # @param timeout [Integer, nil] timeout in seconds until the default action is taken
   def render_machine_vpsadminos_config(machine, generation:, file:, root:, timeout: nil)
-    variants = {
-      default: {
-        label: 'Default runlevel',
-        kernel_params: [],
-        runlevel: 'default'
-      },
-      nopools: {
-        label: 'Default runlevel without container imports',
-        kernel_params: ['osctl.pools=0'],
-        runlevel: 'default'
-      },
-      nostart: {
-        label: 'Default runlevel without container autostart',
-        kernel_params: ['osctl.autostart=0'],
-        runlevel: 'default'
-      },
-      rescue: {
-        label: 'Rescue runlevel (network and sshd)',
-        kernel_params: [],
-        runlevel: 'rescue'
-      },
-      single: {
-        label: 'Single-user runlevel (console only)',
-        kernel_params: [],
-        runlevel: 'single'
-      }
-    }
-
     tpl = <<~ERB
       <% if timeout -%>
       DEFAULT menu.c32
@@ -537,12 +509,12 @@ class TftpBuilder < RootBuilder
       <% end -%>
       MENU TITLE <%= m.label %> (<%= g.generation %> - <%= g.current ? 'current' : g.time_s %> - <%= g.shortrev %> - <%= g.kernel_version %>)
 
-      <% variants.each do |variant, vopts| -%>
-      LABEL <%= variant %>
-        MENU LABEL <%= vopts[:label] %>
+      <% g.variants.each do |variant| -%>
+      LABEL <%= variant.name %>
+        MENU LABEL <%= variant.label %>
         LINUX boot/<%= m.fqdn %>/<%= g.generation %>/bzImage
         INITRD boot/<%= m.fqdn %>/<%= g.generation %>/initrd
-        APPEND httproot=<%= g.boot_files['root.squashfs'].url %> <%= g.kernel_params.join(' ') %> runlevel=<%= vopts[:runlevel] %> <%= vopts[:kernel_params].join(' ') %>
+        APPEND httproot=<%= g.boot_files['root.squashfs'].url %> <%= g.kernel_params.join(' ') %> <%= variant.kernel_params.join(' ') %>
 
       <% end -%>
       LABEL <%= m.fqdn %>-generations
@@ -568,7 +540,6 @@ class TftpBuilder < RootBuilder
       {
         m: machine,
         g: generation,
-        variants:,
         http_url: @config.http_url,
         root:,
         timeout:,
@@ -782,6 +753,9 @@ class Generation
   # @return [Hash<String, BootFile>]
   attr_reader :boot_files
 
+  # @return [Array<Variant>]
+  attr_reader :variants
+
   # @return [String] Nix store path to `config.system.build.toplevel`
   attr_reader :toplevel
 
@@ -847,6 +821,7 @@ class Generation
   def resolve
     @url = File.join(machine.url, generation.to_s)
     @boot_files = find_boot_files
+    @variants = Variant.for_machine(machine)
   end
 
   def to_json(*args)
@@ -865,6 +840,7 @@ class Generation
       kernel_version:,
       kernel_params:,
       boot_files:,
+      variants:,
       swpins_info: json['swpins-info']
     }.to_json(*args)
   end
@@ -907,6 +883,67 @@ class BootFile
 
   def to_json(*args)
     url.to_json(*args)
+  end
+end
+
+class Variant
+  # @param machine [Machine]
+  # @return [Array<Variant>]
+  def self.for_machine(machine)
+    if machine.spin == 'vpsadminos'
+      [
+        new(
+          name: 'default',
+          label: 'Default runlevel',
+          kernel_params: ['runlevel=default']
+        ),
+        new(
+          name: 'nopools',
+          label: 'Default runlevel without container imports',
+          kernel_params: ['runlevel=default', 'osctl.pools=0']
+        ),
+        new(
+          name: 'nostart',
+          label: 'Default runlevel without container autostart',
+          kernel_params: ['runlevel=default', 'osctl.autostart=0']
+        ),
+        new(
+          name: 'rescue',
+          label: 'Rescue runlevel (network and sshd)',
+          kernel_params: ['runlevel=rescue']
+        ),
+        new(
+          name: 'single',
+          label: 'Single-user runlevel (console only)',
+          kernel_params: ['runlevel=single']
+        )
+      ]
+    else
+      []
+    end
+  end
+
+  # @return [String]
+  attr_reader :name
+
+  # @return [String]
+  attr_reader :label
+
+  # @return [String]
+  attr_reader :kernel_params
+
+  def initialize(name:, label:, kernel_params:)
+    @name = name
+    @label = label
+    @kernel_params = kernel_params
+  end
+
+  def to_json(*args)
+    {
+      name:,
+      label:,
+      kernel_params:
+    }.to_json(*args)
   end
 end
 
