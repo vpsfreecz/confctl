@@ -514,7 +514,7 @@ class TftpBuilder < RootBuilder
         MENU LABEL <%= variant.label %>
         LINUX boot/<%= m.fqdn %>/<%= g.generation %>/bzImage
         INITRD boot/<%= m.fqdn %>/<%= g.generation %>/initrd
-        APPEND httproot=<%= g.boot_files['root.squashfs'].url %> <%= g.kernel_params.join(' ') %> <%= variant.kernel_params.join(' ') %>
+        APPEND <%= g.kernel_params.join(' ') %> <%= variant.kernel_params.join(' ') %>
 
       <% end -%>
       LABEL <%= m.fqdn %>-generations
@@ -822,6 +822,10 @@ class Generation
     @url = File.join(machine.url, generation.to_s)
     @boot_files = find_boot_files
     @variants = Variant.for_machine(machine)
+
+    return if machine.spin != 'vpsadminos'
+
+    @kernel_params.insert(0, "httproot=#{boot_files['root.squashfs'].url}")
   end
 
   def to_json(*args)
