@@ -1,0 +1,55 @@
+= netboot-kexec(8)
+:doctype: manpage
+:docdate: 2025-03-03
+:manmanual: NETBOOT-KEXEC
+:mansource: NETBOOT-KEXEC
+:man-linkstyle: pass:[blue R < >]
+
+== Name
+
+netboot-kexec - Prepare machine for kexec using kernel/initrd from netboot server
+
+== Synopsis
+
+*netboot-kexec* [_options_]
+
+== Description
+
+*netboot-kexec* may be used to download kernel and initrd from the netboot server
+the machine was booted from and load it using *kexec*.
+
+It is possible to boot into any machine available on the netboot server
+and to select generation and variant (default, single-user mode).
+
+== Options
+
+The following options are understood:
+
+*-h*, *--help*::
+  Print a short help text and exit.
+
+*-m*, *--machine* _FQDN_::
+  Select machine from the netboot server.
+
+*-g*, *--generation* _GENERATION_::
+  Select machine generation identified by its number.
+
+*-v*, *--variant* _VARIANT_::
+  Select generation variant identified by its name.
+
+*-i*, *--interactive*::
+  Ask the user to select machine, generation and variant interactively.
+
+*-a*, *--append* _PARAMS_::
+  Append parameters to the kernel command line.
+
+*-u*, *--unload*::
+  Unload kexec from the kernel and exit.
+
+== Bugs
+
+Report bugs to https://github.com/vpsfreecz/confctl/issues.
+
+== About
+
+*netboot-kexec* is a part of https://github.com/vpsfreecz/confctl[confctl].

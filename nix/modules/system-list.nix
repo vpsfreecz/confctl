@@ -4,5 +4,7 @@
     ./confctl/carrier/netboot/nixos.nix
   ];
 
-  vpsadminos = [];
+  vpsadminos = [
+    ./confctl/netboot-kexec
+  ];
 }
