@@ -28,6 +28,10 @@ The following options are understood:
 *-h*, *--help*::
   Print a short help text and exit.
 
+*-s*, *--server-url* _URL_::
+  Specify URL to the netboot server. By default, the URL is auto-detected
+  by reading *httproot* from */proc/cmdline*.
+
 *-m*, *--machine* _FQDN_::
   Select machine from the netboot server.
 

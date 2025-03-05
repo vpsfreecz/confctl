@@ -12,6 +12,7 @@ class NetbootKexec
   KEXEC = '@kexecTools@/bin/kexec'.freeze
 
   def initialize
+    @server_url    = nil
     @machine_fqdn  = nil
     @machine_gen   = nil
     @variant_name  = nil
@@ -33,7 +34,12 @@ class NetbootKexec
       exit 1
     end
 
-    machines_url = derive_machines_json_url(httproot)
+    machines_url =
+      if @server_url
+        File.join(@server_url, 'machines.json')
+      else
+        derive_machines_json_url(httproot)
+      end
 
     @machines_json = fetch_machines_json(machines_url)
 
@@ -105,6 +111,10 @@ class NetbootKexec
   def parse_arguments
     opt_parser = OptionParser.new do |opts|
       opts.banner = "Usage: #{$0} [options]"
+
+      opts.on('-s', '--server-url URL', 'Specify URL of the netboot server') do |val|
+        @server_url = val
+      end
 
       opts.on('-m', '--machine FQDN', 'Select machine by FQDN') do |val|
         @machine_fqdn = val
