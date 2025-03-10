@@ -1,4 +1,5 @@
 require 'confctl/utils/file'
+require 'digest'
 require 'etc'
 require 'json'
 require 'securerandom'
@@ -137,19 +138,19 @@ module ConfCtl
       end
     end
 
-    # Evaluate swpins for host
-    # @param host [String]
-    # @return [Hash]
-    def eval_host_swpins(host)
+    # Evaluate swpins for hosts
+    # @param hosts [Array<String>]
+    # @return [Hash] host => swpins
+    def eval_host_swpins(hosts)
       with_argument({
         confDir: conf_dir,
         build: :evalHostSwpins,
-        machines: [host]
+        machines: hosts
       }, core_swpins: true) do |arg|
         out_link = File.join(
           cache_dir,
           'build',
-          "#{ConfCtl.safe_host_name(host)}.swpins"
+          "#{Digest::SHA256.hexdigest(hosts.join(','))[0..11]}.swpins"
         )
 
         cmd_args = [
@@ -164,7 +165,7 @@ module ConfCtl
 
         out, = cmd.run(*cmd_args)
 
-        JSON.parse(File.read(out.strip))[host]
+        JSON.parse(File.read(out.strip))
       end
     end
 

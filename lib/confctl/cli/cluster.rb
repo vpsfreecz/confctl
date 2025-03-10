@@ -1021,16 +1021,18 @@ module ConfCtl::Cli
         max_jobs: opts['max-jobs'],
         cores: opts['cores']
       )
-      hosts_swpin_paths = {}
 
       autoupdate_swpins(machines)
       host_swpin_specs = check_swpins(machines)
 
       raise 'one or more swpins need to be updated' unless host_swpin_specs
 
-      machines.each do |host, d|
-        puts Rainbow("Evaluating swpins for #{host}...").bright
-        hosts_swpin_paths[host] = nix.eval_host_swpins(host).update(d.nix_paths)
+      puts Rainbow("Evaluating swpins for #{machines.length} machines...").bright
+
+      hosts_swpin_paths = nix.eval_host_swpins(machines.map { |host, _| host })
+
+      machines.each do |host, m|
+        hosts_swpin_paths[host].update(m.nix_paths)
       end
 
       grps = swpin_build_groups(hosts_swpin_paths)
