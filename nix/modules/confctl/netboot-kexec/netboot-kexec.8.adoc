@@ -50,6 +50,9 @@ The following options are understood:
 *-u*, *--unload*::
   Unload kexec from the kernel and exit.
 
+*-e*, *--exec*::
+  Run the currently loaded kernel.
+
 == Bugs
 
 Report bugs to https://github.com/vpsfreecz/confctl/issues.

@@ -18,6 +18,7 @@ class NetbootKexec
     @variant_name  = nil
     @interactive   = false
     @append_params = ''
+    @exec          = false
     @unload        = false
     @machines_json = nil
     @tmp_files     = []
@@ -26,7 +27,14 @@ class NetbootKexec
   def run
     parse_arguments
 
-    return unload_kexec if @unload
+    if @unload && @exec
+      warn 'ERROR: use either --unload or --exec, not both'
+      exit 1
+    elsif @unload
+      return unload_kexec
+    elsif @exec
+      return exec_kexec
+    end
 
     httproot = parse_httproot_from_cmdline
     unless httproot
@@ -134,6 +142,10 @@ class NetbootKexec
 
       opts.on('-a', '--append PARAMS', 'Append parameters to kernel command line') do |val|
         @append_params = val
+      end
+
+      opts.on('-e', '--exec', 'Run the currently loaded kernel') do
+        @exec = true
       end
 
       opts.on('-u', '--unload', 'Unload kexec from the kernel and exit') do
@@ -398,6 +410,20 @@ class NetbootKexec
       puts 'kexec -l completed successfully.'
     else
       warn 'ERROR: kexec -l failed!'
+      exit 1
+    end
+  end
+
+  def exec_kexec
+    cmd = [KEXEC, '-e'].join(' ')
+
+    puts "Executing: #{cmd}"
+    system(cmd)
+
+    if $?.exitstatus == 0
+      puts 'kexec -e completed successfully.'
+    else
+      warn 'ERROR: kexec -u failed!'
       exit 1
     end
   end
