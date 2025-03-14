@@ -148,7 +148,7 @@ class NetbootKexec
         @exec = true
       end
 
-      opts.on('-u', '--unload', 'Unload kexec from the kernel and exit') do
+      opts.on('-u', '--unload', 'Unload the current kexec target kernel and exit') do
         @unload = true
       end
     end

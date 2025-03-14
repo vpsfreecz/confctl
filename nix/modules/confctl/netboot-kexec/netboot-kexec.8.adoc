@@ -48,7 +48,7 @@ The following options are understood:
   Append parameters to the kernel command line.
 
 *-u*, *--unload*::
-  Unload kexec from the kernel and exit.
+  Unload the current kexec target kernel and exit.
 
 *-e*, *--exec*::
   Run the currently loaded kernel.
