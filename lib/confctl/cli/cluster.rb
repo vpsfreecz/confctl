@@ -561,27 +561,7 @@ module ConfCtl::Cli
     end
 
     def deploy_standalone_to_host(lw, nix, host, machine, generation, action)
-      if opts['dry-activate-first']
-        lw.sync_console do
-          puts Rainbow(
-            "Trying to activate configuration on #{host} " \
-            "(#{machine.target_host})"
-          ).yellow
-        end
-
-        unless nix.activate(machine, generation, 'dry-activate')
-          raise "Error while activating configuration on #{host}"
-        end
-      end
-
-      lw.sync_console do
-        puts Rainbow(
-          "Activating configuration on #{host} (#{machine.target_host}): " \
-          "#{action}"
-        ).yellow
-      end
-
-      return :skip if opts[:interactive] && !ask_confirmation(always: true)
+      return :skip if pre_host_activate(lw, nix, host, machine, generation, action) == :skip
 
       # rubocop:disable Style/GuardClause
 
@@ -609,6 +589,51 @@ module ConfCtl::Cli
         raise "Error while setting carried profile for #{host} on #{machine.carrier_machine}"
       end
       # rubocop:enable Style/GuardClause
+    end
+
+    def pre_host_activate(lw, nix, host, machine, generation, action)
+      loop do
+        if opts['dry-activate-first']
+          lw.sync_console do
+            puts Rainbow(
+              "Trying to activate configuration on #{host} " \
+              "(#{machine.target_host})"
+            ).yellow
+          end
+
+          unless nix.activate(machine, generation, 'dry-activate')
+            raise "Error while activating configuration on #{host}"
+          end
+        end
+
+        lw.sync_console do
+          puts Rainbow(
+            "Activating configuration on #{host} (#{machine.target_host}): " \
+            "#{action}"
+          ).yellow
+        end
+
+        return unless opts[:interactive]
+
+        options = {}
+        options['c'] = 'Continue'
+        options['r'] = 'Retry' if opts['dry-activate-first']
+        options['s'] = 'Skip'
+        options['a'] = 'Abort'
+
+        answer = ask_action(options:, default: nil)
+
+        case answer
+        when 'c'
+          return
+        when 'r'
+          next
+        when 's'
+          return :skip
+        when 'a'
+          raise 'Aborting'
+        end
+      end
     end
 
     def reboot_host(host, machine)
