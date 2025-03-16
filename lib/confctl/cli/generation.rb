@@ -11,6 +11,7 @@ module ConfCtl::Cli
     def remove
       machines = select_machines(args[0])
       gens = select_generations(machines, args[1])
+      changed_hosts = []
 
       if gens.empty?
         puts 'No generations found'
@@ -27,21 +28,35 @@ module ConfCtl::Cli
       gens.each do |gen|
         puts "Removing #{gen.presence_str} generation #{gen.host}@#{gen.name}"
         gen.destroy
+
+        changed_hosts << gen.host unless changed_hosts.include?(gen.host)
       end
 
       return unless opts[:remote] && opts[:gc]
 
-      machines_gc = machines.runnable.select do |host, _machine|
-        gens.detect { |gen| gen.host == host }
+      machines_gc = {}
+
+      machines.each do |host, machine|
+        next unless changed_hosts.include?(host)
+
+        m =
+          if machine.carried?
+            machine.carrier_machine
+          else
+            machine
+          end
+
+        machines_gc[m.name] = m if m.target_host
       end
 
-      run_gc(machines_gc)
+      run_gc(ConfCtl::MachineList.new(machines: machines_gc))
     end
 
     def rotate
       machines = select_machines(args[0])
 
       to_delete = []
+      changed_hosts = []
 
       to_delete.concat(host_generations_rotate(machines)) if opts[:remote]
 
@@ -62,23 +77,31 @@ module ConfCtl::Cli
       to_delete.each do |gen|
         puts "Removing #{gen[:type]} generation #{gen[:host]}@#{gen[:name]}"
         gen[:generation].destroy
+
+        changed_hosts << gen.host unless changed_hosts.include?(gen.host)
       end
 
       return unless opts[:remote]
 
       global = ConfCtl::Settings.instance.host_generations
+      machines_gc = {}
 
-      machines_gc = machines.runnable.select do |_host, machine|
-        gc = machine['buildGenerations']['collectGarbage']
+      machines.each do |host, machine|
+        next unless changed_hosts.include?(host)
 
-        if gc.nil?
-          global['collectGarbage']
-        else
-          gc
-        end
+        m =
+          if machine.carried?
+            machine.carrier_machine
+          else
+            machine
+          end
+
+        next if !m.target_host || (!m['buildGenerations']['collectGarbage'] && !global['collectGarbage'])
+
+        machines_gc[m.name] = m
       end
 
-      run_gc(machines_gc) if machines_gc.any?
+      run_gc(ConfCtl::MachineList.new(machines: machines_gc)) if machines_gc.any?
     end
 
     def collect_garbage
