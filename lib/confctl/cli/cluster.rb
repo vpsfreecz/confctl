@@ -539,20 +539,25 @@ module ConfCtl::Cli
     end
 
     def deploy_to_host(nix, host, machine, generation, action)
+      ret = nil
+
       LogView.open_with_logger(
         header: "#{Rainbow('Deploying to').bright} #{Rainbow(host).yellow}\n",
         title: Rainbow('Live view').bright,
         size: :auto,
         reserved_lines: 10
       ) do |lw|
-        if machine.carried?
-          deploy_carried_to_host(lw, nix, host, machine, generation, action)
-        else
-          deploy_standalone_to_host(lw, nix, host, machine, generation, action)
-        end
+        ret =
+          if machine.carried?
+            deploy_carried_to_host(lw, nix, host, machine, generation, action)
+          else
+            deploy_standalone_to_host(lw, nix, host, machine, generation, action)
+          end
 
         lw.flush
       end
+
+      ret
     end
 
     def deploy_standalone_to_host(lw, nix, host, machine, generation, action)
