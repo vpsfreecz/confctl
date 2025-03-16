@@ -29,7 +29,7 @@ module ConfCtl
         end
 
         list << Generation::Host.new(
-          machine.name,
+          machine,
           profile,
           id,
           path,

@@ -2,14 +2,15 @@ module ConfCtl
   class Generation::Host
     attr_reader :host, :profile, :id, :toplevel, :date, :current
 
-    # @param host [String]
+    # @param machine [Machine]
     # @param profile [String]
     # @param id [Integer]
     # @param toplevel [String]
     # @param date [Time]
     # @param mc [MachineControl]
-    def initialize(host, profile, id, toplevel, date, current: false, mc: nil)
-      @host = host
+    def initialize(machine, profile, id, toplevel, date, current: false, mc: nil)
+      @host = machine.name
+      @machine = machine
       @profile = profile
       @id = id
       @toplevel = toplevel
@@ -25,7 +26,8 @@ module ConfCtl
     def destroy
       raise 'machine control not available' if mc.nil?
 
-      mc.execute('nix-env', '-p', profile, '--delete-generations', id.to_s)
+      env_cmd = @machine.carried? ? 'carrier-env' : 'nix-env'
+      mc.execute(env_cmd, '-p', profile, '--delete-generations', id.to_s)
     end
 
     protected
