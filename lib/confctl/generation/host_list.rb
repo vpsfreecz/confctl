@@ -1,9 +1,10 @@
 module ConfCtl
   class Generation::HostList
+    # @parma machine [Machine]
     # @param mc [MachineControl]
     # @param profile [String]
     # @return [Generation::HostList]
-    def self.fetch(mc, profile:)
+    def self.fetch(machine, mc, profile:)
       out, = mc.bash_script(<<~END)
         realpath #{profile}
 
@@ -12,7 +13,7 @@ module ConfCtl
         done
       END
 
-      list = new(mc.machine.name)
+      list = new(machine.name)
       lines = out.strip.split("\n")
       current_path = lines.shift
       id_rx = /^#{Regexp.escape(profile)}-(\d+)-link$/
@@ -28,7 +29,7 @@ module ConfCtl
         end
 
         list << Generation::Host.new(
-          mc.machine.name,
+          machine.name,
           profile,
           id,
           path,

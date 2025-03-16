@@ -103,7 +103,7 @@ module ConfCtl
 
       if generations
         begin
-          @generations = Generation::HostList.fetch(mc, profile: machine.profile)
+          @generations = Generation::HostList.fetch(machine, mc, profile: machine.profile)
         rescue TTY::Command::ExitError
           return
         end
