@@ -78,7 +78,7 @@ module ConfCtl::Cli
         puts "Removing #{gen[:type]} generation #{gen[:host]}@#{gen[:name]}"
         gen[:generation].destroy
 
-        changed_hosts << gen.host unless changed_hosts.include?(gen.host)
+        changed_hosts << gen[:host] unless changed_hosts.include?(gen[:host])
       end
 
       return unless opts[:remote]
