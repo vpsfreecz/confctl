@@ -625,6 +625,8 @@ class HttpBuilder < RootBuilder
         end
 
         write_to(File.join(gen_path, 'generation.json'), JSON.pretty_generate(g))
+        write_to(File.join(gen_path, 'kernel-params'), g.kernel_params.join(' '))
+
         ln_s(g.generation.to_s, File.join(m.fqdn, 'current')) if g.current
       end
 
