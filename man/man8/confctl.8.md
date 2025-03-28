@@ -544,16 +544,16 @@ the generation before last and so on.
   Update selected or all software packages that have been configured to support
   this command. The usual case for git is to pin to the current branch head.
 
-  `--[no-]commit`
-    Commit changed swpins files to git. Disabled by default.
+    `--[no-]commit`
+      Commit changed swpins files to git. Disabled by default.
 
-  `--[no-]changelog`
-    Include changelog in the commit message when `--commit` is used. Enabled by
-    default.
+    `--[no-]changelog`
+      Include changelog in the commit message when `--commit` is used. Enabled by
+      default.
 
-  `-d`, `--downgrade`
-    Use when the new version is older than the previously set version. Used for
-    generating changelog for the commit message.
+    `-d`, `--downgrade`
+      Use when the new version is older than the previously set version. Used for
+      generating changelog for the commit message.
 
 `confctl swpins channel ls` [*channel-pattern* [*sw-pattern*]]
   List existing channels with pinned software packages.
@@ -563,32 +563,32 @@ the generation before last and so on.
   of *version* depends on the type of the software pin, for git it is a git
   reference, e.g. a revision.
 
-  `--[no-]commit`
-    Commit changed swpins files to git. Disabled by default.
+    `--[no-]commit`
+      Commit changed swpins files to git. Disabled by default.
 
-  `--[no-]changelog`
-    Include changelog in the commit message when `--commit` is used. Enabled by
-    default.
+    `--[no-]changelog`
+      Include changelog in the commit message when `--commit` is used. Enabled by
+      default.
 
-  `-d`, `--downgrade`
-    Use when the new version is older than the previously set version. Used for
-    generating changelog for the commit message.
+    `-d`, `--downgrade`
+      Use when the new version is older than the previously set version. Used for
+      generating changelog for the commit message.
 
 `confctl swpins channel update` [*channel-pattern* [*sw-pattern*]]
   Update selected or all software packages in channels that have been configured
   to support this command. The usual case for git is to pin to the current
   branch head.
 
-  `--[no-]commit`
-    Commit changed swpins files to git. Disabled by default.
+    `--[no-]commit`
+      Commit changed swpins files to git. Disabled by default.
 
-  `--[no-]changelog`
-    Include changelog in the commit message when `--commit` is used. Enabled by
-    default.
+    `--[no-]changelog`
+      Include changelog in the commit message when `--commit` is used. Enabled by
+      default.
 
-  `-d`, `--downgrade`
-    Use when the new version is older than the previously set version. Used for
-    generating changelog for the commit message.
+    `-d`, `--downgrade`
+      Use when the new version is older than the previously set version. Used for
+      generating changelog for the commit message.
 
 `confctl swpins core ls` [*sw-pattern*]
   List core software packages used internally by confctl.
@@ -598,47 +598,47 @@ the generation before last and so on.
   of *version* depends on the type of the software pin, for git it is a git
   reference, e.g. a revision.
 
-  `--[no-]commit`
-    Commit changed swpins files to git. Disabled by default.
+    `--[no-]commit`
+      Commit changed swpins files to git. Disabled by default.
 
-  `--[no-]changelog`
-    Include changelog in the commit message when `--commit` is used. Enabled by
-    default.
+    `--[no-]changelog`
+      Include changelog in the commit message when `--commit` is used. Enabled by
+      default.
 
-  `-d`, `--downgrade`
-    Use when the new version is older than the previously set version. Used for
-    generating changelog for the commit message.
+    `-d`, `--downgrade`
+      Use when the new version is older than the previously set version. Used for
+      generating changelog for the commit message.
 
 `confctl swpins core update` [*sw-pattern*]
   Update selected or all core software packages that have been configured
   to support this command. The usual case for git is to pin to the current
   branch head.
 
-  `--[no-]commit`
-    Commit changed swpins files to git. Disabled by default.
+    `--[no-]commit`
+      Commit changed swpins files to git. Disabled by default.
 
-  `--[no-]changelog`
-    Include changelog in the commit message when `--commit` is used. Enabled by
-    default.
+    `--[no-]changelog`
+      Include changelog in the commit message when `--commit` is used. Enabled by
+      default.
 
-  `-d`, `--downgrade`
-    Use when the new version is older than the previously set version. Used for
-    generating changelog for the commit message.
+    `-d`, `--downgrade`
+      Use when the new version is older than the previously set version. Used for
+      generating changelog for the commit message.
 
 `confctl swpins update`
   Update software pins that have been configured for updates, including pins
   in all channels, all machine-specific pins and the core pins.
 
-  `--[no-]commit`
-    Commit changed swpins files to git. Disabled by default.
+    `--[no-]commit`
+      Commit changed swpins files to git. Disabled by default.
 
-  `--[no-]changelog`
-    Include changelog in the commit message when `--commit` is used. Enabled by
-    default.
+    `--[no-]changelog`
+      Include changelog in the commit message when `--commit` is used. Enabled by
+      default.
 
-  `-d`, `--downgrade`
-    Use when the new version is older than the previously set version. Used for
-    generating changelog for the commit message.
+    `-d`, `--downgrade`
+      Use when the new version is older than the previously set version. Used for
+      generating changelog for the commit message.
 
 `confctl swpins reconfigure`
   Regenerate all confctl-managed software pin files according to the Nix
