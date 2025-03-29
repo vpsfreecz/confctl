@@ -57,6 +57,7 @@ module ConfCtl::Cli
 
       to_delete = []
       changed_hosts = []
+      enable_gc = opts[:remote] && opts[:gc]
 
       to_delete.concat(host_generations_rotate(machines)) if opts[:remote]
 
@@ -71,7 +72,7 @@ module ConfCtl::Cli
         puts 'The following generations will be removed:'
         OutputFormatter.print(to_delete, %i[host name type id], layout: :columns)
         puts
-        puts "Garbage collection: #{opts[:remote] ? 'when enabled in configuration' : 'no'}"
+        puts "Garbage collection: #{enable_gc ? 'when enabled in configuration' : 'no'}"
       end
 
       to_delete.each do |gen|
@@ -81,7 +82,7 @@ module ConfCtl::Cli
         changed_hosts << gen[:host] unless changed_hosts.include?(gen[:host])
       end
 
-      return unless opts[:remote]
+      return unless enable_gc
 
       global = ConfCtl::Settings.instance.host_generations
       machines_gc = {}

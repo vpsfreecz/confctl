@@ -489,6 +489,9 @@ the generation before last and so on.
     `-r`, `--remote`
       Consider generations found on deployed machines.
 
+    `--no-gc`, `--no-collect-garbage`
+      Do not run the garbage collector even if it is enabled in configuration.
+
     `--max-concurrent-gc` *n*
       Run `nix-collect-garbage` at most on *n* machines at the same time.
       Defaults to `5`.

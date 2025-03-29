@@ -460,6 +460,9 @@ module ConfCtl::Cli
           c.desc 'List remote machine generations'
           c.switch %i[r remote]
 
+          c.desc 'Do not run the garbage collector if enabled in configuration'
+          c.switch %i[gc collect-garbage], default_value: true
+
           c.desc 'Max number of concurrent nix-collect-garbage processes'
           c.flag 'max-concurrent-gc', arg_name: 'n', type: Integer,
                                       default_value: 5
