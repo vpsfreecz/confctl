@@ -176,7 +176,7 @@ module ConfCtl
         next unless %r{\A/nix/store/[^-]+-linux-([^/]+)} =~ link
 
         return ::Regexp.last_match(1)
-      rescue Errno::ENOENT
+      rescue Errno::ENOENT, Errno::EINVAL
         next
       end
 
