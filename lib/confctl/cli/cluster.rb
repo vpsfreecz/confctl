@@ -1023,7 +1023,8 @@ module ConfCtl::Cli
       rows = host_generations.map do |host, gen|
         row = {
           'name' => host,
-          'generation' => gen.name
+          'generation' => gen.name,
+          'kernel' => gen.kernel_version
         }
 
         gen.swpin_specs.each do |name, spec|
@@ -1039,7 +1040,7 @@ module ConfCtl::Cli
 
       OutputFormatter.print(
         rows,
-        %w[name generation] + swpin_names,
+        %w[name generation kernel] + swpin_names,
         layout: :columns,
         sort: %w[name generation]
       )
