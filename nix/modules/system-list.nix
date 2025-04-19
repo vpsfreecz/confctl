@@ -5,6 +5,6 @@
   ];
 
   vpsadminos = [
-    ./confctl/netboot-kexec
+    ./confctl/kexec-netboot
   ];
 }

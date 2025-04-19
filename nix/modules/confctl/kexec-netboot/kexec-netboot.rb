@@ -6,7 +6,7 @@ require 'uri'
 require 'optparse'
 require 'tempfile'
 
-class NetbootKexec
+class KexecNetboot
   MACHINE_FQDN = '@machineFqdn@'.freeze
 
   KEXEC = '@kexecTools@/bin/kexec'.freeze
@@ -451,5 +451,5 @@ class NetbootKexec
   end
 end
 
-loader = NetbootKexec.new
+loader = KexecNetboot.new
 loader.run

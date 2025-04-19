@@ -1,21 +1,21 @@
-= netboot-kexec(8)
+= kexec-netboot(8)
 :doctype: manpage
 :docdate: 2025-03-03
-:manmanual: NETBOOT-KEXEC
-:mansource: NETBOOT-KEXEC
+:manmanual: kexec-netboot
+:mansource: kexec-netboot
 :man-linkstyle: pass:[blue R < >]
 
 == Name
 
-netboot-kexec - Prepare machine for kexec using kernel/initrd from netboot server
+kexec-netboot - Prepare machine for kexec using kernel/initrd from netboot server
 
 == Synopsis
 
-*netboot-kexec* [_options_]
+*kexec-netboot* [_options_]
 
 == Description
 
-*netboot-kexec* may be used to download kernel and initrd from the netboot server
+*kexec-netboot* may be used to download kernel and initrd from the netboot server
 the machine was booted from and load it using *kexec*.
 
 It is possible to boot into any machine available on the netboot server
@@ -59,4 +59,4 @@ Report bugs to https://github.com/vpsfreecz/confctl/issues.
 
 == About
 
-*netboot-kexec* is a part of https://github.com/vpsfreecz/confctl[confctl].
+*kexec-netboot* is a part of https://github.com/vpsfreecz/confctl[confctl].
