@@ -344,7 +344,8 @@ module ConfCtl::Cli
           'name' => gen.name,
           'id' => gen.id,
           'presence' => gen.presence_str,
-          'current' => gen.current_str
+          'current' => gen.current_str,
+          'kernel' => gen.kernel_version
         }
 
         gen.swpin_specs.each do |name, spec|
@@ -356,7 +357,7 @@ module ConfCtl::Cli
 
       OutputFormatter.print(
         rows,
-        %w[host name id presence current] + swpin_names,
+        %w[host name id presence current kernel] + swpin_names,
         layout: :columns,
         sort: %w[name host]
       )

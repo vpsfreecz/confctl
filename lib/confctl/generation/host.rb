@@ -1,20 +1,22 @@
 module ConfCtl
   class Generation::Host
-    attr_reader :host, :profile, :id, :toplevel, :date, :current
+    attr_reader :host, :profile, :id, :toplevel, :date, :kernel_version, :current
 
     # @param machine [Machine]
     # @param profile [String]
     # @param id [Integer]
     # @param toplevel [String]
     # @param date [Time]
+    # @param kernel_version [String, nil]
     # @param mc [MachineControl]
-    def initialize(machine, profile, id, toplevel, date, current: false, mc: nil)
+    def initialize(machine, profile, id, toplevel, date, kernel_version, current: false, mc: nil)
       @host = machine.name
       @machine = machine
       @profile = profile
       @id = id
       @toplevel = toplevel
       @date = date
+      @kernel_version = kernel_version
       @current = current
       @mc = mc
     end

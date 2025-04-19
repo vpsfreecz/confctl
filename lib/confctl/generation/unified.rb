@@ -15,6 +15,9 @@ module ConfCtl
     # @return [Time]
     attr_reader :date
 
+    # @return [String, nil]
+    attr_reader :kernel_version
+
     # @return [Boolean]
     attr_reader :current
 
@@ -37,11 +40,13 @@ module ConfCtl
         @name = build_generation.name
         @toplevel = build_generation.toplevel
         @date = build_generation.date
+        @kernel_version = build_generation.kernel_version
         @current ||= build_generation.current
       elsif host_generation
         @name = host_generation.approx_name
         @toplevel = host_generation.toplevel
         @date = host_generation.date
+        @kernel_version = host_generation.kernel_version
         @current ||= host_generation.current
       else
         raise ArgumentError, 'set build or host'

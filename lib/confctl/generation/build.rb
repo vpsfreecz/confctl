@@ -32,6 +32,9 @@ module ConfCtl
     # @return [Boolean]
     attr_accessor :current
 
+    # @return [String, nil]
+    attr_reader :kernel_version
+
     # @param host [String]
     def initialize(host)
       @host = host
@@ -50,6 +53,7 @@ module ConfCtl
       @swpin_specs = swpin_specs
       @date = date || Time.now
       @name = date.strftime('%Y-%m-%d--%H-%M-%S')
+      @kernel_version = extract_kernel_version
     end
 
     # @param name [String]
@@ -75,6 +79,7 @@ module ConfCtl
       end
 
       @date = Time.iso8601(cfg['date'])
+      @kernel_version = extract_kernel_version
     rescue StandardError => e
       raise Error, "invalid generation '#{name}': #{e.message}"
     end
@@ -161,6 +166,21 @@ module ConfCtl
 
     def gcroot_name(file)
       "#{escaped_host}-generation-#{name}-#{file}"
+    end
+
+    def extract_kernel_version
+      # `kernel` is for NixOS/vpsAdminOS and also carried NixOS machines (netboot)
+      # `bzImage` is for carried vpsAdminOS machines (netboot)
+      %w[kernel bzImage].each do |v|
+        link = File.readlink(File.join(toplevel, v))
+        next unless %r{\A/nix/store/[^-]+-linux-([^/]+)} =~ link
+
+        return ::Regexp.last_match(1)
+      rescue Errno::ENOENT
+        next
+      end
+
+      nil
     end
   end
 end
