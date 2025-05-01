@@ -507,7 +507,7 @@ class TftpBuilder < RootBuilder
       DEFAULT menu.c32
       TIMEOUT 50
       <% end -%>
-      MENU TITLE <%= m.label %> (<%= g.generation %> - <%= g.current ? 'current' : g.time_s %> - <%= g.shortrev %> - <%= g.kernel_version %>)
+      MENU TITLE <%= m.short_label %> (<%= g.generation %> - <%= g.current ? 'current' : g.time_s %> - <%= g.shortrev %> - <%= g.kernel_version %>)
 
       <% g.variants.each do |variant| -%>
       LABEL <%= variant.name %>
@@ -651,6 +651,9 @@ class Machine
   attr_reader :label
 
   # @return [String]
+  attr_reader :short_label
+
+  # @return [String]
   attr_reader :url
 
   # @return [Array<Generation>]
@@ -667,6 +670,7 @@ class Machine
     @spin = 'nixos'
     @fqdn = name
     @label = name
+    @short_label = name[0..14]
     @toplevel = nil
     @macs = []
     @generations = []
@@ -724,6 +728,8 @@ class Machine
     @label ||= @current.json.fetch('fqdn', nil)
     @label ||= name
     # rubocop:enable Naming/MemoizedInstanceVariableName
+
+    @short_label = @label.split('.')[0..1].join('.')
   end
 end
 
