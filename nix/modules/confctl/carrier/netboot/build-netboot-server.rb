@@ -438,7 +438,7 @@ class TftpBuilder < RootBuilder
 
       <% m.generations[1..].each do |g| -%>
       LABEL <%= m.fqdn %>-<%= g.generation %>
-        MENU LABEL Configuration <%= g.generation %> - <%= g.time_s %> - <%= g.shortrev %>
+        MENU LABEL Gen <%= g.generation %> - <%= g.time_s %> - <%= g.shortrev %>
         LINUX boot/<%= m.fqdn %>/<%= g.generation %>/bzImage
         INITRD boot/<%= m.fqdn %>/<%= g.generation %>/initrd
         APPEND init=<%= g.toplevel %>/init loglevel=7
@@ -556,7 +556,7 @@ class TftpBuilder < RootBuilder
 
       <% m.generations.each do |g| -%>
       LABEL generations
-        MENU LABEL Configuration <%= g.generation %> - <%= g.time_s %> - <%= g.shortrev %> - <%= g.kernel_version %>
+        MENU LABEL Gen <%= g.generation %> - <%= g.time_s %> - <%= g.shortrev %> - <%= g.kernel_version %>
         KERNEL menu.c32
         APPEND pxeserver/machines/<%= m.fqdn %>/generation-<%= g.generation %>.cfg
 
