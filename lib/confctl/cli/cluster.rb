@@ -616,7 +616,7 @@ module ConfCtl::Cli
         return unless opts[:interactive]
 
         options = {}
-        options['c'] = 'Continue'
+        options['y'] = 'Continue'
         options['r'] = 'Retry' if opts['dry-activate-first']
         options['s'] = 'Skip'
         options['a'] = 'Abort'
@@ -624,7 +624,7 @@ module ConfCtl::Cli
         answer = ask_action(options:, default: nil)
 
         case answer
-        when 'c'
+        when 'y'
           return
         when 'r'
           next
