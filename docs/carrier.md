@@ -136,3 +136,15 @@ images are deployed to it:
   '';
 }
 ```
+
+## kexec from the netboot server
+Set `confctl.programs.kexec-netboot.enable = true;` within your netbooted machine
+configurations. This will add program `kexec-netboot` to your system path.
+
+This program can be used to load kernel and initrd from the netboot server for kexec.
+It automatically discovers the netboot server it was booted from, by default it uses
+the latest generation found on the netboot server at the moment of execution. Use
+`kexec-netboot --interactive` to select which machine/generation/variant should be
+loaded. See `kexec-netboot --help` for all available options.
+
+The loaded kernel can be run either by `kexec-netboot -e` or `kexec -e` directly.

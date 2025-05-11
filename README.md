@@ -14,7 +14,7 @@ machines.
 * Query machine state, view changelogs and diffs
 * Run health checks
 * Automatically roll back faulty configurations
-* Support for creating netboot servers, see [docs/carrier.md](docs/carrier.md)
+* Support for creating netboot servers with option to kexec, see [docs/carrier.md](docs/carrier.md)
 
 ## Requirements
 
