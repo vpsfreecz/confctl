@@ -1,3 +1,15 @@
+# Sun May 11 2025 -- version 2.1.0
+- Support for referring to generations by their offset
+- Resolved generations are printed on build/deploy/etc.
+- Automatically rollback faulty configurations
+- Interleave copying of carried machine generations
+- Add `confctl.programs.kexec-netboot`
+- Let the user retry dry activation in interactive mode
+- Fix listing, deletion and garbage collection of carried machines' generations
+- Read and display kernel version for each generation
+- Option to disable the garbage collection in `confctl generation rotate`
+- Shorten titles and entries in netboot menus
+
 # Sun Nov 17 2024 -- version 2.0.0
 - Distinguish machine `config` and `metaConfig` (breaking change)
 - Support for machine carriers and netboot servers
