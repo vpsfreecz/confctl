@@ -19,12 +19,19 @@ in stdenv.mkDerivation rec {
     export GEM_HOME="$(pwd)/.gems"
     BINDIR="$(ruby -e 'puts Gem.bindir')"
     mkdir -p "$BINDIR"
+
     export PATH="$BINDIR:$PATH"
     export RUBYLIB="$GEM_HOME:$CONFCTL/lib"
     export MANPATH="$CONFCTL/man:$(man --path)"
-    gem install --no-document bundler overcommit rubocop
+    gem install --no-document bundler
     pushd "$CONFCTL"
-    bundle install
+
+    # Purity disabled because of prism gem, which has a native extension.
+    # The extension has its header files in .gems, which gets stripped but
+    # cc wrapper in Nix. Without NIX_ENFORCE_PURITY=0, we get prism.h not found
+    # error.
+    NIX_ENFORCE_PURITY=0 bundle install
+
     bundle exec rake md2man:man
     popd
 
