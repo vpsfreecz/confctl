@@ -84,11 +84,28 @@ let
     in {
       attribute = result;
 
-      autoRollback = corePkgs.substituteAll {
-        src = ../libexec/auto-rollback.rb;
-        isExecutable = true;
-        ruby = nixpkgs.ruby;
-      };
+      autoRollback =
+        # pkgs.substituteAll was removed from nixos-unstable, but pkgs.replaceVarsWith
+        # is not available in nixos-25.05.
+        let
+          args = {
+            src = ../libexec/auto-rollback.rb;
+            isExecutable = true;
+          };
+
+          replacements = {
+            ruby = nixpkgs.ruby;
+          };
+        in
+          if builtins.hasAttr "replaceVarsWith" corePkgs then
+            corePkgs.replaceVarsWith {
+              inherit (args) src isExecutable;
+              inherit replacements;
+            }
+          else
+            corePkgs.substituteAll ({
+              inherit (args) src isExecutable;
+            } // replacements);
     };
 
   evalMachine = machine:

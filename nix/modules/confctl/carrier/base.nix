@@ -4,16 +4,18 @@ let
 
   cfg = config.confctl.carrier;
 
-  carrier-env = pkgs.substituteAll {
+  carrier-env = pkgs.confReplaceVarsWith {
     src = ./carrier-env.rb;
     name = "carrier-env";
     isExecutable = true;
     dir = "bin";
-    ruby = pkgs.ruby;
-    onChangeCommands = pkgs.writeScript "carrier-on-change-commands.sh" ''
-      #!${pkgs.bash}/bin/bash
-      ${cfg.onChangeCommands}
-    '';
+    replacements = {
+      ruby = pkgs.ruby;
+      onChangeCommands = pkgs.writeScript "carrier-on-change-commands.sh" ''
+        #!${pkgs.bash}/bin/bash
+        ${cfg.onChangeCommands}
+      '';
+    };
   };
 in {
   options = {

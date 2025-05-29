@@ -4,13 +4,15 @@ let
 
   cfg = config.confctl.programs.kexec-netboot;
 
-  kexecNetboot = pkgs.substituteAll {
+  kexecNetboot = pkgs.confReplaceVarsWith {
     name = "kexec-netboot";
     src = ./kexec-netboot.rb;
     isExecutable = true;
-    ruby = pkgs.ruby;
-    kexecTools = pkgs.kexec-tools;
-    machineFqdn = confMachine.host.fqdn;
+    replacements = {
+      ruby = pkgs.ruby;
+      kexecTools = pkgs.kexec-tools;
+      machineFqdn = confMachine.host.fqdn;
+    };
   };
 
   kexecNetbootBin = pkgs.runCommand "kexec-netboot-bin" {} ''

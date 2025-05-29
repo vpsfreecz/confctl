@@ -52,13 +52,15 @@ let
     isoImages = cfg.isoImages;
   };
 
-  builder = pkgs.substituteAll {
+  builder = pkgs.confReplaceVarsWith {
     src = ./build-netboot-server.rb;
     name = "build-netboot-server";
     dir = "bin";
     isExecutable = true;
-    ruby = pkgs.ruby;
-    jsonConfig = pkgs.writeText "netboot-server.json" builderConfig;
+    replacements = {
+      ruby = pkgs.ruby;
+      jsonConfig = pkgs.writeText "netboot-server.json" builderConfig;
+    };
   };
 in {
   options = {
