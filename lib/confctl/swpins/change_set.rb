@@ -64,6 +64,10 @@ module ConfCtl
       raise 'git commit exited with non-zero status code'
     end
 
+    def any_changes?
+      @owners.any? { |_, spec_sets| spec_sets.any?(&:changed?) }
+    end
+
     protected
 
     def build_message(type, changelog)

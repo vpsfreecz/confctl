@@ -46,7 +46,7 @@ module ConfCtl::Cli
       core.save
       core.pre_evaluate
 
-      return unless opts[:commit]
+      return if !opts[:commit] || !change_set.any_changes?
 
       change_set.commit(
         type: opts[:downgrade] ? :downgrade : :upgrade,
@@ -75,7 +75,7 @@ module ConfCtl::Cli
       core.save
       core.pre_evaluate
 
-      return unless opts[:commit]
+      return if !opts[:commit] || !change_set.any_changes?
 
       change_set.commit(
         type: opts[:downgrade] ? :downgrade : :upgrade,

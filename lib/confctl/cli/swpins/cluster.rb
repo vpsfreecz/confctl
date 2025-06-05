@@ -42,7 +42,7 @@ module ConfCtl::Cli
 
       cluster_names.each(&:save)
 
-      return unless opts[:commit]
+      return if !opts[:commit] || !change_set.any_changes?
 
       change_set.commit(
         type: opts[:downgrade] ? :downgrade : :upgrade,
@@ -69,7 +69,7 @@ module ConfCtl::Cli
 
       cluster_names.each(&:save)
 
-      return unless opts[:commit]
+      return if !opts[:commit] || !change_set.any_changes?
 
       change_set.commit(
         type: opts[:downgrade] ? :downgrade : :upgrade,
