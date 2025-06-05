@@ -90,14 +90,18 @@ module ConfCtl
       raise "nix-prefetch-git failed with status #{$?.exitstatus}" if $?.exitstatus != 0
 
       ret = JSON.parse(json.strip)
-      self.state = {
-        'rev' => ret['rev'],
-        'date' => Time.now.iso8601
-      }
-      self.info = {
-        'rev' => ret['rev'],
-        'sha256' => ret['sha256']
-      }
+
+      if state.nil? || state['rev'] != ret['rev']
+        self.state = {
+          'rev' => ret['rev'],
+          'date' => Time.now.iso8601
+        }
+        self.info = {
+          'rev' => ret['rev'],
+          'sha256' => ret['sha256']
+        }
+      end
+
       ret
     end
 
@@ -111,14 +115,17 @@ module ConfCtl
 
       raise "nix-prefetch-url failed with status #{$?.exitstatus}" if $?.exitstatus != 0
 
-      self.state = {
-        'rev' => rev,
-        'date' => Time.now.iso8601
-      }
-      self.info = {
-        'rev' => rev,
-        'sha256' => hash
-      }
+      if state.nil? || state['rev'] != rev
+        self.state = {
+          'rev' => rev,
+          'date' => Time.now.iso8601
+        }
+        self.info = {
+          'rev' => rev,
+          'sha256' => hash
+        }
+      end
+
       { 'url' => url, 'sha256' => hash }
     end
 
