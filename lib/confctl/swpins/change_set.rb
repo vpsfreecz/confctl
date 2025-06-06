@@ -55,7 +55,7 @@ module ConfCtl
       git_commit = [
         'git',
         'commit',
-        editor ? '-e' : nil,
+        use_editor?(editor) ? '-e' : nil,
         '-m', build_message(type, changelog),
         *changed_files
       ].compact
@@ -153,6 +153,10 @@ module ConfCtl
       end
 
       true
+    end
+
+    def use_editor?(editor)
+      editor && $stdout.tty?
     end
   end
 end
