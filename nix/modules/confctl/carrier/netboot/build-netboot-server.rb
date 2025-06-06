@@ -723,12 +723,9 @@ class Machine
     @spin = @current.json.fetch('spin', spin)
     @fqdn = @current.json.fetch('fqdn', name)
 
-    # rubocop:disable Naming/MemoizedInstanceVariableName
     @label = @current.json.fetch('label', nil)
     @label ||= @current.json.fetch('fqdn', nil)
     @label ||= name
-    # rubocop:enable Naming/MemoizedInstanceVariableName
-
     @short_label = @label.split('.')[0..1].join('.')
   end
 end

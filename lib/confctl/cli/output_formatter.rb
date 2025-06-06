@@ -185,9 +185,7 @@ module ConfCtl::Cli
             v = o[i]
           end
 
-          # rubocop:disable Lint/FormatParameterMismatch
           line format("%#{w}s:  %s", c[:label], v)
-          # rubocop:enable Lint/FormatParameterMismatch
         end
 
         line
