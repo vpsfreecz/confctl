@@ -1,3 +1,6 @@
+# Fri Jun 06 2025 -- version 2.2.1
+- Fix `--[no-]editor` option on `confctl swpins core` commands
+
 # Fri Jun 06 2025 -- version 2.2.0
 - Handle `pkgs.substituteAll` / `pkgs.replaceVarsWith` compatibility on NixOS unstable
   and 25.05
