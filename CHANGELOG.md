@@ -1,3 +1,6 @@
+# Fri Jun 06 2025 -- version 2.2.2
+- Fix `--[no-]editor` option on `confctl swpins cluster/channel update` commands
+
 # Fri Jun 06 2025 -- version 2.2.1
 - Fix `--[no-]editor` option on `confctl swpins core` commands
 
