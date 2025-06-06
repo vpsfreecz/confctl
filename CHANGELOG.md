@@ -1,3 +1,9 @@
+# Fri Jun 06 2025 -- version 2.2.0
+- Handle `pkgs.substituteAll` / `pkgs.replaceVarsWith` compatibility on NixOS unstable
+  and 25.05
+- Change swpin files only when revisions are updated, skip commit when no changes were made
+- Add option `--[no-]editor` to `confctl swpins core/cluster/channel set/update` commands
+
 # Sun May 11 2025 -- version 2.1.0
 - Support for referring to generations by their offset
 - Resolved generations are printed on build/deploy/etc.
