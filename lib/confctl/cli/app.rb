@@ -97,6 +97,9 @@ module ConfCtl::Cli
             c.desc 'Include changelog in the commit message'
             c.switch :changelog, default_value: true
 
+            c.desc 'Open $EDITOR with commit message'
+            c.switch :editor, default_value: true
+
             c.desc 'Generate changelog for downgrade'
             c.switch %i[d downgrade], default_value: false
 
@@ -111,6 +114,9 @@ module ConfCtl::Cli
 
             c.desc 'Include changelog in the commit message'
             c.switch :changelog, default_value: true
+
+            c.desc 'Open $EDITOR with commit message'
+            c.switch :editor, default_value: true
 
             c.desc 'Generate changelog for downgrade'
             c.switch %i[d downgrade], default_value: false
