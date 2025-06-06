@@ -539,6 +539,9 @@ the generation before last and so on.
     Include changelog in the commit message when `--commit` is used. Enabled by
     default.
 
+  `--[no]-editor`
+    Open `$EDITOR` with the commit message. Enabled by default.
+
   `-d`, `--downgrade`
     Use when the new version is older than the previously set version. Used for
     generating changelog for the commit message.
@@ -553,6 +556,9 @@ the generation before last and so on.
     `--[no-]changelog`
       Include changelog in the commit message when `--commit` is used. Enabled by
       default.
+
+    `--[no]-editor`
+      Open `$EDITOR` with the commit message. Enabled by default.
 
     `-d`, `--downgrade`
       Use when the new version is older than the previously set version. Used for
@@ -573,6 +579,9 @@ the generation before last and so on.
       Include changelog in the commit message when `--commit` is used. Enabled by
       default.
 
+    `--[no]-editor`
+      Open `$EDITOR` with the commit message. Enabled by default.
+
     `-d`, `--downgrade`
       Use when the new version is older than the previously set version. Used for
       generating changelog for the commit message.
@@ -588,6 +597,9 @@ the generation before last and so on.
     `--[no-]changelog`
       Include changelog in the commit message when `--commit` is used. Enabled by
       default.
+
+    `--[no]-editor`
+      Open `$EDITOR` with the commit message. Enabled by default.
 
     `-d`, `--downgrade`
       Use when the new version is older than the previously set version. Used for
@@ -608,6 +620,9 @@ the generation before last and so on.
       Include changelog in the commit message when `--commit` is used. Enabled by
       default.
 
+    `--[no]-editor`
+      Open `$EDITOR` with the commit message. Enabled by default.
+
     `-d`, `--downgrade`
       Use when the new version is older than the previously set version. Used for
       generating changelog for the commit message.
@@ -624,6 +639,9 @@ the generation before last and so on.
       Include changelog in the commit message when `--commit` is used. Enabled by
       default.
 
+    `--[no]-editor`
+      Open `$EDITOR` with the commit message. Enabled by default.
+
     `-d`, `--downgrade`
       Use when the new version is older than the previously set version. Used for
       generating changelog for the commit message.
@@ -638,6 +656,9 @@ the generation before last and so on.
     `--[no-]changelog`
       Include changelog in the commit message when `--commit` is used. Enabled by
       default.
+
+    `--[no]-editor`
+      Open `$EDITOR` with the commit message. Enabled by default.
 
     `-d`, `--downgrade`
       Use when the new version is older than the previously set version. Used for

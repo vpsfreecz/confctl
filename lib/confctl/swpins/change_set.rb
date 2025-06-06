@@ -48,16 +48,19 @@ module ConfCtl
 
     # @param type [:upgrade, :downgrade]
     # @param changelog [Boolean]
-    def commit(type: :upgrade, changelog: false)
+    # @param editor [Boolean]
+    def commit(type: :upgrade, changelog: false, editor: true)
       return if @owners.empty?
 
-      ret = Kernel.system(
+      git_commit = [
         'git',
         'commit',
-        '-e',
+        editor ? '-e' : nil,
         '-m', build_message(type, changelog),
         *changed_files
-      )
+      ].compact
+
+      ret = Kernel.system(*git_commit)
 
       return if ret
 

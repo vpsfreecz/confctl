@@ -46,7 +46,8 @@ module ConfCtl::Cli
 
       change_set.commit(
         type: opts[:downgrade] ? :downgrade : :upgrade,
-        changelog: opts[:changelog]
+        changelog: opts[:changelog],
+        editor: opts[:editor]
       )
     end
 
@@ -73,7 +74,8 @@ module ConfCtl::Cli
 
       change_set.commit(
         type: opts[:downgrade] ? :downgrade : :upgrade,
-        changelog: opts[:changelog]
+        changelog: opts[:changelog],
+        editor: opts[:editor]
       )
     end
   end
