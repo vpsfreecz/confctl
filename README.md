@@ -36,6 +36,13 @@ This guide assumes you have cloned the repository, because otherwise man will
 not find confctl's manual pages. If you install confctl using gem, you can
 ignore steps with `shell.nix`.
 
+confctl requires per-user garbage collection directory to be created:
+
+```
+sudo mkdir /nix/var/nix/gcroots/per-user/$USER
+sudo chown $USER /nix/var/nix/gcroots/per-user/$USER
+```
+
 2. Create a new directory, where your confctl-managed configuration will be
 stored:
 
