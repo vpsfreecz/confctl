@@ -397,7 +397,7 @@ class KexecNetboot
   def load_kexec(kernel_path, initrd_path, kernel_params_string)
     cmd = [
       KEXEC,
-      '-l',
+      '--load',
       kernel_path,
       "--initrd=#{initrd_path}",
       "--append=\"#{kernel_params_string}\""
@@ -407,37 +407,37 @@ class KexecNetboot
     system(cmd)
 
     if $?.exitstatus == 0
-      puts 'kexec -l completed successfully.'
+      puts 'kexec --load completed successfully.'
     else
-      warn 'ERROR: kexec -l failed!'
+      warn 'ERROR: kexec --load failed!'
       exit 1
     end
   end
 
   def exec_kexec
-    cmd = [KEXEC, '-e'].join(' ')
+    cmd = [KEXEC, '--exec'].join(' ')
 
     puts "Executing: #{cmd}"
     system(cmd)
 
     if $?.exitstatus == 0
-      puts 'kexec -e completed successfully.'
+      puts 'kexec --exec completed successfully.'
     else
-      warn 'ERROR: kexec -u failed!'
+      warn 'ERROR: kexec --exec failed!'
       exit 1
     end
   end
 
   def unload_kexec
-    cmd = [KEXEC, '-u'].join(' ')
+    cmd = [KEXEC, '--unload'].join(' ')
 
     puts "Executing: #{cmd}"
     system(cmd)
 
     if $?.exitstatus == 0
-      puts 'kexec -u completed successfully.'
+      puts 'kexec --unload completed successfully.'
     else
-      warn 'ERROR: kexec -u failed!'
+      warn 'ERROR: kexec --unload failed!'
       exit 1
     end
   end
