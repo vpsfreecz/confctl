@@ -20,6 +20,7 @@ class KexecNetboot
     @append_params = ''
     @exec          = false
     @unload        = false
+    @sync          = false
     @machines_json = nil
     @tmp_files     = []
   end
@@ -150,6 +151,10 @@ class KexecNetboot
 
       opts.on('-u', '--unload', 'Unload the current kexec target kernel and exit') do
         @unload = true
+      end
+
+      opts.on('-y', '--no-sync', 'Skip syncing filesystems') do
+        @sync = false
       end
     end
 
@@ -400,7 +405,8 @@ class KexecNetboot
       '--load',
       kernel_path,
       "--initrd=#{initrd_path}",
-      "--append=\"#{kernel_params_string}\""
+      "--append=\"#{kernel_params_string}\"",
+      '--no-sync'
     ].join(' ')
 
     puts "Executing: #{cmd}"
@@ -415,7 +421,7 @@ class KexecNetboot
   end
 
   def exec_kexec
-    cmd = [KEXEC, '--exec'].join(' ')
+    cmd = [KEXEC, '--exec', @sync ? nil : '--no-sync'].compact.join(' ')
 
     puts "Executing: #{cmd}"
     system(cmd)
@@ -429,7 +435,7 @@ class KexecNetboot
   end
 
   def unload_kexec
-    cmd = [KEXEC, '--unload'].join(' ')
+    cmd = [KEXEC, '--unload', '--no-sync'].join(' ')
 
     puts "Executing: #{cmd}"
     system(cmd)

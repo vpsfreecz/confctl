@@ -53,6 +53,9 @@ The following options are understood:
 *-e*, *--exec*::
   Run the currently loaded kernel.
 
+*-y*, *--no-sync*::
+  Skip syncing filesystems with *--exec*.
+
 == Bugs
 
 Report bugs to https://github.com/vpsfreecz/confctl/issues.
