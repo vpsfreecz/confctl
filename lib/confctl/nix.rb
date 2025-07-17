@@ -288,9 +288,10 @@ module ConfCtl
 
       # Wait for the configuration to be switched
       t = Time.now
+      mc = MachineControl.new(machine, logger:)
 
       loop do
-        out, = MachineControl.new(machine, logger:).execute!('cat', check_file, '2>/dev/null')
+        out, = mc.execute!('cat', check_file, '2>/dev/null')
         stripped = out.strip
         break if stripped == 'switched' || ((t + timeout + 10) < Time.now && stripped != 'switching')
 
@@ -298,8 +299,15 @@ module ConfCtl
       end
 
       # Confirm it
+      confirm_cmd =
+        if machine.localhost?
+          ['sh', '-c', "echo confirmed > #{check_file}"]
+        else
+          ['sh', '-c', "'echo confirmed > #{check_file}'"]
+        end
+
       10.times do
-        break if MachineControl.new(machine, logger:).execute!('sh', '-c', "'echo confirmed > #{check_file}'").success?
+        break if mc.execute!(*confirm_cmd).success?
       end
 
       activation_thread.join
