@@ -9,6 +9,7 @@ in stdenv.mkDerivation rec {
     git
     ncurses
     nix-prefetch-git
+    nixfmt-tree
     openssl
     ruby
   ];
