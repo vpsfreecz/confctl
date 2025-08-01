@@ -1,4 +1,11 @@
-{ confDir, name, dir ? "cluster", channels, pkgs, lib }:
+{
+  confDir,
+  name,
+  dir ? "cluster",
+  channels,
+  pkgs,
+  lib,
+}:
 let
   pinFileName = builtins.replaceStrings [ "/" ] [ ":" ] name;
 
@@ -6,11 +13,7 @@ let
 
   pinFileJson = builtins.readFile pinFilePath;
 
-  pinFileSpecs =
-    if builtins.pathExists pinFilePath then
-      builtins.fromJSON pinFileJson
-    else
-      {};
+  pinFileSpecs = if builtins.pathExists pinFilePath then builtins.fromJSON pinFileJson else { };
 
   pinFileSwpins = lib.mapAttrs (k: v: swpin v) pinFileSpecs;
 
@@ -24,47 +27,54 @@ let
 
   allChannelSwpins = map channelSwpins channels;
 
-  allSwpins = (lib.foldl (a: b: a // b) {} allChannelSwpins) // pinFileSwpins;
+  allSwpins = (lib.foldl (a: b: a // b) { } allChannelSwpins) // pinFileSwpins;
 
-  swpin = { fetcher, ... }:
-    fetchers.${fetcher.type} fetcher.options;
+  swpin = { fetcher, ... }: fetchers.${fetcher.type} fetcher.options;
 
   fetchers = rec {
-    directory = opts:
-      opts.path;
+    directory = opts: opts.path;
 
-    git = opts:
+    git =
+      opts:
       let
-        filter = lib.filterAttrs (k: v: builtins.elem k [
-          "url" "rev" "sha256" "fetchSubmodules"
-        ]);
-      in pkgs.fetchgit (filter opts);
+        filter = lib.filterAttrs (
+          k: v:
+          builtins.elem k [
+            "url"
+            "rev"
+            "sha256"
+            "fetchSubmodules"
+          ]
+        );
+      in
+      pkgs.fetchgit (filter opts);
 
-    zip = opts:
-      pkgs.fetchzip opts;
+    zip = opts: pkgs.fetchzip opts;
 
-    git-rev = opts:
+    git-rev =
+      opts:
       let
         repo = fetchers.${opts.wrapped_fetcher.type} opts.wrapped_fetcher.options;
         shortRev = lib.substring 0 9 (opts.rev);
       in
-        pkgs.runCommand "git-${shortRev}" {} ''
-          cp -a ${repo} $out
-          chmod 700 $out
-          echo "${opts.rev}" > $out/.git-revision
-          echo ".git.${shortRev}" > $out/.version-suffix
-        '';
+      pkgs.runCommand "git-${shortRev}" { } ''
+        cp -a ${repo} $out
+        chmod 700 $out
+        echo "${opts.rev}" > $out/.git-revision
+        echo ".git.${shortRev}" > $out/.version-suffix
+      '';
   };
 
-  pinFileInfos = lib.mapAttrs (k: v: v.info or {}) pinFileSpecs;
+  pinFileInfos = lib.mapAttrs (k: v: v.info or { }) pinFileSpecs;
 
-  channelInfos = chan: lib.mapAttrs (k: v: v.info or {}) (channelSpecs chan);
+  channelInfos = chan: lib.mapAttrs (k: v: v.info or { }) (channelSpecs chan);
 
   allChannelInfos = map channelInfos channels;
 
-  allInfos = (lib.foldl (a: b: a // b) {} allChannelInfos) // pinFileInfos;
+  allInfos = (lib.foldl (a: b: a // b) { } allChannelInfos) // pinFileInfos;
 
-in {
+in
+{
   evaluated = allSwpins;
 
   infos = allInfos;

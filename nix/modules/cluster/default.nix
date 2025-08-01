@@ -1,17 +1,31 @@
-{ config, lib, confLib, ... }@args:
+{
+  config,
+  lib,
+  confLib,
+  ...
+}@args:
 with lib;
 let
   machine =
-    { config, ...}:
+    { config, ... }:
     {
       options = {
         managed = mkOption {
           type = types.nullOr types.bool;
           default = null;
-          apply = v:
-            if !isNull v then v
-            else if elem config.spin [ "nixos" "vpsadminos" ] then true
-            else false;
+          apply =
+            v:
+            if !isNull v then
+              v
+            else if
+              elem config.spin [
+                "nixos"
+                "vpsadminos"
+              ]
+            then
+              true
+            else
+              false;
           description = ''
             Determines whether the machine is managed using confctl or not
 
@@ -20,14 +34,19 @@ let
         };
 
         spin = mkOption {
-          type = types.enum [ "openvz" "nixos" "vpsadminos" "other" ];
+          type = types.enum [
+            "openvz"
+            "nixos"
+            "vpsadminos"
+            "other"
+          ];
           description = "OS type";
         };
 
         swpins = {
           channels = mkOption {
             type = types.listOf types.str;
-            default = [];
+            default = [ ];
             description = ''
               List of channels from <option>confctl.swpins.channels</option>
               to use on this machine
@@ -36,7 +55,7 @@ let
 
           pins = mkOption {
             type = types.attrsOf (types.submodule swpinOptions.specModule);
-            default = {};
+            default = { };
             description = ''
               List of swpins for this machine, which can supplement or
               override swpins from configured channels
@@ -46,7 +65,7 @@ let
 
         addresses = mkOption {
           type = types.nullOr (types.submodule addresses);
-          default = {};
+          default = { };
           description = ''
             IP addresses
           '';
@@ -56,7 +75,7 @@ let
           enable = mkEnableOption "Include this system on pxe servers";
           macs = mkOption {
             type = types.listOf types.str;
-            default = [];
+            default = [ ];
             description = ''
               List of MAC addresses for iPXE node auto-detection
             '';
@@ -65,7 +84,11 @@ let
 
         buildAttribute = mkOption {
           type = types.listOf types.str;
-          default = [ "system" "build" "toplevel" ];
+          default = [
+            "system"
+            "build"
+            "toplevel"
+          ];
           description = ''
             Path to the attribute in machine system config that should be built
 
@@ -79,7 +102,7 @@ let
 
           machines = mkOption {
             type = types.listOf (types.submodule carriedMachine);
-            default = [];
+            default = [ ];
             description = ''
               List of carried machines
             '';
@@ -93,7 +116,7 @@ let
 
         labels = mkOption {
           type = types.attrs;
-          default = {};
+          default = { };
           description = ''
             Optional user-defined labels to classify the machine
           '';
@@ -101,7 +124,7 @@ let
 
         tags = mkOption {
           type = types.listOf types.str;
-          default = [];
+          default = [ ];
           description = ''
             Optional user-defined tags to classify the machine
           '';
@@ -110,7 +133,7 @@ let
         nix = {
           nixPath = mkOption {
             type = types.listOf types.str;
-            default = [];
+            default = [ ];
             description = ''
               List of extra paths added to environment variable
               <literal>NIX_PATH</literal> for <literal>nix-build</literal>
@@ -219,7 +242,10 @@ let
             systemProperties = mkOption {
               type = types.listOf (types.submodule systemdProperty);
               default = [
-                { property = "SystemState"; value = "running"; }
+                {
+                  property = "SystemState";
+                  value = "running";
+                }
               ];
               description = ''
                 Check systemd manager properties reported by systemctl show
@@ -228,7 +254,7 @@ let
 
             unitProperties = mkOption {
               type = types.attrsOf (types.listOf (types.submodule systemdProperty));
-              default = {};
+              default = { };
               example = literalExpression ''
                 {
                   "firewall.service" = [
@@ -244,7 +270,7 @@ let
 
           builderCommands = mkOption {
             type = types.listOf (types.submodule checkCommand);
-            default = [];
+            default = [ ];
             example = literalExpression ''
               [
                 { description = "ping"; command = [ "ping" "-c1" "{host.fqdn}" ]; }
@@ -257,7 +283,7 @@ let
 
           machineCommands = mkOption {
             type = types.listOf (types.submodule checkCommand);
-            default = [];
+            default = [ ];
             example = literalExpression ''
               [
                 { description = "curl"; command = [ "curl" "-s" "http://localhost:80" ]; }
@@ -282,9 +308,9 @@ let
         primary = mkOption {
           type = types.nullOr (types.submodule (confLib.mkOptions.addresses 4));
           default =
-            if config.v4 != [] then
+            if config.v4 != [ ] then
               head config.v4
-            else if config.v6 != [] then
+            else if config.v6 != [ ] then
               head config.v6
             else
               null;
@@ -297,7 +323,7 @@ let
 
         v4 = mkOption {
           type = types.listOf (types.submodule (confLib.mkOptions.addresses 4));
-          default = [];
+          default = [ ];
           description = ''
             List of IPv4 addresses this machine responds to
           '';
@@ -305,7 +331,7 @@ let
 
         v6 = mkOption {
           type = types.listOf (types.submodule (confLib.mkOptions.addresses 6));
-          default = [];
+          default = [ ];
           description = ''
             List of IPv6 addresses this machine responds to
           '';
@@ -321,7 +347,7 @@ let
           type = types.nullOr types.str;
           default = null;
           description = ''
-           Host name
+            Host name
           '';
         };
 
@@ -347,12 +373,10 @@ let
           description = ''
             Domain including location, i.e. FQDN without host name
           '';
-          apply = v:
+          apply =
+            v:
             if isNull v && !isNull config.domain then
-              concatStringsSep "." (
-                (optional (!isNull config.location) config.location)
-                ++ [ config.domain ]
-              )
+              concatStringsSep "." ((optional (!isNull config.location) config.location) ++ [ config.domain ])
             else
               v;
         };
@@ -363,7 +387,8 @@ let
           description = ''
             Host FQDN
           '';
-          apply = v:
+          apply =
+            v:
             if isNull v && !isNull config.name then
               concatStringsSep "." (
                 [ config.name ]
@@ -403,7 +428,7 @@ let
 
         labels = mkOption {
           type = types.attrs;
-          default = {};
+          default = { };
           description = ''
             Optional user-defined labels to classify the machine
           '';
@@ -411,7 +436,7 @@ let
 
         tags = mkOption {
           type = types.listOf types.str;
-          default = [];
+          default = [ ];
           description = ''
             Optional user-defined tags to classify the machine
           '';
@@ -419,7 +444,7 @@ let
 
         extraModules = mkOption {
           type = types.listOf types.path;
-          default = [];
+          default = [ ];
           description = ''
             A list of additional NixOS modules to be imported for this machine
           '';
@@ -427,7 +452,11 @@ let
 
         buildAttribute = mkOption {
           type = types.listOf types.str;
-          default = [ "system" "build" "toplevel" ];
+          default = [
+            "system"
+            "build"
+            "toplevel"
+          ];
           description = ''
             Path to the attribute in machine system config that should be built
 
@@ -564,13 +593,13 @@ let
 
           include = mkOption {
             type = types.listOf types.str;
-            default = [];
+            default = [ ];
             description = "Strings that must be included in standard output";
           };
 
           exclude = mkOption {
             type = types.listOf types.str;
-            default = [];
+            default = [ ];
             description = "Strings that must not be included in standard output";
           };
         };
@@ -584,13 +613,13 @@ let
 
           include = mkOption {
             type = types.listOf types.str;
-            default = [];
+            default = [ ];
             description = "String that must be included in standard error";
           };
 
           exclude = mkOption {
             type = types.listOf types.str;
-            default = [];
+            default = [ ];
             description = "String that must not be included in standard error";
           };
         };
@@ -608,11 +637,12 @@ let
         };
       };
     };
-in {
+in
+{
   options = {
     cluster = mkOption {
       type = types.attrsOf (types.submodule machine);
-      default = {};
+      default = { };
     };
   };
 }

@@ -1,4 +1,10 @@
-{ config, lib, pkgs, confMachine, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  confMachine,
+  ...
+}:
 let
   inherit (lib) mkEnableOption mkIf;
 
@@ -15,7 +21,7 @@ let
     };
   };
 
-  kexecNetbootBin = pkgs.runCommand "kexec-netboot-bin" {} ''
+  kexecNetbootBin = pkgs.runCommand "kexec-netboot-bin" { } ''
     mkdir -p $out/bin
     ln -s ${kexecNetboot} $out/bin/kexec-netboot
 
@@ -25,8 +31,9 @@ let
       -D $out/share/man/man8 \
       ${./kexec-netboot.8.adoc}
   '';
-in {
-  options  = {
+in
+{
+  options = {
     confctl.programs.kexec-netboot = {
       enable = mkEnableOption "Enable kexec-netboot utility";
     };

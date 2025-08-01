@@ -1,8 +1,9 @@
 let
-  pkgs = import <nixpkgs> {};
+  pkgs = import <nixpkgs> { };
   lib = pkgs.lib;
   stdenv = pkgs.stdenv;
-in stdenv.mkDerivation rec {
+in
+stdenv.mkDerivation rec {
   name = "confctl-shell";
 
   buildInputs = with pkgs; [

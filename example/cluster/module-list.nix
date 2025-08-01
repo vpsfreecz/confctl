@@ -1,3 +1,4 @@
-(import ./cluster.nix) ++ [
+(import ./cluster.nix)
+++ [
   # Place for custom modules
 ]

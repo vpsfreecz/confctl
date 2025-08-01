@@ -1,4 +1,10 @@
-{ config, pkgs, lib, confMachine, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  confMachine,
+  ...
+}:
 let
   inherit (lib) mkIf mkOption types;
 
@@ -17,7 +23,8 @@ let
       '';
     };
   };
-in {
+in
+{
   options = {
     confctl.carrier.onChangeCommands = mkOption {
       type = types.lines;

@@ -1,7 +1,21 @@
-{ config, lib, pkgs, confMachine, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  confMachine,
+  ...
+}:
 let
-  inherit (lib) concatStringsSep flip mkOption mkEnableOption mkIf
-                optional optionalString types;
+  inherit (lib)
+    concatStringsSep
+    flip
+    mkOption
+    mkEnableOption
+    mkIf
+    optional
+    optionalString
+    types
+    ;
 
   concatNl = concatStringsSep "\n";
 
@@ -46,7 +60,10 @@ let
     httpUrl = "http://${cfg.host}";
     memtest =
       if cfg.memtest86.enable then
-        { package = pkgs.memtest86plus; params = cfg.memtest86.params; }
+        {
+          package = pkgs.memtest86plus;
+          params = cfg.memtest86.params;
+        }
       else
         null;
     isoImages = cfg.isoImages;
@@ -62,7 +79,8 @@ let
       jsonConfig = pkgs.writeText "netboot-server.json" builderConfig;
     };
   };
-in {
+in
+{
   options = {
     confctl.carrier.netboot = {
       enable = mkEnableOption ''
@@ -89,7 +107,7 @@ in {
 
         params = mkOption {
           type = types.listOf types.str;
-          default = [];
+          default = [ ];
           example = [ "console=ttyS0,115200" ];
           description = "See {option}`boot.loader.grub.memtest86.params`";
         };
@@ -97,7 +115,7 @@ in {
 
       isoImages = mkOption {
         type = types.listOf (types.submodule isoImage);
-        default = [];
+        default = [ ];
         description = "A list of ISO images to be included in boot menu";
       };
 
@@ -107,7 +125,7 @@ in {
           Allow HTTP access for these IP ranges, if not specified
           access is not restricted.
         '';
-        default = [];
+        default = [ ];
         example = "10.0.0.0/24";
       };
 
@@ -135,13 +153,21 @@ in {
     environment.systemPackages = [ builder ];
 
     networking.firewall = {
-      extraCommands = mkIf (cfg.allowedIPv4Ranges != []) (concatNl (map (net: ''
-        # Allow access from ${net} for netboot
-        iptables -A nixos-fw -p udp -s ${net} ${optionalString (!isNull cfg.tftp.bindAddress) "-d ${cfg.tftp.bindAddress}"} --dport 68 -j nixos-fw-accept
-        iptables -A nixos-fw -p udp -s ${net} ${optionalString (!isNull cfg.tftp.bindAddress) "-d ${cfg.tftp.bindAddress}"} --dport 69 -j nixos-fw-accept
-        iptables -A nixos-fw -p tcp -s ${net} --dport 80 -j nixos-fw-accept
-        ${optionalString cfg.enableACME "iptables -A nixos-fw -p tcp -s ${net} --dport 443 -j nixos-fw-accept"}
-      '') cfg.allowedIPv4Ranges));
+      extraCommands = mkIf (cfg.allowedIPv4Ranges != [ ]) (
+        concatNl (
+          map (net: ''
+            # Allow access from ${net} for netboot
+            iptables -A nixos-fw -p udp -s ${net} ${
+              optionalString (!isNull cfg.tftp.bindAddress) "-d ${cfg.tftp.bindAddress}"
+            } --dport 68 -j nixos-fw-accept
+            iptables -A nixos-fw -p udp -s ${net} ${
+              optionalString (!isNull cfg.tftp.bindAddress) "-d ${cfg.tftp.bindAddress}"
+            } --dport 69 -j nixos-fw-accept
+            iptables -A nixos-fw -p tcp -s ${net} --dport 80 -j nixos-fw-accept
+            ${optionalString cfg.enableACME "iptables -A nixos-fw -p tcp -s ${net} --dport 443 -j nixos-fw-accept"}
+          '') cfg.allowedIPv4Ranges
+        )
+      );
     };
 
     systemd.services.netboot-atftpd = {
@@ -149,12 +175,18 @@ in {
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
       # runs as nobody
-      serviceConfig.ExecStart = toString ([
-        "${pkgs.atftp}/sbin/atftpd"
-        "--daemon"
-        "--no-fork"
-      ] ++ (optional (!isNull cfg.tftp.bindAddress) [ "--bind-address" cfg.tftp.bindAddress ])
-        ++ [ tftpRoot ]);
+      serviceConfig.ExecStart = toString (
+        [
+          "${pkgs.atftp}/sbin/atftpd"
+          "--daemon"
+          "--no-fork"
+        ]
+        ++ (optional (!isNull cfg.tftp.bindAddress) [
+          "--bind-address"
+          cfg.tftp.bindAddress
+        ])
+        ++ [ tftpRoot ]
+      );
     };
 
     services.nginx = {
@@ -173,7 +205,7 @@ in {
             "/" = {
               extraConfig = ''
                 autoindex on;
-                ${optionalString (cfg.allowedIPv4Ranges != []) ''
+                ${optionalString (cfg.allowedIPv4Ranges != [ ]) ''
                   ${concatNl (flip map cfg.allowedIPv4Ranges (range: "allow ${range};"))}
                   deny all;
                 ''}

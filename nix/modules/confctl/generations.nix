@@ -26,7 +26,7 @@ with lib;
 
         maxAge = mkOption {
           type = types.int;
-          default = 180*24*60*60;
+          default = 180 * 24 * 60 * 60;
           description = ''
             Delete build generations older than
             <option>confctl.buildGenerations.maxAge</option> seconds. Old generations
@@ -61,7 +61,7 @@ with lib;
 
         maxAge = mkOption {
           type = types.int;
-          default = 180*24*60*60;
+          default = 180 * 24 * 60 * 60;
           description = ''
             Delete generations older than
             <option>confctl.hostGenerations.maxAge</option> seconds from

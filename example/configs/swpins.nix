@@ -17,12 +17,17 @@ let
       update.ref = "refs/heads/${branch}";
     };
   };
-in {
+in
+{
   confctl.swpins.channels = {
-    nixos-unstable = { nixpkgs = nixpkgsBranch "nixos-unstable"; };
+    nixos-unstable = {
+      nixpkgs = nixpkgsBranch "nixos-unstable";
+    };
 
     # nixos-stable = { nixpkgs = nixpkgsBranch "nixos-20.09"; };
 
-    vpsadminos-staging = { vpsadminos = vpsadminosBranch "staging"; };
+    vpsadminos-staging = {
+      vpsadminos = vpsadminosBranch "staging";
+    };
   };
 }

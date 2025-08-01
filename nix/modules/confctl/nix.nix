@@ -15,7 +15,7 @@ with lib;
 
         nixPath = mkOption {
           type = types.listOf types.str;
-          default = [];
+          default = [ ];
           description = ''
             List of extra paths added to environment variable
             <literal>NIX_PATH</literal> for all <literal>nix-build</literal>

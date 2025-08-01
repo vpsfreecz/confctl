@@ -4,11 +4,7 @@ let
 
   hasCorePkgs = (builtins.hasAttr "coreSwpins" arg) && (builtins.hasAttr "nixpkgs" arg.coreSwpins);
 
-  nixpkgs =
-    if hasCorePkgs then
-      import arg.coreSwpins.nixpkgs {}
-    else
-      import <nixpkgs> {};
+  nixpkgs = if hasCorePkgs then import arg.coreSwpins.nixpkgs { } else import <nixpkgs> { };
 
   machines = import ./machines.nix {
     inherit (arg) confDir;
@@ -18,38 +14,46 @@ let
   nameValuePairs = builtins.map (m: {
     name = m.name;
     value = {
-      inherit (m) name alias clusterName carrier metaConfig;
+      inherit (m)
+        name
+        alias
+        clusterName
+        carrier
+        metaConfig
+        ;
     };
   }) machines;
 
   machinesAttrs = builtins.listToAttrs nameValuePairs;
 
-  fullMachinesAttrs = builtins.listToAttrs (builtins.map (m: {
-    name = m.name;
-    value = m;
-  }) machines);
+  fullMachinesAttrs = builtins.listToAttrs (
+    builtins.map (m: {
+      name = m.name;
+      value = m;
+    }) machines
+  );
 
-  coreSwpins =
-    import ./lib/swpins/eval.nix {
-      inherit (arg) confDir;
-      name = "core";
-      dir = "";
-      channels = evalConfctl.config.confctl.swpins.core.channels;
-      pkgs = nixpkgs.pkgs;
-      lib = nixpkgs.lib;
-    };
+  coreSwpins = import ./lib/swpins/eval.nix {
+    inherit (arg) confDir;
+    name = "core";
+    dir = "";
+    channels = evalConfctl.config.confctl.swpins.core.channels;
+    pkgs = nixpkgs.pkgs;
+    lib = nixpkgs.lib;
+  };
 
   corePkgs =
     if hasCorePkgs then
       nixpkgs
     else if builtins.hasAttr "nixpkgs" coreSwpins.evaluated then
-      import coreSwpins.evaluated.nixpkgs {}
+      import coreSwpins.evaluated.nixpkgs { }
     else
       abort "Core swpins not set, run `confctl swpins core update`";
 
   coreLib = corePkgs.lib;
 
-  machineSwpins = m:
+  machineSwpins =
+    m:
     import ./lib/swpins/eval.nix {
       inherit (arg) confDir;
       name = m.name;
@@ -60,17 +64,22 @@ let
 
   coreSwpinsAttrs = coreSwpins.evaluated;
 
-  selectedSwpinsAttrs = builtins.listToAttrs (builtins.map (host: {
-    name = host;
-    value = (machineSwpins fullMachinesAttrs.${host}).evaluated;
-  }) arg.machines);
+  selectedSwpinsAttrs = builtins.listToAttrs (
+    builtins.map (host: {
+      name = host;
+      value = (machineSwpins fullMachinesAttrs.${host}).evaluated;
+    }) arg.machines
+  );
 
-  selectedToplevels = builtins.listToAttrs (builtins.map (host: {
-    name = host;
-    value = buildToplevel fullMachinesAttrs.${host};
-  }) arg.machines);
+  selectedToplevels = builtins.listToAttrs (
+    builtins.map (host: {
+      name = host;
+      value = buildToplevel fullMachinesAttrs.${host};
+    }) arg.machines
+  );
 
-  buildToplevel = machine:
+  buildToplevel =
+    machine:
     let
       machineConfig = (evalMachine machine).config;
 
@@ -81,7 +90,8 @@ let
           abort "Attribute 'config.${coreLib.concatStringsSep "." machine.build.attribute}' not found on machine ${machine.name}"
         else
           buildAttr;
-    in {
+    in
+    {
       attribute = result;
 
       autoRollback =
@@ -97,18 +107,22 @@ let
             ruby = nixpkgs.ruby;
           };
         in
-          if builtins.hasAttr "replaceVarsWith" corePkgs then
-            corePkgs.replaceVarsWith {
+        if builtins.hasAttr "replaceVarsWith" corePkgs then
+          corePkgs.replaceVarsWith {
+            inherit (args) src isExecutable;
+            inherit replacements;
+          }
+        else
+          corePkgs.substituteAll (
+            {
               inherit (args) src isExecutable;
-              inherit replacements;
             }
-          else
-            corePkgs.substituteAll ({
-              inherit (args) src isExecutable;
-            } // replacements);
+            // replacements
+          );
     };
 
-  evalMachine = machine:
+  evalMachine =
+    machine:
     let
       importPath = {
         nixos = <nixpkgs/nixos/lib/eval-config.nix>;
@@ -118,64 +132,74 @@ let
       evalConfig = import importPath.${machine.metaConfig.spin} {
         modules = machine.extraModules ++ [ machine.build.toplevel ];
       };
-    in evalConfig;
+    in
+    evalConfig;
 
   evalConfctl =
     let
       cfg = "${toString arg.confDir}/configs/confctl.nix";
-    in evalNixosModules ([
-      ./modules/confctl/generations.nix
-      ./modules/confctl/cli.nix
-      ./modules/confctl/nix.nix
-      ./modules/confctl/swpins.nix
-      "${toString arg.confDir}/configs/swpins.nix"
-    ] ++ nixpkgs.lib.optional (builtins.pathExists cfg) cfg);
+    in
+    evalNixosModules (
+      [
+        ./modules/confctl/generations.nix
+        ./modules/confctl/cli.nix
+        ./modules/confctl/nix.nix
+        ./modules/confctl/swpins.nix
+        "${toString arg.confDir}/configs/swpins.nix"
+      ]
+      ++ nixpkgs.lib.optional (builtins.pathExists cfg) cfg
+    );
 
   docToplevels = [
     "cluster."
     "confctl."
   ];
 
-  filterOption = o:
-    !o.internal && builtins.any (top: nixpkgs.lib.hasPrefix top o.name) docToplevels;
+  filterOption = o: !o.internal && builtins.any (top: nixpkgs.lib.hasPrefix top o.name) docToplevels;
 
   docModules =
     let
       userModules = "${toString arg.confDir}/modules/cluster/default.nix";
-    in evalNixosModules (
+    in
+    evalNixosModules (
       (import ./modules/module-list.nix).all
-      ++
-      (nixpkgs.lib.optional (builtins.pathExists userModules) userModules)
+      ++ (nixpkgs.lib.optional (builtins.pathExists userModules) userModules)
     );
 
-  docOptions =
-    builtins.filter filterOption (nixpkgs.lib.optionAttrSetToDocList docModules.options);
+  docOptions = builtins.filter filterOption (nixpkgs.lib.optionAttrSetToDocList docModules.options);
 
-  evalNixosModules = modules:
+  evalNixosModules =
+    modules:
     import <nixpkgs/nixos/lib/eval-config.nix> {
       modules = modules ++ [
-        ({ ... }:
-        {
-          _module.args = {
-            confLib = import ./lib {
-              confDir = "${toString arg.confDir}";
-              coreLib = nixpkgs.lib;
-              corePkgs = nixpkgs.pkgs;
+        (
+          { ... }:
+          {
+            _module.args = {
+              confLib = import ./lib {
+                confDir = "${toString arg.confDir}";
+                coreLib = nixpkgs.lib;
+                corePkgs = nixpkgs.pkgs;
+              };
             };
-          };
-        })
+          }
+        )
       ];
     };
 
   build = {
     # confctl settings
-    confctl = nixpkgs.writeText "confctl-settings.json" (builtins.toJSON { confctl = evalConfctl.config.confctl; });
+    confctl = nixpkgs.writeText "confctl-settings.json" (
+      builtins.toJSON { confctl = evalConfctl.config.confctl; }
+    );
 
     # List available nixos module options for documentation purposes
     moduleOptions = docOptions;
 
     # List of machines
-    list = { machines = builtins.map (m: m.name) machines; };
+    list = {
+      machines = builtins.map (m: m.name) machines;
+    };
 
     # List of machines in an attrset: host => config
     info = corePkgs.writeText "machine-list.json" (builtins.toJSON machinesAttrs);
@@ -193,4 +217,5 @@ let
     # be run with proper NIX_PATH with swpins
     toplevel = corePkgs.writeText "toplevels.json" (builtins.toJSON selectedToplevels);
   };
-in build.${arg.build}
+in
+build.${arg.build}

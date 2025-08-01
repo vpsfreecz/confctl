@@ -1,10 +1,17 @@
-{ config, pkgs, lib, swpinsInfo, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  swpinsInfo,
+  ...
+}:
 with lib;
 let
   swpinOptions = import ../../lib/swpins/options.nix { inherit lib; };
 
   machineSwpinsInfo = pkgs.writeText "swpins-info.json" (builtins.toJSON swpinsInfo);
-in {
+in
+{
   options = {
     confctl = {
       swpins.core = {
@@ -17,7 +24,7 @@ in {
                 url = "https://github.com/NixOS/nixpkgs";
                 update.ref = "refs/heads/nixos-unstable";
                 update.auto = true;
-                update.interval = 30*24*60*60; # 1 month
+                update.interval = 30 * 24 * 60 * 60; # 1 month
               };
             };
           };
@@ -31,7 +38,7 @@ in {
 
         channels = mkOption {
           type = types.listOf types.str;
-          default = [];
+          default = [ ];
           description = ''
             List of channels from <option>confctl.swpins.channels</option>
             to use for core swpins
@@ -41,7 +48,7 @@ in {
 
       swpins.channels = mkOption {
         type = types.attrsOf (types.attrsOf (types.submodule swpinOptions.specModule));
-        default = {};
+        default = { };
         description = ''
           Software pin channels
         '';
