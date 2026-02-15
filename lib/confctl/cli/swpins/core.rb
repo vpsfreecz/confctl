@@ -1,10 +1,7 @@
-require 'confctl/cli/command'
-require 'confctl/cli/swpins/utils'
+require 'confctl/cli/swpins/base'
 
 module ConfCtl::Cli
-  class Swpins::Core < Command
-    include Swpins::Utils
-
+  class Swpins::Core < Swpins::Base
     def list
       core = ConfCtl::Swpins::Core.get
 

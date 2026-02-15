@@ -22,6 +22,15 @@ with lib;
             invokations
           '';
         };
+
+        impureEval = mkOption {
+          type = types.bool;
+          default = false;
+          description = ''
+            If true, confctl passes --impure to nix eval/nix build (flake backend).
+            Needed when evaluation/build references host paths like /secrets.
+          '';
+        };
       };
     };
   };

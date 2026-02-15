@@ -8,25 +8,24 @@ let
 
   userModules = "${toString confDir}/modules/cluster/default.nix";
 
-  baseModules =
-    [
-      (
-        { ... }:
-        {
-          _module.args = {
-            pkgs = corePkgs;
-            inherit confLib;
-            swpins = { };
-            swpinsInfo = { };
-            confMachine = null;
-          };
-        }
-      )
+  baseModules = [
+    (
+      { ... }:
+      {
+        _module.args = {
+          pkgs = corePkgs;
+          inherit confLib;
+          swpins = { };
+          swpinsInfo = { };
+          confMachine = null;
+        };
+      }
+    )
 
-      ./modules/cluster
-    ]
-    ++ (import "${toString confDir}/cluster/module-list.nix")
-    ++ (coreLib.optional (builtins.pathExists userModules) userModules);
+    ./modules/cluster
+  ]
+  ++ (import "${toString confDir}/cluster/module-list.nix")
+  ++ (coreLib.optional (builtins.pathExists userModules) userModules);
 
   evalConfig = corePkgs.lib.evalModules {
     prefix = [ ];

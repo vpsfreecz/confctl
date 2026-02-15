@@ -5,6 +5,15 @@ module ConfCtl::Cli
   class Swpins::Base < Command
     include Swpins::Utils
 
+    def initialize(...)
+      super
+
+      return unless ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
+
+      raise ConfCtl::Error,
+            'swpins are not supported for flake configs; use flake inputs (Phase 2: confctl pins)'
+    end
+
     def update
       run_command(Swpins::Core, :update)
       run_command(Swpins::Channel, :update)

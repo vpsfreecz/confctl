@@ -521,13 +521,13 @@ module ConfCtl::Cli
       end
 
       until carried_groups.empty?
-        carried_groups.delete_if do |_, machines|
-          m = machines.shift
+        carried_groups.delete_if do |_, group_machines|
+          m = group_machines.shift
           next(true) if m.nil?
 
           sorted_generations << [m.name, host_generations[m.name]]
 
-          machines.empty?
+          group_machines.empty?
         end
       end
 
@@ -1175,6 +1175,11 @@ module ConfCtl::Cli
     end
 
     def autoupdate_swpins(machines)
+      if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
+        puts Rainbow('Skipping swpins auto updates for flake config').bright
+        return
+      end
+
       puts Rainbow('Running swpins auto updates...').bright
       channels_update = []
       any_updated = false
@@ -1250,6 +1255,13 @@ module ConfCtl::Cli
     end
 
     def check_swpins(machines)
+      if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
+        puts Rainbow('Skipping swpins checks for flake config').bright
+        ret = {}
+        machines.each_key { |host| ret[host] = {} }
+        return ret
+      end
+
       ret = {}
       valid = true
 

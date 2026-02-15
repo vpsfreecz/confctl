@@ -1,10 +1,7 @@
-require 'confctl/cli/command'
-require 'confctl/cli/swpins/utils'
+require 'confctl/cli/swpins/base'
 
 module ConfCtl::Cli
-  class Swpins::Channel < Command
-    include Swpins::Utils
-
+  class Swpins::Channel < Swpins::Base
     def list
       rows = []
 

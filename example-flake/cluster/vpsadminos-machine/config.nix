@@ -10,15 +10,17 @@
     ./hardware.nix
   ];
 
-  networking.hostName = "nixos-machine";
+  networking.hostName = "vpsadminos-machine";
 
   boot.loader.grub.enable = true;
   boot.loader.grub.version = 2;
-  boot.loader.grub.device = "/dev/sda";
+  # boot.loader.grub.device = "";
 
-  fileSystems."/" = {
-    device = "/dev/sda1";
-    fsType = "ext4";
+  boot.supportedFilesystems = [ "zfs" ];
+  boot.kernelParams = [ "nolive" ];
+
+  boot.zfs.pools = {
+    # ZFS pool configuration
   };
 
   system.stateVersion = "20.09";
