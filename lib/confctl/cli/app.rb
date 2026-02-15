@@ -145,6 +145,36 @@ module ConfCtl::Cli
         end
       end
 
+      desc 'Manage flake inputs (replacement for swpins in flake configs)'
+      command :pins do |pins|
+        pins.desc 'List root-level flake inputs and their locked revisions'
+        pins.arg_name '[input-pattern]'
+        pins.command :ls do |c|
+          c.action(&Command.run(c, Pins::Inputs, :list))
+        end
+
+        pins.desc 'Update flake inputs in flake.lock'
+        pins.arg_name '[input-name ...]'
+        pins.command :update do |c|
+          c.desc 'Commit changes to git'
+          c.switch :commit, default_value: false
+
+          c.desc 'Include git log in the commit message'
+          c.switch :changelog, default_value: true
+
+          c.desc 'Open $EDITOR with commit message'
+          c.switch :editor, default_value: true
+
+          c.desc 'Treat change as downgrade for changelog direction'
+          c.switch %i[d downgrade], default_value: false
+
+          c.desc 'Update all root inputs (dangerous; normally specify names)'
+          c.switch :all, default_value: false
+
+          c.action(&Command.run(c, Pins::Inputs, :update))
+        end
+      end
+
       desc 'List configured machines'
       arg_name '[machine-pattern]'
       command :ls do |c|

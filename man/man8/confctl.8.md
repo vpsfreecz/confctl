@@ -525,6 +525,30 @@ the generation before last and so on.
 `confctl gen-data vpsadmin network`
   Generate network data files from vpsAdmin API.
 
+`confctl pins ls` [*input-pattern*]
+  List root-level flake inputs and their locked revisions. Available only in
+  flake configs.
+
+`confctl pins update` [*input-name ...*]
+  Update flake inputs in `flake.lock`. Available only in flake configs.
+
+    `--[no-]commit`
+      Commit changes to git. Disabled by default.
+
+    `--[no-]changelog`
+      Include git log in the commit message when `--commit` is used. Enabled by
+      default.
+
+    `--[no]-editor`
+      Open `$EDITOR` with the commit message. Enabled by default.
+
+    `-d`, `--downgrade`
+      Use when the new version is older than the previously set version. Used for
+      generating the commit changelog direction.
+
+    `--all`
+      Update all root inputs.
+
 `confctl swpins cluster ls` [*name-pattern* [*sw-pattern*]]
   List cluster machines with pinned software packages.
 
