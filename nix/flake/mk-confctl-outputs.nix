@@ -245,6 +245,13 @@ let
     ) machines
   );
 
+  pins = builtins.listToAttrs (
+    map (m: {
+      name = m.name;
+      value = buildPlan.${m.name}.swpinPaths;
+    }) machines
+  );
+
   confctlModules = [
     (confctlSrc + "/nix/modules/confctl/generations.nix")
     (confctlSrc + "/nix/modules/confctl/cli.nix")
@@ -353,5 +360,6 @@ in
   machineNames = machineNames;
   machines = machinesAttrs;
   buildPlan = buildPlan;
+  pins = pins;
   build = buildOutputs;
 }

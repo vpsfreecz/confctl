@@ -1,11 +1,12 @@
 require 'json'
 require_relative 'nix_build_flake'
+require_relative 'nix/args'
 
 module ConfCtl
   class NixFlake < NixLegacy
     def confctl_settings
       @confctl_settings ||= begin
-        settings = nix_eval_json('.#confctl.settings', impure: false)
+        settings = nix_eval_json('.#confctl.settings', impure: false, settings: {})
         demodulify(settings)
       end
     end
@@ -81,7 +82,8 @@ module ConfCtl
         installables << ".#confctl.build.#{flake_key}.autoRollback"
       end
 
-      build_results = nix_build_json(installables, &block)
+      legacy_args = legacy_nix_path_args(hosts)
+      build_results = nix_build_json(installables, legacy_nix_path_args: legacy_args, &block)
       installable_paths = map_installables(installables, build_results)
 
       hosts.each do |host|
@@ -133,15 +135,20 @@ module ConfCtl
       @build_plan ||= nix_eval_json('.#confctl.buildPlan')
     end
 
-    def nix_eval_json(installable, impure: nil)
-      impure_flag = impure.nil? ? impure_eval? : impure
+    def nix_eval_json(installable, impure: nil, settings: nil)
+      settings_for_args = settings || confctl_settings
 
       result = run_nix_with_fallback do |extra_experimental, no_update_lock_file|
+        args_builder = nix_args(
+          settings: settings_for_args,
+          impure: impure,
+          no_update_lock_file: no_update_lock_file
+        )
+
         nix_eval_args(
           installable,
-          impure: impure_flag,
-          extra_experimental: extra_experimental,
-          no_update_lock_file: no_update_lock_file
+          args_builder: args_builder,
+          extra_experimental: extra_experimental
         )
       end
 
@@ -149,17 +156,21 @@ module ConfCtl
       JSON.parse(out)
     end
 
-    def nix_build_json(installables, &block)
-      impure_flag = impure_eval?
+    def nix_build_json(installables, legacy_nix_path_args: [], &block)
       extra_experimental = false
       no_update_lock_file = true
 
       loop do
+        args_builder = nix_args(
+          settings: confctl_settings,
+          no_update_lock_file: no_update_lock_file
+        )
+
         args = nix_build_args(
           installables,
-          impure: impure_flag,
+          args_builder: args_builder,
           extra_experimental: extra_experimental,
-          no_update_lock_file: no_update_lock_file
+          legacy_nix_path_args: legacy_nix_path_args
         )
 
         nb = NixBuildFlake.new(args, chdir: conf_dir)
@@ -204,41 +215,47 @@ module ConfCtl
       end
     end
 
-    def nix_eval_args(installable, impure:, extra_experimental:, no_update_lock_file:)
+    def nix_args(settings:, impure: nil, no_update_lock_file: true)
+      ConfCtl::Nix::Args.new(
+        settings: settings,
+        impure: impure,
+        no_update_lock_file: no_update_lock_file
+      )
+    end
+
+    def nix_eval_args(installable, args_builder:, extra_experimental:)
       args = ['nix', 'eval', '--json']
       args.concat(
         nix_common_args(
-          impure: impure,
-          extra_experimental: extra_experimental,
-          no_update_lock_file: no_update_lock_file
+          args_builder.eval_args,
+          extra_experimental: extra_experimental
         )
       )
       args << installable
       args
     end
 
-    def nix_build_args(installables, impure:, extra_experimental:, no_update_lock_file:)
+    def nix_build_args(installables, args_builder:, extra_experimental:, legacy_nix_path_args: [])
       args = ['--json', '--no-link']
       args.concat(
         nix_common_args(
-          impure: impure,
-          extra_experimental: extra_experimental,
-          no_update_lock_file: no_update_lock_file
+          args_builder.build_args,
+          extra_experimental: extra_experimental
         )
       )
+      args.concat(legacy_nix_path_args)
       args.concat(installables)
       args
     end
 
-    def nix_common_args(impure:, extra_experimental:, no_update_lock_file:)
+    def nix_common_args(base_args, extra_experimental:)
       args = []
       if extra_experimental
         args << '--extra-experimental-features' << 'nix-command'
         args << '--extra-experimental-features' << 'flakes'
       end
 
-      args << '--no-write-lock-file'
-      args << '--no-update-lock-file' if no_update_lock_file
+      args.concat(base_args)
       args << '--override-input' << 'confctl' << "path:#{ConfCtl.root}"
 
       args << '--show-trace' if show_trace
@@ -250,9 +267,47 @@ module ConfCtl
       if cores
         args << '--option' << 'cores' << cores.to_s
       end
-
-      args << '--impure' if impure
       args
+    end
+
+    def nix_attr_string(value)
+      escaped = value.to_s.gsub('\\', '\\\\').gsub('"', '\\"')
+      "\"#{escaped}\""
+    end
+
+    def legacy_nix_path_args(hosts)
+      return [] if hosts.empty?
+
+      args_builder = nix_args(settings: confctl_settings)
+      return [] unless args_builder.legacy_nix_path?
+
+      unless args_builder.impure?
+        raise ConfCtl::Error, 'legacyNixPath requires impureEval'
+      end
+
+      merged_pins = {}
+
+      hosts.each do |host|
+        pins = nix_eval_json(".#confctl.pins.#{nix_attr_string(host)}")
+
+        pins.each do |name, path|
+          next unless path.is_a?(String) && !path.empty?
+
+          key = name.to_s
+          if merged_pins.has_key?(key) && merged_pins[key] != path
+            raise ConfCtl::Error,
+                  "legacyNixPath requires consistent pin #{key} across hosts; build hosts separately"
+          end
+          merged_pins[key] = path
+        end
+      end
+
+      args_builder.legacy_names.each_with_object([]) do |name, acc|
+        path = merged_pins[name.to_s]
+        next unless path.is_a?(String) && !path.empty?
+
+        acc << '-I' << "#{name}=#{path}"
+      end
     end
 
     def map_installables(installables, build_results)
@@ -269,11 +324,6 @@ module ConfCtl
 
     def experimental_error?(message)
       message.match?(/experimental/i) && message.match?(/nix-command|flakes/i)
-    end
-
-    def impure_eval?
-      settings = confctl_settings
-      settings.fetch('nix', {}).fetch('impureEval', false) == true
     end
   end
 end

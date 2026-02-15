@@ -8,10 +8,19 @@
 
   outputs =
     inputs@{ self, confctl, ... }:
-    {
-      confctl = confctl.lib.mkConfctlOutputs {
+    let
+      confctlOutputs = confctl.lib.mkConfctlOutputs {
         confDir = ./.;
         inputs = inputs;
+      };
+    in
+    {
+      confctl = confctlOutputs // {
+        settings = confctlOutputs.settings // {
+          nix = confctlOutputs.settings.nix // {
+            impureEval = true;
+          };
+        };
       };
     };
 }
