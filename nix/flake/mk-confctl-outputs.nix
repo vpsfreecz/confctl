@@ -1,6 +1,7 @@
 {
   confDir,
   inputs,
+  channels ? { },
   system ? null,
 }:
 let
@@ -449,6 +450,7 @@ let
 in
 {
   settings = settings;
+  channels = channels;
   machineNames = machineNames;
   machineKeys = machineKeys;
   machines = machinesAttrs;

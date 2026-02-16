@@ -177,6 +177,10 @@ module ConfCtl
       raise Error, 'pins are available only in flake configs'
     end
 
+    def eval_json(_installable)
+      raise Error, 'nix eval is available only in flake configs'
+    end
+
     # Build config.system.build.toplevel for selected hosts
     #
     # @param hosts [Array<Machine>]

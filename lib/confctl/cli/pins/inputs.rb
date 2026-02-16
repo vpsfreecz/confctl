@@ -1,10 +1,8 @@
 require 'confctl/cli/command'
 require 'confctl/config_type'
 require 'confctl/flake_lock'
-require 'confctl/flake_lock_diff'
-require 'confctl/pins'
 require 'confctl/pattern'
-require 'confctl/system_command'
+require 'confctl/pins/updater'
 
 module ConfCtl::Cli
   class Pins::Inputs < Command
@@ -34,41 +32,29 @@ module ConfCtl::Cli
       ensure_flake_config!
 
       conf_dir = ConfCtl::ConfDir.path
-      lock_path = File.join(conf_dir, 'flake.lock')
-
       inputs = if opts[:all]
-                 nil
+                 lock = ConfCtl::FlakeLock.load_optional(File.join(conf_dir, 'flake.lock'))
+                 raise ConfCtl::Error, 'flake.lock missing; specify inputs explicitly' if lock.nil?
+
+                 lock.root_inputs
                else
                  raise GLI::BadCommandLine, 'missing input name (or pass --all)' if args.empty?
 
                  args
                end
 
-      old_lock = ConfCtl::FlakeLock.load_optional(lock_path)
+      raise ConfCtl::Error, 'no inputs selected' if inputs.empty?
 
-      run_nix_flake_update!(conf_dir, inputs)
-
-      new_lock = ConfCtl::FlakeLock.load(lock_path)
-
-      changes = ConfCtl::FlakeLockDiff.diff(old_lock, new_lock, inputs: inputs)
-
-      print_update_summary(changes)
-
-      return if changes.empty?
-      return unless opts[:commit]
-
-      msg = ConfCtl::Pins::CommitMessage.build(
-        changes: changes,
-        changelog: opts[:changelog],
-        downgrade: opts[:downgrade]
-      )
-
-      ConfCtl::Pins::GitCommit.commit!(
+      res = ConfCtl::Pins::Updater.run!(
         conf_dir: conf_dir,
-        message: msg,
-        editor: opts[:editor],
-        files: ['flake.lock']
+        inputs: inputs,
+        commit: opts[:commit],
+        changelog: opts[:changelog],
+        downgrade: opts[:downgrade],
+        editor: opts[:editor]
       )
+
+      print_update_summary(res[:changes])
     end
 
     protected
@@ -77,33 +63,6 @@ module ConfCtl::Cli
       return if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
 
       raise ConfCtl::Error, 'pins is for flake configs only; this config has no flake.nix; use swpins.'
-    end
-
-    def run_nix_flake_update!(conf_dir, inputs)
-      cmd = ConfCtl::SystemCommand.new
-      extra_experimental = false
-
-      loop do
-        args = ['nix']
-        if extra_experimental
-          args << '--extra-experimental-features' << 'nix-command'
-          args << '--extra-experimental-features' << 'flakes'
-        end
-        args << 'flake' << 'update'
-        args.concat(inputs) if inputs
-
-        begin
-          Dir.chdir(conf_dir) { cmd.run(*args) }
-          break
-        rescue TTY::Command::ExitError => e
-          if !extra_experimental && experimental_error?(e.message)
-            extra_experimental = true
-            next
-          end
-
-          raise
-        end
-      end
     end
 
     def print_update_summary(changes)
@@ -116,10 +75,6 @@ module ConfCtl::Cli
       changes.each do |ch|
         puts "  #{ch.name}: #{ch.old_short_rev || '-'} -> #{ch.new_short_rev || '-'}"
       end
-    end
-
-    def experimental_error?(message)
-      message.match?(/experimental/i) && message.match?(/nix-command|flakes/i)
     end
   end
 end

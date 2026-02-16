@@ -173,6 +173,38 @@ module ConfCtl::Cli
 
           c.action(&Command.run(c, Pins::Inputs, :update))
         end
+
+        pins.desc 'Channel-based pin operations'
+        pins.command :channel do |ch|
+          ch.desc 'List channels and their role->input mapping (with locked revisions)'
+          ch.arg_name '[channel-pattern]'
+          ch.command :ls do |c|
+            c.action(&Command.run(c, Pins::Channels, :list))
+          end
+
+          ch.desc 'Update inputs referenced by channels (optionally only a single role)'
+          ch.arg_name '<channels> [role]'
+          ch.command :update do |c|
+            c.switch :commit, default_value: false
+            c.switch :changelog, default_value: true
+            c.switch :editor, default_value: true
+            c.switch %i[d downgrade], default_value: false
+            c.action(&Command.run(c, Pins::Channels, :update))
+          end
+        end
+
+        pins.desc 'Machine-based pin operations'
+        pins.command :machine do |m|
+          m.desc 'Update the input used by a specific machine for a specific role'
+          m.arg_name '<machine> <role>'
+          m.command :update do |c|
+            c.switch :commit, default_value: false
+            c.switch :changelog, default_value: true
+            c.switch :editor, default_value: true
+            c.switch %i[d downgrade], default_value: false
+            c.action(&Command.run(c, Pins::Machines, :update))
+          end
+        end
       end
 
       desc 'List configured machines'

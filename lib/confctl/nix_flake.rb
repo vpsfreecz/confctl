@@ -32,6 +32,13 @@ module ConfCtl
       machines
     end
 
+    # Evaluate flake installable and parse JSON
+    # @param installable [String]
+    # @return [Object]
+    def eval_json(installable)
+      nix_eval_json(installable)
+    end
+
     # Return list of swpins channels
     # @return [Hash]
     def list_swpins_channels

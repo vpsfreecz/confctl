@@ -9,9 +9,21 @@
   outputs =
     inputs@{ self, confctl, ... }:
     let
+      channels = {
+        nixos-unstable = {
+          nixpkgs = "nixpkgs";
+        };
+        staging = {
+          nixpkgs = "nixpkgs";
+        };
+        production = {
+          nixpkgs = "nixpkgs";
+        };
+      };
+
       confctlOutputs = confctl.lib.mkConfctlOutputs {
         confDir = ./.;
-        inputs = inputs;
+        inherit inputs channels;
       };
     in
     {

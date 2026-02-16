@@ -37,6 +37,7 @@ module ConfCtl
                    :eval_core_swpins,
                    :eval_host_swpins,
                    :eval_pins_info,
-                   :eval_pins
+                   :eval_pins,
+                   :eval_json
   end
 end
