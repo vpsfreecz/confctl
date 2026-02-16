@@ -1383,8 +1383,12 @@ module ConfCtl::Cli
 
     def format_command(reserved_cols = 0)
       cmd = "#{$0.split('/').last} #{ARGV.join(' ')}"
-      _, cols = IO.console.winsize
+      cols = IO.console&.winsize&.last
+      cols = cols.to_i
+      cols = 80 if cols <= 0
       max_length = cols - reserved_cols
+
+      return cmd if max_length <= 4
 
       if cmd.length > max_length
         "#{cmd[0..(max_length - 4)]}..."

@@ -209,7 +209,8 @@ module ConfCtl::Cli
         end
 
         output.print(cursor.clear_line)
-        output.puts("<#{'-' * (cols - 1)}")
+        line_len = [cols - 1, 1].max
+        output.puts("<#{'-' * line_len}")
         output.puts
       end
     end
@@ -220,21 +221,31 @@ module ConfCtl::Cli
       ret = ''
       ret << s
       ret << ' '
-      ret << ('-' * (cols - uncolored.length - 2))
+      dash_count = cols - uncolored.length - 2
+      dash_count = 1 if dash_count < 1
+      ret << ('-' * dash_count)
       ret << '>'
       ret
     end
 
     def fit_line(line)
-      if line.length >= (cols - 4)
-        "#{line[0..(cols - 4)]}..."
+      width = [cols - 4, 1].max
+      if line.length >= width
+        "#{line[0..width]}..."
       else
         line
       end
     end
 
     def fetch_size
-      @rows, @cols = IO.console.winsize
+      console = IO.console
+      rows, cols = console ? console.winsize : [24, 80]
+      rows = rows.to_i
+      cols = cols.to_i
+      rows = 24 if rows <= 0
+      cols = 80 if cols <= 0
+      @rows = rows
+      @cols = cols
 
       return unless size == :auto
 
