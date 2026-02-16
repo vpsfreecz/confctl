@@ -17,6 +17,9 @@ module ConfCtl
     # @return [Boolean]
     attr_reader :managed
 
+    # @return [String, nil]
+    attr_reader :key
+
     # @return [String]
     attr_reader :spin
 
@@ -47,6 +50,7 @@ module ConfCtl
       @name = opts['name']
       @safe_name = name.gsub('/', ':')
       @managed = meta['managed']
+      @key = opts['key'] || opts['machineKey'] || opts['flakeKey']
       @spin = meta['spin']
       @is_carrier = meta.fetch('carrier', {}).fetch('enable', false)
       @carrier_name = opts['carrier']
@@ -171,6 +175,8 @@ module ConfCtl
         get(meta, key.split('.'))
       elsif key == 'name'
         name
+      elsif %w[key machineKey flakeKey].include?(key)
+        @key
       elsif key == 'checks'
         health_checks.length
       else

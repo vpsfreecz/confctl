@@ -147,26 +147,58 @@ let
     in
     expandCarriers machineAttrs;
 
-  flakeKeyFor =
+  mkMachineKey =
     name:
     let
-      sanitized = builtins.replaceStrings [ "/" "." "-" ":" "#" ] [ "_" "_" "_" "_" "_" ] name;
-      base = if builtins.match "^[0-9].*" sanitized != null then "_" + sanitized else sanitized;
-      h = builtins.substring 0 8 (builtins.hashString "sha256" name);
+      sanitized =
+        let
+          chars =
+            if builtins ? stringToCharacters then
+              builtins.stringToCharacters name
+            else
+              coreLib.stringToCharacters name;
+          safeChar =
+            c:
+            if (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || (c >= "0" && c <= "9") || (c == "_") then
+              c
+            else
+              "_";
+          s = builtins.concatStringsSep "" (map safeChar chars);
+        in
+        if builtins.match "^[0-9].*" s != null then "_" + s else s;
+
+      hash = builtins.substring 0 8 (builtins.hashString "sha256" name);
     in
-    base + "__" + h;
+    "m_" + sanitized + "_" + hash;
 
   machines = getClusterMachines cluster;
 
-  machineNames = map (m: m.name) machines;
+  machinesWithKey = map (m: m // { key = mkMachineKey m.name; }) machines;
+
+  machineNames = map (m: m.name) machinesWithKey;
+
+  machineKeys = builtins.listToAttrs (
+    map (m: {
+      name = m.name;
+      value = m.key;
+    }) machinesWithKey
+  );
 
   machinesAttrs = builtins.listToAttrs (
     map (m: {
       name = m.name;
       value = m // {
-        flakeKey = flakeKeyFor m.name;
+        key = m.key;
+        flakeKey = m.key;
       };
-    }) machines
+    }) machinesWithKey
+  );
+
+  machinesByKey = builtins.listToAttrs (
+    map (m: {
+      name = m.key;
+      value = m;
+    }) machinesWithKey
   );
 
   lock = builtins.fromJSON (builtins.readFile (confDir + "/flake.lock"));
@@ -269,7 +301,8 @@ let
       {
         name = m.name;
         value = {
-          flakeKey = flakeKeyFor m.name;
+          key = m.key;
+          flakeKey = m.key;
           swpinPaths = swpinPaths;
           swpinSpecJson = swpinSpecJson;
           swpinInfos = swpinInfos;
@@ -277,21 +310,21 @@ let
           pinsInfo = pinsInfo;
         };
       }
-    ) machines
+    ) machinesWithKey
   );
 
   pinsOutput = builtins.listToAttrs (
     map (m: {
-      name = m.name;
+      name = m.key;
       value = buildPlan.${m.name}.pins;
-    }) machines
+    }) machinesWithKey
   );
 
   pinsInfoOutput = builtins.listToAttrs (
     map (m: {
-      name = m.name;
+      name = m.key;
       value = buildPlan.${m.name}.pinsInfo;
-    }) machines
+    }) machinesWithKey
   );
 
   confctlModules = [
@@ -403,21 +436,28 @@ let
         pkgs = import swpinPaths.nixpkgs { system = resolvedSystem; };
       in
       {
-        name = plan.flakeKey;
+        name = plan.key;
         value = {
           toplevel = toplevelFor m;
           autoRollback = autoRollbackFor pkgs;
         };
       }
-    ) machines
+    ) machinesWithKey
   );
+
+  toplevelOutput = coreLib.mapAttrs (_: v: v.toplevel) buildOutputs;
 in
 {
   settings = settings;
   machineNames = machineNames;
+  machineKeys = machineKeys;
   machines = machinesAttrs;
   buildPlan = buildPlan;
   pins = pinsOutput;
   pinsInfo = pinsInfoOutput;
   build = buildOutputs;
+  toplevel = toplevelOutput;
+  lib = {
+    mkMachineKey = mkMachineKey;
+  };
 }

@@ -27,7 +27,9 @@ module ConfCtl
     # @return [Hash]
     def list_machines
       machines = nix_eval_json('.#confctl.machines')
-      demodulify(machines)
+      machines = demodulify(machines)
+      refresh_machine_key_maps(machines)
+      machines
     end
 
     # Return list of swpins channels
@@ -90,10 +92,10 @@ module ConfCtl
 
       hosts.each do |host|
         host_plan = plan.fetch(host)
-        flake_key = host_plan['flakeKey']
+        machine_key = host_plan['key'] || host_plan['machineKey'] || host_plan['flakeKey'] || machine_key_for(host)
         host_plans[host] = host_plan
-        installables << ".#confctl.build.#{flake_key}.toplevel"
-        installables << ".#confctl.build.#{flake_key}.autoRollback"
+        installables << ".#confctl.build.#{machine_key}.toplevel"
+        installables << ".#confctl.build.#{machine_key}.autoRollback"
       end
 
       legacy_args = legacy_nix_path_args(hosts)
@@ -102,7 +104,7 @@ module ConfCtl
 
       hosts.each do |host|
         host_plan = host_plans[host]
-        flake_key = host_plan['flakeKey']
+        machine_key = host_plan['key'] || host_plan['machineKey'] || host_plan['flakeKey'] || machine_key_for(host)
         host_swpin_paths = host_plan['swpinPaths'] || {}
         swpin_specs_json = host_plan['swpinSpecJson'] || {}
         pins = host_plan['pins'] || host_swpin_paths
@@ -117,8 +119,8 @@ module ConfCtl
           [name, spec]
         end
 
-        toplevel_installable = ".#confctl.build.#{flake_key}.toplevel"
-        rollback_installable = ".#confctl.build.#{flake_key}.autoRollback"
+        toplevel_installable = ".#confctl.build.#{machine_key}.toplevel"
+        rollback_installable = ".#confctl.build.#{machine_key}.autoRollback"
         toplevel_path = installable_paths[toplevel_installable]
         auto_rollback_path = installable_paths[rollback_installable]
 
@@ -154,11 +156,11 @@ module ConfCtl
     end
 
     def pins_info_installable(host)
-      ".#confctl.pinsInfo.#{nix_attr_string(host)}"
+      ".#confctl.pinsInfo.#{machine_key_for(host)}"
     end
 
     def pins_installable(host)
-      ".#confctl.pins.#{nix_attr_string(host)}"
+      ".#confctl.pins.#{machine_key_for(host)}"
     end
 
     def nix_eval_json(installable, impure: nil, settings: nil)
@@ -314,7 +316,7 @@ module ConfCtl
       merged_pins = {}
 
       hosts.each do |host|
-        pins = nix_eval_json(".#confctl.pins.#{nix_attr_string(host)}")
+        pins = nix_eval_json(pins_installable(host))
 
         pins.each do |name, path|
           next unless path.is_a?(String) && !path.empty?
@@ -333,6 +335,37 @@ module ConfCtl
         next unless path.is_a?(String) && !path.empty?
 
         acc << '-I' << "#{name}=#{path}"
+      end
+    end
+
+    def refresh_machine_key_maps(machines)
+      @machine_name_to_key = {}
+      @machine_key_to_name = {}
+
+      machines.each do |name, info|
+        key = info['key'] || info['machineKey'] || info['flakeKey'] || name
+        @machine_name_to_key[name] = key
+        @machine_key_to_name[key] = name
+      end
+    end
+
+    def ensure_machine_key_maps
+      return if @machine_name_to_key && @machine_key_to_name
+
+      mapping = nix_eval_json('.#confctl.machineKeys')
+      @machine_name_to_key = mapping
+      @machine_key_to_name = mapping.to_h { |name, key| [key, name] }
+    end
+
+    def machine_key_for(host)
+      ensure_machine_key_maps
+
+      if @machine_name_to_key.has_key?(host)
+        @machine_name_to_key[host]
+      elsif @machine_key_to_name.has_key?(host)
+        host
+      else
+        raise ConfCtl::Error, "Unknown machine #{host.inspect}"
       end
     end
 

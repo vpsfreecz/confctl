@@ -161,8 +161,25 @@ module ConfCtl::Cli
       attr_filters = AttrFilters.new(opts[:attr])
       tag_filters = TagFilters.new(opts[:tag])
 
+      if pattern.nil?
+        return machines.select do |_host, d|
+          attr_filters.pass?(d) && tag_filters.pass?(d)
+        end
+      end
+
+      if machines[pattern]
+        return machines.select do |host, d|
+          host == pattern && attr_filters.pass?(d) && tag_filters.pass?(d)
+        end
+      end
+
+      key_matches = machines.select do |_host, d|
+        d['key'] == pattern && attr_filters.pass?(d) && tag_filters.pass?(d)
+      end
+      return key_matches unless key_matches.empty?
+
       machines.select do |host, d|
-        (pattern.nil? || ConfCtl::Pattern.match?(pattern, host)) \
+        ConfCtl::Pattern.match?(pattern, host) \
           && attr_filters.pass?(d) \
           && tag_filters.pass?(d)
       end
