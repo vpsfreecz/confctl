@@ -20,6 +20,7 @@ stdenv.mkDerivation rec {
     CONFCTL="${toString ./.}"
     BASEDIR="$(realpath `pwd`)"
     export GEM_HOME="$(pwd)/.gems"
+    export RUBOCOP_CACHE_ROOT="$CONFCTL/.rubocop_cache"
     BINDIR="$(ruby -e 'puts Gem.bindir')"
     mkdir -p "$BINDIR"
 

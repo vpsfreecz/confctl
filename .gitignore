@@ -7,3 +7,4 @@ man/man?/*.?
 html_doc
 .gems
 .yardoc
+.rubocop_cache/
