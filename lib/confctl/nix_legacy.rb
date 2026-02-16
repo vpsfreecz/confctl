@@ -169,6 +169,14 @@ module ConfCtl
       end
     end
 
+    def eval_pins_info(_host)
+      raise Error, 'pins info is available only in flake configs'
+    end
+
+    def eval_pins(_host)
+      raise Error, 'pins are available only in flake configs'
+    end
+
     # Build config.system.build.toplevel for selected hosts
     #
     # @param hosts [Array<Machine>]

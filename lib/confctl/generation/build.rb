@@ -28,6 +28,12 @@ module ConfCtl
     # @return [Hash]
     attr_reader :swpin_specs
 
+    # @return [Hash, nil]
+    attr_reader :pins_info
+
+    # @return [Hash, nil]
+    attr_reader :pins
+
     # @param current [Boolean]
     # @return [Boolean]
     attr_accessor :current
@@ -45,12 +51,16 @@ module ConfCtl
     # @param swpin_paths [Hash]
     # @param swpin_specs [Hash]
     # @param date [Time]
-    def create(toplevel, auto_rollback, swpin_paths, swpin_specs, date: nil)
+    # @param pins_info [Hash, nil]
+    # @param pins [Hash, nil]
+    def create(toplevel, auto_rollback, swpin_paths, swpin_specs, date: nil, pins_info: nil, pins: nil)
       @toplevel = toplevel
       @auto_rollback = auto_rollback
       @swpin_names = swpin_paths.keys
       @swpin_paths = swpin_paths
       @swpin_specs = swpin_specs
+      @pins_info = pins_info
+      @pins = pins
       @date = date || Time.now
       @name = date.strftime('%Y-%m-%d--%H-%M-%S')
       @kernel_version = extract_kernel_version
@@ -78,6 +88,9 @@ module ConfCtl
         )
       end
 
+      @pins_info = cfg['pins_info']
+      @pins = cfg['pins']
+
       @date = Time.iso8601(cfg['date'])
       @kernel_version = extract_kernel_version
     rescue StandardError => e
@@ -94,14 +107,19 @@ module ConfCtl
       end
 
       File.open(config_path, 'w') do |f|
-        f.puts(JSON.pretty_generate({
+        data = {
           date: date.iso8601,
           toplevel:,
           auto_rollback:,
           swpins: swpin_paths.to_h do |name, path|
             [name, { path:, spec: swpin_specs[name].as_json }]
           end
-        }))
+        }
+
+        data[:pins_info] = pins_info if pins_info
+        data[:pins] = pins if pins
+
+        f.puts(JSON.pretty_generate(data))
       end
 
       add_gcroot

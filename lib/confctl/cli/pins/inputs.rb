@@ -76,7 +76,7 @@ module ConfCtl::Cli
     def ensure_flake_config!
       return if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
 
-      raise ConfCtl::Error, 'confctl pins is available only in flake configs (flake.nix present)'
+      raise ConfCtl::Error, 'pins is for flake configs only; this config has no flake.nix; use swpins.'
     end
 
     def run_nix_flake_update!(conf_dir, inputs)

@@ -35,6 +35,8 @@ module ConfCtl
                    :collect_garbage,
                    :list_swpins_channels,
                    :eval_core_swpins,
-                   :eval_host_swpins
+                   :eval_host_swpins,
+                   :eval_pins_info,
+                   :eval_pins
   end
 end

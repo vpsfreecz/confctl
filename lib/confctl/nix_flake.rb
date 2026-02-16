@@ -54,6 +54,20 @@ module ConfCtl
       end
     end
 
+    # Evaluate pins info for host
+    # @param host [String]
+    # @return [Hash]
+    def eval_pins_info(host)
+      nix_eval_json(pins_info_installable(host))
+    end
+
+    # Evaluate pins for host
+    # @param host [String]
+    # @return [Hash]
+    def eval_pins(host)
+      nix_eval_json(pins_installable(host))
+    end
+
     # Build config.system.build.toplevel for selected hosts
     #
     # @param hosts [Array<String>]
@@ -91,6 +105,7 @@ module ConfCtl
         flake_key = host_plan['flakeKey']
         host_swpin_paths = host_plan['swpinPaths'] || {}
         swpin_specs_json = host_plan['swpinSpecJson'] || {}
+        pins = host_plan['pins'] || host_swpin_paths
 
         specs = swpin_specs_json.to_h do |name, spec_json|
           spec_class = ConfCtl::Swpins::Spec.for(spec_json['type'].to_sym)
@@ -111,13 +126,16 @@ module ConfCtl
         generation = host_generations.find(toplevel_path, host_swpin_paths)
 
         if generation.nil?
+          pins_info = eval_pins_info(host)
           generation = Generation::Build.new(host)
           generation.create(
             toplevel_path,
             auto_rollback_path,
             host_swpin_paths,
             specs,
-            date: time
+            date: time,
+            pins_info: pins_info,
+            pins: pins
           )
           generation.save
         end
@@ -133,6 +151,14 @@ module ConfCtl
 
     def build_plan
       @build_plan ||= nix_eval_json('.#confctl.buildPlan')
+    end
+
+    def pins_info_installable(host)
+      ".#confctl.pinsInfo.#{nix_attr_string(host)}"
+    end
+
+    def pins_installable(host)
+      ".#confctl.pins.#{nix_attr_string(host)}"
     end
 
     def nix_eval_json(installable, impure: nil, settings: nil)

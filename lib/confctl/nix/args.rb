@@ -1,5 +1,5 @@
 module ConfCtl
-  module Nix
+  class Nix
     class Args
       DEFAULT_LEGACY_NAMES = %w[nixpkgs vpsadminos vpsadmin].freeze
 

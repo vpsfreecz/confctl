@@ -110,6 +110,8 @@ module ConfCtl::Cli
     end
 
     def status
+      return status_flake if flake_config?
+
       machines = select_machines(args[0]).managed.select do |_host, machine|
         machine.target_host || machine.carried?
       end
@@ -216,7 +218,100 @@ module ConfCtl::Cli
       OutputFormatter.print(rows, cols, layout: :columns, color: use_color?)
     end
 
+    def status_flake
+      machines = select_machines(args[0]).managed.select do |_host, machine|
+        machine.target_host || machine.carried?
+      end
+
+      raise 'No machines to check' if machines.empty?
+
+      ask_confirmation! do
+        if opts[:generation]
+          puts 'The following machines will be checked:'
+        else
+          puts 'The following machines will be built and then checked:'
+        end
+
+        list_machines(machines)
+        puts
+        puts "Generation: #{opts[:generation] || 'new build'}"
+      end
+
+      statuses = machines.transform_values do |machine|
+        ConfCtl::MachineStatus.new(machine)
+      end
+
+      if opts[:generation] == 'none'
+        host_generations = nil
+      elsif opts[:generation]
+        host_generations = find_generations(machines, opts[:generation])
+
+        # Ignore statuses when no generation was found
+        statuses.delete_if do |host, _st|
+          !host_generations.has_key?(host)
+        end
+      else
+        host_generations = do_build(machines)
+        puts
+      end
+
+      if host_generations
+        host_generations.each do |host, gen|
+          statuses[host].target_toplevel = gen.toplevel
+        end
+      end
+
+      assign_target_pins_info(
+        statuses,
+        host_generations: opts[:generation] && opts[:generation] != 'none' ? host_generations : nil
+      )
+
+      tw = ConfCtl::ParallelExecutor.new(machines.length)
+
+      statuses.each_value do |st|
+        tw.add do
+          st.query(toplevel: opts[:generation] != 'none', swpins: false, pins: true)
+        end
+      end
+
+      tw.run
+
+      roles = pins_roles_for_status(statuses)
+      rows = []
+      cols = %w[host online uptime status generations] + roles
+
+      statuses.each do |host, st|
+        build_generations = ConfCtl::Generation::BuildList.new(host)
+        online = st.uptime ? true : false
+
+        pins_ok = pins_ok?(st)
+        status_ok = online && pins_ok
+        status_ok &&= st.target_toplevel == st.current_toplevel if st.target_toplevel
+
+        row = {
+          'host' => host,
+          'online' => online && Rainbow('yes').green,
+          'uptime' => st.uptime && format_duration(st.uptime),
+          'status' => status_ok ? Rainbow('ok').green : Rainbow('outdated').red,
+          'generations' => "#{build_generations.count}:#{st.generations && st.generations.count}"
+        }
+
+        roles.each do |role|
+          t_info = st.target_pins_info && st.target_pins_info[role]
+          d_info = st.pins_info && st.pins_info[role]
+          state = pins_info_state(t_info, d_info)
+          row[role] = format_pins_state(state, d_info, t_info)
+        end
+
+        rows << row
+      end
+
+      OutputFormatter.print(rows, cols, layout: :columns, color: use_color?)
+    end
+
     def changelog
+      return changelog_flake if flake_config?
+
       compare_swpins do |io, _host, status, sw_name, spec|
         s = spec.string_changelog_info(
           opts[:downgrade] ? :downgrade : :upgrade,
@@ -233,6 +328,8 @@ module ConfCtl::Cli
     end
 
     def diff
+      return diff_flake if flake_config?
+
       compare_swpins do |io, _host, status, sw_name, spec|
         s = spec.string_diff_info(
           opts[:downgrade] ? :downgrade : :upgrade,
@@ -243,6 +340,96 @@ module ConfCtl::Cli
         io.puts e.message
       else
         io.puts(s || 'no changes')
+      end
+    end
+
+    def changelog_flake
+      compare_pins_info do |io, host, target_info, deployed_info|
+        roles = pins_roles(target_info, deployed_info)
+        if roles.empty?
+          io.puts "#{host}: no pins info"
+          io.puts ''
+          next
+        end
+
+        entries = pins_info_entries(target_info, deployed_info, pattern: args[1])
+        next if entries.empty?
+
+        any_changed = false
+        any_unknown = false
+
+        entries.each do |entry|
+          role = entry[:role]
+          t_info = entry[:target]
+          d_info = entry[:deployed]
+
+          case entry[:status]
+          when :unknown
+            any_unknown = true
+            io.puts "#{host} @ #{role} in unknown state"
+          when :changed
+            any_changed = true
+            io.puts "#{host} @ #{role}:"
+
+            begin
+              log = pins_git_log(t_info, d_info)
+              io.puts(log || '(changelog unavailable)')
+            rescue StandardError => e
+              io.puts e.message
+            end
+
+            io.puts ''
+          end
+        end
+
+        unless any_changed || any_unknown
+          io.puts "#{host}: no changes"
+          io.puts ''
+        end
+
+        io.puts '' if any_unknown && !any_changed
+      end
+    end
+
+    def diff_flake
+      compare_pins_info do |io, host, target_info, deployed_info|
+        roles = pins_roles(target_info, deployed_info)
+        if roles.empty?
+          io.puts "#{host}: no pins info"
+          io.puts ''
+          next
+        end
+
+        entries = pins_info_entries(target_info, deployed_info, pattern: args[1])
+        next if entries.empty?
+
+        any_output = false
+
+        entries.each do |entry|
+          role = entry[:role]
+          t_info = entry[:target]
+          d_info = entry[:deployed]
+
+          case entry[:status]
+          when :unknown
+            any_output = true
+            io.puts "#{host} @ #{role} in unknown state"
+          when :changed
+            any_output = true
+            from = pins_short_rev(d_info) || 'unknown'
+            to = pins_short_rev(t_info) || 'unknown'
+            from, to = to, from if opts[:downgrade]
+            url = pins_url(t_info, d_info)
+            label = url ? "#{role} (#{url})" : role
+            io.puts "#{host} @ #{label}: #{from} -> #{to}"
+          end
+        end
+
+        unless any_output
+          io.puts "#{host}: no changes"
+        end
+
+        io.puts ''
       end
     end
 
@@ -1307,6 +1494,50 @@ module ConfCtl::Cli
       ret
     end
 
+    def compare_pins_info
+      machines = select_machines(args[0]).managed
+
+      ask_confirmation! do
+        puts 'Compare pins on the following machines:'
+        list_machines(machines)
+        puts
+        puts "Generation: #{opts[:generation] || 'current configuration'}"
+      end
+
+      statuses = machines.transform_values do |machine|
+        ConfCtl::MachineStatus.new(machine)
+      end
+
+      if opts[:generation]
+        host_generations = find_generations(machines, opts[:generation])
+
+        # Ignore statuses when no generation was found
+        statuses.delete_if do |host, _st|
+          !host_generations.has_key?(host)
+        end
+
+        assign_target_pins_info(statuses, host_generations:)
+      else
+        assign_target_pins_info(statuses)
+      end
+
+      TTY::Pager.page(enabled: use_pager?) do |io|
+        statuses.each do |host, st|
+          st.query(toplevel: false, generations: false, swpins: false, pins: true)
+
+          if st.uptime.nil?
+            io.puts "#{host} is offline"
+            next
+          end
+
+          target_info = st.target_pins_info || {}
+          deployed_info = st.pins_info || {}
+
+          yield(io, host, target_info, deployed_info)
+        end
+      end
+    end
+
     def compare_swpins
       machines = select_machines(args[0]).managed
 
@@ -1365,6 +1596,122 @@ module ConfCtl::Cli
           end
         end
       end
+    end
+
+    def assign_target_pins_info(statuses, host_generations: nil)
+      if host_generations
+        host_generations.each do |host, gen|
+          next unless statuses[host]
+
+          statuses[host].target_pins_info = ConfCtl::PinsInfo.normalize(gen.pins_info)
+        end
+      else
+        nix = ConfCtl::Nix.new(show_trace: opts['show-trace'])
+
+        statuses.each do |host, st|
+          st.target_pins_info = ConfCtl::PinsInfo.normalize(nix.eval_pins_info(host))
+        rescue StandardError
+          st.target_pins_info = nil
+        end
+      end
+    end
+
+    def pins_roles_for_status(statuses)
+      roles = []
+
+      statuses.each_value do |st|
+        roles.concat((st.target_pins_info || {}).keys)
+        roles.concat((st.pins_info || {}).keys)
+      end
+
+      roles.uniq.sort
+    end
+
+    def pins_ok?(status)
+      target_info = status.target_pins_info
+      return false if target_info.nil? || target_info.empty?
+
+      target_info.all? do |role, info|
+        pins_info_state(info, status.pins_info && status.pins_info[role]) == :same
+      end
+    end
+
+    def pins_info_entries(target_info, deployed_info, pattern: nil)
+      pins_roles(target_info, deployed_info).filter_map do |role|
+        next if pattern && !ConfCtl::Pattern.match?(pattern, role)
+
+        t_info = target_info[role]
+        d_info = deployed_info[role]
+        { role:, target: t_info, deployed: d_info, status: pins_info_state(t_info, d_info) }
+      end
+    end
+
+    def pins_roles(target_info, deployed_info)
+      roles = []
+      roles.concat(target_info.keys) if target_info
+      roles.concat(deployed_info.keys) if deployed_info
+      roles.uniq.sort
+    end
+
+    def pins_info_state(target_info, deployed_info)
+      return :unknown if target_info.nil? || deployed_info.nil?
+
+      target_rev = pins_rev(target_info)
+      deployed_rev = pins_rev(deployed_info)
+      return :unknown if target_rev.nil? || deployed_rev.nil?
+
+      target_rev == deployed_rev ? :same : :changed
+    end
+
+    def pins_rev(info)
+      return nil unless info.is_a?(Hash)
+
+      info['rev']
+    end
+
+    def pins_short_rev(info)
+      return nil unless info.is_a?(Hash)
+
+      info['shortRev'] || (info['rev'] && info['rev'][0, 8])
+    end
+
+    def pins_url(target_info, deployed_info)
+      (target_info && target_info['url']) || (deployed_info && deployed_info['url'])
+    end
+
+    def pins_git_log(target_info, deployed_info)
+      url = pins_url(target_info, deployed_info)
+      old_rev = pins_rev(deployed_info)
+      new_rev = pins_rev(target_info)
+      return nil if url.nil? || old_rev.nil? || new_rev.nil?
+
+      old_rev, new_rev = new_rev, old_rev if opts[:downgrade]
+
+      log_opts = []
+      log_opts << '--oneline' unless opts[:verbose]
+      log_opts << '-p' if opts[:patch]
+      log_opts << '--max-count=50' unless opts[:verbose] || opts[:patch]
+
+      mirror = ConfCtl::GitRepoMirror.new(url, quiet: true)
+      mirror.setup
+      mirror.log(old_rev, new_rev, opts: log_opts)
+    end
+
+    def format_pins_state(state, deployed_info, target_info)
+      case state
+      when :same
+        Rainbow(pins_short_rev(deployed_info) || 'unknown').green
+      when :changed
+        old = pins_short_rev(deployed_info) || 'unknown'
+        new = pins_short_rev(target_info) || 'unknown'
+        Rainbow("#{old} -> #{new}").red
+      else
+        Rainbow('unknown').yellow
+      end
+    end
+
+    def flake_config?
+      ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
     end
 
     def parse_wait_online

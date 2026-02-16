@@ -12,11 +12,11 @@ let
     else
       "x86_64-linux";
 
-  pins = import (confDir + "/configs/pins.nix");
+  pinsConfig = import (confDir + "/configs/pins.nix");
 
   confctlSrc = inputs.confctl;
 
-  coreInputName = pins.core.nixpkgs;
+  coreInputName = pinsConfig.core.nixpkgs;
   coreNixpkgs = inputs.${coreInputName};
   corePkgs = import coreNixpkgs { system = resolvedSystem; };
   coreLib = corePkgs.lib;
@@ -171,8 +171,23 @@ let
 
   lock = builtins.fromJSON (builtins.readFile (confDir + "/flake.lock"));
 
+  derivedUrlForNode =
+    node:
+    let
+      original = node.original or { };
+    in
+    if (original.type or null) == "github" then
+      "https://github.com/${original.owner}/${original.repo}"
+    else if original ? url then
+      let
+        raw = original.url;
+      in
+      if coreLib.hasPrefix "git+" raw then coreLib.removePrefix "git+" raw else raw
+    else
+      null;
+
   swpinInputsFor =
-    channels: builtins.foldl' (acc: chan: acc // (pins.channels.${chan} or { })) { } channels;
+    channels: builtins.foldl' (acc: chan: acc // (pinsConfig.channels.${chan} or { })) { } channels;
 
   swpinPathsFor =
     swpinInputs: coreLib.mapAttrs (_: inputName: inputs.${inputName}.outPath) swpinInputs;
@@ -187,15 +202,10 @@ let
         narHash = node.locked.narHash or null;
 
         derivedUrl =
-          if node.original.type == "github" then
-            "https://github.com/${node.original.owner}/${node.original.repo}"
-          else if node.original ? url then
-            let
-              raw = node.original.url;
-            in
-            if coreLib.hasPrefix "git+" raw then coreLib.removePrefix "git+" raw else raw
-          else
-            "unknown";
+          let
+            url = derivedUrlForNode node;
+          in
+          if url == null then "unknown" else url;
       in
       {
         type = "git-rev";
@@ -226,6 +236,25 @@ let
       }
     ) swpinInputs;
 
+  swpinInfosFor = swpinSpecJson: coreLib.mapAttrs (_: spec: spec.info or { }) swpinSpecJson;
+
+  mkRoleInfo =
+    inputName:
+    let
+      node = lock.nodes.${inputName} or { };
+      src = node.locked or { };
+      rev = src.rev or null;
+    in
+    {
+      input = inputName;
+      url = derivedUrlForNode node;
+      inherit rev;
+      shortRev = if rev == null then null else builtins.substring 0 8 rev;
+      lastModified = src.lastModified or null;
+    };
+
+  pinsInfoFor = swpinInputs: coreLib.mapAttrs (_: inputName: mkRoleInfo inputName) swpinInputs;
+
   buildPlan = builtins.listToAttrs (
     map (
       m:
@@ -233,22 +262,35 @@ let
         channels = m.metaConfig.swpins.channels or [ ];
         swpinInputs = swpinInputsFor channels;
         swpinPaths = swpinPathsFor swpinInputs;
+        swpinSpecJson = swpinSpecJsonFor swpinInputs swpinPaths;
+        swpinInfos = swpinInfosFor swpinSpecJson;
+        pinsInfo = pinsInfoFor swpinInputs;
       in
       {
         name = m.name;
         value = {
           flakeKey = flakeKeyFor m.name;
           swpinPaths = swpinPaths;
-          swpinSpecJson = swpinSpecJsonFor swpinInputs swpinPaths;
+          swpinSpecJson = swpinSpecJson;
+          swpinInfos = swpinInfos;
+          pins = swpinPaths;
+          pinsInfo = pinsInfo;
         };
       }
     ) machines
   );
 
-  pins = builtins.listToAttrs (
+  pinsOutput = builtins.listToAttrs (
     map (m: {
       name = m.name;
-      value = buildPlan.${m.name}.swpinPaths;
+      value = buildPlan.${m.name}.pins;
+    }) machines
+  );
+
+  pinsInfoOutput = builtins.listToAttrs (
+    map (m: {
+      name = m.name;
+      value = buildPlan.${m.name}.pinsInfo;
     }) machines
   );
 
@@ -258,6 +300,7 @@ let
     (confctlSrc + "/nix/modules/confctl/nix.nix")
     (confctlSrc + "/nix/modules/confctl/overlays.nix")
     (confctlSrc + "/nix/modules/confctl/swpins.nix")
+    (confctlSrc + "/nix/modules/confctl/pins-info.nix")
   ];
 
   confctlConfig = confDir + "/configs/confctl.nix";
@@ -281,9 +324,22 @@ let
       _module.args = {
         inherit confDir confLib;
         confData = import (confDir + "/data/default.nix") { lib = coreLib; };
-        swpins = { };
-        swpinsInfo = { };
         confMachine = null;
+      };
+    };
+
+  machineArgsModule =
+    m:
+    { ... }:
+    let
+      plan = buildPlan.${m.name};
+    in
+    {
+      _module.args = {
+        swpins = plan.swpinPaths;
+        swpinsInfo = plan.swpinInfos;
+        pins = plan.pins;
+        pinsInfo = plan.pinsInfo;
       };
     };
 
@@ -291,6 +347,7 @@ let
     m:
     [
       baseSystemModule
+      (machineArgsModule m)
       (confDir + "/cluster/${m.clusterName}/config.nix")
       (confDir + "/environments/base.nix")
     ]
@@ -360,6 +417,7 @@ in
   machineNames = machineNames;
   machines = machinesAttrs;
   buildPlan = buildPlan;
-  pins = pins;
+  pins = pinsOutput;
+  pinsInfo = pinsInfoOutput;
   build = buildOutputs;
 }
