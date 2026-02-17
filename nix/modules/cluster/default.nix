@@ -63,6 +63,16 @@ let
           };
         };
 
+        pins = {
+          inputs = mkOption {
+            type = types.attrsOf types.str;
+            default = { };
+            description = ''
+              Override role to flake input mapping for this machine
+            '';
+          };
+        };
+
         addresses = mkOption {
           type = types.nullOr (types.submodule addresses);
           default = { };

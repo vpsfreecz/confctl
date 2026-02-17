@@ -293,7 +293,8 @@ let
       m:
       let
         channels = m.metaConfig.swpins.channels or [ ];
-        swpinInputs = swpinInputsFor channels;
+        pinInputOverrides = (m.metaConfig.pins or { }).inputs or { };
+        swpinInputs = (swpinInputsFor channels) // pinInputOverrides;
         swpinPaths = swpinPathsFor swpinInputs;
         swpinSpecJson = swpinSpecJsonFor swpinInputs swpinPaths;
         swpinInfos = swpinInfosFor swpinSpecJson;
