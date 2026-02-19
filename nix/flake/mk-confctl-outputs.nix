@@ -13,12 +13,9 @@ let
     else
       "x86_64-linux";
 
-  pinsConfig = import (confDir + "/configs/pins.nix");
-
   confctlSrc = inputs.confctl;
 
-  coreInputName = pinsConfig.core.nixpkgs;
-  coreNixpkgs = inputs.${coreInputName};
+  coreNixpkgs = inputs.nixpkgs;
   corePkgs = import coreNixpkgs { system = resolvedSystem; };
   coreLib = corePkgs.lib;
 
@@ -220,7 +217,7 @@ let
       null;
 
   swpinInputsFor =
-    channels: builtins.foldl' (acc: chan: acc // (pinsConfig.channels.${chan} or { })) { } channels;
+    channelNames: builtins.foldl' (acc: chan: acc // (channels.${chan} or { })) { } channelNames;
 
   swpinPathsFor =
     swpinInputs: coreLib.mapAttrs (_: inputName: inputs.${inputName}.outPath) swpinInputs;
