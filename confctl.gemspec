@@ -10,7 +10,25 @@ Gem::Specification.new do |s|
     s.description = 'Nix deployment management tool'
   s.authors     = 'Jakub Skokan'
   s.email       = 'jakub.skokan@vpsfree.cz'
-  s.files       = `git ls-files -z`.split("\x0")
+  files =
+    if File.directory?(File.join(__dir__, '.git'))
+      `git ls-files -z`.split("\x0")
+    else
+      Dir.chdir(__dir__) do
+        Dir.glob('**/*', File::FNM_DOTMATCH).reject do |f|
+          f == '.' || f == '..' ||
+            f.start_with?('.git/') ||
+            f.start_with?('pkg/') ||
+            f.start_with?('tmp/') ||
+            f.start_with?('log/') ||
+            f.start_with?('.bundle/') ||
+            f.start_with?('vendor/') ||
+            f.end_with?('~')
+        end
+      end
+    end
+
+  s.files = files
   s.files      += Dir['man/man?/*.?']
   s.executables = s.files.grep(%r{^bin/}) { |f| File.basename(f) }
   s.license     = 'GPL-3.0-only'
