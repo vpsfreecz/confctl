@@ -19,6 +19,8 @@ let
   corePkgs = import coreNixpkgs { system = resolvedSystem; };
   coreLib = corePkgs.lib;
 
+  flakeInputs = coreLib.filterAttrs (n: _: n != "self") inputs;
+
   confLib = import (confctlSrc + "/nix/lib") {
     inherit confDir;
     coreLib = coreLib;
@@ -33,7 +35,7 @@ let
       {
         _module.args = {
           pkgs = corePkgs;
-          inherit confLib;
+          inherit confLib flakeInputs;
           swpins = { };
           swpinsInfo = { };
           confMachine = null;
@@ -289,9 +291,13 @@ let
     map (
       m:
       let
-        channels = m.metaConfig.swpins.channels or [ ];
+        pinsChannels = (m.metaConfig.pins.channels or [ ]);
+        swpinsChannels = (m.metaConfig.swpins.channels or [ ]);
+
+        channelNames = if pinsChannels != [ ] then pinsChannels else swpinsChannels;
+
         pinInputOverrides = (m.metaConfig.pins or { }).inputs or { };
-        swpinInputs = (swpinInputsFor channels) // pinInputOverrides;
+        swpinInputs = (swpinInputsFor channelNames) // pinInputOverrides;
         swpinPaths = swpinPathsFor swpinInputs;
         swpinSpecJson = swpinSpecJsonFor swpinInputs swpinPaths;
         swpinInfos = swpinInfosFor swpinSpecJson;
@@ -354,7 +360,7 @@ let
     { ... }:
     {
       _module.args = {
-        inherit confDir confLib;
+        inherit confDir confLib flakeInputs;
         confData = import (confDir + "/data/default.nix") { lib = coreLib; };
         confMachine = null;
       };

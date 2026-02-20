@@ -50,6 +50,8 @@ let
             description = ''
               List of channels from <option>confctl.swpins.channels</option>
               to use on this machine
+
+              This option is legacy in flake mode, prefer <option>cluster.&lt;name&gt;.pins.channels</option>.
             '';
           };
 
@@ -64,6 +66,19 @@ let
         };
 
         pins = {
+          channels = mkOption {
+            type = types.listOf types.str;
+            default = [ ];
+            description = ''
+              List of flake pin channels to use on this machine.
+
+              In flake mode, this selects entries from the `channels` mapping
+              passed to `mkConfctlOutputs` (e.g. "production", "staging", "os-staging").
+
+              This replaces legacy `swpins.channels`.
+            '';
+          };
+
           inputs = mkOption {
             type = types.attrsOf types.str;
             default = { };

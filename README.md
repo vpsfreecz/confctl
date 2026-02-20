@@ -195,6 +195,12 @@ and how to fetch them. Such configured channels can then be manipulated using
 `confctl`. `confctl` prefetches selected software pins and saves their hashes
 in JSON files in the `swpins/` directory.
 
+In flake-based configurations (using `confctl.lib.mkConfctlOutputs`), channel
+names are provided by the flake `channels` mapping. Machines should select
+channels via `cluster.<name>.pins.channels` (preferred) and can override the
+role-to-input mapping with `cluster.<name>.pins.inputs`. Legacy
+`cluster.<name>.swpins.channels` remains supported for non-flake configs.
+
 ```
 # List channels
 $ confctl swpins channel ls
@@ -239,8 +245,11 @@ For example, machine named `my-machine` would be described in
     # This tells confctl whether it is a NixOS or vpsAdminOS machine
     spin = "nixos";
 
-    # Use NixOS unstable channel defined in configs/swpins.nix
-    swpins.channels = [ "nixos-unstable" ];
+    # Flake configs: prefer pins.channels (channels come from mkConfctlOutputs)
+    pins.channels = [ "nixos-unstable" ];
+
+    # Legacy configs: use swpins.channels (configs/swpins.nix)
+    # swpins.channels = [ "nixos-unstable" ];
 
     # If the machine name is not a hostname, configure the address to which
     # should confctl deploy it
@@ -284,11 +293,11 @@ Instead of `confctl swpins channel` commands, use `confctl swpins cluster`
 to manage configured pins.
 
 ## Nix flakes
-confctl's software pins are an alternative to flakes and flakes are not supported
-by confctl at this time. Software pins are implemented by manipulating the `$NIX_PATH`
-environment variable, which is in conflict with using flakes. confctl is likely
-to be migrated to flakes when the interface will be stabilized. Since the transition
-is going to require a significant effort, there are no plans for it currently.
+confctl can be used from a configuration flake via `confctl.lib.mkConfctlOutputs`.
+In that mode, channel definitions live in the flake `channels` mapping and
+machines should select them via `cluster.<name>.pins.channels` (legacy
+`cluster.<name>.swpins.channels` is still supported). Software pins are still
+used to pin inputs for machine builds.
 
 ## Extra module arguments
 Machine configs can use the following extra module arguments:
@@ -300,6 +309,7 @@ Machine configs can use the following extra module arguments:
 - `confMachine` - attrset with information about the machine that is currently
   being built, contains key `name` and all options from
   [machine metadata module](##machine-metadata-and-software-pins)
+- `flakeInputs` - flake inputs passed to `mkConfctlOutputs` (excluding `self`)
 - `swpins` - attrset of software pins of the machine that is currently being built
 
 For example in `cluster/my-machine/config.nix`:

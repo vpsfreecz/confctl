@@ -22,11 +22,14 @@ for `nix-build` and can also be read by `Nix` while building machines.
 Software pins can be defined using channels or on specific machines.
 The advantage of using channels is that changing a pin in a channel changes
 also all machines that use the channel. Channels are defined in file
-`configs/swpins.nix` using option `confctl.swpins.channels`. Deployments
-declare software pins and channels in their respective `module.nix` files,
-option `cluster.<name>.swpins.channels` is a list of channels to use and option
-`cluster.<name>.swpins.pins` is an attrset of pins to extend or override pins
-from channels.
+`configs/swpins.nix` using option `confctl.swpins.channels` (legacy, non-flake
+configurations). In flake-based configurations (using
+`confctl.lib.mkConfctlOutputs`), channel names are provided by the flake
+`channels` mapping and machines should select them via
+`cluster.<name>.pins.channels` (preferred). Legacy
+`cluster.<name>.swpins.channels` remains supported, while
+`cluster.<name>.swpins.pins` can extend or override pins from channels and
+`cluster.<name>.pins.inputs` can override role-to-input mapping per machine.
 
 Software pins declared in the Nix configuration have to be prefetched before
 they can be used to build machines. See the `confctl swpins` command family
