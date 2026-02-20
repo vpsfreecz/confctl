@@ -341,7 +341,6 @@ let
     (confctlSrc + "/nix/modules/confctl/generations.nix")
     (confctlSrc + "/nix/modules/confctl/cli.nix")
     (confctlSrc + "/nix/modules/confctl/nix.nix")
-    (confctlSrc + "/nix/modules/confctl/overlays.nix")
     (confctlSrc + "/nix/modules/confctl/swpins.nix")
     (confctlSrc + "/nix/modules/confctl/pins-info.nix")
   ];
@@ -485,20 +484,9 @@ let
             vpsadminosPath = swpinPaths.vpsadminos;
             vpsadminosOverlays = import (vpsadminosPath + "/os/overlays");
             vpsadminOverlays = import (swpinPaths.vpsadmin + "/nixos/overlays");
-            confctlOverlays = [
-              (self: super: {
-                confReplaceVarsWith =
-                  { replacements, ... }@args:
-                  if builtins.hasAttr "replaceVarsWith" self then
-                    self.replaceVarsWith args
-                  else
-                    self.substituteAll ((builtins.removeAttrs args [ "replacements" ]) // replacements);
-              })
-            ];
             vpsadminosPkgs = import swpinPaths.nixpkgs {
               system = resolvedSystem;
-              overlays =
-                vpsadminosOverlays ++ vpsadminOverlays ++ (import (confDir + "/overlays")) ++ confctlOverlays;
+              overlays = vpsadminosOverlays ++ vpsadminOverlays ++ (import (confDir + "/overlays"));
             };
             vpsadminosSpecialArgs = specialArgs // {
               pkgs = vpsadminosPkgs;

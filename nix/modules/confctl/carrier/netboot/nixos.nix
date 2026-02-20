@@ -69,7 +69,7 @@ let
     isoImages = cfg.isoImages;
   };
 
-  builder = pkgs.confReplaceVarsWith {
+  builder = pkgs.replaceVarsWith {
     src = ./build-netboot-server.rb;
     name = "build-netboot-server";
     dir = "bin";

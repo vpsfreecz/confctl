@@ -4,7 +4,6 @@ let
     ./confctl/generations.nix
     ./confctl/cli.nix
     ./confctl/nix.nix
-    ./confctl/overlays.nix
     ./confctl/swpins.nix
     ./confctl/pins-info.nix
   ];

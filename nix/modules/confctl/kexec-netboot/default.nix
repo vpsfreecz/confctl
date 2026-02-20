@@ -10,7 +10,7 @@ let
 
   cfg = config.confctl.programs.kexec-netboot;
 
-  kexecNetboot = pkgs.confReplaceVarsWith {
+  kexecNetboot = pkgs.replaceVarsWith {
     name = "kexec-netboot";
     src = ./kexec-netboot.rb;
     isExecutable = true;

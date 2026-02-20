@@ -10,7 +10,7 @@ let
 
   cfg = config.confctl.carrier;
 
-  carrier-env = pkgs.confReplaceVarsWith {
+  carrier-env = pkgs.replaceVarsWith {
     src = ./carrier-env.rb;
     name = "carrier-env";
     isExecutable = true;
