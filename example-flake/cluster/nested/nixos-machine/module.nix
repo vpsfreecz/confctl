@@ -2,7 +2,7 @@
 {
   cluster."nested/nixos-machine" = {
     spin = "nixos";
-    swpins.channels = [ "nixos-unstable" ];
+    pins.channels = [ "nixos-unstable" ];
     host.target = "localhost";
   };
 }

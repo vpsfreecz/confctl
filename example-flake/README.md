@@ -8,14 +8,14 @@ There are four skeleton deployments:
   which is the same as `vpsadminos-container`
 
 ## Usage
-1. Enter `nix-shell`:
+1. Enter `nix develop`:
 ```
-nix-shell
+nix develop
 ```
 
 2. Update software pins:
 ```
-confctl swpins update
+confctl pins update
 ```
 
 3. Edit configurations in `cluster/` to your liking.
@@ -31,14 +31,7 @@ in `cluster/*/module.nix`, option `target.host`.
 
 Configure SSH keys in `data/ssh-keys.nix`.
 
-4. Create the secrets test file (required for the impure-eval example):
-```
-sudo mkdir -p /secrets/confctl-test
-echo "hello" | sudo tee /secrets/confctl-test/hello.txt
-sudo chmod -R a+rX /secrets/confctl-test
-```
-
-5. Build and deploy
+4. Build and deploy
 ```
 confctl build vpsfreecz-vps
 confctl deploy vpsfreecz-vps

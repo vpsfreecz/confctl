@@ -2,7 +2,7 @@
 {
   cluster."vpsfreecz-vps" = {
     spin = "nixos";
-    swpins.channels = [
+    pins.channels = [
       "nixos-unstable"
       "vpsadminos-staging"
     ];

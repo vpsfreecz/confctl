@@ -2,7 +2,7 @@
 {
   cluster."vpsadminos-container" = {
     spin = "nixos";
-    swpins.channels = [
+    pins.channels = [
       "nixos-unstable"
       "vpsadminos-staging"
     ];
