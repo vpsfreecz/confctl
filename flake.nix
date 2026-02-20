@@ -5,8 +5,24 @@
 
   outputs =
     { self, nixpkgs }:
+    let
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
+      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
+
+      mkDevShell = import ./nix/flake/mk-devshell.nix { inherit self nixpkgs; };
+    in
     {
       lib.mkConfctlOutputs = import ./nix/flake/mk-confctl-outputs.nix;
+
+      # Reusable dev shell for cluster configuration repos (vpsfconf etc.)
+      lib.mkDevShell = mkDevShell;
+
+      devShells = forAllSystems (system: {
+        default = mkDevShell { inherit system; };
+      });
 
       nixosModules = {
         generations = import ./nix/modules/confctl/generations.nix;
