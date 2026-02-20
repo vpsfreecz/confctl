@@ -47,7 +47,7 @@ Custom build attributes can be created by the user. For example, this is how
 
 ```nix
 # File cluster/nixos/config.nix
-{ config, pkgs, lib, confMachine, swpinsInfo, ... }:
+{ config, pkgs, lib, confMachine, pinsInfo, ... }:
 let
   # machine.json contains metadata about the machine that the carrier uses
   # to assemble the netboot server
@@ -72,11 +72,11 @@ let
     macs = confMachine.netboot.macs;
 
     # Information used by confctl status
-    swpins-info = swpinsInfo;
+    pins-info = pinsInfo;
   });
 in {
   imports = [
-    <nixpkgs/nixos/modules/installer/netboot/netboot-minimal.nix>
+    "${pkgs.path}/nixos/modules/installer/netboot/netboot-minimal.nix"
   ];
 
   # Define custom build attribute

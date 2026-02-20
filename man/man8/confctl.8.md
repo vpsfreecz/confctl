@@ -552,6 +552,46 @@ the generation before last and so on.
     `--all`
       Update all root inputs.
 
+`confctl pins channel ls` [*channel-pattern*]
+  List channels and their role-to-input mapping (including locked revisions).
+  Available only in flake configs.
+
+`confctl pins channel update` *channels* [*role*]
+  Update inputs referenced by selected channels. If *role* is provided, update
+  only that role (e.g. `nixpkgs` or `vpsadminos`). Available only in flake configs.
+
+    `--[no-]commit`
+      Commit changes to git. Disabled by default.
+
+    `--[no-]changelog`
+      Include git log in the commit message when `--commit` is used. Enabled by
+      default.
+
+    `--[no-]editor`
+      Open `$EDITOR` with the commit message. Enabled by default.
+
+    `-d`, `--downgrade`
+      Use when the new version is older than the previously set version. Used for
+      generating the commit changelog direction.
+
+`confctl pins machine update` *machine* *role*
+  Update the input used by a specific machine for a specific role. Available
+  only in flake configs.
+
+    `--[no-]commit`
+      Commit changes to git. Disabled by default.
+
+    `--[no-]changelog`
+      Include git log in the commit message when `--commit` is used. Enabled by
+      default.
+
+    `--[no-]editor`
+      Open `$EDITOR` with the commit message. Enabled by default.
+
+    `-d`, `--downgrade`
+      Use when the new version is older than the previously set version. Used for
+      generating the commit changelog direction.
+
 `confctl swpins cluster ls` [*name-pattern* [*sw-pattern*]]
   List cluster machines with pinned software packages.
 

@@ -21,6 +21,67 @@ machines.
 * [Nix](https://nixos.org)
 
 ## Quick start
+### Flake-based configuration (recommended)
+
+confctl works best with a flake-based configuration repository. The repository
+defines flake inputs (nixpkgs/vpsadminos/etc.), maps them into **channels**, and
+machines select channels via `cluster.<name>.pins.channels`.
+
+A minimal flake skeleton looks like this:
+
+```nix
+{
+  description = "my cluster config (confctl flake)";
+
+  inputs = {
+    confctl.url = "github:vpsfreecz/confctl/2026-02-15-flakes";
+
+    nixpkgsStable.url = "github:NixOS/nixpkgs/nixos-25.11";
+    vpsadminosStaging.url = "github:vpsfreecz/vpsadminos/staging";
+  };
+
+  outputs = inputs@{ self, confctl, ... }:
+    let
+      channels = {
+        production = { nixpkgs = "nixpkgsStable"; vpsadminos = "vpsadminosStaging"; };
+        staging    = { nixpkgs = "nixpkgsStable"; vpsadminos = "vpsadminosStaging"; };
+      };
+
+      confctlOutputs = confctl.lib.mkConfctlOutputs {
+        confDir = ./.;
+        inherit inputs channels;
+      };
+    in
+    {
+      confctl = confctlOutputs;
+
+      # Reusable dev shell provided by confctl
+      devShells.x86_64-linux.default = confctl.lib.mkDevShell { system = "x86_64-linux"; };
+    };
+}
+```
+
+Then enter the dev shell:
+
+```bash
+nix develop
+```
+
+This makes `confctl` available and installs Ruby gems into `./.gems`.
+It also generates man pages into `./.man` so `man confctl` works.
+
+To update flake inputs, use the `confctl pins ...` commands (instead of `swpins`):
+
+```bash
+confctl pins ls
+confctl pins update --commit nixpkgsStable vpsadminosStaging
+confctl pins channel update --commit '{production,staging}' vpsadminos
+```
+
+### Legacy configuration (non-flake)
+
+The following steps describe the original non-flake workflow.
+
 1. Either install confctl as a gem:
 ```
 gem install confctl
@@ -83,7 +144,7 @@ confctl add my-machine
 
 You can now edit the machine's configuration in directory `cluster/my-machine`.
 
-7. Update pre-configured software pins to fetch current nixpkgs:
+7. Update pre-configured software pins to fetch current nixpkgs. In flake-based configurations, use `confctl pins ...` instead:
 ```
 confctl swpins update
 ```
