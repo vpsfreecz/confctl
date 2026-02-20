@@ -429,6 +429,7 @@ let
     m:
     let
       userModules = userModuleList.${m.metaConfig.spin} or [ ];
+      systemModules = (import (confctlSrc + "/nix/modules/system-list.nix")).${m.metaConfig.spin} or [ ];
     in
     [
       baseSystemModule
@@ -440,6 +441,7 @@ let
       (confDir + "/environments/base.nix")
     ]
     ++ confctlModules
+    ++ systemModules
     ++ userModules;
 
   autoRollbackFor =
@@ -481,26 +483,44 @@ let
         else if m.metaConfig.spin == "vpsadminos" then
           let
             vpsadminosPath = swpinPaths.vpsadminos;
+            vpsadminosOverlays = import (vpsadminosPath + "/os/overlays");
+            vpsadminOverlays = import (swpinPaths.vpsadmin + "/nixos/overlays");
+            confctlOverlays = [
+              (self: super: {
+                confReplaceVarsWith =
+                  { replacements, ... }@args:
+                  if builtins.hasAttr "replaceVarsWith" self then
+                    self.replaceVarsWith args
+                  else
+                    self.substituteAll ((builtins.removeAttrs args [ "replacements" ]) // replacements);
+              })
+            ];
+            vpsadminosPkgs = import swpinPaths.nixpkgs {
+              system = resolvedSystem;
+              overlays =
+                vpsadminosOverlays ++ vpsadminOverlays ++ (import (confDir + "/overlays")) ++ confctlOverlays;
+            };
+            vpsadminosSpecialArgs = specialArgs // {
+              pkgs = vpsadminosPkgs;
+            };
             vpsadminosPkgsModule = {
               _file = vpsadminosPath + "/os/default.nix";
               key = vpsadminosPath + "/os/default.nix";
               config = {
                 _module = {
-                  args = specialArgs;
                   check = true;
                 };
-                nixpkgs.system = pkgs.lib.mkDefault resolvedSystem;
-                nixpkgs.overlays = import (vpsadminosPath + "/os/overlays");
+                nixpkgs.system = vpsadminosPkgs.lib.mkDefault resolvedSystem;
               };
             };
             vpsadminosBaseModules = import (vpsadminosPath + "/os/modules/module-list.nix") {
               nixpkgsPath = swpinPaths.nixpkgs;
             };
           in
-          pkgs.lib.evalModules {
+          vpsadminosPkgs.lib.evalModules {
             prefix = [ ];
             modules = vpsadminosBaseModules ++ [ vpsadminosPkgsModule ] ++ modules;
-            specialArgs = specialArgs;
+            specialArgs = vpsadminosSpecialArgs;
           }
         else
           abort "Unsupported spin ${m.metaConfig.spin}";
