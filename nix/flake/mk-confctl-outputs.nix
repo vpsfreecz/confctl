@@ -53,6 +53,11 @@ let
 
   cluster = evalCluster.config.cluster;
 
+  clusterModulesForSystem = [
+    (confctlSrc + "/nix/modules/cluster")
+  ]
+  ++ (import (confDir + "/cluster/module-list.nix"));
+
   makeMachine =
     {
       name,
@@ -343,6 +348,15 @@ let
 
   confctlConfig = confDir + "/configs/confctl.nix";
   swpinsConfig = confDir + "/configs/swpins.nix";
+  userModuleListPath = confDir + "/modules/module-list.nix";
+  userModuleList =
+    if builtins.pathExists userModuleListPath then
+      import userModuleListPath
+    else
+      {
+        nixos = [ ];
+        vpsadminos = [ ];
+      };
 
   evalConfctl = import (coreNixpkgs + "/nixos/lib/eval-config.nix") {
     modules =
@@ -355,15 +369,25 @@ let
   };
 
   settings = evalConfctl.config.confctl;
+  confData = import (confDir + "/data/default.nix") { lib = coreLib; };
 
   baseSystemModule =
     { ... }:
     {
       _module.args = {
         inherit confDir confLib flakeInputs;
-        confData = import (confDir + "/data/default.nix") { lib = coreLib; };
-        confMachine = null;
+        inherit confData;
       };
+    };
+
+  confMachineFor =
+    m:
+    (confLib.findMetaConfig {
+      inherit cluster;
+      name = m.clusterName;
+    })
+    // {
+      name = m.clusterName;
     };
 
   machineArgsModule =
@@ -378,18 +402,45 @@ let
         swpinsInfo = plan.swpinInfos;
         pins = plan.pins;
         pinsInfo = plan.pinsInfo;
+        confMachine = confMachineFor m;
       };
+    };
+
+  specialArgsFor =
+    m:
+    let
+      plan = buildPlan.${m.name};
+    in
+    {
+      inherit
+        confDir
+        confLib
+        flakeInputs
+        confData
+        ;
+      confMachine = confMachineFor m;
+      swpins = plan.swpinPaths;
+      swpinsInfo = plan.swpinInfos;
+      pins = plan.pins;
+      pinsInfo = plan.pinsInfo;
     };
 
   systemModulesFor =
     m:
+    let
+      userModules = userModuleList.${m.metaConfig.spin} or [ ];
+    in
     [
       baseSystemModule
       (machineArgsModule m)
+    ]
+    ++ clusterModulesForSystem
+    ++ [
       (confDir + "/cluster/${m.clusterName}/config.nix")
       (confDir + "/environments/base.nix")
     ]
-    ++ confctlModules;
+    ++ confctlModules
+    ++ userModules;
 
   autoRollbackFor =
     pkgs:
@@ -418,15 +469,39 @@ let
       swpinPaths = plan.swpinPaths;
       pkgs = import swpinPaths.nixpkgs { system = resolvedSystem; };
       modules = systemModulesFor m;
+      specialArgs = specialArgsFor m;
 
       evalConfig =
         if m.metaConfig.spin == "nixos" then
           import (swpinPaths.nixpkgs + "/nixos/lib/eval-config.nix") {
             inherit modules pkgs;
             system = resolvedSystem;
+            specialArgs = specialArgs;
           }
         else if m.metaConfig.spin == "vpsadminos" then
-          import (swpinPaths.vpsadminos + "/os/default.nix") { inherit modules pkgs; }
+          let
+            vpsadminosPath = swpinPaths.vpsadminos;
+            vpsadminosPkgsModule = {
+              _file = vpsadminosPath + "/os/default.nix";
+              key = vpsadminosPath + "/os/default.nix";
+              config = {
+                _module = {
+                  args = specialArgs;
+                  check = true;
+                };
+                nixpkgs.system = pkgs.lib.mkDefault resolvedSystem;
+                nixpkgs.overlays = import (vpsadminosPath + "/os/overlays");
+              };
+            };
+            vpsadminosBaseModules = import (vpsadminosPath + "/os/modules/module-list.nix") {
+              nixpkgsPath = swpinPaths.nixpkgs;
+            };
+          in
+          pkgs.lib.evalModules {
+            prefix = [ ];
+            modules = vpsadminosBaseModules ++ [ vpsadminosPkgsModule ] ++ modules;
+            specialArgs = specialArgs;
+          }
         else
           abort "Unsupported spin ${m.metaConfig.spin}";
     in
