@@ -1,23 +1,156 @@
-# Flake pins notes
+# Flake pins
 
-In flake configs, confctl does not use any "core pins" concept.
-Pin resolution comes from the flake lock file and the channel
-mapping exported as `confctl.channels`.
+confctl supports flake-based configuration repositories via `confctl.lib.mkConfctlOutputs`.
 
-Use normal flake inputs and the pins commands instead:
-- confctl pins ls / update
-- confctl pins channel ls / update
-- confctl pins machine update
+In flake configs:
 
-If you want a stable nixpkgs for helper evaluation, keep a normal
-input like `nixpkgsCore` and point `nixpkgs` to it:
+- pins are normal flake inputs locked in `flake.lock`
+- machines select “channels” via `pins.channels`
+- machines can override role→input mapping via `pins.inputs`
+- updates are performed by `confctl pins ...` (or `nix flake lock --update-input ...`)
 
-```
-inputs = {
-  nixpkgsCore.url = "...";
-  nixpkgs.follows = "nixpkgsCore";
+This document explains the model and the common workflows.
+
+## Roles, inputs, and channels
+
+A **role** is a named dependency such as:
+
+- `nixpkgs`
+- `vpsadminos`
+- `vpsadmin`
+
+A role is mapped to a **flake input name** via **channels**.
+
+A **channel** is just a name like `production` or `staging` that selects a set of role mappings.
+
+Example:
+
+```nix
+channels = {
+  staging = {
+    nixpkgs = "nixpkgsStable";
+    vpsadminos = "vpsadminosStaging";
+    vpsadmin = "vpsadminStaging";
+  };
+
+  production = {
+    nixpkgs = "nixpkgsStable";
+    vpsadminos = "vpsadminosProduction";
+    vpsadmin = "vpsadminProduction";
+  };
 };
 ```
 
-The helper uses `inputs.nixpkgs` for evaluation; machine roles still
-select inputs via `confctl.channels`.
+## `mkConfctlOutputs` flake skeleton
+
+A minimal pattern:
+
+```nix
+{
+  description = "my cluster config (confctl flake)";
+
+  inputs = {
+    confctl.url = "github:vpsfreecz/confctl";
+
+    nixpkgsStable.url = "github:NixOS/nixpkgs/nixos-25.11";
+    vpsadminosStaging.url = "github:vpsfreecz/vpsadminos/staging";
+    vpsadminosProduction.url = "github:vpsfreecz/vpsadminos/staging";
+
+    vpsadminStaging = {
+      url = "github:vpsfreecz/vpsadmin/2026-02-19-flakes";
+      inputs.vpsadminos.follows = "vpsadminosStaging";
+    };
+
+    vpsadminProduction = {
+      url = "github:vpsfreecz/vpsadmin/2026-02-19-flakes";
+      inputs.vpsadminos.follows = "vpsadminosProduction";
+    };
+  };
+
+  outputs = inputs@{ self, confctl, ... }:
+    let
+      channels = {
+        staging = {
+          nixpkgs = "nixpkgsStable";
+          vpsadminos = "vpsadminosStaging";
+          vpsadmin = "vpsadminStaging";
+        };
+
+        production = {
+          nixpkgs = "nixpkgsStable";
+          vpsadminos = "vpsadminosProduction";
+          vpsadmin = "vpsadminProduction";
+        };
+      };
+    in
+    {
+      confctl = confctl.lib.mkConfctlOutputs {
+        confDir = ./.;
+        inherit inputs channels;
+      };
+
+      # Optional: reuse the confctl dev shell for this repo
+      devShells.x86_64-linux.default = confctl.lib.mkDevShell { system = "x86_64-linux"; };
+    };
+}
+```
+
+## Selecting channels on a machine
+
+In machine metadata (typically `cluster/<name>/module.nix`), choose channels:
+
+```nix
+{ ... }:
+{
+  cluster."my-machine" = {
+    spin = "nixos";
+    pins.channels = [ "production" ];
+  };
+}
+```
+
+Multiple channels can be combined; later channels can override roles from earlier ones.
+
+## Per-machine overrides
+
+To override one role for a single machine:
+
+```nix
+cluster."my-machine".pins.inputs.nixpkgs = "nixpkgsMunin";
+```
+
+Use this sparingly. The default model is: select channels, update channels.
+
+## Updating pins
+
+Pins are flake inputs in `flake.lock`.
+
+Common commands:
+
+```bash
+confctl pins ls
+confctl pins update --commit <input...>
+
+confctl pins channel ls
+confctl pins channel update --commit '{production,staging}' vpsadminos
+
+confctl pins machine update --commit <machine> nixpkgs
+```
+
+- `--no-changelog` disables including `git log --oneline old..new` in the commit message.
+- `--downgrade` is useful when you intentionally move to an older revision and still want the changelog direction to make sense.
+
+## Nested inputs and `follows`
+
+If input **A** depends on input **B** and you want the *top-level flake* to decide the revision of **B**, use `follows`.
+
+Example (vpsadmin → vpsadminos):
+
+```nix
+inputs.vpsadminStaging = {
+  url = "github:vpsfreecz/vpsadmin/2026-02-19-flakes";
+  inputs.vpsadminos.follows = "vpsadminosStaging";
+};
+```
+
+Because `follows` is per-input-name, you typically need separate inputs per environment (staging vs production) to pin independently.
