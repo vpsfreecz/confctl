@@ -7,7 +7,6 @@
 {
   imports = [
     ../../../environments/base.nix
-    ../../../modules/secrets-test.nix
     ./hardware.nix
   ];
 

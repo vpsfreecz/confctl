@@ -2,10 +2,7 @@
 {
   cluster."vpsadminos-container" = {
     spin = "nixos";
-    pins.channels = [
-      "nixos-unstable"
-      "vpsadminos-staging"
-    ];
+    pins.channels = [ "vpsadminos" ];
     host.target = "<ip address>";
   };
 }

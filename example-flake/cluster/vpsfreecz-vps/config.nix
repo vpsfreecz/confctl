@@ -2,12 +2,13 @@
   config,
   pkgs,
   lib,
+  pins,
   ...
 }:
 {
   imports = [
     ../../environments/base.nix
-    <vpsadminos/os/lib/nixos-container/vpsadminos.nix>
+    (pins.vpsadminos + "/os/lib/nixos-container/vpsadminos.nix")
   ];
 
   networking.hostName = "vpsfreecz-vps";

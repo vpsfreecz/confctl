@@ -49,7 +49,24 @@
     "root": {
       "inputs": {
         "confctl": "confctl",
-        "nixpkgs": "nixpkgs_2"
+        "nixpkgs": "nixpkgs_2",
+        "vpsadminos": "vpsadminos"
+      }
+    },
+    "vpsadminos": {
+      "locked": {
+        "lastModified": 1771582184,
+        "narHash": "sha256-gWttuL99qq18bQkLIM0TJiNnERvbyiosZvlb8hmslIo=",
+        "owner": "vpsfreecz",
+        "repo": "vpsadminos",
+        "rev": "b48e737b40d58d9cdd2f1fef4491b83e463ce554",
+        "type": "github"
+      },
+      "original": {
+        "owner": "vpsfreecz",
+        "ref": "staging",
+        "repo": "vpsadminos",
+        "type": "github"
       }
     }
   },

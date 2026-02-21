@@ -4,20 +4,19 @@
   inputs = {
     confctl.url = "path:..";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    vpsadminos.url = "github:vpsfreecz/vpsadminos/staging";
   };
 
   outputs =
     inputs@{ self, confctl, ... }:
     let
       channels = {
-        nixos-unstable = {
+        nixos = {
           nixpkgs = "nixpkgs";
         };
-        staging = {
+        vpsadminos = {
           nixpkgs = "nixpkgs";
-        };
-        production = {
-          nixpkgs = "nixpkgs";
+          vpsadminos = "vpsadminos";
         };
       };
 
@@ -27,12 +26,8 @@
       };
     in
     {
-      confctl = confctlOutputs // {
-        settings = confctlOutputs.settings // {
-          nix = confctlOutputs.settings.nix // {
-            impureEval = true;
-          };
-        };
-      };
+      confctl = confctlOutputs;
+
+      devShells.x86_64-linux.default = confctl.lib.mkDevShell { system = "x86_64-linux"; };
     };
 }
