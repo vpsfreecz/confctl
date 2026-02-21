@@ -27,8 +27,7 @@ with lib;
           type = types.bool;
           default = false;
           description = ''
-            If true, confctl passes --impure to nix eval/nix build (flake backend).
-            Needed when evaluation/build references host paths like /secrets.
+            Enable impure evaluation/builds (allows reading host paths outside the Nix store when they are referenced as Nix paths).
           '';
         };
 
