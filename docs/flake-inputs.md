@@ -1,13 +1,13 @@
-# Flake pins
+# Flake inputs
 
 confctl supports flake-based configuration repositories via `confctl.lib.mkConfctlOutputs`.
 
 In flake configs:
 
-- pins are normal flake inputs locked in `flake.lock`
-- machines select “channels” via `pins.channels`
-- machines can override role→input mapping via `pins.inputs`
-- updates are performed by `confctl pins ...` (or `nix flake lock --update-input ...`)
+- inputs are normal flake inputs locked in `flake.lock`
+- machines select “channels” via `inputs.channels`
+- machines can override role→input mapping via `inputs.overrides`
+- updates are performed by `confctl inputs ...` (or `nix flake lock --update-input ...`)
 
 This document explains the model and the common workflows.
 
@@ -104,7 +104,7 @@ In machine metadata (typically `cluster/<name>/module.nix`), choose channels:
 {
   cluster."my-machine" = {
     spin = "nixos";
-    pins.channels = [ "production" ];
+    inputs.channels = [ "production" ];
   };
 }
 ```
@@ -116,25 +116,25 @@ Multiple channels can be combined; later channels can override roles from earlie
 To override one role for a single machine:
 
 ```nix
-cluster."my-machine".pins.inputs.nixpkgs = "nixpkgsMunin";
+cluster."my-machine".inputs.overrides.nixpkgs = "nixpkgsMunin";
 ```
 
 Use this sparingly. The default model is: select channels, update channels.
 
-## Updating pins
+## Updating inputs
 
-Pins are flake inputs in `flake.lock`.
+Inputs are flake inputs in `flake.lock`.
 
 Common commands:
 
 ```bash
-confctl pins ls
-confctl pins update --commit <input...>
+confctl inputs ls
+confctl inputs update --commit <input...>
 
-confctl pins channel ls
-confctl pins channel update --commit '{production,staging}' vpsadminos
+confctl inputs channel ls
+confctl inputs channel update --commit '{production,staging}' vpsadminos
 
-confctl pins machine update --commit <machine> nixpkgs
+confctl inputs machine update --commit <machine> nixpkgs
 ```
 
 - `--no-changelog` disables including `git log --oneline old..new` in the commit message.

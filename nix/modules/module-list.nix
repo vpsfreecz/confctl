@@ -5,7 +5,7 @@ let
     ./confctl/cli.nix
     ./confctl/nix.nix
     ./confctl/swpins.nix
-    ./confctl/pins-info.nix
+    ./confctl/inputs-info.nix
   ];
 
   nixos = [

@@ -1,13 +1,13 @@
 require 'json'
 
 module ConfCtl
-  class PinsInfo
+  class InputsInfo
     KEYS = %w[input url rev shortRev lastModified].freeze
 
     def self.parse(json)
       normalize(JSON.parse(json))
     rescue JSON::ParserError => e
-      raise Error, "unable to parse pins info: #{e.message}"
+      raise Error, "unable to parse inputs info: #{e.message}"
     end
 
     def self.normalize(hash)

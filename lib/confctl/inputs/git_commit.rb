@@ -1,5 +1,5 @@
 module ConfCtl
-  module Pins
+  module Inputs
     class GitCommit
       def self.commit!(conf_dir:, message:, editor:, files:)
         args = %w[git commit]

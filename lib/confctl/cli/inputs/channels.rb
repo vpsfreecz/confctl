@@ -3,15 +3,15 @@ require 'confctl/config_type'
 require 'confctl/flake_lock'
 require 'confctl/nix'
 require 'confctl/pattern'
-require 'confctl/pins/setter'
-require 'confctl/pins/updater'
+require 'confctl/inputs/setter'
+require 'confctl/inputs/updater'
 
 module ConfCtl::Cli
-  class Pins::Channels < Command
+  class Inputs::Channels < Command
     def list
       ensure_flake_config!
 
-      raise GLI::BadCommandLine, 'usage: confctl pins channel ls [channel-pattern]' if args.length > 1
+      raise GLI::BadCommandLine, 'usage: confctl inputs channel ls [channel-pattern]' if args.length > 1
 
       conf_dir = ConfCtl::ConfDir.path
       lock = ConfCtl::FlakeLock.load(File.join(conf_dir, 'flake.lock'))
@@ -62,7 +62,7 @@ module ConfCtl::Cli
 
       raise ConfCtl::Error, 'no inputs selected (check role name?)' if inputs.empty?
 
-      ConfCtl::Pins::Updater.run!(
+      ConfCtl::Inputs::Updater.run!(
         conf_dir: ConfCtl::ConfDir.path,
         inputs: inputs,
         commit: opts[:commit],
@@ -110,7 +110,7 @@ module ConfCtl::Cli
         puts "Warning: #{msg}"
       end
 
-      ConfCtl::Pins::Setter.run!(
+      ConfCtl::Inputs::Setter.run!(
         conf_dir: ConfCtl::ConfDir.path,
         inputs: inputs,
         rev: rev,
@@ -129,7 +129,7 @@ module ConfCtl::Cli
     def ensure_flake_config!
       return if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
 
-      raise ConfCtl::Error, 'confctl pins channel is available only in flake configs'
+      raise ConfCtl::Error, 'confctl inputs channel is available only in flake configs'
     end
 
     def eval_channels

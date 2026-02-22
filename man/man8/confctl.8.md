@@ -26,10 +26,10 @@ also all machines that use the channel. Channels are defined in file
 configurations). In flake-based configurations (using
 `confctl.lib.mkConfctlOutputs`), channel names are provided by the flake
 `channels` mapping and machines should select them via
-`cluster.<name>.pins.channels` (preferred). Legacy
+`cluster.<name>.inputs.channels` (preferred). Legacy
 `cluster.<name>.swpins.channels` remains supported, while
 `cluster.<name>.swpins.pins` can extend or override pins from channels and
-`cluster.<name>.pins.inputs` can override role-to-input mapping per machine.
+`cluster.<name>.inputs.overrides` can override role-to-input mapping per machine.
 
 Software pins declared in the Nix configuration have to be prefetched before
 they can be used to build machines. See the `confctl swpins` command family
@@ -528,11 +528,11 @@ the generation before last and so on.
 `confctl gen-data vpsadmin network`
   Generate network data files from vpsAdmin API.
 
-`confctl pins ls` [*input-pattern*]
+`confctl inputs ls` [*input-pattern*]
   List root-level flake inputs and their locked revisions. Available only in
   flake configs.
 
-`confctl pins update` [*input-name ...*]
+`confctl inputs update` [*input-name ...*]
   Update flake inputs in `flake.lock`. Available only in flake configs.
 
     `--[no-]commit`
@@ -552,7 +552,7 @@ the generation before last and so on.
     `--all`
       Update all root inputs.
 
-`confctl pins set` *input-name* *rev*
+`confctl inputs set` *input-name* *rev*
   Set a flake input to a specific revision in `flake.lock` while keeping the
   original upstream reference. Available only in flake configs.
 
@@ -570,11 +570,11 @@ the generation before last and so on.
       Use when the new version is older than the previously set version. Used for
       generating the commit changelog direction.
 
-`confctl pins channel ls` [*channel-pattern*]
+`confctl inputs channel ls` [*channel-pattern*]
   List channels and their role-to-input mapping (including locked revisions).
   Available only in flake configs.
 
-`confctl pins channel update` *channels* [*role*]
+`confctl inputs channel update` *channels* [*role*]
   Update inputs referenced by selected channels. If *role* is provided, update
   only that role (e.g. `nixpkgs` or `vpsadminos`). Available only in flake configs.
 
@@ -592,7 +592,7 @@ the generation before last and so on.
       Use when the new version is older than the previously set version. Used for
       generating the commit changelog direction.
 
-`confctl pins channel set` *channels* *role* *rev*
+`confctl inputs channel set` *channels* *role* *rev*
   Set inputs referenced by selected channels for a specific role to *rev*.
   Available only in flake configs.
 
@@ -614,7 +614,7 @@ the generation before last and so on.
       Allow setting inputs that are shared with other channels or roles. Disabled
       by default; without it, shared inputs cause an error.
 
-`confctl pins machine update` *machine* *role*
+`confctl inputs machine update` *machine* *role*
   Update the input used by a specific machine for a specific role. Available
   only in flake configs.
 
@@ -632,7 +632,7 @@ the generation before last and so on.
       Use when the new version is older than the previously set version. Used for
       generating the commit changelog direction.
 
-`confctl pins machine set` *machine* *role* *rev*
+`confctl inputs machine set` *machine* *role* *rev*
   Set the input used by a specific machine for a specific role to *rev*.
   Available only in flake configs.
 

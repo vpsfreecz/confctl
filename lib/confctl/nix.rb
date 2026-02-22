@@ -36,8 +36,8 @@ module ConfCtl
                    :list_swpins_channels,
                    :eval_core_swpins,
                    :eval_host_swpins,
-                   :eval_pins_info,
-                   :eval_pins,
+                   :eval_inputs_info,
+                   :eval_inputs,
                    :eval_json
   end
 end

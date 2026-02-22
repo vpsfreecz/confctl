@@ -29,14 +29,14 @@
         cli = import ./nix/modules/confctl/cli.nix;
         nix = import ./nix/modules/confctl/nix.nix;
         swpins = import ./nix/modules/confctl/swpins.nix;
-        pins-info = import ./nix/modules/confctl/pins-info.nix;
+        inputs-info = import ./nix/modules/confctl/inputs-info.nix;
         default = {
           imports = [
             (import ./nix/modules/confctl/generations.nix)
             (import ./nix/modules/confctl/cli.nix)
             (import ./nix/modules/confctl/nix.nix)
             (import ./nix/modules/confctl/swpins.nix)
-            (import ./nix/modules/confctl/pins-info.nix)
+            (import ./nix/modules/confctl/inputs-info.nix)
           ];
         };
       };

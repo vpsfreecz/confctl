@@ -29,10 +29,10 @@ module ConfCtl
     attr_reader :swpin_specs
 
     # @return [Hash, nil]
-    attr_reader :pins_info
+    attr_reader :inputs_info
 
     # @return [Hash, nil]
-    attr_reader :pins
+    attr_reader :inputs
 
     # @param current [Boolean]
     # @return [Boolean]
@@ -51,16 +51,16 @@ module ConfCtl
     # @param swpin_paths [Hash]
     # @param swpin_specs [Hash]
     # @param date [Time]
-    # @param pins_info [Hash, nil]
-    # @param pins [Hash, nil]
-    def create(toplevel, auto_rollback, swpin_paths, swpin_specs, date: nil, pins_info: nil, pins: nil)
+    # @param inputs_info [Hash, nil]
+    # @param inputs [Hash, nil]
+    def create(toplevel, auto_rollback, swpin_paths, swpin_specs, date: nil, inputs_info: nil, inputs: nil)
       @toplevel = toplevel
       @auto_rollback = auto_rollback
       @swpin_names = swpin_paths.keys
       @swpin_paths = swpin_paths
       @swpin_specs = swpin_specs
-      @pins_info = pins_info
-      @pins = pins
+      @inputs_info = inputs_info
+      @inputs = inputs
       @date = date || Time.now
       @name = date.strftime('%Y-%m-%d--%H-%M-%S')
       @kernel_version = extract_kernel_version
@@ -88,8 +88,8 @@ module ConfCtl
         )
       end
 
-      @pins_info = cfg['pins_info']
-      @pins = cfg['pins']
+      @inputs_info = cfg['inputs_info']
+      @inputs = cfg['inputs']
 
       @date = Time.iso8601(cfg['date'])
       @kernel_version = extract_kernel_version
@@ -116,8 +116,8 @@ module ConfCtl
           end
         }
 
-        data[:pins_info] = pins_info if pins_info
-        data[:pins] = pins if pins
+        data[:inputs_info] = inputs_info if inputs_info
+        data[:inputs] = inputs if inputs
 
         f.puts(JSON.pretty_generate(data))
       end

@@ -1,11 +1,11 @@
 require 'confctl/cli/command'
 require 'confctl/config_type'
 require 'confctl/nix'
-require 'confctl/pins/setter'
-require 'confctl/pins/updater'
+require 'confctl/inputs/setter'
+require 'confctl/inputs/updater'
 
 module ConfCtl::Cli
-  class Pins::Machines < Command
+  class Inputs::Machines < Command
     def update
       ensure_flake_config!
       require_args!('machine', 'role')
@@ -13,17 +13,17 @@ module ConfCtl::Cli
       machine_name = args[0]
       role = args[1]
 
-      pins_info = ConfCtl::Nix.new.eval_pins_info(machine_name)
-      unless pins_info.is_a?(Hash)
-        raise ConfCtl::Error, "pins info unavailable for machine '#{machine_name}'"
+      inputs_info = ConfCtl::Nix.new.eval_inputs_info(machine_name)
+      unless inputs_info.is_a?(Hash)
+        raise ConfCtl::Error, "inputs info unavailable for machine '#{machine_name}'"
       end
 
-      role_info = pins_info[role] || pins_info[role.to_s] || pins_info[role.to_sym]
+      role_info = inputs_info[role] || inputs_info[role.to_s] || inputs_info[role.to_sym]
       input = role_info.is_a?(Hash) ? (role_info['input'] || role_info[:input]) : nil
 
       raise ConfCtl::Error, "machine '#{machine_name}' has no role '#{role}'" unless input
 
-      ConfCtl::Pins::Updater.run!(
+      ConfCtl::Inputs::Updater.run!(
         conf_dir: ConfCtl::ConfDir.path,
         inputs: [input],
         commit: opts[:commit],
@@ -46,17 +46,17 @@ module ConfCtl::Cli
       role = args[1]
       rev = args[2]
 
-      pins_info = ConfCtl::Nix.new.eval_pins_info(machine_name)
-      unless pins_info.is_a?(Hash)
-        raise ConfCtl::Error, "pins info unavailable for machine '#{machine_name}'"
+      inputs_info = ConfCtl::Nix.new.eval_inputs_info(machine_name)
+      unless inputs_info.is_a?(Hash)
+        raise ConfCtl::Error, "inputs info unavailable for machine '#{machine_name}'"
       end
 
-      role_info = pins_info[role] || pins_info[role.to_s] || pins_info[role.to_sym]
+      role_info = inputs_info[role] || inputs_info[role.to_s] || inputs_info[role.to_sym]
       input = role_info.is_a?(Hash) ? (role_info['input'] || role_info[:input]) : nil
 
       raise ConfCtl::Error, "machine '#{machine_name}' has no role '#{role}'" unless input
 
-      ConfCtl::Pins::Setter.run!(
+      ConfCtl::Inputs::Setter.run!(
         conf_dir: ConfCtl::ConfDir.path,
         inputs: [input],
         rev: rev,
@@ -73,7 +73,7 @@ module ConfCtl::Cli
     def ensure_flake_config!
       return if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
 
-      raise ConfCtl::Error, 'confctl pins machine is available only in flake configs'
+      raise ConfCtl::Error, 'confctl inputs machine is available only in flake configs'
     end
   end
 end

@@ -2,7 +2,7 @@
 {
   cluster."vpsadminos-machine" = {
     spin = "nixos";
-    pins.channels = [ "vpsadminos" ];
+    inputs.channels = [ "vpsadminos" ];
     host.target = "<ip address>";
   };
 }

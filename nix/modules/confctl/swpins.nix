@@ -56,7 +56,7 @@ in
     };
   };
 
-  config = mkIf (config.confctl.pinsInfo == null) {
+  config = mkIf (config.confctl.inputsInfo == null) {
     environment.etc."confctl/swpins-info.json".source = machineSwpinsInfo;
   };
 }

@@ -169,12 +169,12 @@ module ConfCtl
       end
     end
 
-    def eval_pins_info(_host)
-      raise Error, 'pins info is available only in flake configs'
+    def eval_inputs_info(_host)
+      raise Error, 'inputs info is available only in flake configs'
     end
 
-    def eval_pins(_host)
-      raise Error, 'pins are available only in flake configs'
+    def eval_inputs(_host)
+      raise Error, 'inputs are available only in flake configs'
     end
 
     def eval_json(_installable)

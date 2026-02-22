@@ -2,11 +2,11 @@ require 'confctl/cli/command'
 require 'confctl/config_type'
 require 'confctl/flake_lock'
 require 'confctl/pattern'
-require 'confctl/pins/setter'
-require 'confctl/pins/updater'
+require 'confctl/inputs/setter'
+require 'confctl/inputs/updater'
 
 module ConfCtl::Cli
-  class Pins::Inputs < Command
+  class Inputs::Root < Command
     def list
       ensure_flake_config!
 
@@ -46,7 +46,7 @@ module ConfCtl::Cli
 
       raise ConfCtl::Error, 'no inputs selected' if inputs.empty?
 
-      res = ConfCtl::Pins::Updater.run!(
+      res = ConfCtl::Inputs::Updater.run!(
         conf_dir: conf_dir,
         inputs: inputs,
         commit: opts[:commit],
@@ -65,7 +65,7 @@ module ConfCtl::Cli
       input = args[0]
       rev = args[1]
 
-      res = ConfCtl::Pins::Setter.run!(
+      res = ConfCtl::Inputs::Setter.run!(
         conf_dir: ConfCtl::ConfDir.path,
         inputs: [input],
         rev: rev,
@@ -83,7 +83,7 @@ module ConfCtl::Cli
     def ensure_flake_config!
       return if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
 
-      raise ConfCtl::Error, 'pins is for flake configs only; this config has no flake.nix; use swpins.'
+      raise ConfCtl::Error, 'inputs is for flake configs only; this config has no flake.nix; use swpins.'
     end
 
     def print_update_summary(changes)

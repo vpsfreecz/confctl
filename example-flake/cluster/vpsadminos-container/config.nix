@@ -2,13 +2,13 @@
   config,
   pkgs,
   lib,
-  pins,
+  inputs,
   ...
 }:
 {
   imports = [
     ../../environments/base.nix
-    (pins.vpsadminos + "/os/lib/nixos-container/vpsadminos.nix")
+    (inputs.vpsadminos + "/os/lib/nixos-container/vpsadminos.nix")
   ];
 
   networking.hostName = "vpsadminos-container";

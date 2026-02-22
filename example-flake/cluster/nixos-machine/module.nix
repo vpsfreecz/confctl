@@ -2,7 +2,7 @@
 {
   cluster."nixos-machine" = {
     spin = "nixos";
-    pins.channels = [ "nixos" ];
+    inputs.channels = [ "nixos" ];
     host.target = "localhost";
   };
 }

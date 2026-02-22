@@ -47,7 +47,7 @@ Custom build attributes can be created by the user. For example, this is how
 
 ```nix
 # File cluster/nixos/config.nix
-{ config, pkgs, lib, confMachine, pinsInfo, ... }:
+{ config, pkgs, lib, confMachine, inputsInfo, ... }:
 let
   # machine.json contains metadata about the machine that the carrier uses
   # to assemble the netboot server
@@ -72,7 +72,7 @@ let
     macs = confMachine.netboot.macs;
 
     # Information used by confctl status
-    pins-info = pinsInfo;
+    inputs-info = inputsInfo;
   });
 in {
   imports = [

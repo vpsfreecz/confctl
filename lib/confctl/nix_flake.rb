@@ -63,18 +63,18 @@ module ConfCtl
       end
     end
 
-    # Evaluate pins info for host
+    # Evaluate inputs info for host
     # @param host [String]
     # @return [Hash]
-    def eval_pins_info(host)
-      nix_eval_json(pins_info_installable(host))
+    def eval_inputs_info(host)
+      nix_eval_json(inputs_info_installable(host))
     end
 
-    # Evaluate pins for host
+    # Evaluate inputs for host
     # @param host [String]
     # @return [Hash]
-    def eval_pins(host)
-      nix_eval_json(pins_installable(host))
+    def eval_inputs(host)
+      nix_eval_json(inputs_installable(host))
     end
 
     # Build config.system.build.toplevel for selected hosts
@@ -114,7 +114,7 @@ module ConfCtl
         machine_key = host_plan['key'] || host_plan['machineKey'] || host_plan['flakeKey'] || machine_key_for(host)
         host_swpin_paths = host_plan['swpinPaths'] || {}
         swpin_specs_json = host_plan['swpinSpecJson'] || {}
-        pins = host_plan['pins'] || host_swpin_paths
+        inputs = host_plan['inputs'] || host_swpin_paths
 
         specs = swpin_specs_json.to_h do |name, spec_json|
           spec_class = ConfCtl::Swpins::Spec.for(spec_json['type'].to_sym)
@@ -135,7 +135,7 @@ module ConfCtl
         generation = host_generations.find(toplevel_path, host_swpin_paths)
 
         if generation.nil?
-          pins_info = eval_pins_info(host)
+          inputs_info = eval_inputs_info(host)
           generation = Generation::Build.new(host)
           generation.create(
             toplevel_path,
@@ -143,8 +143,8 @@ module ConfCtl
             host_swpin_paths,
             specs,
             date: time,
-            pins_info: pins_info,
-            pins: pins
+            inputs_info: inputs_info,
+            inputs: inputs
           )
           generation.save
         end
@@ -162,12 +162,12 @@ module ConfCtl
       @build_plan ||= nix_eval_json('.#confctl.buildPlan')
     end
 
-    def pins_info_installable(host)
-      ".#confctl.pinsInfo.#{machine_key_for(host)}"
+    def inputs_info_installable(host)
+      ".#confctl.inputsInfo.#{machine_key_for(host)}"
     end
 
-    def pins_installable(host)
-      ".#confctl.pins.#{machine_key_for(host)}"
+    def inputs_installable(host)
+      ".#confctl.inputs.#{machine_key_for(host)}"
     end
 
     def nix_eval_json(installable, impure: nil, settings: nil)
@@ -320,25 +320,25 @@ module ConfCtl
         raise ConfCtl::Error, 'legacyNixPath requires impureEval'
       end
 
-      merged_pins = {}
+      merged_inputs = {}
 
       hosts.each do |host|
-        pins = nix_eval_json(pins_installable(host))
+        inputs = nix_eval_json(inputs_installable(host))
 
-        pins.each do |name, path|
+        inputs.each do |name, path|
           next unless path.is_a?(String) && !path.empty?
 
           key = name.to_s
-          if merged_pins.has_key?(key) && merged_pins[key] != path
+          if merged_inputs.has_key?(key) && merged_inputs[key] != path
             raise ConfCtl::Error,
-                  "legacyNixPath requires consistent pin #{key} across hosts; build hosts separately"
+                  "legacyNixPath requires consistent input #{key} across hosts; build hosts separately"
           end
-          merged_pins[key] = path
+          merged_inputs[key] = path
         end
       end
 
       args_builder.legacy_names.each_with_object([]) do |name, acc|
-        path = merged_pins[name.to_s]
+        path = merged_inputs[name.to_s]
         next unless path.is_a?(String) && !path.empty?
 
         acc << '-I' << "#{name}=#{path}"

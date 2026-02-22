@@ -25,7 +25,7 @@ machines.
 
 confctl works best with a flake-based configuration repository. The repository
 defines flake inputs (nixpkgs/vpsadminos/etc.), maps them into **channels**, and
-machines select channels via `cluster.<name>.pins.channels`.
+machines select channels via `cluster.<name>.inputs.channels`.
 
 A minimal flake skeleton looks like this:
 
@@ -70,12 +70,12 @@ nix develop
 This makes `confctl` available and installs Ruby gems into `./.gems`.
 It also generates man pages into `./.man` so `man confctl` works.
 
-To update flake inputs, use the `confctl pins ...` commands (instead of `swpins`):
+To update flake inputs, use the `confctl inputs ...` commands (instead of `swpins`):
 
 ```bash
-confctl pins ls
-confctl pins update --commit nixpkgsStable vpsadminosStaging
-confctl pins channel update --commit '{production,staging}' vpsadminos
+confctl inputs ls
+confctl inputs update --commit nixpkgsStable vpsadminosStaging
+confctl inputs channel update --commit '{production,staging}' vpsadminos
 ```
 
 ### Legacy configuration (non-flake)
@@ -144,7 +144,7 @@ confctl add my-machine
 
 You can now edit the machine's configuration in directory `cluster/my-machine`.
 
-7. Update pre-configured software pins to fetch current nixpkgs. In flake-based configurations, use `confctl pins ...` instead:
+7. Update pre-configured software pins to fetch current nixpkgs. In flake-based configurations, use `confctl inputs ...` instead:
 ```
 confctl swpins update
 ```
@@ -258,8 +258,8 @@ in JSON files in the `swpins/` directory.
 
 In flake-based configurations (using `confctl.lib.mkConfctlOutputs`), channel
 names are provided by the flake `channels` mapping. Machines should select
-channels via `cluster.<name>.pins.channels` (preferred) and can override the
-role-to-input mapping with `cluster.<name>.pins.inputs`. Legacy
+channels via `cluster.<name>.inputs.channels` (preferred) and can override the
+role-to-input mapping with `cluster.<name>.inputs.overrides`. Legacy
 `cluster.<name>.swpins.channels` remains supported for non-flake configs.
 
 ```
@@ -306,8 +306,8 @@ For example, machine named `my-machine` would be described in
     # This tells confctl whether it is a NixOS or vpsAdminOS machine
     spin = "nixos";
 
-    # Flake configs: prefer pins.channels (channels come from mkConfctlOutputs)
-    pins.channels = [ "nixos-unstable" ];
+    # Flake configs: prefer inputs.channels (channels come from mkConfctlOutputs)
+    inputs.channels = [ "nixos-unstable" ];
 
     # Legacy configs: use swpins.channels (configs/swpins.nix)
     # swpins.channels = [ "nixos-unstable" ];
@@ -356,7 +356,7 @@ to manage configured pins.
 ## Nix flakes
 confctl can be used from a configuration flake via `confctl.lib.mkConfctlOutputs`.
 In that mode, channel definitions live in the flake `channels` mapping and
-machines should select them via `cluster.<name>.pins.channels` (legacy
+machines should select them via `cluster.<name>.inputs.channels` (legacy
 `cluster.<name>.swpins.channels` is still supported). Software pins are still
 used to pin inputs for machine builds.
 

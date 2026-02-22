@@ -51,7 +51,7 @@ let
               List of channels from <option>confctl.swpins.channels</option>
               to use on this machine
 
-              This option is legacy in flake mode, prefer <option>cluster.&lt;name&gt;.pins.channels</option>.
+              This option is legacy in flake mode, prefer <option>cluster.&lt;name&gt;.inputs.channels</option>.
             '';
           };
 
@@ -65,7 +65,7 @@ let
           };
         };
 
-        pins = {
+        inputs = {
           channels = mkOption {
             type = types.listOf types.str;
             default = [ ];
@@ -79,11 +79,11 @@ let
             '';
           };
 
-          inputs = mkOption {
+          overrides = mkOption {
             type = types.attrsOf types.str;
             default = { };
             description = ''
-              Override role to flake input mapping for this machine
+              Override role -> flake input mapping for this machine
             '';
           };
         };

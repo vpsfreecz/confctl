@@ -13,9 +13,9 @@ There are four skeleton deployments:
 nix develop
 ```
 
-2. Update software pins:
+2. Update flake inputs:
 ```
-confctl pins update
+confctl inputs update
 ```
 
 3. Edit configurations in `cluster/` to your liking.

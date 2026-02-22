@@ -11,7 +11,7 @@ module ConfCtl::Cli
       return unless ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
 
       raise ConfCtl::Error,
-            'swpins are not supported in flake configs; use `confctl pins ls` / `confctl pins update`'
+            'swpins are not supported in flake configs; use `confctl inputs ls` / `confctl inputs update`'
     end
 
     def update

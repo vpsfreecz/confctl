@@ -290,23 +290,23 @@ let
       lastModified = src.lastModified or null;
     };
 
-  pinsInfoFor = swpinInputs: coreLib.mapAttrs (_: inputName: mkRoleInfo inputName) swpinInputs;
+  inputsInfoFor = swpinInputs: coreLib.mapAttrs (_: inputName: mkRoleInfo inputName) swpinInputs;
 
   buildPlan = builtins.listToAttrs (
     map (
       m:
       let
-        pinsChannels = (m.metaConfig.pins.channels or [ ]);
+        inputsChannels = (m.metaConfig.inputs.channels or [ ]);
         swpinsChannels = (m.metaConfig.swpins.channels or [ ]);
 
-        channelNames = if pinsChannels != [ ] then pinsChannels else swpinsChannels;
+        channelNames = if inputsChannels != [ ] then inputsChannels else swpinsChannels;
 
-        pinInputOverrides = (m.metaConfig.pins or { }).inputs or { };
-        swpinInputs = (swpinInputsFor channelNames) // pinInputOverrides;
+        inputsOverrides = (m.metaConfig.inputs or { }).overrides or { };
+        swpinInputs = (swpinInputsFor channelNames) // inputsOverrides;
         swpinPaths = swpinPathsFor swpinInputs;
         swpinSpecJson = swpinSpecJsonFor swpinInputs swpinPaths;
         swpinInfos = swpinInfosFor swpinSpecJson;
-        pinsInfo = pinsInfoFor swpinInputs;
+        inputsInfo = inputsInfoFor swpinInputs;
       in
       {
         name = m.name;
@@ -316,24 +316,24 @@ let
           swpinPaths = swpinPaths;
           swpinSpecJson = swpinSpecJson;
           swpinInfos = swpinInfos;
-          pins = swpinPaths;
-          pinsInfo = pinsInfo;
+          inputs = swpinPaths;
+          inputsInfo = inputsInfo;
         };
       }
     ) machinesWithKey
   );
 
-  pinsOutput = builtins.listToAttrs (
+  inputsOutput = builtins.listToAttrs (
     map (m: {
       name = m.key;
-      value = buildPlan.${m.name}.pins;
+      value = buildPlan.${m.name}.inputs;
     }) machinesWithKey
   );
 
-  pinsInfoOutput = builtins.listToAttrs (
+  inputsInfoOutput = builtins.listToAttrs (
     map (m: {
       name = m.key;
-      value = buildPlan.${m.name}.pinsInfo;
+      value = buildPlan.${m.name}.inputsInfo;
     }) machinesWithKey
   );
 
@@ -342,7 +342,7 @@ let
     (confctlSrc + "/nix/modules/confctl/cli.nix")
     (confctlSrc + "/nix/modules/confctl/nix.nix")
     (confctlSrc + "/nix/modules/confctl/swpins.nix")
-    (confctlSrc + "/nix/modules/confctl/pins-info.nix")
+    (confctlSrc + "/nix/modules/confctl/inputs-info.nix")
   ];
 
   confctlConfig = confDir + "/configs/confctl.nix";
@@ -399,8 +399,8 @@ let
       _module.args = {
         swpins = plan.swpinPaths;
         swpinsInfo = plan.swpinInfos;
-        pins = plan.pins;
-        pinsInfo = plan.pinsInfo;
+        inputs = plan.inputs;
+        inputsInfo = plan.inputsInfo;
         confMachine = confMachineFor m;
       };
     };
@@ -420,8 +420,8 @@ let
       confMachine = confMachineFor m;
       swpins = plan.swpinPaths;
       swpinsInfo = plan.swpinInfos;
-      pins = plan.pins;
-      pinsInfo = plan.pinsInfo;
+      inputs = plan.inputs;
+      inputsInfo = plan.inputsInfo;
     };
 
   systemModulesFor =
@@ -542,8 +542,8 @@ in
   machineKeys = machineKeys;
   machines = machinesAttrs;
   buildPlan = buildPlan;
-  pins = pinsOutput;
-  pinsInfo = pinsInfoOutput;
+  inputs = inputsOutput;
+  inputsInfo = inputsInfoOutput;
   build = buildOutputs;
   toplevel = toplevelOutput;
   lib = {

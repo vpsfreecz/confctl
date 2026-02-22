@@ -1,21 +1,21 @@
 require 'confctl/flake_lock'
 require 'confctl/flake_lock_diff'
-require 'confctl/pins/commit_message'
-require 'confctl/pins/git_commit'
+require 'confctl/inputs/commit_message'
+require 'confctl/inputs/git_commit'
 require 'confctl/system_command'
 require 'fileutils'
 require 'json'
 require 'securerandom'
 
 module ConfCtl
-  module Pins
+  module Inputs
     class Setter
       def self.run!(conf_dir:, inputs:, rev:, commit:, changelog:, downgrade:, editor:)
         raise ArgumentError, 'inputs empty' if inputs.nil? || inputs.empty?
 
         lock_path = File.join(conf_dir, 'flake.lock')
         unless File.exist?(lock_path)
-          raise ConfCtl::Error, 'flake.lock missing; run confctl pins update first'
+          raise ConfCtl::Error, 'flake.lock missing; run confctl inputs update first'
         end
 
         old_lock = ConfCtl::FlakeLock.load(lock_path)
@@ -45,13 +45,13 @@ module ConfCtl
         return { changed: false, changes: [] } if changes.empty?
 
         if commit
-          msg = ConfCtl::Pins::CommitMessage.build(
+          msg = ConfCtl::Inputs::CommitMessage.build(
             changes: changes,
             changelog: changelog,
             downgrade: downgrade,
             action: :set
           )
-          ConfCtl::Pins::GitCommit.commit!(
+          ConfCtl::Inputs::GitCommit.commit!(
             conf_dir: conf_dir,
             message: msg,
             editor: editor,

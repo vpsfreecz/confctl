@@ -146,16 +146,16 @@ module ConfCtl::Cli
       end
 
       desc 'Manage flake inputs (replacement for swpins in flake configs)'
-      command :pins do |pins|
-        pins.desc 'List root-level flake inputs and their locked revisions'
-        pins.arg_name '[input-pattern]'
-        pins.command :ls do |c|
-          c.action(&Command.run(c, Pins::Inputs, :list))
+      command :inputs do |inputs|
+        inputs.desc 'List root-level flake inputs and their locked revisions'
+        inputs.arg_name '[input-pattern]'
+        inputs.command :ls do |c|
+          c.action(&Command.run(c, Inputs::Root, :list))
         end
 
-        pins.desc 'Update flake inputs in flake.lock'
-        pins.arg_name '[input-name ...]'
-        pins.command :update do |c|
+        inputs.desc 'Update flake inputs in flake.lock'
+        inputs.arg_name '[input-name ...]'
+        inputs.command :update do |c|
           c.desc 'Commit changes to git'
           c.switch :commit, default_value: false
 
@@ -171,12 +171,12 @@ module ConfCtl::Cli
           c.desc 'Update all root inputs (dangerous; normally specify names)'
           c.switch :all, default_value: false
 
-          c.action(&Command.run(c, Pins::Inputs, :update))
+          c.action(&Command.run(c, Inputs::Root, :update))
         end
 
-        pins.desc 'Set a flake input to a specific revision'
-        pins.arg_name '<input-name> <rev>'
-        pins.command :set do |c|
+        inputs.desc 'Set a flake input to a specific revision'
+        inputs.arg_name '<input-name> <rev>'
+        inputs.command :set do |c|
           c.desc 'Commit changes to git'
           c.switch :commit, default_value: false
 
@@ -189,15 +189,15 @@ module ConfCtl::Cli
           c.desc 'Treat change as downgrade for changelog direction'
           c.switch %i[d downgrade], default_value: false
 
-          c.action(&Command.run(c, Pins::Inputs, :set))
+          c.action(&Command.run(c, Inputs::Root, :set))
         end
 
-        pins.desc 'Channel-based pin operations'
-        pins.command :channel do |ch|
+        inputs.desc 'Channel-based input operations'
+        inputs.command :channel do |ch|
           ch.desc 'List channels and their role->input mapping (with locked revisions)'
           ch.arg_name '[channel-pattern]'
           ch.command :ls do |c|
-            c.action(&Command.run(c, Pins::Channels, :list))
+            c.action(&Command.run(c, Inputs::Channels, :list))
           end
 
           ch.desc 'Update inputs referenced by channels (optionally only a single role)'
@@ -207,7 +207,7 @@ module ConfCtl::Cli
             c.switch :changelog, default_value: true
             c.switch :editor, default_value: true
             c.switch %i[d downgrade], default_value: false
-            c.action(&Command.run(c, Pins::Channels, :update))
+            c.action(&Command.run(c, Inputs::Channels, :update))
           end
 
           ch.desc 'Set inputs referenced by channels for a role to a specific revision'
@@ -219,12 +219,12 @@ module ConfCtl::Cli
             c.switch %i[d downgrade], default_value: false
             c.desc 'Allow setting inputs shared with other channels/roles'
             c.switch :allow_shared, default_value: false
-            c.action(&Command.run(c, Pins::Channels, :set))
+            c.action(&Command.run(c, Inputs::Channels, :set))
           end
         end
 
-        pins.desc 'Machine-based pin operations'
-        pins.command :machine do |m|
+        inputs.desc 'Machine-based input operations'
+        inputs.command :machine do |m|
           m.desc 'Update the input used by a specific machine for a specific role'
           m.arg_name '<machine> <role>'
           m.command :update do |c|
@@ -232,7 +232,7 @@ module ConfCtl::Cli
             c.switch :changelog, default_value: true
             c.switch :editor, default_value: true
             c.switch %i[d downgrade], default_value: false
-            c.action(&Command.run(c, Pins::Machines, :update))
+            c.action(&Command.run(c, Inputs::Machines, :update))
           end
 
           m.desc 'Set the input used by a specific machine for a specific role to a revision'
@@ -242,7 +242,7 @@ module ConfCtl::Cli
             c.switch :changelog, default_value: true
             c.switch :editor, default_value: true
             c.switch %i[d downgrade], default_value: false
-            c.action(&Command.run(c, Pins::Machines, :set))
+            c.action(&Command.run(c, Inputs::Machines, :set))
           end
         end
       end

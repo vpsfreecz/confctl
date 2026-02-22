@@ -1,6 +1,6 @@
 require 'json'
 require 'tty-command'
-require 'confctl/pins_info'
+require 'confctl/inputs_info'
 
 module ConfCtl
   class MachineStatus
@@ -75,13 +75,13 @@ module ConfCtl
     attr_accessor :target_swpin_specs
 
     # @return [Hash]
-    attr_accessor :target_pins_info
+    attr_accessor :target_inputs_info
 
     # @return [Hash]
     attr_reader :swpins_info
 
     # @return [Hash]
-    attr_reader :pins_info
+    attr_reader :inputs_info
 
     # @return [Hash]
     attr_reader :swpins_state
@@ -93,7 +93,7 @@ module ConfCtl
     end
 
     # Connect to the machine and query its state
-    def query(toplevel: true, generations: true, swpins: true, pins: false)
+    def query(toplevel: true, generations: true, swpins: true, inputs: false)
       begin
         @uptime = mc.uptime
       rescue TTY::Command::ExitError
@@ -124,10 +124,10 @@ module ConfCtl
         end
       end
 
-      return unless pins
+      return unless inputs
 
       begin
-        @pins_info = query_pins_info
+        @inputs_info = query_inputs_info
       rescue Error
         nil
       end
@@ -162,7 +162,7 @@ module ConfCtl
     end
 
     def query_swpins
-      json = read_pins_info_json
+      json = read_swpins_info_json
 
       case json
       when String
@@ -172,59 +172,54 @@ module ConfCtl
       end
     end
 
-    def query_pins_info
-      json = read_pins_info_json
+    def query_inputs_info
+      json = read_inputs_info_json
 
       case json
       when String
-        PinsInfo.parse(json)
+        InputsInfo.parse(json)
       when Hash
-        PinsInfo.normalize(json)
+        InputsInfo.normalize(json)
       end
     end
 
-    # @return [Hash, String]
-    def read_pins_info_json
+    # @return [Hash, String, nil]
+    def read_swpins_info_json
       if machine.carried?
-        read_carried_pins_info_json
+        read_carried_info_json('swpins-info', '/etc/confctl/swpins-info.json')
       else
-        read_file_with_fallback(
-          '/etc/confctl/pins-info.json',
-          '/etc/confctl/swpins-info.json'
-        )
+        read_file('/etc/confctl/swpins-info.json')
       end
     end
 
-    def read_carried_pins_info_json
-      begin
-        json = mc.read_file(File.join(machine.profile, 'machine.json'))
-        parsed = JSON.parse(json)
-        return parsed['pins-info'] if parsed['pins-info']
-        return parsed['swpins-info'] if parsed['swpins-info']
-      rescue TTY::Command::ExitError, JSON::ParserError
-        # pass
+    # @return [Hash, String, nil]
+    def read_inputs_info_json
+      if machine.carried?
+        read_carried_info_json('inputs-info', '/etc/confctl/inputs-info.json')
+      else
+        read_file('/etc/confctl/inputs-info.json')
       end
+    end
 
-      begin
-        return read_file_with_fallback(
-          File.join(machine.profile, '/etc/confctl/pins-info.json'),
-          File.join(machine.profile, '/etc/confctl/swpins-info.json')
-        )
-      rescue TTY::Command::ExitError
-        # pass
-      end
+    def read_carried_info_json(key, path)
+      info = read_carried_machine_json(key)
+      return info if info
 
+      read_file(File.join(machine.profile, path))
+    end
+
+    def read_carried_machine_json(key)
+      json = mc.read_file(File.join(machine.profile, 'machine.json'))
+      parsed = JSON.parse(json)
+      parsed[key] if parsed[key]
+    rescue TTY::Command::ExitError, JSON::ParserError
       nil
     end
 
-    def read_file_with_fallback(primary, fallback)
-      mc.read_file(primary)
+    def read_file(path)
+      mc.read_file(path)
     rescue TTY::Command::ExitError
-      begin
-        mc.read_file(fallback)
-      rescue TTY::Command::ExitError
-        nil
-      end
+      nil
     end
   end
 end
