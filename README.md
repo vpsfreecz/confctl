@@ -78,6 +78,9 @@ confctl inputs update --commit nixpkgsStable vpsadminosStaging
 confctl inputs channel update --commit '{production,staging}' vpsadminos
 ```
 
+If you are migrating an existing configuration repository that uses `configs/swpins.nix`
+and the `swpins/` directory, see [docs/swpins-to-flakes.md](docs/swpins-to-flakes.md).
+
 ### Legacy configuration (non-flake)
 
 The following steps describe the original non-flake workflow.
@@ -593,3 +596,4 @@ See the [man pages](./man/man8) for more information:
 
 * [confctl(8)](./man/man8/confctl.8.md)
 * [confctl-options.nix(8)](./man/man8/confctl-options.nix.8.md)
+* [Migrating from swpins to flakes](docs/swpins-to-flakes.md)
