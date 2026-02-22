@@ -542,7 +542,7 @@ the generation before last and so on.
       Include git log in the commit message when `--commit` is used. Enabled by
       default.
 
-    `--[no]-editor`
+    `--[no-]editor`
       Open `$EDITOR` with the commit message. Enabled by default.
 
     `-d`, `--downgrade`
@@ -551,6 +551,24 @@ the generation before last and so on.
 
     `--all`
       Update all root inputs.
+
+`confctl pins set` *input-name* *rev*
+  Set a flake input to a specific revision in `flake.lock` while keeping the
+  original upstream reference. Available only in flake configs.
+
+    `--[no-]commit`
+      Commit changes to git. Disabled by default.
+
+    `--[no-]changelog`
+      Include git log in the commit message when `--commit` is used. Enabled by
+      default.
+
+    `--[no]-editor`
+      Open `$EDITOR` with the commit message. Enabled by default.
+
+    `-d`, `--downgrade`
+      Use when the new version is older than the previously set version. Used for
+      generating the commit changelog direction.
 
 `confctl pins channel ls` [*channel-pattern*]
   List channels and their role-to-input mapping (including locked revisions).
@@ -574,9 +592,49 @@ the generation before last and so on.
       Use when the new version is older than the previously set version. Used for
       generating the commit changelog direction.
 
+`confctl pins channel set` *channels* *role* *rev*
+  Set inputs referenced by selected channels for a specific role to *rev*.
+  Available only in flake configs.
+
+    `--[no-]commit`
+      Commit changes to git. Disabled by default.
+
+    `--[no-]changelog`
+      Include git log in the commit message when `--commit` is used. Enabled by
+      default.
+
+    `--[no-]editor`
+      Open `$EDITOR` with the commit message. Enabled by default.
+
+    `-d`, `--downgrade`
+      Use when the new version is older than the previously set version. Used for
+      generating the commit changelog direction.
+
+    `--[no-]allow-shared`
+      Allow setting inputs that are shared with other channels or roles. Disabled
+      by default; without it, shared inputs cause an error.
+
 `confctl pins machine update` *machine* *role*
   Update the input used by a specific machine for a specific role. Available
   only in flake configs.
+
+    `--[no-]commit`
+      Commit changes to git. Disabled by default.
+
+    `--[no-]changelog`
+      Include git log in the commit message when `--commit` is used. Enabled by
+      default.
+
+    `--[no-]editor`
+      Open `$EDITOR` with the commit message. Enabled by default.
+
+    `-d`, `--downgrade`
+      Use when the new version is older than the previously set version. Used for
+      generating the commit changelog direction.
+
+`confctl pins machine set` *machine* *role* *rev*
+  Set the input used by a specific machine for a specific role to *rev*.
+  Available only in flake configs.
 
     `--[no-]commit`
       Commit changes to git. Disabled by default.

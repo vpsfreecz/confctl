@@ -3,11 +3,12 @@ require 'confctl/git_repo_mirror'
 module ConfCtl
   module Pins
     class CommitMessage
-      def self.build(changes:, changelog:, downgrade: false)
+      def self.build(changes:, changelog:, downgrade: false, action: :update)
         raise ArgumentError, 'no changes' if changes.nil? || changes.empty?
 
         names = changes.map(&:name).sort
-        title = "pins: update #{names.join(', ')}"
+        verb = action == :set ? 'set' : 'update'
+        title = "pins: #{verb} #{names.join(', ')}"
 
         body = +''
 

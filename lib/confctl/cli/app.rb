@@ -174,6 +174,24 @@ module ConfCtl::Cli
           c.action(&Command.run(c, Pins::Inputs, :update))
         end
 
+        pins.desc 'Set a flake input to a specific revision'
+        pins.arg_name '<input-name> <rev>'
+        pins.command :set do |c|
+          c.desc 'Commit changes to git'
+          c.switch :commit, default_value: false
+
+          c.desc 'Include git log in the commit message'
+          c.switch :changelog, default_value: true
+
+          c.desc 'Open $EDITOR with commit message'
+          c.switch :editor, default_value: true
+
+          c.desc 'Treat change as downgrade for changelog direction'
+          c.switch %i[d downgrade], default_value: false
+
+          c.action(&Command.run(c, Pins::Inputs, :set))
+        end
+
         pins.desc 'Channel-based pin operations'
         pins.command :channel do |ch|
           ch.desc 'List channels and their role->input mapping (with locked revisions)'
@@ -191,6 +209,18 @@ module ConfCtl::Cli
             c.switch %i[d downgrade], default_value: false
             c.action(&Command.run(c, Pins::Channels, :update))
           end
+
+          ch.desc 'Set inputs referenced by channels for a role to a specific revision'
+          ch.arg_name '<channels> <role> <rev>'
+          ch.command :set do |c|
+            c.switch :commit, default_value: false
+            c.switch :changelog, default_value: true
+            c.switch :editor, default_value: true
+            c.switch %i[d downgrade], default_value: false
+            c.desc 'Allow setting inputs shared with other channels/roles'
+            c.switch :allow_shared, default_value: false
+            c.action(&Command.run(c, Pins::Channels, :set))
+          end
         end
 
         pins.desc 'Machine-based pin operations'
@@ -203,6 +233,16 @@ module ConfCtl::Cli
             c.switch :editor, default_value: true
             c.switch %i[d downgrade], default_value: false
             c.action(&Command.run(c, Pins::Machines, :update))
+          end
+
+          m.desc 'Set the input used by a specific machine for a specific role to a revision'
+          m.arg_name '<machine> <role> <rev>'
+          m.command :set do |c|
+            c.switch :commit, default_value: false
+            c.switch :changelog, default_value: true
+            c.switch :editor, default_value: true
+            c.switch %i[d downgrade], default_value: false
+            c.action(&Command.run(c, Pins::Machines, :set))
           end
         end
       end

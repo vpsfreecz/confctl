@@ -2,6 +2,7 @@ require 'confctl/cli/command'
 require 'confctl/config_type'
 require 'confctl/flake_lock'
 require 'confctl/pattern'
+require 'confctl/pins/setter'
 require 'confctl/pins/updater'
 
 module ConfCtl::Cli
@@ -48,6 +49,26 @@ module ConfCtl::Cli
       res = ConfCtl::Pins::Updater.run!(
         conf_dir: conf_dir,
         inputs: inputs,
+        commit: opts[:commit],
+        changelog: opts[:changelog],
+        downgrade: opts[:downgrade],
+        editor: opts[:editor]
+      )
+
+      print_update_summary(res[:changes])
+    end
+
+    def set
+      ensure_flake_config!
+      require_args!('input-name', 'rev')
+
+      input = args[0]
+      rev = args[1]
+
+      res = ConfCtl::Pins::Setter.run!(
+        conf_dir: ConfCtl::ConfDir.path,
+        inputs: [input],
+        rev: rev,
         commit: opts[:commit],
         changelog: opts[:changelog],
         downgrade: opts[:downgrade],
