@@ -657,19 +657,19 @@ the generation before last and so on.
   Set selected software packages to new *version*. The value of *version* depends
   on the type of the software pin, for git it is a git reference, e.g. a revision.
 
-  `--[no-]commit`
-    Commit changed swpins files to git. Disabled by default.
+    `--[no-]commit`
+      Commit changed swpins files to git. Disabled by default.
 
-  `--[no-]changelog`
-    Include changelog in the commit message when `--commit` is used. Enabled by
-    default.
+    `--[no-]changelog`
+      Include changelog in the commit message when `--commit` is used. Enabled by
+      default.
 
-  `--[no]-editor`
-    Open `$EDITOR` with the commit message. Enabled by default.
+    `--[no]-editor`
+      Open `$EDITOR` with the commit message. Enabled by default.
 
-  `-d`, `--downgrade`
-    Use when the new version is older than the previously set version. Used for
-    generating changelog for the commit message.
+    `-d`, `--downgrade`
+      Use when the new version is older than the previously set version. Used for
+      generating changelog for the commit message.
 
 `confctl swpins cluster update` [*name-pattern* [*sw-pattern*]]
   Update selected or all software packages that have been configured to support
