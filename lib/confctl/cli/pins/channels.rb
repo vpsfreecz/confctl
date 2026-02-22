@@ -42,27 +42,27 @@ module ConfCtl::Cli
 
       selector = args[0]
       role = args[1]
+      role_name = role&.to_s
 
       channels = eval_channels
       selected = select_channels(channels.keys, selector)
       raise ConfCtl::Error, "no channels matched '#{selector}'" if selected.empty?
 
-      inputs = selected.flat_map do |ch|
+      targets = selected.flat_map do |ch|
         mapping = channels[ch] || {}
-        if role
-          v = mapping[role] || mapping[role.to_s]
-          v ? [v] : []
+        if role_name
+          input = mapping[role] || mapping[role_name]
+          input ? [{ channel: ch, role: role_name, input: input }] : []
         else
-          mapping.values
+          mapping.map { |r, input| { channel: ch, role: r.to_s, input: input } }
         end
-      end.compact.uniq
+      end
+
+      inputs = targets.map { |t| t[:input] }.uniq
 
       raise ConfCtl::Error, 'no inputs selected (check role name?)' if inputs.empty?
 
-      puts "Channels: #{selected.join(', ')}"
-      puts "Inputs: #{inputs.join(', ')}"
-
-      res = ConfCtl::Pins::Updater.run!(
+      ConfCtl::Pins::Updater.run!(
         conf_dir: ConfCtl::ConfDir.path,
         inputs: inputs,
         commit: opts[:commit],
@@ -71,7 +71,12 @@ module ConfCtl::Cli
         editor: opts[:editor]
       )
 
-      puts(res[:changed] ? "Updated #{res[:changes].length} inputs." : 'No changes.')
+      lock = ConfCtl::FlakeLock.load(File.join(ConfCtl::ConfDir.path, 'flake.lock'))
+      targets.each do |t|
+        info = lock.input_info(t[:input])
+        rev = info[:short_rev] || info[:rev] || '-'
+        puts "Updating #{t[:role]} in #{t[:channel]} -> #{rev}"
+      end
     end
 
     def set

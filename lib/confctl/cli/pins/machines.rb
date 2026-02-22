@@ -23,11 +23,7 @@ module ConfCtl::Cli
 
       raise ConfCtl::Error, "machine '#{machine_name}' has no role '#{role}'" unless input
 
-      puts "Machine: #{machine_name}"
-      puts "Role: #{role}"
-      puts "Input: #{input}"
-
-      res = ConfCtl::Pins::Updater.run!(
+      ConfCtl::Pins::Updater.run!(
         conf_dir: ConfCtl::ConfDir.path,
         inputs: [input],
         commit: opts[:commit],
@@ -36,7 +32,10 @@ module ConfCtl::Cli
         editor: opts[:editor]
       )
 
-      puts(res[:changed] ? "Updated #{input}." : 'No changes.')
+      lock = ConfCtl::FlakeLock.load(File.join(ConfCtl::ConfDir.path, 'flake.lock'))
+      info = lock.input_info(input)
+      rev = info[:short_rev] || info[:rev] || '-'
+      puts "Updating #{role} in #{machine_name} -> #{rev}"
     end
 
     def set
