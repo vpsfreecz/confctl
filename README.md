@@ -376,6 +376,10 @@ Machine configs can use the following extra module arguments:
   [machine metadata module](##machine-metadata-and-software-pins)
 - `flakeInputs` - flake inputs passed to `mkConfctlOutputs` (excluding `self`)
 - `swpins` - attrset of software pins of the machine that is currently being built
+- `inputsInfo` - metadata about flake inputs selected for the machine (keys are
+  roles like `nixpkgs`/`vpsadminos`, values include `input`, `url`, `rev`,
+  `shortRev`, `lastModified`), exposed as `confctl.inputsInfo` and written to
+  `/etc/confctl/inputs-info.json`
 
 For example in `cluster/my-machine/config.nix`:
 
