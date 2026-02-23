@@ -437,7 +437,6 @@ let
     ++ clusterModulesForSystem
     ++ [
       (confDir + "/cluster/${m.clusterName}/config.nix")
-      (confDir + "/environments/base.nix")
     ]
     ++ confctlModules
     ++ systemModules
