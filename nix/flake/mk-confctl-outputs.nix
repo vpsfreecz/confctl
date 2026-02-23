@@ -462,70 +462,56 @@ let
     else
       pkgs.substituteAll ({ inherit (args) src isExecutable; } // replacements);
 
-  toplevelFor =
+  evalConfigFor =
     m:
     let
       plan = buildPlan.${m.name};
       swpinPaths = plan.swpinPaths;
-      pkgs = import swpinPaths.nixpkgs { system = resolvedSystem; };
       modules = systemModulesFor m;
       specialArgs = specialArgsFor m;
-
-      evalConfig =
-        if m.metaConfig.spin == "nixos" then
-          import (swpinPaths.nixpkgs + "/nixos/lib/eval-config.nix") {
-            inherit modules pkgs;
-            system = resolvedSystem;
-            specialArgs = specialArgs;
-          }
-        else if m.metaConfig.spin == "vpsadminos" then
-          let
-            vpsadminosPath = swpinPaths.vpsadminos;
-            vpsadminosOverlays = import (vpsadminosPath + "/os/overlays");
-            vpsadminOverlays = import (swpinPaths.vpsadmin + "/nixos/overlays");
-            vpsadminosPkgs = import swpinPaths.nixpkgs {
-              system = resolvedSystem;
-              overlays = vpsadminosOverlays ++ vpsadminOverlays ++ (import (confDir + "/overlays"));
-            };
-            vpsadminosSpecialArgs = specialArgs // {
-              pkgs = vpsadminosPkgs;
-            };
-            vpsadminosPkgsModule = {
-              _file = vpsadminosPath + "/os/default.nix";
-              key = vpsadminosPath + "/os/default.nix";
-              config = {
-                _module = {
-                  check = true;
-                };
-                nixpkgs.system = vpsadminosPkgs.lib.mkDefault resolvedSystem;
-              };
-            };
-            vpsadminosBaseModules = import (vpsadminosPath + "/os/modules/module-list.nix") {
-              nixpkgsPath = swpinPaths.nixpkgs;
-            };
-          in
-          vpsadminosPkgs.lib.evalModules {
-            prefix = [ ];
-            modules = vpsadminosBaseModules ++ [ vpsadminosPkgsModule ] ++ modules;
-            specialArgs = vpsadminosSpecialArgs;
-          }
-        else
-          abort "Unsupported spin ${m.metaConfig.spin}";
     in
-    evalConfig.config.system.build.toplevel;
+    if m.metaConfig.spin == "nixos" then
+      let
+        evalConfig = import (swpinPaths.nixpkgs + "/nixos/lib/eval-config.nix") {
+          inherit modules;
+          system = resolvedSystem;
+          specialArgs = specialArgs;
+        };
+      in
+      {
+        inherit evalConfig;
+        pkgs = evalConfig.pkgs;
+      }
+    else if m.metaConfig.spin == "vpsadminos" then
+      let
+        vpsadminosPath = swpinPaths.vpsadminos;
+        evalResult = import (vpsadminosPath + "/os/default.nix") {
+          nixpkgsPath = swpinPaths.nixpkgs;
+          modules = modules;
+          extraArgs = specialArgs;
+          system = resolvedSystem;
+        };
+      in
+      {
+        evalConfig = evalResult.test1;
+        pkgs = evalResult.test1.pkgs;
+      }
+    else
+      abort "Unsupported spin ${m.metaConfig.spin}";
 
   buildOutputs = builtins.listToAttrs (
     map (
       m:
       let
         plan = buildPlan.${m.name};
-        swpinPaths = plan.swpinPaths;
-        pkgs = import swpinPaths.nixpkgs { system = resolvedSystem; };
+        evalResult = evalConfigFor m;
+        evalConfig = evalResult.evalConfig;
+        pkgs = evalResult.pkgs;
       in
       {
         name = plan.key;
         value = {
-          toplevel = toplevelFor m;
+          toplevel = evalConfig.config.system.build.toplevel;
           autoRollback = autoRollbackFor pkgs;
         };
       }
