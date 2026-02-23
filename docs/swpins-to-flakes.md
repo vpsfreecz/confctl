@@ -22,6 +22,17 @@ If you are new to the flake model in confctl, read `docs/flake-inputs.md` after 
 
 ---
 
+## Automated migration (recommended)
+
+confctl includes an interactive migration helper that performs the steps in this guide:
+
+```bash
+confctl migrate swpins-to-flakes --dry-run
+confctl migrate swpins-to-flakes --yes
+```
+
+You can also run individual steps (`flake`, `machines`, `imports`, `clean`); see `confctl migrate swpins-to-flakes --help`.
+
 ## Step 1: Add `flake.nix`
 
 Create `flake.nix` in the root of your configuration repository.

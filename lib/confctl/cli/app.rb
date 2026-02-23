@@ -247,6 +247,46 @@ module ConfCtl::Cli
         end
       end
 
+      desc 'Migration helpers'
+      command :migrate do |m|
+        m.desc 'Migrate swpins-based configuration repository to flake-based inputs'
+        m.command :'swpins-to-flakes' do |stf|
+          stf.desc 'Assume yes for all prompts'
+          stf.switch %i[y yes], default_value: false
+
+          stf.desc 'Do not modify files, only print what would be done'
+          stf.switch %i[n dry-run], default_value: false
+
+          # Default action = run full migration
+          stf.action(&Command.run(stf, Migrate::SwpinsToFlakes, :all))
+
+          stf.desc 'Create flake.nix (+ lock revisions from swpins)'
+          stf.command :flake do |c|
+            c.action(&Command.run(c, Migrate::SwpinsToFlakes, :flake))
+          end
+
+          stf.desc 'Rewrite cluster/*/module.nix metadata to use inputs.*'
+          stf.command :machines do |c|
+            c.action(&Command.run(c, Migrate::SwpinsToFlakes, :machines))
+          end
+
+          stf.desc 'Scan for legacy <...> imports and optionally enable legacyNixPath'
+          stf.command :imports do |c|
+            c.action(&Command.run(c, Migrate::SwpinsToFlakes, :imports))
+          end
+
+          stf.desc 'Remove swpins/ and other legacy files'
+          stf.command :clean do |c|
+            c.action(&Command.run(c, Migrate::SwpinsToFlakes, :clean))
+          end
+
+          stf.desc 'Run the full migration (same as running without a subcommand)'
+          stf.command :all do |c|
+            c.action(&Command.run(c, Migrate::SwpinsToFlakes, :all))
+          end
+        end
+      end
+
       desc 'List configured machines'
       arg_name '[machine-pattern]'
       command :ls do |c|

@@ -79,7 +79,8 @@ confctl inputs channel update --commit '{production,staging}' vpsadminos
 ```
 
 If you are migrating an existing configuration repository that uses `configs/swpins.nix`
-and the `swpins/` directory, see [docs/swpins-to-flakes.md](docs/swpins-to-flakes.md).
+and the `swpins/` directory, confctl includes an interactive helper: `confctl migrate swpins-to-flakes`
+(use `--dry-run` to preview). See [docs/swpins-to-flakes.md](docs/swpins-to-flakes.md).
 
 ### Legacy configuration (non-flake)
 
