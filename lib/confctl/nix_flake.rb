@@ -106,18 +106,25 @@ module ConfCtl
       end
 
       legacy_args = legacy_nix_path_args(hosts)
-      build_results = nix_build_json(installables, legacy_nix_path_args: legacy_args, &block)
-      installable_paths = map_installables(installables, build_results)
+      nix_build_json(installables, legacy_nix_path_args: legacy_args, &block)
+      build_outputs = nix_eval_json('.#confctl.build')
 
       hosts.each do |host|
         host_plan = host_plans[host]
         machine_key = host_plan['key'] || host_plan['machineKey'] || host_plan['flakeKey'] || machine_key_for(host)
         host_input_paths = host_plan['inputs'] || {}
 
-        toplevel_installable = ".#confctl.build.#{machine_key}.toplevel"
-        rollback_installable = ".#confctl.build.#{machine_key}.autoRollback"
-        toplevel_path = installable_paths[toplevel_installable]
-        auto_rollback_path = installable_paths[rollback_installable]
+        outputs = build_outputs[machine_key]
+        if outputs.nil?
+          raise ConfCtl::Error, "missing build outputs for #{machine_key.inspect}"
+        end
+
+        toplevel_path = outputs['toplevel']
+        auto_rollback_path = outputs['autoRollback']
+
+        if toplevel_path.nil? || auto_rollback_path.nil?
+          raise ConfCtl::Error, "invalid build outputs for #{machine_key.inspect}"
+        end
 
         host_generations = Generation::BuildList.new(host)
         generation = host_generations.find(toplevel_path, host_input_paths, mode: 'flakes')
@@ -359,14 +366,6 @@ module ConfCtl
         host
       else
         raise ConfCtl::Error, "Unknown machine #{host.inspect}"
-      end
-    end
-
-    def map_installables(installables, build_results)
-      installables.zip(build_results).to_h do |installable, result|
-        outputs = result['outputs'] || {}
-        path = outputs['out'] || outputs.values.first
-        [installable, path]
       end
     end
 
