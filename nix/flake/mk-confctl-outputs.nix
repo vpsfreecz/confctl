@@ -427,7 +427,13 @@ let
       in
       {
         evalConfig = evalResult.test1;
-        pkgs = evalResult.test1.pkgs;
+        pkgs =
+          if evalResult.test1 ? pkgs then
+            evalResult.test1.pkgs
+          else
+            # vpsAdminOS evaluation returns evalModules result; pkgs is provided
+            # via nixpkgs module system here.
+            evalResult.test1._module.args.pkgs;
       }
     else
       abort "Unsupported spin ${m.metaConfig.spin}";
