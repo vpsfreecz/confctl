@@ -76,7 +76,8 @@ module ConfCtl
 
       if build_generation && gen.is_a?(Generation::Build)
         build_generation.name == gen.name \
-          && build_generation.swpin_paths == gen.swpin_paths
+          && build_generation.mode == gen.mode \
+          && build_generation.pin_paths == gen.pin_paths
       else
         true
       end

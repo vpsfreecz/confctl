@@ -87,11 +87,12 @@ module ConfCtl
     end
 
     # @param toplevel [String]
-    # @param swpin_paths [Hash]
+    # @param pin_paths [Hash]
+    # @param mode [String]
     # @return [Generation::Build, nil]
-    def find(toplevel, swpin_paths)
+    def find(toplevel, pin_paths, mode: 'swpins')
       generations.detect do |gen|
-        gen.toplevel == toplevel && gen.swpin_paths == swpin_paths
+        gen.toplevel == toplevel && gen.mode == mode && gen.pin_paths == pin_paths
       end
     end
 

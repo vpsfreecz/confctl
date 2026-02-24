@@ -1245,7 +1245,11 @@ module ConfCtl::Cli
 
       raise 'one or more swpins need to be updated' unless host_swpin_specs
 
-      puts Rainbow("Evaluating swpins for #{machines.length} machines...").bright
+      if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
+        puts Rainbow("Evaluating inputs for #{machines.length} machines...").bright
+      else
+        puts Rainbow("Evaluating swpins for #{machines.length} machines...").bright
+      end
 
       hosts_swpin_paths = nix.eval_host_swpins(machines.map { |host, _| host })
 
@@ -1299,7 +1303,7 @@ module ConfCtl::Cli
     def do_build_group(group_index, group_count, hosts, swpin_paths, host_swpin_specs, nix, time)
       puts Rainbow('Building machines').bright
       hosts.each { |h| puts "  #{h}" }
-      puts 'with swpins'
+      puts ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path) ? 'with inputs' : 'with swpins'
       swpin_paths.each { |k, v| puts "  #{k}=#{v}" }
 
       header = '' \

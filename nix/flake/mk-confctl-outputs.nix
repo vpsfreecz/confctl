@@ -226,49 +226,6 @@ let
 
   inputPathsFor = roleInputs: coreLib.mapAttrs (_: inputName: inputs.${inputName}.outPath) roleInputs;
 
-  inputsSpecJsonFor =
-    roleInputs: inputPaths:
-    coreLib.mapAttrs (
-      role: inputName:
-      let
-        node = lock.nodes.${inputName};
-        rev = node.locked.rev or null;
-        narHash = node.locked.narHash or null;
-
-        derivedUrl =
-          let
-            url = derivedUrlForNode node;
-          in
-          if url == null then "unknown" else url;
-      in
-      {
-        type = "git-rev";
-        name = role;
-        nix_options = {
-          url = derivedUrl;
-          fetchSubmodules = false;
-          update = {
-            auto = false;
-            interval = 0;
-            ref = null;
-          };
-        };
-        state = {
-          rev = rev;
-          date = "1970-01-01T00:00:00Z";
-        };
-        info = {
-          rev = rev;
-          sha256 = narHash;
-        };
-        fetcher = {
-          type = "directory";
-          options = {
-            path = inputPaths.${role};
-          };
-        };
-      }
-    ) roleInputs;
   mkRoleInfo =
     inputName:
     let
@@ -294,7 +251,6 @@ let
 
         roleInputs = (roleInputsForChannels channelNames) // inputsOverrides;
         inputPaths = inputPathsFor roleInputs;
-        inputsSpecJson = inputsSpecJsonFor roleInputs inputPaths;
         inputsInfo = inputsInfoFor roleInputs;
       in
       {
@@ -303,7 +259,6 @@ let
           key = m.key;
           flakeKey = m.key;
           inputs = inputPaths;
-          inputsSpecJson = inputsSpecJson;
           inputsInfo = inputsInfo;
         };
       }

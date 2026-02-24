@@ -113,18 +113,6 @@ module ConfCtl
         host_plan = host_plans[host]
         machine_key = host_plan['key'] || host_plan['machineKey'] || host_plan['flakeKey'] || machine_key_for(host)
         host_input_paths = host_plan['inputs'] || {}
-        inputs_specs_json = host_plan['inputsSpecJson'] || {}
-        inputs = host_input_paths
-
-        specs = inputs_specs_json.to_h do |name, spec_json|
-          spec_class = ConfCtl::Swpins::Spec.for(spec_json['type'].to_sym)
-          spec = spec_class.new(
-            spec_json['name'] || name,
-            spec_json['nix_options'],
-            spec_json
-          )
-          [name, spec]
-        end
 
         toplevel_installable = ".#confctl.build.#{machine_key}.toplevel"
         rollback_installable = ".#confctl.build.#{machine_key}.autoRollback"
@@ -132,19 +120,17 @@ module ConfCtl
         auto_rollback_path = installable_paths[rollback_installable]
 
         host_generations = Generation::BuildList.new(host)
-        generation = host_generations.find(toplevel_path, host_input_paths)
+        generation = host_generations.find(toplevel_path, host_input_paths, mode: 'flakes')
 
         if generation.nil?
           inputs_info = eval_inputs_info(host)
           generation = Generation::Build.new(host)
-          generation.create(
+          generation.create_flake(
             toplevel_path,
             auto_rollback_path,
-            host_input_paths,
-            specs,
-            date: time,
+            inputs: host_input_paths,
             inputs_info: inputs_info,
-            inputs: inputs
+            date: time
           )
           generation.save
         end
