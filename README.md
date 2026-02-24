@@ -359,10 +359,11 @@ to manage configured pins.
 
 ## Nix flakes
 confctl can be used from a configuration flake via `confctl.lib.mkConfctlOutputs`.
-In that mode, channel definitions live in the flake `channels` mapping and
-machines should select them via `cluster.<name>.inputs.channels` (legacy
-`cluster.<name>.swpins.channels` is still supported). Software pins are still
-used to pin inputs for machine builds.
+In that mode, channel definitions live in the flake `channels` mapping and machines
+select them via `cluster.<name>.inputs.channels`. Per-machine role-to-input overrides
+are done via `cluster.<name>.inputs.overrides`.
+
+`cluster.<name>.swpins.*` and `configs/swpins.nix` are not evaluated in flake mode.
 
 ## Extra module arguments
 Machine configs can use the following extra module arguments:
@@ -375,7 +376,8 @@ Machine configs can use the following extra module arguments:
   being built, contains key `name` and all options from
   [machine metadata module](##machine-metadata-and-software-pins)
 - `flakeInputs` - flake inputs passed to `mkConfctlOutputs` (excluding `self`)
-- `swpins` - attrset of software pins of the machine that is currently being built
+- `inputs` - attrset of flake input store paths selected for the machine build
+- `swpins` - (legacy configs only) attrset of prefetched software pins of the machine that is currently being built
 - `inputsInfo` - metadata about flake inputs selected for the machine (keys are
   roles like `nixpkgs`/`vpsadminos`, values include `input`, `url`, `rev`,
   `shortRev`, `lastModified`), exposed as `confctl.inputsInfo` and written to

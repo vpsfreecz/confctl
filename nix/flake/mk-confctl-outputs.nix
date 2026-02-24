@@ -36,8 +36,6 @@ let
         _module.args = {
           pkgs = corePkgs;
           inherit confLib flakeInputs;
-          swpins = { };
-          swpinsInfo = { };
           confMachine = null;
         };
       }
@@ -223,16 +221,15 @@ let
     else
       null;
 
-  swpinInputsFor =
+  roleInputsForChannels =
     channelNames: builtins.foldl' (acc: chan: acc // (channels.${chan} or { })) { } channelNames;
 
-  swpinPathsFor =
-    swpinInputs: coreLib.mapAttrs (_: inputName: inputs.${inputName}.outPath) swpinInputs;
+  inputPathsFor = roleInputs: coreLib.mapAttrs (_: inputName: inputs.${inputName}.outPath) roleInputs;
 
-  swpinSpecJsonFor =
-    swpinInputs: swpinPaths:
+  inputsSpecJsonFor =
+    roleInputs: inputPaths:
     coreLib.mapAttrs (
-      swpinName: inputName:
+      role: inputName:
       let
         node = lock.nodes.${inputName};
         rev = node.locked.rev or null;
@@ -246,7 +243,7 @@ let
       in
       {
         type = "git-rev";
-        name = swpinName;
+        name = role;
         nix_options = {
           url = derivedUrl;
           fetchSubmodules = false;
@@ -267,14 +264,11 @@ let
         fetcher = {
           type = "directory";
           options = {
-            path = swpinPaths.${swpinName};
+            path = inputPaths.${role};
           };
         };
       }
-    ) swpinInputs;
-
-  swpinInfosFor = swpinSpecJson: coreLib.mapAttrs (_: spec: spec.info or { }) swpinSpecJson;
-
+    ) roleInputs;
   mkRoleInfo =
     inputName:
     let
@@ -290,33 +284,26 @@ let
       lastModified = src.lastModified or null;
     };
 
-  inputsInfoFor = swpinInputs: coreLib.mapAttrs (_: inputName: mkRoleInfo inputName) swpinInputs;
-
+  inputsInfoFor = roleInputs: coreLib.mapAttrs (_: inputName: mkRoleInfo inputName) roleInputs;
   buildPlan = builtins.listToAttrs (
     map (
       m:
       let
-        inputsChannels = (m.metaConfig.inputs.channels or [ ]);
-        swpinsChannels = (m.metaConfig.swpins.channels or [ ]);
-
-        channelNames = if inputsChannels != [ ] then inputsChannels else swpinsChannels;
-
+        channelNames = (m.metaConfig.inputs.channels or [ ]);
         inputsOverrides = (m.metaConfig.inputs or { }).overrides or { };
-        swpinInputs = (swpinInputsFor channelNames) // inputsOverrides;
-        swpinPaths = swpinPathsFor swpinInputs;
-        swpinSpecJson = swpinSpecJsonFor swpinInputs swpinPaths;
-        swpinInfos = swpinInfosFor swpinSpecJson;
-        inputsInfo = inputsInfoFor swpinInputs;
+
+        roleInputs = (roleInputsForChannels channelNames) // inputsOverrides;
+        inputPaths = inputPathsFor roleInputs;
+        inputsSpecJson = inputsSpecJsonFor roleInputs inputPaths;
+        inputsInfo = inputsInfoFor roleInputs;
       in
       {
         name = m.name;
         value = {
           key = m.key;
           flakeKey = m.key;
-          swpinPaths = swpinPaths;
-          swpinSpecJson = swpinSpecJson;
-          swpinInfos = swpinInfos;
-          inputs = swpinPaths;
+          inputs = inputPaths;
+          inputsSpecJson = inputsSpecJson;
           inputsInfo = inputsInfo;
         };
       }
@@ -341,12 +328,10 @@ let
     (confctlSrc + "/nix/modules/confctl/generations.nix")
     (confctlSrc + "/nix/modules/confctl/cli.nix")
     (confctlSrc + "/nix/modules/confctl/nix.nix")
-    (confctlSrc + "/nix/modules/confctl/swpins.nix")
     (confctlSrc + "/nix/modules/confctl/inputs-info.nix")
   ];
 
   confctlConfig = confDir + "/configs/confctl.nix";
-  swpinsConfig = confDir + "/configs/swpins.nix";
   userModuleListPath = confDir + "/modules/module-list.nix";
   userModuleList =
     if builtins.pathExists userModuleListPath then
@@ -358,10 +343,7 @@ let
       };
 
   evalConfctl = import (coreNixpkgs + "/nixos/lib/eval-config.nix") {
-    modules =
-      confctlModules
-      ++ (coreLib.optional (builtins.pathExists swpinsConfig) swpinsConfig)
-      ++ (coreLib.optional (builtins.pathExists confctlConfig) confctlConfig);
+    modules = confctlModules ++ (coreLib.optional (builtins.pathExists confctlConfig) confctlConfig);
     pkgs = corePkgs;
     lib = coreLib;
     system = resolvedSystem;
@@ -397,8 +379,6 @@ let
     in
     {
       _module.args = {
-        swpins = plan.swpinPaths;
-        swpinsInfo = plan.swpinInfos;
         inputs = plan.inputs;
         inputsInfo = plan.inputsInfo;
         confMachine = confMachineFor m;
@@ -418,8 +398,6 @@ let
         confData
         ;
       confMachine = confMachineFor m;
-      swpins = plan.swpinPaths;
-      swpinsInfo = plan.swpinInfos;
       inputs = plan.inputs;
       inputsInfo = plan.inputsInfo;
     };
@@ -466,13 +444,13 @@ let
     m:
     let
       plan = buildPlan.${m.name};
-      swpinPaths = plan.swpinPaths;
+      inputPaths = plan.inputs;
       modules = systemModulesFor m;
       specialArgs = specialArgsFor m;
     in
     if m.metaConfig.spin == "nixos" then
       let
-        evalConfig = import (swpinPaths.nixpkgs + "/nixos/lib/eval-config.nix") {
+        evalConfig = import (inputPaths.nixpkgs + "/nixos/lib/eval-config.nix") {
           inherit modules;
           system = resolvedSystem;
           specialArgs = specialArgs;
@@ -484,9 +462,9 @@ let
       }
     else if m.metaConfig.spin == "vpsadminos" then
       let
-        vpsadminosPath = swpinPaths.vpsadminos;
+        vpsadminosPath = inputPaths.vpsadminos;
         evalResult = import (vpsadminosPath + "/os/default.nix") {
-          nixpkgsPath = swpinPaths.nixpkgs;
+          nixpkgsPath = inputPaths.nixpkgs;
           modules = modules;
           extraArgs = specialArgs;
           system = resolvedSystem;

@@ -59,7 +59,7 @@ module ConfCtl
 
       hosts.to_h do |host|
         host_plan = plan.fetch(host)
-        [host, host_plan['swpinPaths'] || {}]
+        [host, host_plan['inputs'] || {}]
       end
     end
 
@@ -112,11 +112,11 @@ module ConfCtl
       hosts.each do |host|
         host_plan = host_plans[host]
         machine_key = host_plan['key'] || host_plan['machineKey'] || host_plan['flakeKey'] || machine_key_for(host)
-        host_swpin_paths = host_plan['swpinPaths'] || {}
-        swpin_specs_json = host_plan['swpinSpecJson'] || {}
-        inputs = host_plan['inputs'] || host_swpin_paths
+        host_input_paths = host_plan['inputs'] || {}
+        inputs_specs_json = host_plan['inputsSpecJson'] || {}
+        inputs = host_input_paths
 
-        specs = swpin_specs_json.to_h do |name, spec_json|
+        specs = inputs_specs_json.to_h do |name, spec_json|
           spec_class = ConfCtl::Swpins::Spec.for(spec_json['type'].to_sym)
           spec = spec_class.new(
             spec_json['name'] || name,
@@ -132,7 +132,7 @@ module ConfCtl
         auto_rollback_path = installable_paths[rollback_installable]
 
         host_generations = Generation::BuildList.new(host)
-        generation = host_generations.find(toplevel_path, host_swpin_paths)
+        generation = host_generations.find(toplevel_path, host_input_paths)
 
         if generation.nil?
           inputs_info = eval_inputs_info(host)
@@ -140,7 +140,7 @@ module ConfCtl
           generation.create(
             toplevel_path,
             auto_rollback_path,
-            host_swpin_paths,
+            host_input_paths,
             specs,
             date: time,
             inputs_info: inputs_info,

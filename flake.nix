@@ -35,7 +35,6 @@
             (import ./nix/modules/confctl/generations.nix)
             (import ./nix/modules/confctl/cli.nix)
             (import ./nix/modules/confctl/nix.nix)
-            (import ./nix/modules/confctl/swpins.nix)
             (import ./nix/modules/confctl/inputs-info.nix)
           ];
         };
