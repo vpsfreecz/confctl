@@ -42,6 +42,7 @@ pkgs.mkShell {
     export GEM_PATH="$GEM_HOME"
     export BUNDLE_PATH="$GEM_HOME"
     export BUNDLE_APP_CONFIG="$PWD/.bundle"
+    export RUBOCOP_CACHE_ROOT="$CONFCTL_SRC/.rubocop_cache"
     export PATH="$PWD/.bin:$GEM_HOME/bin:$PATH"
 
     mkdir -p "$GEM_HOME" "$PWD/.bin" "$PWD/.man/man8"
