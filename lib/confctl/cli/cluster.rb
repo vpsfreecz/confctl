@@ -1217,9 +1217,11 @@ module ConfCtl::Cli
         end
       end
 
-      input_columns = input_roles.to_h do |role|
-        col = swpin_names.include?(role) ? "input:#{role}" : role
-        [role, col]
+      input_column_names = {}
+      input_columns = input_roles.map do |role|
+        name = swpin_names.include?(role) ? "input:#{role}" : role
+        input_column_names[role] = name
+        { name: name, label: role.to_s.upcase }
       end
 
       rows = host_generations.map do |host, gen|
@@ -1236,7 +1238,7 @@ module ConfCtl::Cli
         if flake_generation?(gen)
           inputs_info = normalized_inputs_info(gen) || {}
           input_roles.each do |role|
-            row[input_columns[role]] = inputs_short_rev(inputs_info[role])
+            row[input_column_names[role]] = inputs_short_rev(inputs_info[role])
           end
         end
 
@@ -1249,7 +1251,7 @@ module ConfCtl::Cli
 
       OutputFormatter.print(
         rows,
-        %w[name generation kernel] + swpin_names + input_columns.values,
+        %w[name generation kernel] + swpin_names + input_columns,
         layout: :columns,
         sort: %w[name generation]
       )
