@@ -290,7 +290,6 @@ module ConfCtl
       end
 
       args.concat(base_args)
-      args << '--override-input' << 'confctl' << "path:#{ConfCtl.root}"
 
       args << '--show-trace' if show_trace
 
