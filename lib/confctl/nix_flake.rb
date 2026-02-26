@@ -96,6 +96,7 @@ module ConfCtl
       ret_generations = {}
       host_plans = {}
       installables = []
+      machine_keys = []
 
       hosts.each do |host|
         host_plan = plan.fetch(host)
@@ -103,11 +104,12 @@ module ConfCtl
         host_plans[host] = host_plan
         installables << ".#confctl.build.#{machine_key}.toplevel"
         installables << ".#confctl.build.#{machine_key}.autoRollback"
+        machine_keys << machine_key
       end
 
       legacy_args = legacy_nix_path_args(hosts)
       nix_build_json(installables, legacy_nix_path_args: legacy_args, &block)
-      build_outputs = nix_eval_json('.#confctl.build')
+      build_outputs = build_outputs_for_keys(machine_keys)
 
       hosts.each do |host|
         host_plan = host_plans[host]
@@ -163,7 +165,7 @@ module ConfCtl
       ".#confctl.inputs.#{machine_key_for(host)}"
     end
 
-    def nix_eval_json(installable, impure: nil, settings: nil)
+    def nix_eval_json(installable, impure: nil, settings: nil, apply: nil)
       settings_for_args = settings || confctl_settings
 
       result = run_nix_with_fallback do |extra_experimental, no_update_lock_file|
@@ -176,7 +178,8 @@ module ConfCtl
         nix_eval_args(
           installable,
           args_builder: args_builder,
-          extra_experimental: extra_experimental
+          extra_experimental: extra_experimental,
+          apply: apply
         )
       end
 
@@ -251,7 +254,7 @@ module ConfCtl
       )
     end
 
-    def nix_eval_args(installable, args_builder:, extra_experimental:)
+    def nix_eval_args(installable, args_builder:, extra_experimental:, apply: nil)
       args = ['nix', 'eval', '--json']
       args.concat(
         nix_common_args(
@@ -259,6 +262,9 @@ module ConfCtl
           extra_experimental: extra_experimental
         )
       )
+      if apply
+        args << '--apply' << apply
+      end
       args << installable
       args
     end
@@ -301,6 +307,19 @@ module ConfCtl
     def nix_attr_string(value)
       escaped = value.to_s.gsub('\\', '\\\\').gsub('"', '\\"')
       "\"#{escaped}\""
+    end
+
+    def build_outputs_for_keys(machine_keys)
+      return {} if machine_keys.empty?
+
+      keys = machine_keys.uniq
+      apply = build_outputs_apply_expr(keys)
+      nix_eval_json('.#confctl.build', apply: apply)
+    end
+
+    def build_outputs_apply_expr(machine_keys)
+      list = machine_keys.map { |k| nix_attr_string(k) }.join(' ')
+      "x: builtins.listToAttrs (map (k: { name = k; value = x.${k}; }) [ #{list} ])"
     end
 
     def legacy_nix_path_args(hosts)
