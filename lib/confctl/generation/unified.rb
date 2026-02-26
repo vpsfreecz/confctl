@@ -89,6 +89,18 @@ module ConfCtl
       end
     end
 
+    def inputs_info
+      build_generation ? build_generation.inputs_info : nil
+    end
+
+    def inputs
+      build_generation ? build_generation.inputs : nil
+    end
+
+    def flakes_mode?
+      build_generation ? build_generation.flakes_mode? : false
+    end
+
     def current_str
       build = build_generation && build_generation.current
       host = host_generation && host_generation.current

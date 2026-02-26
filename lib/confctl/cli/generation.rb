@@ -331,11 +331,26 @@ module ConfCtl::Cli
 
     def list_generations(gens)
       swpin_names = []
+      input_roles = []
 
       gens.each do |gen|
         gen.swpin_names.each do |name|
           swpin_names << name unless swpin_names.include?(name)
         end
+
+        next unless flake_generation?(gen)
+
+        inputs_info = normalized_inputs_info(gen)
+        next if inputs_info.nil? || inputs_info.empty?
+
+        inputs_info.each_key do |role|
+          input_roles << role unless input_roles.include?(role)
+        end
+      end
+
+      input_columns = input_roles.to_h do |role|
+        col = swpin_names.include?(role) ? "input:#{role}" : role
+        [role, col]
       end
 
       rows = gens.map do |gen|
@@ -352,15 +367,38 @@ module ConfCtl::Cli
           row[name] = spec.version
         end
 
+        if flake_generation?(gen)
+          inputs_info = normalized_inputs_info(gen) || {}
+          input_roles.each do |role|
+            row[input_columns[role]] = inputs_short_rev(inputs_info[role])
+          end
+        end
+
         row
       end
 
       OutputFormatter.print(
         rows,
-        %w[host name id presence current kernel] + swpin_names,
+        %w[host name id presence current kernel] + swpin_names + input_columns.values,
         layout: :columns,
         sort: %w[name host]
       )
+    end
+
+    def normalized_inputs_info(gen)
+      return nil unless gen.respond_to?(:inputs_info)
+
+      ConfCtl::InputsInfo.normalize(gen.inputs_info)
+    end
+
+    def inputs_short_rev(info)
+      return nil unless info.is_a?(Hash)
+
+      info['shortRev'] || (info['rev'] && info['rev'][0, 8])
+    end
+
+    def flake_generation?(gen)
+      gen.respond_to?(:flakes_mode?) && gen.flakes_mode?
     end
   end
 end
