@@ -110,6 +110,7 @@ module ConfCtl
       legacy_args = legacy_nix_path_args(hosts)
       nix_build_json(installables, legacy_nix_path_args: legacy_args, &block)
       build_outputs = build_outputs_for_keys(machine_keys)
+      pending_generations = {}
 
       hosts.each do |host|
         host_plan = host_plans[host]
@@ -132,20 +133,38 @@ module ConfCtl
         generation = host_generations.find(toplevel_path, host_input_paths, mode: 'flakes')
 
         if generation.nil?
-          inputs_info = eval_inputs_info(host)
-          generation = Generation::Build.new(host)
-          generation.create_flake(
-            toplevel_path,
-            auto_rollback_path,
-            inputs: host_input_paths,
-            inputs_info: inputs_info,
-            date: time
-          )
-          generation.save
+          pending_generations[host] = {
+            host_generations: host_generations,
+            machine_key: machine_key,
+            toplevel_path: toplevel_path,
+            auto_rollback_path: auto_rollback_path,
+            host_input_paths: host_input_paths
+          }
+          next
         end
 
         host_generations.current = generation
         ret_generations[host] = generation
+      end
+
+      if pending_generations.any?
+        inputs_infos = inputs_info_for_keys(pending_generations.values.map { |v| v[:machine_key] })
+
+        pending_generations.each do |host, data|
+          inputs_info = inputs_infos[data[:machine_key]] || eval_inputs_info(host)
+          generation = Generation::Build.new(host)
+          generation.create_flake(
+            data[:toplevel_path],
+            data[:auto_rollback_path],
+            inputs: data[:host_input_paths],
+            inputs_info: inputs_info,
+            date: time
+          )
+          generation.save
+
+          data[:host_generations].current = generation
+          ret_generations[host] = generation
+        end
       end
 
       ret_generations
@@ -312,12 +331,28 @@ module ConfCtl
       return {} if machine_keys.empty?
 
       keys = machine_keys.uniq
-      apply = build_outputs_apply_expr(keys)
+      apply = list_to_attrs_apply_expr(keys)
       nix_eval_json('.#confctl.build', apply: apply)
     end
 
-    def build_outputs_apply_expr(machine_keys)
-      list = machine_keys.map { |k| nix_attr_string(k) }.join(' ')
+    def inputs_info_for_keys(machine_keys)
+      return {} if machine_keys.empty?
+
+      keys = machine_keys.uniq
+      apply = list_to_attrs_apply_expr(keys)
+      nix_eval_json('.#confctl.inputsInfo', apply: apply)
+    end
+
+    def inputs_for_keys(machine_keys)
+      return {} if machine_keys.empty?
+
+      keys = machine_keys.uniq
+      apply = list_to_attrs_apply_expr(keys)
+      nix_eval_json('.#confctl.inputs', apply: apply)
+    end
+
+    def list_to_attrs_apply_expr(keys)
+      list = keys.map { |k| nix_attr_string(k) }.join(' ')
       "x: builtins.listToAttrs (map (k: { name = k; value = x.${k}; }) [ #{list} ])"
     end
 
@@ -332,9 +367,13 @@ module ConfCtl
       end
 
       merged_inputs = {}
+      host_keys = {}
+      hosts.each { |host| host_keys[host] = machine_key_for(host) }
+      inputs_by_key = inputs_for_keys(host_keys.values)
 
       hosts.each do |host|
-        inputs = nix_eval_json(inputs_installable(host))
+        machine_key = host_keys[host]
+        inputs = inputs_by_key[machine_key] || nix_eval_json(inputs_installable(host))
 
         inputs.each do |name, path|
           next unless path.is_a?(String) && !path.empty?
