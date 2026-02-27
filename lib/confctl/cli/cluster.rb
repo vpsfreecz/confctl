@@ -1281,7 +1281,7 @@ module ConfCtl::Cli
         hosts_swpin_paths[host].update(m.nix_paths)
       end
 
-      grps = swpin_build_groups(hosts_swpin_paths)
+      grps = swpin_build_groups(hosts_swpin_paths, nix)
       puts
       puts "Machines will be built in #{grps.length} groups"
       puts
@@ -1505,7 +1505,15 @@ module ConfCtl::Cli
       valid ? ret : false
     end
 
-    def swpin_build_groups(hosts_swpins)
+    def swpin_build_groups(hosts_swpins, nix = nil)
+      if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
+        legacy_nix_path = false
+        if nix
+          legacy_nix_path = nix.confctl_settings.dig('nix', 'legacyNixPath') == true
+        end
+        return [[hosts_swpins.keys, {}]] unless legacy_nix_path
+      end
+
       ret = []
       all_swpins = hosts_swpins.values.uniq
 
