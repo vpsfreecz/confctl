@@ -36,6 +36,9 @@ module ConfCtl::Cli
 
       desc 'Create a new configuration'
       command :init do |c|
+        c.desc 'Create legacy swpins-based configuration (non-flake)'
+        c.switch %i[swpins legacy], default_value: false
+
         c.action(&Command.run(c, Configuration, :init))
       end
 

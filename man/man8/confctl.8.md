@@ -52,9 +52,12 @@ the generation before last and so on.
   the standard output is connected to a terminal.
 
 ## COMMANDS
-`confctl init`
+`confctl init` [*options*]
   Create a new configuration in the current directory. The current directory
-  is set up to be used with `confctl`.
+  is set up to be used with `confctl`. Defaults to a flake-based configuration.
+
+    `--swpins`, `--legacy`
+      Create a legacy swpins-based (non-flake) configuration.
 
 `confctl add` *name*
   Add new machine to the configuration.

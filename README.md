@@ -136,9 +136,9 @@ man confctl
 man confctl-options.nix
 ```
 
-5. Initialize the configuration directory with confctl:
+5. Initialize the configuration directory with confctl (legacy swpins layout):
 ```
-confctl init
+confctl init --swpins
 ```
 
 6. Add a new machine to be deployed:
