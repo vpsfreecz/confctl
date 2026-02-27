@@ -41,6 +41,8 @@ Naming/HeredocDelimiterNaming:
   Enabled: false
 Naming/MethodParameterName:
   Enabled: false
+Naming/PredicateMethod:
+  Enabled: false
 
 Style/CaseEquality:
   Enabled: false
@@ -59,6 +61,8 @@ Style/MultilineBlockChain:
   Enabled: false
 Style/NumericPredicate:
   EnforcedStyle: comparison
+Style/OneClassPerFile:
+  Enabled: false
 Style/PreferredHashMethods:
   EnforcedStyle: verbose
 Style/SafeNavigation:

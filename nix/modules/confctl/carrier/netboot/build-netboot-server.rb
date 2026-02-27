@@ -128,7 +128,7 @@ class NetbootBuilder
       puts m.fqdn
 
       m.generations.each do |g|
-        puts "  - #{g.time_s} - #{g.version}#{g.current ? ' (current)' : ''}"
+        puts "  - #{g.time_s} - #{g.version}#{' (current)' if g.current}"
       end
 
       puts

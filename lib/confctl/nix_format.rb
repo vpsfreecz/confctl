@@ -80,7 +80,7 @@ module ConfCtl
                   'implement #to_nix()?'
           end
 
-        pad("#{simple}#{semicolon ? ';' : ''}#{nl ? "\n" : ''}", indent:)
+        pad("#{simple}#{';' if semicolon}#{"\n" if nl}", indent:)
       end
     end
 
@@ -105,7 +105,7 @@ module ConfCtl
         end
       end
 
-      ret << pad("}#{semicolon ? ';' : ''}#{nl ? "\n" : ''}")
+      ret << pad("}#{';' if semicolon}#{"\n" if nl}")
       ret
     end
 
@@ -118,7 +118,7 @@ module ConfCtl
         end
       end
 
-      ret << pad("]#{semicolon ? ';' : ''}#{nl ? "\n" : ''}")
+      ret << pad("]#{';' if semicolon}#{"\n" if nl}")
     end
   end
 end

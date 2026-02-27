@@ -338,11 +338,11 @@ module ConfCtl::Cli
       FileUtils.mkdir_p(name, mode: DIR_MODE)
     end
 
-    def mkfile(name)
+    def mkfile(name, &block)
       puts "mkfile #{name}"
-      f = File.open(name, 'w', FILE_MODE)
-      yield(f)
-      f.close
+      File.open(name, 'w', FILE_MODE) do |f|
+        block.call(f)
+      end
     end
 
     def replace_file(name, &)

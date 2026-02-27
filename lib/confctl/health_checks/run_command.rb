@@ -89,7 +89,7 @@ module ConfCtl
 
       def make_command(machine, args)
         args.map do |arg|
-          arg.gsub(/\{([^\}]+)\}/) do
+          arg.gsub(/\{([^}]+)\}/) do
             machine[::Regexp.last_match(1)]
           end
         end

@@ -34,7 +34,7 @@ module ConfCtl
         ret << 'systemd: '
       end
 
-      ret << @property_checks.map(&:to_s).join(', ')
+      ret << @property_checks.join(', ')
       ret
     end
 

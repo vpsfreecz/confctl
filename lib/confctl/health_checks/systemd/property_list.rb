@@ -1,9 +1,9 @@
 module ConfCtl
   class HealthChecks::Systemd::PropertyList < Hash
-    def self.from_enumerator(it)
+    def self.from_enumerator(lines)
       hash = new
 
-      it.each do |line|
+      lines.each do |line|
         stripped = line.strip
         eq = line.index('=')
         next if eq.nil?

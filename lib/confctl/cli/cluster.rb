@@ -61,7 +61,7 @@ module ConfCtl::Cli
         list_machines(machines)
         puts
         puts "Generation: #{opts[:generation] || 'new build'}"
-        puts "Target action: #{action}#{opts[:reboot] ? ' + reboot' : ''}"
+        puts "Target action: #{action}#{' + reboot' if opts[:reboot]}"
       end
 
       ConfCtl::Hook.call(:cluster_deploy, kwargs: {

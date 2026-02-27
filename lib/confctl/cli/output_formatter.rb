@@ -33,7 +33,7 @@ module ConfCtl::Cli
         @cols = parse_cols(cols)
 
       elsif @objects.is_a?(::Array)
-        if @objects.count == 0
+        if @objects.none?
           @cols = []
         else
           @cols ||= parse_cols(@objects.first.keys)
