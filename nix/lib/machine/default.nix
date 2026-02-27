@@ -47,11 +47,6 @@ let
             confData = import "${toString confDir}/data/default.nix" { inherit lib; };
           };
 
-          networking.hostName = lib.mkIf (confMachine.host != null && confMachine.host.name != null) (
-            lib.mkDefault confMachine.host.name
-          );
-
-          networking.domain = lib.mkIf (confMachine.host != null) (lib.mkDefault confMachine.host.fullDomain);
         }
       )
     ]
