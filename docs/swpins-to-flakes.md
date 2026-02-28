@@ -157,7 +157,7 @@ Notes:
 
 ## Step 3: Switch machine metadata from `swpins.channels` to `inputs.channels`
 
-For every machine `cluster/<name>/module.nix`:
+For every machine `cluster/**/module.nix`:
 
 - replace `swpins.channels = [ ... ];` with `inputs.channels = [ ... ];`
 
@@ -204,7 +204,7 @@ Example `flake.nix`:
 inputs.nixpkgsSomeBranch.url = "github:NixOS/nixpkgs/some-branch";
 ```
 
-Example `cluster/<name>/module.nix`:
+Example `cluster/<path>/module.nix`:
 
 ```nix
 cluster."my-machine".inputs.overrides.nixpkgs = "nixpkgsSomeBranch";

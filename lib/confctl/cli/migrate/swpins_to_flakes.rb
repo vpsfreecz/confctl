@@ -95,9 +95,10 @@ module ConfCtl::Cli
 
       flake_path = File.join(conf_dir, 'flake.nix')
 
-      module_paths = Dir.glob(File.join(conf_dir, 'cluster', '*', 'module.nix'))
+      cluster_dir = File.join(conf_dir, 'cluster')
+      module_paths = Dir.glob(File.join(cluster_dir, '**', 'module.nix'))
       if module_paths.empty?
-        puts 'No cluster/*/module.nix files found.'
+        puts 'No cluster/**/module.nix files found.'
         return true
       end
 
@@ -116,7 +117,10 @@ module ConfCtl::Cli
       set_ops = []
 
       module_paths.each do |path|
-        machine = File.basename(File.dirname(path))
+        relative = path.sub(%r{\A#{Regexp.escape(cluster_dir)}/}, '')
+        machine = File.dirname(relative)
+        next if machine == '.'
+
         content = File.read(path)
         updated = content.gsub(/\bswpins\.channels\b/, 'inputs.channels')
 
@@ -321,10 +325,11 @@ module ConfCtl::Cli
     end
 
     def load_machine_overrides(machine)
-      path = File.join(conf_dir, 'swpins', 'cluster', "#{machine}.json")
+      safe_machine = machine.tr('/', ':')
+      path = File.join(conf_dir, 'swpins', 'cluster', "#{safe_machine}.json")
       return {} unless File.exist?(path)
 
-      load_json(path, "swpins/cluster/#{machine}.json")
+      load_json(path, "swpins/cluster/#{safe_machine}.json")
     end
 
     def load_json(path, label)

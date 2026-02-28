@@ -268,7 +268,7 @@ module ConfCtl::Cli
             c.action(&Command.run(c, Migrate::SwpinsToFlakes, :flake))
           end
 
-          stf.desc 'Rewrite cluster/*/module.nix metadata to use inputs.*'
+          stf.desc 'Rewrite cluster/**/module.nix metadata to use inputs.*'
           stf.command :machines do |c|
             c.action(&Command.run(c, Migrate::SwpinsToFlakes, :machines))
           end
