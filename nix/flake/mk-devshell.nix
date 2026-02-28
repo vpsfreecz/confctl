@@ -27,7 +27,7 @@ pkgs.mkShell {
       less
       # helpful tools used in existing shell.nix / workflows
       nix-prefetch-git
-      nixfmt-rfc-style
+      nixfmt
       nixfmt-tree
     ])
     ++ extraPackages;
