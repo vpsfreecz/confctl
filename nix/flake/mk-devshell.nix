@@ -69,9 +69,15 @@ pkgs.mkShell {
     # (Bundler supports per-gem local overrides via `local.<name>`.)
     bundle config set --local path "$GEM_HOME" >/dev/null
     bundle config set --local "local.confctl" "$CONFCTL_SRC" >/dev/null
+    bundle config set --local bin "$PWD/.bin" >/dev/null
 
     # Install gems (purity disabled due to native extensions in some gems)
     NIX_ENFORCE_PURITY=0 bundle install >/dev/null
+
+    # Generate binstubs for tools used by hooks (if present in the bundle)
+    if bundle info rubocop >/dev/null 2>&1; then
+      bundle binstubs rubocop --force >/dev/null
+    fi
 
     # Provide `confctl` on PATH
     cat > "$PWD/.bin/confctl" <<'EOF'

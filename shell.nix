@@ -36,6 +36,9 @@ stdenv.mkDerivation rec {
     # error.
     NIX_ENFORCE_PURITY=0 bundle install
 
+    bundle config set --local bin "$BINDIR"
+    bundle binstubs rubocop --force
+
     bundle exec rake md2man:man
     popd
 
@@ -49,5 +52,6 @@ stdenv.mkDerivation rec {
     load File.join('$CONFCTL', 'bin/confctl')
     EOF
     chmod +x "$BINDIR/confctl"
+
   '';
 }
