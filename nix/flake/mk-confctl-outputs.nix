@@ -127,6 +127,10 @@ let
               path = [ "tags" ];
               update = old: old ++ cm.tags;
             }
+            {
+              path = [ "buildAttribute" ];
+              update = _: cm.buildAttribute;
+            }
           ]
           ++ (generationUpdates cm)
         ) machineAttrs.${cm.machine}.metaConfig;
@@ -446,11 +450,23 @@ let
         evalResult = evalConfigFor m;
         evalConfig = evalResult.evalConfig;
         pkgs = evalResult.pkgs;
+        buildAttrPath =
+          m.metaConfig.buildAttribute or [
+            "system"
+            "build"
+            "toplevel"
+          ];
+        buildAttr = coreLib.attrByPath buildAttrPath null evalConfig.config;
+        buildValue =
+          if buildAttr == null then
+            abort "Attribute 'config.${coreLib.concatStringsSep "." buildAttrPath}' not found on machine ${m.name}"
+          else
+            buildAttr;
       in
       {
         name = plan.key;
         value = {
-          toplevel = evalConfig.config.system.build.toplevel;
+          toplevel = buildValue;
           autoRollback = autoRollbackFor pkgs;
         };
       }
