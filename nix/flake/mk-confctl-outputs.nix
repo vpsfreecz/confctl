@@ -362,11 +362,16 @@ let
     let
       userModules = userModuleList.${m.metaConfig.spin} or [ ];
       systemModules = (import (confctlSrc + "/nix/modules/system-list.nix")).${m.metaConfig.spin} or [ ];
+      moduleArgsModules =
+        if m.metaConfig.spin == "vpsadminos" then
+          [ ]
+        else
+          [
+            baseSystemModule
+            (machineArgsModule m)
+          ];
     in
-    [
-      baseSystemModule
-      (machineArgsModule m)
-    ]
+    moduleArgsModules
     ++ clusterModulesForSystem
     ++ [
       (confDir + "/cluster/${m.clusterName}/config.nix")
