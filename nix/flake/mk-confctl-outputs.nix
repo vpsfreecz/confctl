@@ -63,6 +63,7 @@ let
       carrier ? null,
       alias ? null,
       clusterName ? null,
+      extraModules ? [ ],
     }:
     let
       ensuredClusterName = if clusterName == null then name else clusterName;
@@ -73,6 +74,7 @@ let
         alias
         metaConfig
         carrier
+        extraModules
         ;
       clusterName = ensuredClusterName;
     };
@@ -117,6 +119,7 @@ let
         alias = cm.alias;
         clusterName = cm.machine;
         carrier = carrierMachine.name;
+        extraModules = cm.extraModules;
         metaConfig = coreLib.updateManyAttrsByPath (
           [
             {
@@ -382,7 +385,8 @@ let
     ]
     ++ confctlModules
     ++ systemModules
-    ++ userModules;
+    ++ userModules
+    ++ m.extraModules;
 
   autoRollbackFor =
     pkgs:
