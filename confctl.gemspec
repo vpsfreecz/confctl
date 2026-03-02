@@ -33,7 +33,7 @@ Gem::Specification.new do |s|
   s.executables = s.files.grep(%r{^bin/}) { |f| File.basename(f) }
   s.license     = 'GPL-3.0-only'
 
-  s.required_ruby_version = '>= 3.1.0'
+  s.required_ruby_version = '>= 3.3.0'
 
   s.add_dependency 'curses'
   s.add_dependency 'gli', '~> 2.22.0'
