@@ -413,15 +413,15 @@ let
     let
       plan = buildPlan.${m.name};
       inputPaths = plan.inputs;
+      nixpkgsInput = inputs.${plan.inputsInfo.nixpkgs.input};
       modules = systemModulesFor m;
       specialArgs = specialArgsFor m;
     in
     if m.metaConfig.spin == "nixos" then
       let
-        evalConfig = import (inputPaths.nixpkgs + "/nixos/lib/eval-config.nix") {
-          inherit modules;
+        evalConfig = nixpkgsInput.lib.nixosSystem {
+          inherit modules specialArgs;
           system = resolvedSystem;
-          specialArgs = specialArgs;
         };
       in
       {
