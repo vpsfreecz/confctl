@@ -3,6 +3,7 @@ require 'confctl'
 require 'md2man/rakefile'
 require 'md2man/roff/engine'
 require 'md2man/html/engine'
+require 'rspec/core/rake_task'
 
 # Override markdown engine to add extra parameter
 [Md2Man::Roff, Md2Man::HTML].each do |mod|
@@ -38,3 +39,7 @@ task 'confctl-options' do
     end
   }, 'man/man8/confctl-options.nix.8.md')
 end
+
+desc 'Run RSpec tests'
+RSpec::Core::RakeTask.new(:spec)
+task test: :spec
