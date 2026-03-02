@@ -412,7 +412,6 @@ let
     m:
     let
       plan = buildPlan.${m.name};
-      inputPaths = plan.inputs;
       nixpkgsInput = inputs.${plan.inputsInfo.nixpkgs.input};
       modules = systemModulesFor m;
       specialArgs = specialArgsFor m;
@@ -430,11 +429,10 @@ let
       }
     else if m.metaConfig.spin == "vpsadminos" then
       let
-        vpsadminosPath = inputPaths.vpsadminos;
-        evalResult = import (vpsadminosPath + "/os/default.nix") {
-          nixpkgsPath = inputPaths.nixpkgs;
-          modules = modules;
-          extraArgs = specialArgs;
+        vpsadminosInput = inputs.${plan.inputsInfo.vpsadminos.input};
+        evalResult = vpsadminosInput.lib.vpsadminosSystem {
+          pkgs = nixpkgsInput.legacyPackages.${resolvedSystem};
+          inherit modules specialArgs;
           system = resolvedSystem;
         };
         evalConfig = evalResult.eval;
