@@ -694,7 +694,7 @@ class Machine
     nil
   end
 
-  def to_json(*args)
+  def to_json(*)
     {
       url:,
       name:,
@@ -702,7 +702,7 @@ class Machine
       fqdn:,
       label:,
       generations:
-    }.to_json(*args)
+    }.to_json(*)
   end
 
   protected
@@ -833,7 +833,7 @@ class Generation
     @kernel_params.insert(0, "httproot=#{boot_files['root.squashfs'].url}")
   end
 
-  def to_json(*args)
+  def to_json(*)
     {
       url:,
       store_path:,
@@ -851,7 +851,7 @@ class Generation
       boot_files:,
       variants:,
       swpins_info: json['swpins-info']
-    }.to_json(*args)
+    }.to_json(*)
   end
 
   protected
@@ -890,8 +890,8 @@ class BootFile
     @url = url
   end
 
-  def to_json(*args)
-    url.to_json(*args)
+  def to_json(*)
+    url.to_json(*)
   end
 end
 
@@ -947,12 +947,12 @@ class Variant
     @kernel_params = kernel_params
   end
 
-  def to_json(*args)
+  def to_json(*)
     {
       name:,
       label:,
       kernel_params:
-    }.to_json(*args)
+    }.to_json(*)
   end
 end
 

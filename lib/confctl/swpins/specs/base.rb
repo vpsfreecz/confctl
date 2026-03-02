@@ -129,8 +129,8 @@ module ConfCtl
       ret
     end
 
-    def to_json(*args)
-      as_json.to_json(*args)
+    def to_json(*)
+      as_json.to_json(*)
     end
 
     protected

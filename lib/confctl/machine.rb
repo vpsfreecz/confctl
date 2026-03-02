@@ -4,8 +4,7 @@ module ConfCtl
       :carrier,
       :name,
       :alias,
-      :attribute,
-      keyword_init: true
+      :attribute
     )
 
     # @return [String]

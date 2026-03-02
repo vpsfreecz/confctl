@@ -3,8 +3,7 @@ module ConfCtl
     Change = Struct.new(
       :name,
       :old_info,
-      :new_info,
-      keyword_init: true
+      :new_info
     ) do
       def old_rev = old_info && old_info[:rev]
       def new_rev = new_info && new_info[:rev]

@@ -2,13 +2,13 @@ require 'rainbow'
 
 module ConfCtl::Cli
   class OutputFormatter
-    def self.to_s(*args)
-      f = new(*args)
+    def self.to_s(*)
+      f = new(*)
       f.to_s
     end
 
-    def self.print(*args, **kwargs)
-      f = new(*args, **kwargs)
+    def self.print(*, **)
+      f = new(*, **)
       f.print
     end
 

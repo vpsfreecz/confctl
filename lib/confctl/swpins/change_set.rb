@@ -4,7 +4,7 @@ module ConfCtl
       attr_reader :name, :path
     end
 
-    SpecSet = Struct.new(:spec, :original_version, :original_info, keyword_init: true) do
+    SpecSet = Struct.new(:spec, :original_version, :original_info) do
       def name
         spec.name
       end

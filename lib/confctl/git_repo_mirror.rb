@@ -55,10 +55,10 @@ module ConfCtl
 
     attr_reader :cmd, :quiet
 
-    def git_repo(git_cmd, *args, **kwargs)
+    def git_repo(git_cmd, *, **kwargs)
       kwargs[:gopts] ||= []
       kwargs[:gopts] << '-C' << mirror_path
-      git(git_cmd, *args, **kwargs)
+      git(git_cmd, *, **kwargs)
     end
 
     def git(git_cmd, args: [], opts: [], gopts: [])

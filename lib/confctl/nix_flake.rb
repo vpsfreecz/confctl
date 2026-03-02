@@ -90,7 +90,7 @@ module ConfCtl
     # @yieldparam path [String]
     #
     # @return [Hash<String, Generation::Build>]
-    def build_attributes(hosts: [], swpin_paths: {}, host_swpin_specs: {}, time: nil, &block)
+    def build_attributes(hosts: [], swpin_paths: {}, host_swpin_specs: {}, time: nil, &)
       plan = build_plan
       time ||= Time.now
       ret_generations = {}
@@ -108,7 +108,7 @@ module ConfCtl
       end
 
       legacy_args = legacy_nix_path_args(hosts)
-      nix_build_json(installables, legacy_nix_path_args: legacy_args, &block)
+      nix_build_json(installables, legacy_nix_path_args: legacy_args, &)
       build_outputs = build_outputs_for_keys(machine_keys)
       pending_generations = {}
 

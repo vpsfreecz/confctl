@@ -63,8 +63,8 @@ class CarrierEnv
     on_change_commands
   end
 
-  def nix_env(*args)
-    system_command('nix-env', '-p', @profile, *args)
+  def nix_env(*)
+    system_command('nix-env', '-p', @profile, *)
   end
 
   def on_change_commands
