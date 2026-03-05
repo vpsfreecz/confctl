@@ -1,8 +1,22 @@
-import ../make-test.nix (
+{ deployMode }:
+let
+  mode =
+    if
+      builtins.elem deployMode [
+        "flakes"
+        "swpins"
+      ]
+    then
+      deployMode
+    else
+      throw "unsupported deployMode '${deployMode}'";
+in
+import ../../make-test.nix (
   {
     pkgs,
     confctlPackage,
     confctlSrc,
+    vpsadminosPath,
     ...
   }:
   let
@@ -13,12 +27,15 @@ import ../make-test.nix (
         "${confctlPackage}/bin/confctl";
 
     confctlSource = if confctlSrc == null then throw "suiteArgs.confctlSrc is required" else confctlSrc;
+
+    vpsadminosSource =
+      if vpsadminosPath == null then throw "suiteArgs.vpsadminosPath is required" else vpsadminosPath;
   in
   {
-    name = "deploy";
+    name = "deploy-${mode}";
 
     description = ''
-      Exercise confctl build/deploy lifecycle on NixOS and vpsAdminOS machines.
+      Exercise confctl build/deploy lifecycle on NixOS and vpsAdminOS machines (${mode} mode).
     '';
 
     tags = [
@@ -54,45 +71,71 @@ import ../make-test.nix (
           ];
         };
       };
-
-      vpsadminos = {
-        spin = "vpsadminos";
-        networks = [
-          {
-            type = "user";
-            opts = {
-              hostForward = "tcp::net2-:22";
-              network = "10.0.2.0/24";
-              host = "10.0.2.2";
-              dns = "10.0.2.3";
-            };
-          }
-        ];
-        config = {
-          services.openssh = {
-            enable = true;
-            settings = {
-              PermitRootLogin = "yes";
-              PasswordAuthentication = false;
+    }
+    // (
+      if mode == "flakes" then
+        {
+          vpsadminos = {
+            spin = "vpsadminos";
+            networks = [
+              {
+                type = "user";
+                opts = {
+                  hostForward = "tcp::net2-:22";
+                  network = "10.0.2.0/24";
+                  host = "10.0.2.2";
+                  dns = "10.0.2.3";
+                };
+              }
+            ];
+            config = {
+              services.openssh = {
+                enable = true;
+                settings = {
+                  PermitRootLogin = "yes";
+                  PasswordAuthentication = false;
+                };
+              };
+              boot.qemu = {
+                memory = 2048;
+                cpus = 4;
+              };
+              networking.firewall.enable = false;
+              environment.systemPackages = with pkgs; [
+                git
+              ];
             };
           };
-          boot.qemu = {
-            memory = 2048;
-            cpus = 4;
-          };
-          networking.firewall.enable = false;
-          environment.systemPackages = with pkgs; [
-            git
-          ];
-        };
-      };
-    };
+        }
+      else
+        { }
+    );
 
     testScript = ''
       require 'fileutils'
 
+      DEPLOY_MODE = '${mode}'
+      NIXPKGS_PATH = '${pkgs.path}'
+      VPSADMINOS_PATH = '${vpsadminosSource}'
+
       NIXOS_MACHINE = 'nixos-machine'
       VPSADMINOS_MACHINE = 'vpsadminos-machine'
+
+      def flake_mode?
+        DEPLOY_MODE == 'flakes'
+      end
+
+      def include_vpsadminos_machine?
+        flake_mode?
+      end
+
+      def expected_successful_hosts
+        include_vpsadminos_machine? ? 2 : 1
+      end
+
+      def fixture_template_name
+        flake_mode? ? 'example-flake' : 'example'
+      end
 
       def git_commit!(repo, file, content, message)
         File.write(File.join(repo, file), content)
@@ -128,6 +171,14 @@ import ../make-test.nix (
       end
 
       def write_nixos_config!(conf_dir, marker:)
+        vpsadminos_path = VPSADMINOS_PATH
+        vpsadminos_import =
+          if flake_mode?
+            '(inputs.vpsadminos + "/tests/configs/nixos/base.nix")'
+          else
+            "(#{vpsadminos_path} + \"/tests/configs/nixos/base.nix\")"
+          end
+
         File.write(File.join(conf_dir, 'cluster/nixos-machine/config.nix'), <<~NIX)
           {
             config,
@@ -161,7 +212,7 @@ import ../make-test.nix (
                   };
                 }
               )
-              (inputs.vpsadminos + "/tests/configs/nixos/base.nix")
+              #{vpsadminos_import}
             ];
 
             networking.hostName = "nixos-machine";
@@ -179,6 +230,14 @@ import ../make-test.nix (
       end
 
       def write_vpsadminos_config!(conf_dir, marker:)
+        vpsadminos_path = VPSADMINOS_PATH
+        vpsadminos_import =
+          if flake_mode?
+            '(inputs.vpsadminos + "/tests/configs/vpsadminos/base.nix")'
+          else
+            "(#{vpsadminos_path} + \"/tests/configs/vpsadminos/base.nix\")"
+          end
+
         File.write(File.join(conf_dir, 'cluster/vpsadminos-machine/config.nix'), <<~NIX)
           {
             config,
@@ -191,7 +250,7 @@ import ../make-test.nix (
             imports = [
               ../../environments/base.nix
               ./hardware.nix
-              (inputs.vpsadminos + "/tests/configs/vpsadminos/base.nix")
+              #{vpsadminos_import}
             ];
 
             networking.hostName = "vpsadminos-machine";
@@ -209,9 +268,7 @@ import ../make-test.nix (
         NIX
       end
 
-      def prepare_fixture!(conf_dir:, dummy_repo:, nixos_port:, vpsadminos_port:, pubkey:)
-        prepare_fixture_dir!(conf_dir)
-
+      def write_flake_root!(conf_dir, dummy_repo)
         File.write(File.join(conf_dir, 'flake.nix'), <<~NIX)
           {
             description = "confctl test fixture (flake)";
@@ -226,12 +283,7 @@ import ../make-test.nix (
             outputs = inputs@{ self, confctl, ... }:
               let
                 channels = {
-                  nixos = {
-                    nixpkgs = "nixpkgs";
-                    vpsadminos = "vpsadminos";
-                    dummy = "dummy-input";
-                  };
-                  vpsadminos = {
+                  deploy = {
                     nixpkgs = "nixpkgs";
                     vpsadminos = "vpsadminos";
                     dummy = "dummy-input";
@@ -250,13 +302,74 @@ import ../make-test.nix (
               };
           }
         NIX
+      end
+
+      def write_swpins_config!(conf_dir, dummy_repo)
+        out, = run_local!(%w[git rev-parse --abbrev-ref HEAD], chdir: dummy_repo)
+        dummy_branch = out.strip
+        dummy_repo_escaped = nix_escape_string(dummy_repo)
+        nixpkgs_path_escaped = nix_escape_string(NIXPKGS_PATH)
+        vpsadminos_path_escaped = nix_escape_string(VPSADMINOS_PATH)
+
+        File.write(File.join(conf_dir, 'configs/swpins.nix'), <<~NIX)
+          { config, ... }:
+          {
+            confctl.swpins.core.pins = {
+              nixpkgs = {
+                type = "directory";
+                directory.path = "#{nixpkgs_path_escaped}";
+              };
+
+              vpsadminos = {
+                type = "directory";
+                directory.path = "#{vpsadminos_path_escaped}";
+              };
+            };
+
+            confctl.swpins.channels = {
+              deploy = {
+                nixpkgs = {
+                  type = "directory";
+                  directory.path = "#{nixpkgs_path_escaped}";
+                };
+
+                vpsadminos = {
+                  type = "directory";
+                  directory.path = "#{vpsadminos_path_escaped}";
+                };
+
+                dummy = {
+                  type = "git-rev";
+                  git-rev = {
+                    url = "file://#{dummy_repo_escaped}";
+                    fetchSubmodules = false;
+                    update = {
+                      auto = false;
+                      interval = 0;
+                      ref = "refs/heads/#{dummy_branch}";
+                    };
+                  };
+                };
+              };
+            };
+          }
+        NIX
+      end
+
+      def write_machine_modules!(conf_dir, nixos_port:, vpsadminos_port:)
+        channel_line =
+          if flake_mode?
+            'inputs.channels = [ "deploy" ];'
+          else
+            'swpins.channels = [ "deploy" ];'
+          end
 
         File.write(File.join(conf_dir, 'cluster/nixos-machine/module.nix'), <<~NIX)
           { config, ... }:
           {
             cluster."nixos-machine" = {
               spin = "nixos";
-              inputs.channels = [ "nixos" ];
+              #{channel_line}
               host.target = "127.0.0.1";
               host.port = #{nixos_port};
               healthChecks.machineCommands = [
@@ -269,33 +382,75 @@ import ../make-test.nix (
           }
         NIX
 
-        File.write(File.join(conf_dir, 'cluster/vpsadminos-machine/module.nix'), <<~NIX)
-          { config, ... }:
-          {
-            cluster."vpsadminos-machine" = {
-              spin = "vpsadminos";
-              inputs.channels = [ "vpsadminos" ];
-              host.target = "127.0.0.1";
-              host.port = #{vpsadminos_port};
-              healthChecks.machineCommands = [
-                {
-                  description = "true";
-                  command = [ "true" ];
-                }
-              ];
-            };
-          }
-        NIX
+        if include_vpsadminos_machine?
+          File.write(File.join(conf_dir, 'cluster/vpsadminos-machine/module.nix'), <<~NIX)
+            { config, ... }:
+            {
+              cluster."vpsadminos-machine" = {
+                spin = "vpsadminos";
+                #{channel_line}
+                host.target = "127.0.0.1";
+                host.port = #{vpsadminos_port};
+                healthChecks.machineCommands = [
+                  {
+                    description = "true";
+                    command = [ "true" ];
+                  }
+                ];
+              };
+            }
+          NIX
+        end
+      end
+
+      def prepare_fixture!(conf_dir:, dummy_repo:, nixos_port:, vpsadminos_port:, pubkey:)
+        prepare_fixture_dir!(conf_dir, template: fixture_template_name)
+
+        if flake_mode?
+          write_flake_root!(conf_dir, dummy_repo)
+        else
+          write_swpins_config!(conf_dir, dummy_repo)
+        end
+
+        write_machine_modules!(
+          conf_dir,
+          nixos_port:,
+          vpsadminos_port:
+        )
 
         write_nixos_config!(conf_dir, marker: 'A')
-        write_vpsadminos_config!(conf_dir, marker: 'A')
+        write_vpsadminos_config!(conf_dir, marker: 'A') if include_vpsadminos_machine?
 
         write_admin_ssh_keys!(conf_dir, pubkey)
-        write_cluster_modules!(conf_dir, [
-          'nixos-machine/module.nix',
-          'vpsadminos-machine/module.nix'
-        ])
+        cluster_modules = [ 'nixos-machine/module.nix' ]
+        cluster_modules << 'vpsadminos-machine/module.nix' if include_vpsadminos_machine?
+        write_cluster_modules!(conf_dir, cluster_modules)
         init_fixture_repo!(conf_dir)
+      end
+
+      def prepare_mode_state!
+        return if flake_mode?
+
+        confctl!('swpins', 'core', 'update')
+        confctl!('swpins', 'channel', 'update', 'deploy')
+      end
+
+      def update_dummy_without_commit!
+        if flake_mode?
+          confctl!('inputs', 'update', 'dummy-input')
+        else
+          confctl!('swpins', 'channel', 'update', 'deploy', 'dummy')
+        end
+      end
+
+      def commit_dummy_update_and_set!(target_rev)
+        if flake_mode?
+          confctl!('inputs', 'update', '--commit', '--no-changelog', '--no-editor', 'dummy-input')
+          confctl!('inputs', 'set', '--commit', '--changelog', '--no-editor', 'dummy-input', target_rev)
+        else
+          confctl!('swpins', 'channel', 'update', '--commit', '--no-changelog', '--no-editor', 'deploy', 'dummy')
+          confctl!('swpins', 'channel', 'set', '--commit', '--changelog', '--no-editor', 'deploy', 'dummy', target_rev)
+        end
       end
 
       def machine_state(machine_name)
@@ -318,10 +473,10 @@ import ../make-test.nix (
 
       before(:suite) do
         @nixos_port = ConfctlHostfwdPorts.reserve('net1')
-        @vpsadminos_port = ConfctlHostfwdPorts.reserve('net2')
+        @vpsadminos_port = include_vpsadminos_machine? ? ConfctlHostfwdPorts.reserve('net2') : nil
 
         nixos.start
-        vpsadminos.start
+        vpsadminos.start if include_vpsadminos_machine?
 
         @state_dir = @opts[:state_dir]
         @conf_dir = File.join(@state_dir, 'conf')
@@ -338,7 +493,7 @@ import ../make-test.nix (
         @pubkey = setup_ssh_home!(@home_dir)
 
         install_pubkey!(nixos, @pubkey)
-        install_pubkey!(vpsadminos, @pubkey)
+        install_pubkey!(vpsadminos, @pubkey) if include_vpsadminos_machine?
 
         prepare_fixture!(
           conf_dir: @conf_dir,
@@ -347,15 +502,17 @@ import ../make-test.nix (
           vpsadminos_port: @vpsadminos_port,
           pubkey: @pubkey
         )
+
+        prepare_mode_state!
       end
 
       describe 'confctl deploy behavior', order: :defined do
         before(:context) do
-          out = wait_for_confctl_connectivity!(expected_successes: 2, timeout: 180)
-          expect(out).to include('2 successful')
+          out = wait_for_confctl_connectivity!(expected_successes: expected_successful_hosts, timeout: 180)
+          expect(out).to include("#{expected_successful_hosts} successful")
 
           @nixos_gen_a = build_generation!(NIXOS_MACHINE)
-          @vps_gen_a = build_generation!(VPSADMINOS_MACHINE)
+          @vps_gen_a = build_generation!(VPSADMINOS_MACHINE) if include_vpsadminos_machine?
 
           out, = confctl!('deploy', '--yes')
           expect(out).not_to match(/\e\[/)
@@ -369,11 +526,13 @@ import ../make-test.nix (
             profile: @nixos_gen_a['toplevel'],
             current: @nixos_gen_a['toplevel']
           )
-          assert_machine_state(
-            VPSADMINOS_MACHINE,
-            profile: @vps_gen_a['toplevel'],
-            current: @vps_gen_a['toplevel']
-          )
+          if include_vpsadminos_machine?
+            assert_machine_state(
+              VPSADMINOS_MACHINE,
+              profile: @vps_gen_a['toplevel'],
+              current: @vps_gen_a['toplevel']
+            )
+          end
         end
 
         it 'builds second generation for activation-target tests' do
@@ -488,7 +647,7 @@ import ../make-test.nix (
 
         it 'deploys selected current generation with one-by-one and dry-activate-first' do
           selected_nixos = confctl_generation_info(NIXOS_MACHINE)
-          selected_vpsadminos = confctl_generation_info(VPSADMINOS_MACHINE)
+          selected_vpsadminos = confctl_generation_info(VPSADMINOS_MACHINE) if include_vpsadminos_machine?
 
           confctl!('deploy', '--yes', '--one-by-one', '--dry-activate-first', '--generation', 'current')
 
@@ -497,18 +656,20 @@ import ../make-test.nix (
             profile: selected_nixos['toplevel'],
             current: selected_nixos['toplevel']
           )
-          assert_machine_state(
-            VPSADMINOS_MACHINE,
-            profile: selected_vpsadminos['toplevel'],
-            current: selected_vpsadminos['toplevel']
-          )
-          assert_store_path_exists(VPSADMINOS_MACHINE, selected_vpsadminos['toplevel'])
+          if include_vpsadminos_machine?
+            assert_machine_state(
+              VPSADMINOS_MACHINE,
+              profile: selected_vpsadminos['toplevel'],
+              current: selected_vpsadminos['toplevel']
+            )
+            assert_store_path_exists(VPSADMINOS_MACHINE, selected_vpsadminos['toplevel'])
+          end
         end
 
         it 'runs status command for current generation' do
           out, = confctl!('status', '--yes', '--generation', 'current')
           expect(out).to include('nixos-machine')
-          expect(out).to include('vpsadminos-machine')
+          expect(out).to include('vpsadminos-machine') if include_vpsadminos_machine?
         end
 
         it 'runs diff command for current generation' do
@@ -516,25 +677,24 @@ import ../make-test.nix (
           expect(out).to be_a(String)
         end
 
-        it 'runs changelog command for dummy input' do
+        it 'runs changelog command for dummy source' do
           out, = confctl!('changelog', '--yes', 'dummy')
           expect(out).to be_a(String)
         end
 
-        it 'updates dummy input without creating commit' do
+        it 'updates dummy source without creating commit' do
           @dummy_rev_b = bump_dummy_repo!(@dummy_repo, 'B')
-          confctl!('inputs', 'update', 'dummy-input')
+          update_dummy_without_commit!
         end
 
-        it 'commits input update and sets revision back' do
+        it 'commits dummy source update and sets revision back' do
           expect(@dummy_rev_b).not_to be_nil
 
           bump_dummy_repo!(@dummy_repo, 'C')
-          confctl!('inputs', 'update', '--commit', '--no-changelog', '--no-editor', 'dummy-input')
-          confctl!('inputs', 'set', '--commit', '--changelog', '--no-editor', 'dummy-input', @dummy_rev_b)
+          commit_dummy_update_and_set!(@dummy_rev_b)
         end
 
-        it 'reports dummy input changes in status, diff and changelog output' do
+        it 'reports dummy source changes in status, diff and changelog output' do
           status_out, = confctl!('status', '--yes', '--generation', 'current')
           diff_out, = confctl!('diff', '--yes', '--generation', 'current')
           changelog_out, = confctl!('changelog', '--yes', 'dummy')
@@ -550,7 +710,7 @@ import ../make-test.nix (
         it 'lists local generations' do
           out, = confctl!('generation', 'ls', '--local')
           expect(out).to include('nixos-machine')
-          expect(out).to include('vpsadminos-machine')
+          expect(out).to include('vpsadminos-machine') if include_vpsadminos_machine?
         end
 
         it 'prints expected output from confctl ssh' do
@@ -560,8 +720,8 @@ import ../make-test.nix (
         end
 
         it 'keeps both machines reachable at the end' do
-          out = wait_for_confctl_connectivity!(expected_successes: 2, timeout: 180)
-          expect(out).to include('2 successful')
+          out = wait_for_confctl_connectivity!(expected_successes: expected_successful_hosts, timeout: 180)
+          expect(out).to include("#{expected_successful_hosts} successful")
         end
       end
     '';

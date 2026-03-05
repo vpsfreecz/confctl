@@ -57,7 +57,9 @@ module ConfctlTestHelpers
     run_local!(['cp', '-r', "#{File.join(confctl_src, template)}/.", path])
     run_local!(['chmod', '-R', 'u+w', path])
 
-    %w[.bin .confctl .gems .man].each do |dir|
+    # Test fixtures regenerate local state such as swpins pins and channels.
+    # Drop any copied state from the repository template to keep runs deterministic.
+    %w[.bin .confctl .gems .man swpins].each do |dir|
       FileUtils.rm_rf(File.join(path, dir))
     end
   end
