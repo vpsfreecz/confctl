@@ -24,6 +24,6 @@
 - When fixing a bug, add a minimal regression check in RSpec if practical and document the manual steps you executed.
 
 ## Commit & Pull Request Guidelines
-- Commit subjects are short, imperative, and capitalized (see `git log`); avoid trailing periods and bundle related changes together.
+- Commit subjects are short and imperative. Without a prefix, capitalize the first word. With a `topic/component:` prefix, keep the first word after `:` lowercase. Avoid trailing periods and bundle related changes together.
 - Describe PRs clearly with motivation, scope, and manual verification notes; link relevant issues and update docs/manpages when behavior changes.
 - Run rspec, rubocop, and nixfmt before pushing; ensure generated artifacts (`man/`, `pkg/` when releasing) reflect your changes.
