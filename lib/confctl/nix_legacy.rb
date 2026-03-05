@@ -257,10 +257,11 @@ module ConfCtl
       if machine.localhost?
         true
       elsif machine.carried?
-        cp = NixCopy.new(machine.carrier_machine.target_host, paths)
+        carrier = machine.carrier_machine
+        cp = NixCopy.new(carrier.target_host, paths, port: carrier.target_port)
         cp.run!(&).success?
       else
-        cp = NixCopy.new(machine.target_host, paths)
+        cp = NixCopy.new(machine.target_host, paths, port: machine.target_port)
         cp.run!(&).success?
       end
     end

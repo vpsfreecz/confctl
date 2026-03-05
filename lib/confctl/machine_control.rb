@@ -174,7 +174,12 @@ module ConfCtl
     end
 
     def ssh_args
-      ['ssh', '-l', 'root'] + extra_ssh_opts + [machine.target_host]
+      ret = ['ssh']
+      ssh_config = ENV.fetch('CONFCTL_SSH_CONFIG', nil)
+      ret += ['-F', ssh_config] if ssh_config && !ssh_config.empty?
+      ret += ['-l', 'root']
+      ret += ['-p', machine.target_port.to_s] if machine.target_port != 22
+      ret + extra_ssh_opts + [machine.target_host]
     end
   end
 end

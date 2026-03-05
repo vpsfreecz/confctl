@@ -1,10 +1,12 @@
 module ConfCtl
   class NixCopy
     # @param target [String]
+    # @param port [Integer]
     # @param store_paths [Array<String>]
-    def initialize(target, store_paths)
+    def initialize(target, store_paths, port: 22)
       @target = target
       @store_paths = store_paths
+      @port = port.to_i
       @total = nil
       @progress = 0
     end
@@ -23,6 +25,7 @@ module ConfCtl
         'nix-copy-closure',
         '--to', "root@#{target}",
         *store_paths,
+        env: nix_ssh_env,
         &line_buf.feed_block
       )
 
@@ -32,7 +35,16 @@ module ConfCtl
 
     protected
 
-    attr_reader :target, :store_paths
+    attr_reader :target, :store_paths, :port
+
+    def nix_ssh_env
+      return {} if port == 22
+
+      ssh_opts = [ENV.fetch('NIX_SSHOPTS', nil), "-p #{port}"].compact.join(' ').strip
+      {
+        'NIX_SSHOPTS' => ssh_opts
+      }
+    end
 
     def parse_line(line)
       if @total.nil? && /^copying (\d+) paths/ =~ line

@@ -434,6 +434,14 @@ let
             as a carried machine.
           '';
         };
+
+        port = mkOption {
+          type = types.int;
+          default = 22;
+          description = ''
+            SSH port used to connect to this machine.
+          '';
+        };
       };
     };
 

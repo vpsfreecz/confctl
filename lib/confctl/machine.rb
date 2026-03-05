@@ -97,6 +97,10 @@ module ConfCtl
       meta.fetch('host', {}).fetch('target', name)
     end
 
+    def target_port
+      meta.fetch('host', {}).fetch('port', 22).to_i
+    end
+
     def localhost?
       target_host == 'localhost'
     end
