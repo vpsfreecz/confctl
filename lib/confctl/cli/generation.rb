@@ -273,6 +273,30 @@ module ConfCtl::Cli
           Rainbow('Collecting garbage on ').bright + Rainbow(machines.first.to_s).yellow
         end
 
+      unless ConfCtl::Ui.tty?
+        puts header
+
+        executor = ConfCtl::ParallelExecutor.new(opts['max-concurrent-gc'])
+
+        machines.each do |host, machine|
+          executor.add do
+            end_stats = nil
+            ret = nix.collect_garbage(machine) do |progress|
+              puts "#{host}> #{progress}"
+              end_stats = progress.line if /^\d+ store paths deleted/ =~ progress.line
+            end
+
+            puts(ret ? "#{host}: #{end_stats || 'done'}" : "#{host}: error occurred")
+            ret ? nil : host
+          end
+        end
+
+        failed = executor.run.compact
+        raise "Gargabe collection failed on: #{failed.join(', ')}" if failed.any?
+
+        return
+      end
+
       LogView.open(
         header: "#{header}\n",
         title: Rainbow('Live view').bright,

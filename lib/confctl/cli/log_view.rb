@@ -63,7 +63,7 @@ module ConfCtl::Cli
       @current_size = size if size != :auto
       @reserved_lines = reserved_lines
       @output = output
-      @enabled = output.respond_to?(:tty?) && output.tty?
+      @enabled = output.respond_to?(:tty?) && output.tty? && ConfCtl::Ui.tty?
       @resized = false
       @stop = false
       @generation = 0

@@ -139,6 +139,11 @@ module ConfCtl::Cli
     end
 
     def determine_color
+      if gopts[:color] == 'auto' && ConfCtl::Ui.no_color?
+        Rainbow.enabled = false
+        return false
+      end
+
       case gopts[:color]
       when 'always'
         Rainbow.enabled = true
@@ -152,7 +157,7 @@ module ConfCtl::Cli
     end
 
     def determine_pager
-      ENV.fetch('PAGER', nil) && ENV['PAGER'].strip != ''
+      ConfCtl::Ui.tty? && ENV.fetch('PAGER', nil) && ENV['PAGER'].strip != ''
     end
 
     def select_machines(pattern)

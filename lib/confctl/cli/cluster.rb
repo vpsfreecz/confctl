@@ -613,6 +613,16 @@ module ConfCtl::Cli
 
       return :skip if opts[:interactive] && !ask_confirmation(always: true)
 
+      unless ui_enabled?
+        ret = nix_copy(nix, machine, build_generation) do |i, n, path|
+          puts "[#{host}] [#{i}/#{n}] #{path}"
+        end
+
+        raise "Error while copying system to #{host}" unless ret
+
+        return true
+      end
+
       LogView.open(
         header: "#{Rainbow('Copying to').bright} #{host}\n",
         title: Rainbow('Live view').bright
@@ -639,6 +649,26 @@ module ConfCtl::Cli
 
     def concurrent_copy(machines, host_generations, nix)
       sorted_generations = sort_generations_for_copy(machines, host_generations)
+
+      unless ui_enabled?
+        executor = ConfCtl::ParallelExecutor.new(opts['max-concurrent-copy'])
+
+        sorted_generations.each do |host, gen|
+          executor.add do
+            ret = nix_copy(nix, machines[host], gen) do |i, n, path|
+              puts "[#{host}] [#{i}/#{n}] #{path}"
+            end
+
+            puts("[#{host}] copy failed") unless ret
+            ret ? nil : host
+          end
+        end
+
+        failed = executor.run.compact
+        raise "Copy failed to: #{failed.join(', ')}" if failed.any?
+
+        return
+      end
 
       LogView.open(
         header: "#{Rainbow("Copying to #{sorted_generations.length} machines").bright}\n",
@@ -842,26 +872,43 @@ module ConfCtl::Cli
         m.reboot
       else
         since = Time.now
-        spinner = nil
 
-        secs = m.reboot_and_wait(
-          timeout: wait_online == :wait ? nil : wait_online
-        ) do |state, timeleft|
-          if state == :reboot
-            spinner = TTY::Spinner.new(
-              ":spinner Waiting for #{host} (:seconds s)",
-              format: :classic
-            )
-            spinner.auto_spin
-          elsif state == :is_up
-            spinner.success('up')
-            next
+        if ui_enabled?
+          spinner = nil
+
+          secs = m.reboot_and_wait(
+            timeout: wait_online == :wait ? nil : wait_online
+          ) do |state, timeleft|
+            if state == :reboot
+              spinner = TTY::Spinner.new(
+                ":spinner Waiting for #{host} (:seconds s)",
+                format: :classic
+              )
+              spinner.auto_spin
+            elsif state == :is_up
+              spinner.success('up')
+              next
+            end
+
+            if wait_online == :wait
+              spinner.update(seconds: (Time.now - since).round)
+            else
+              spinner.update(seconds: timeleft.round)
+            end
           end
+        else
+          puts "Waiting for #{host} to reboot..."
 
-          if wait_online == :wait
-            spinner.update(seconds: (Time.now - since).round)
-          else
-            spinner.update(seconds: timeleft.round)
+          secs = m.reboot_and_wait(
+            timeout: wait_online == :wait ? nil : wait_online
+          ) do |state, timeleft|
+            next unless %i[went_down is_down].include?(state)
+
+            if wait_online == :wait
+              puts "  #{host}: waiting #{(Time.now - since).round}s"
+            else
+              puts "  #{host}: #{timeleft.round}s left"
+            end
           end
         end
 
@@ -940,42 +987,68 @@ module ConfCtl::Cli
 
       header << "\n" << Rainbow('Full log: ').bright << ConfCtl::Logger.relative_path << "\n"
 
-      LogView.open(
-        header:,
-        title: Rainbow('Live view').bright,
-        size: :auto,
-        reserved_lines: 10
-      ) do |lw|
-        pb = TTY::ProgressBar.new(
-          'Checks [:bar] :current/:total (:percent)',
-          width: 80,
-          total: run_checks.length
-        )
+      if ui_enabled?
+        LogView.open(
+          header:,
+          title: Rainbow('Live view').bright,
+          size: :auto,
+          reserved_lines: 10
+        ) do |lw|
+          pb = TTY::ProgressBar.new(
+            'Checks [:bar] :current/:total (:percent)',
+            width: 80,
+            total: run_checks.length
+          )
+
+          run_checks.each_with_index do |check, i|
+            tw.add do
+              prefix = "[#{i + 1}/#{run_checks.length}] #{check.machine}> "
+              lw << "#{prefix}#{check.description}"
+
+              check.run do |attempt, _errors|
+                lw << "#{prefix}failed ##{attempt}: #{check.message}"
+                ConfCtl::Logger.keep
+              end
+
+              lw << if check.successful?
+                      "#{prefix}succeeded"
+                    else
+                      "#{prefix}error: #{check.message}"
+                    end
+
+              lw.sync_console do
+                pb.advance
+              end
+            end
+          end
+
+          tw.run
+          lw.flush
+        end
+      else
+        puts header
 
         run_checks.each_with_index do |check, i|
           tw.add do
             prefix = "[#{i + 1}/#{run_checks.length}] #{check.machine}> "
-            lw << "#{prefix}#{check.description}"
+            puts "#{prefix}#{check.description}"
 
             check.run do |attempt, _errors|
-              lw << "#{prefix}failed ##{attempt}: #{check.message}"
+              puts "#{prefix}failed ##{attempt}: #{check.message}"
               ConfCtl::Logger.keep
             end
 
-            lw << if check.successful?
-                    "#{prefix}succeeded"
-                  else
-                    "#{prefix}error: #{check.message}"
-                  end
-
-            lw.sync_console do
-              pb.advance
-            end
+            puts(
+              if check.successful?
+                "#{prefix}succeeded"
+              else
+                "#{prefix}error: #{check.message}"
+              end
+            )
           end
         end
 
         tw.run
-        lw.flush
       end
 
       successful = []
@@ -1076,31 +1149,44 @@ module ConfCtl::Cli
       results = {}
       tw = ConfCtl::ParallelExecutor.new(machines.length)
 
-      LogView.open_with_logger(
-        header: Rainbow('Executing').bright + " #{cmd.join(' ')}\n",
-        title: Rainbow('Live view').bright,
-        size: :auto,
-        reserved_lines: 10
-      ) do |lw|
-        pb = TTY::ProgressBar.new(
-          'Command [:bar] :current/:total (:percent)',
-          width: 80,
-          total: machines.length
-        )
+      if ui_enabled?
+        LogView.open_with_logger(
+          header: Rainbow('Executing').bright + " #{cmd.join(' ')}\n",
+          title: Rainbow('Live view').bright,
+          size: :auto,
+          reserved_lines: 10
+        ) do |lw|
+          pb = TTY::ProgressBar.new(
+            'Command [:bar] :current/:total (:percent)',
+            width: 80,
+            total: machines.length
+          )
+
+          machines.each do |host, machine|
+            tw.add do
+              mc = ConfCtl::MachineControl.new(machine)
+
+              result = run_ssh_command_on_machine(mc, cmd)
+              results[host] = result
+
+              lw.sync_console { pb.advance }
+            end
+          end
+
+          tw.run
+          lw.flush
+        end
+      else
+        puts "Executing #{cmd.join(' ')} on #{machines.length} machines"
 
         machines.each do |host, machine|
           tw.add do
             mc = ConfCtl::MachineControl.new(machine)
-
-            result = run_ssh_command_on_machine(mc, cmd)
-            results[host] = result
-
-            lw.sync_console { pb.advance }
+            results[host] = run_ssh_command_on_machine(mc, cmd)
           end
         end
 
         tw.run
-        lw.flush
       end
 
       if aggregate
@@ -1341,51 +1427,63 @@ module ConfCtl::Cli
         << " #{ConfCtl::Logger.relative_path}" \
         << "\n\n"
 
-      LogView.open_with_logger(
-        header:,
-        title: Rainbow('Live view').bright,
-        size: :auto,
-        reserved_lines: 10
-      ) do |lw|
-        multibar = TTY::ProgressBar::Multi.new(
-          'nix-build [:bar] :current/:total (:percent)',
-          width: 80
-        )
+      if ui_enabled?
+        LogView.open_with_logger(
+          header:,
+          title: Rainbow('Live view').bright,
+          size: :auto,
+          reserved_lines: 10
+        ) do |lw|
+          multibar = TTY::ProgressBar::Multi.new(
+            'nix-build [:bar] :current/:total (:percent)',
+            width: 80
+          )
 
-        build_pb = multibar.register(
-          'Building [:bar] :current/:total (:percent)'
-        )
+          build_pb = multibar.register(
+            'Building [:bar] :current/:total (:percent)'
+          )
 
-        fetch_pb = multibar.register(
-          'Fetching [:bar] :current/:total (:percent)'
-        )
+          fetch_pb = multibar.register(
+            'Fetching [:bar] :current/:total (:percent)'
+          )
 
-        built_generations = nix.build_attributes(
+          built_generations = nix.build_attributes(
+            hosts:,
+            swpin_paths:,
+            time:,
+            host_swpin_specs:
+          ) do |type, _progress, total, _path|
+            if type == :build
+              lw.sync_console do
+                build_pb.update(total:) if total > 0 && build_pb.total.nil?
+                build_pb.advance
+              end
+            elsif type == :fetch
+              lw.sync_console do
+                fetch_pb.update(total:) if total > 0 && fetch_pb.total.nil?
+                fetch_pb.advance
+              end
+            end
+
+            if build_pb.total && fetch_pb.total && multibar.top_bar.total.nil?
+              lw.sync_console do
+                multibar.top_bar.update(total: multibar.total)
+              end
+            end
+          end
+
+          built_generations
+        end
+      else
+        puts header
+        nix.build_attributes(
           hosts:,
           swpin_paths:,
           time:,
           host_swpin_specs:
-        ) do |type, _progress, total, _path|
-          if type == :build
-            lw.sync_console do
-              build_pb.update(total:) if total > 0 && build_pb.total.nil?
-              build_pb.advance
-            end
-          elsif type == :fetch
-            lw.sync_console do
-              fetch_pb.update(total:) if total > 0 && fetch_pb.total.nil?
-              fetch_pb.advance
-            end
-          end
-
-          if build_pb.total && fetch_pb.total && multibar.top_bar.total.nil?
-            lw.sync_console do
-              multibar.top_bar.update(total: multibar.total)
-            end
-          end
+        ) do |type, progress, total, path|
+          puts "[#{type}] #{progress}/#{total} #{path}"
         end
-
-        built_generations
       end
     end
 
@@ -1811,6 +1909,10 @@ module ConfCtl::Cli
       paths << generation.auto_rollback if enable_auto_rollback?(machine, generation)
 
       nix.copy(machine, paths, &)
+    end
+
+    def ui_enabled?
+      ConfCtl::Ui.tty?
     end
 
     def enable_auto_rollback?(machine, generation)
