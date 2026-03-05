@@ -1,3 +1,5 @@
+require 'pathname'
+
 module ConfCtl
   class Swpins::ChangeSet
     class SpecOwner
@@ -51,6 +53,16 @@ module ConfCtl
     # @param editor [Boolean]
     def commit(type: :upgrade, changelog: false, editor: true)
       return if @owners.empty?
+
+      git_add = [
+        'git',
+        'add',
+        *changed_files
+      ]
+
+      unless Kernel.system(*git_add)
+        raise 'git add exited with non-zero status code'
+      end
 
       git_commit = [
         'git',
@@ -135,7 +147,17 @@ module ConfCtl
     end
 
     def changed_files
-      @owners.each_key.map(&:path)
+      root_path = Pathname.new(ConfCtl::ConfDir.path)
+
+      @owners.each_key.map do |owner|
+        owner_path = Pathname.new(owner.path)
+
+        if owner_path.absolute?
+          owner_path.relative_path_from(root_path).to_s
+        else
+          owner.path
+        end
+      end
     end
 
     def same_changes?
