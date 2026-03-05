@@ -6,7 +6,6 @@
 .man/
 .rubocop_cache/
 .yardoc
-Gemfile.lock
 html_doc
 man/**/*.html
 man/*.html

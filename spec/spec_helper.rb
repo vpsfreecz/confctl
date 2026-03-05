@@ -8,3 +8,5 @@ RSpec.configure do |config|
     expectations.syntax = :expect
   end
 end
+
+Dir[File.join(__dir__, 'support', '*.rb')].each { |f| require f }
