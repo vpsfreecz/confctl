@@ -1,0 +1,101 @@
+name: Tests
+
+on:
+  push:
+    paths:
+      - .github/workflows/tests.yml
+      - flake.nix
+      - flake.lock
+      - Gemfile
+      - Gemfile.lock
+      - bin/**
+      - lib/**
+      - libexec/**
+      - nix/**
+      - tests/**
+      - test-runner.sh
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Run ci-tagged tests
+    runs-on: self-hosted
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout confctl
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Reset per-user Nix gcroots
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          user="$(id -un)"
+          gcroot_dir="/nix/var/nix/gcroots/per-user/${user}"
+
+          if [ ! -d "$gcroot_dir" ]; then
+            echo "Missing gcroots directory: $gcroot_dir" >&2
+            exit 1
+          fi
+
+          if [ ! -w "$gcroot_dir" ]; then
+            echo "Gcroots directory is not writable: $gcroot_dir" >&2
+            ls -ld "$gcroot_dir" >&2
+            exit 1
+          fi
+
+          find "$gcroot_dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+
+      - name: Determine job count
+        id: determine-test-jobs
+        uses: vpsfreecz/vpsadminos/.github/actions/determine-test-jobs@staging
+        with:
+          per_job_gib: "20"
+
+      - name: Run tests
+        id: run-tests
+        timeout-minutes: 320
+        shell: bash
+        run: |
+          set -o pipefail
+          rm -rf /tmp/os-test-runner
+          ./test-runner.sh test -f -j "${{ steps.determine-test-jobs.outputs.jobs }}" -t ci --state-dir /tmp/os-test-runner | tee test.log
+
+      - name: Evaluate test results
+        if: always()
+        uses: vpsfreecz/vpsadminos/.github/actions/evaluate-test-results@staging
+        with:
+          log-file: test.log
+
+      - name: Summarise test logs
+        if: always()
+        uses: vpsfreecz/vpsadminos/.github/actions/summarise-test-logs@staging
+        with:
+          logs-root: /tmp/os-test-runner
+
+      - name: Upload full test logs
+        if: failure()
+        uses: vpsfreecz/vpsadminos/.github/actions/upload-test-logs@staging
+        with:
+          name: confctl-test-logs-${{ github.run_id }}
+          paths: |
+            /tmp/os-test-runner/**/*.log
+            /tmp/os-test-runner/**/*.txt
+
+      - name: Cleanup per-user Nix gcroots
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          user="$(id -un)"
+          gcroot_dir="/nix/var/nix/gcroots/per-user/${user}"
+
+          if [ -d "$gcroot_dir" ] && [ -w "$gcroot_dir" ]; then
+            find "$gcroot_dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+          fi
