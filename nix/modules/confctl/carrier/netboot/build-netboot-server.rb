@@ -841,10 +841,16 @@ class Generation
     @url = File.join(machine.url, generation.to_s)
     @boot_files = find_boot_files
     @variants = Variant.for_machine(machine)
+    @kernel_params.reject! { |v| v.start_with?('httproot=') }
 
-    return if machine.spin != 'vpsadminos'
+    httproot =
+      if machine.spin == 'vpsadminos'
+        boot_files['root.squashfs']&.url
+      else
+        boot_files['initrd']&.url || boot_files['bzImage']&.url
+      end
 
-    @kernel_params.insert(0, "httproot=#{boot_files['root.squashfs'].url}")
+    @kernel_params.insert(0, "httproot=#{httproot}") if httproot
   end
 
   def to_json(*)
