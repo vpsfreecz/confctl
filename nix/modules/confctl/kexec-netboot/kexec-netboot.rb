@@ -379,18 +379,21 @@ class KexecNetboot
     uri = URI.parse(url)
     basename = File.basename(uri.path)
     tmp_file = Tempfile.new(basename)
+    tmp_file.binmode
 
     puts "Downloading #{url} -> #{tmp_file.path}"
 
     Net::HTTP.start(uri.host, uri.port) do |http|
-      resp = http.get(uri.request_uri)
+      http.request_get(uri.request_uri) do |resp|
+        unless resp.is_a?(Net::HTTPSuccess)
+          warn "ERROR: Could not download #{url}, HTTP #{resp.code}"
+          exit 1
+        end
 
-      unless resp.is_a?(Net::HTTPSuccess)
-        warn "ERROR: Could not download #{url}, HTTP #{resp.code}"
-        exit 1
+        resp.read_body do |chunk|
+          tmp_file.write(chunk)
+        end
       end
-
-      tmp_file.write(resp.body)
     end
 
     tmp_file.close
