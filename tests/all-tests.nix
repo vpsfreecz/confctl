@@ -18,6 +18,7 @@ let
   };
 in
 testLib.makeTests [
+  "carrier/deploy"
   "deploy/flakes"
   "deploy/swpins"
   "auto_rollback"
