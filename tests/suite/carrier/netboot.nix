@@ -21,6 +21,7 @@ import ../../make-test.nix (
     carrierPxeMac = "52:54:00:10:00:02";
     nixosPxeMac = "52:54:00:10:00:11";
     vpsadminosPxeMac = "52:54:00:10:00:12";
+    pxeMachineMemory = 4096;
     pxeNetworkTag = "carrier-pxe";
   in
   {
@@ -64,6 +65,7 @@ import ../../make-test.nix (
               PasswordAuthentication = false;
             };
           };
+          services.logrotate.checkConfig = false;
           networking.firewall.enable = false;
           environment.systemPackages = with pkgs; [
             git
@@ -74,7 +76,7 @@ import ../../make-test.nix (
       nixos = {
         spin = "nixos";
         config = null;
-        memory = 2048;
+        memory = pxeMachineMemory;
         cpus = 2;
         cpu = {
           cores = 2;
@@ -94,7 +96,7 @@ import ../../make-test.nix (
       vpsadminos = {
         spin = "vpsadminos";
         config = null;
-        memory = 2048;
+        memory = pxeMachineMemory;
         cpus = 2;
         cpu = {
           cores = 2;
@@ -324,10 +326,13 @@ import ../../make-test.nix (
             time.timeZone = lib.mkForce "UTC";
             networking.useDHCP = lib.mkForce true;
             networking.nameservers = [ "#{PXE_ADDRESS}" ];
+            virtualisation.memorySize = lib.mkForce ${toString pxeMachineMemory};
             boot.initrd.availableKernelModules = lib.mkAfter [
               "e1000"
               "e1000e"
             ];
+
+            confctl.programs.kexec-netboot.enable = true;
 
             environment.etc."confctl-marker".text = "#{marker}\n";
 
@@ -508,6 +513,14 @@ import ../../make-test.nix (
         init_fixture_repo!(conf_dir)
       end
 
+      def update_nixos_generation!(marker:)
+        write_nixos_config!(@conf_dir, marker:)
+      end
+
+      def update_vpsadminos_generation!(marker:)
+        write_vpsadminos_config!(@conf_dir, marker:)
+      end
+
       def carrier_success?(cmd, timeout: 30)
         status, = carrier.execute(cmd, timeout:)
         status == 0
@@ -528,8 +541,32 @@ import ../../make-test.nix (
         Base64.decode64(encoded)
       end
 
+      def carrier_json(path)
+        JSON.parse(carrier_file(path))
+      end
+
       def carrier_profile_path(alias_name)
         "/nix/var/nix/profiles/confctl-#{alias_name}"
+      end
+
+      def netboot_machine_path(fqdn)
+        "/var/lib/confctl/carrier/netboot/http/#{fqdn}/machine.json"
+      end
+
+      def netboot_current_path(fqdn)
+        "/var/lib/confctl/carrier/netboot/http/#{fqdn}/current"
+      end
+
+      def netboot_generation_path(fqdn, generation)
+        "/var/lib/confctl/carrier/netboot/http/#{fqdn}/#{generation}/generation.json"
+      end
+
+      def netboot_kernel_params_path(fqdn, generation)
+        "/var/lib/confctl/carrier/netboot/http/#{fqdn}/#{generation}/kernel-params"
+      end
+
+      def carrier_netboot_machine(fqdn)
+        carrier_json(netboot_machine_path(fqdn))
       end
 
       def build_generation!(host)
@@ -545,21 +582,35 @@ import ../../make-test.nix (
         end
       end
 
-      def wait_for_nixos_netboot_artifacts!(generation:)
+      def wait_for_nixos_netboot_artifacts!(generation:, previous_generations: [])
         wait_for_block(name: 'nixos carried netboot artifacts', timeout: 300) do
           next(false) unless carrier_success?("test -e #{Shellwords.escape(carrier_profile_path(NIXOS_MACHINE))}")
           next(false) unless carrier_success?('test -e /var/lib/confctl/carrier/netboot/tftp/pxelinux.cfg/01-52-54-00-10-00-11')
           next(false) unless carrier_success?("test -e #{Shellwords.escape("/var/lib/confctl/carrier/netboot/tftp/pxeserver/machines/#{NIXOS_FQDN}/auto.cfg")}")
-          next(false) unless carrier_success?("test -e #{Shellwords.escape("/var/lib/confctl/carrier/netboot/http/#{NIXOS_FQDN}/1/generation.json")}")
 
           begin
             next(false) unless carrier_realpath(carrier_profile_path(NIXOS_MACHINE)) == generation['toplevel']
 
-            machines_json = JSON.parse(carrier_file('/var/lib/confctl/carrier/netboot/http/machines.json'))
+            machines_json = carrier_json('/var/lib/confctl/carrier/netboot/http/machines.json')
             next(false) unless machines_json.fetch('machines').any? { |m| m.fetch('name') == NIXOS_MACHINE }
+
+            machine_json = carrier_netboot_machine(NIXOS_FQDN)
+            current_generation = machine_json.fetch('generations').detect { |g| g.fetch('current') }
+            next(false) if current_generation.nil?
+            next(false) unless current_generation.fetch('store_path') == generation['toplevel']
+            next(false) unless carrier_success?("test -e #{Shellwords.escape(netboot_generation_path(NIXOS_FQDN, current_generation.fetch('generation')))}")
+            next(false) unless carrier_success?("test \"$(basename $(readlink -f #{Shellwords.escape(netboot_current_path(NIXOS_FQDN))}))\" = #{Shellwords.escape(current_generation.fetch('generation').to_s)}")
+
+            next(false) unless previous_generations.all? do |prev_generation|
+              prev = machine_json.fetch('generations').detect { |g| g.fetch('store_path') == prev_generation.fetch('toplevel') }
+              !prev.nil? && carrier_success?("test -e #{Shellwords.escape(netboot_generation_path(NIXOS_FQDN, prev.fetch('generation')))}")
+            end
 
             nixos_auto = carrier_file("/var/lib/confctl/carrier/netboot/tftp/pxeserver/machines/#{NIXOS_FQDN}/auto.cfg")
             next(false) unless nixos_auto.include?("DEFAULT #{NIXOS_FQDN}")
+
+            nixos_kernel_params = carrier_file(netboot_kernel_params_path(NIXOS_FQDN, current_generation.fetch('generation')))
+            next(false) unless nixos_kernel_params.include?('httproot=http://192.168.100.1/')
           rescue JSON::ParserError, OsVm::Error
             next(false)
           end
@@ -568,20 +619,31 @@ import ../../make-test.nix (
         end
       end
 
-      def wait_for_vpsadminos_netboot_artifacts!(generation:)
+      def wait_for_vpsadminos_netboot_artifacts!(generation:, previous_generations: [])
         wait_for_block(name: 'vpsadminos carried netboot artifacts', timeout: 300) do
           next(false) unless carrier_success?("test -e #{Shellwords.escape(carrier_profile_path(VPSADMINOS_MACHINE))}")
           next(false) unless carrier_success?('test -e /var/lib/confctl/carrier/netboot/tftp/pxelinux.cfg/01-52-54-00-10-00-12')
           next(false) unless carrier_success?("test -e #{Shellwords.escape("/var/lib/confctl/carrier/netboot/tftp/pxeserver/machines/#{VPSADMINOS_FQDN}/auto.cfg")}")
-          next(false) unless carrier_success?("test -e #{Shellwords.escape("/var/lib/confctl/carrier/netboot/http/#{VPSADMINOS_FQDN}/1/generation.json")}")
 
           begin
             next(false) unless carrier_realpath(carrier_profile_path(VPSADMINOS_MACHINE)) == generation['toplevel']
 
-            machines_json = JSON.parse(carrier_file('/var/lib/confctl/carrier/netboot/http/machines.json'))
+            machines_json = carrier_json('/var/lib/confctl/carrier/netboot/http/machines.json')
             next(false) unless machines_json.fetch('machines').any? { |m| m.fetch('name') == VPSADMINOS_MACHINE }
 
-            vpsadminos_kernel_params = carrier_file("/var/lib/confctl/carrier/netboot/http/#{VPSADMINOS_FQDN}/1/kernel-params")
+            machine_json = carrier_netboot_machine(VPSADMINOS_FQDN)
+            current_generation = machine_json.fetch('generations').detect { |g| g.fetch('current') }
+            next(false) if current_generation.nil?
+            next(false) unless current_generation.fetch('store_path') == generation['toplevel']
+            next(false) unless carrier_success?("test -e #{Shellwords.escape(netboot_generation_path(VPSADMINOS_FQDN, current_generation.fetch('generation')))}")
+            next(false) unless carrier_success?("test \"$(basename $(readlink -f #{Shellwords.escape(netboot_current_path(VPSADMINOS_FQDN))}))\" = #{Shellwords.escape(current_generation.fetch('generation').to_s)}")
+
+            next(false) unless previous_generations.all? do |prev_generation|
+              prev = machine_json.fetch('generations').detect { |g| g.fetch('store_path') == prev_generation.fetch('toplevel') }
+              !prev.nil? && carrier_success?("test -e #{Shellwords.escape(netboot_generation_path(VPSADMINOS_FQDN, prev.fetch('generation')))}")
+            end
+
+            vpsadminos_kernel_params = carrier_file(netboot_kernel_params_path(VPSADMINOS_FQDN, current_generation.fetch('generation')))
             next(false) unless vpsadminos_kernel_params.include?('httproot=http://192.168.100.1/')
           rescue JSON::ParserError, OsVm::Error
             next(false)
@@ -598,6 +660,40 @@ import ../../make-test.nix (
 
       def wait_for_netboot_http!(machine, timeout:)
         machine.wait_until_succeeds("curl -sf http://#{PXE_ADDRESS}/machines.json >/dev/null", timeout:)
+      end
+
+      def boot_id(machine)
+        _, out = machine.succeeds('cat /proc/sys/kernel/random/boot_id')
+        out.strip
+      end
+
+      def wait_for_reboot!(machine, previous_boot_id:, timeout:)
+        wait_for_block(name: "#{machine.name} reboot after kexec", timeout:) do
+          begin
+            _, out = machine.execute('cat /proc/sys/kernel/random/boot_id', timeout: 10)
+            next(false) if out.strip == previous_boot_id
+
+            true
+          rescue OsVm::MachineShellClosed, OsVm::TimeoutError, OsVm::Error
+            next(false)
+          end
+        end
+
+        machine.wait_for_boot(timeout: 30)
+      end
+
+      def kexec_netboot!(machine, load_args: [], boot_timeout:)
+        previous_boot_id = boot_id(machine)
+        machine.succeeds(Shellwords.join(['kexec-netboot', *load_args]))
+
+        begin
+          machine.execute('kexec-netboot --exec', timeout: 120)
+        rescue OsVm::MachineShellClosed
+          # The old shell can disappear either during the exec call itself or
+          # slightly later as the new kernel takes over.
+        end
+
+        wait_for_reboot!(machine, previous_boot_id:, timeout: boot_timeout)
       end
 
       def assert_marker!(machine, marker)
@@ -644,23 +740,26 @@ import ../../make-test.nix (
         end
 
         it 'deploys the carried NixOS machine to the carrier' do
-          carried_nixos_generation = build_generation!("carrier##{NIXOS_MACHINE}")
+          @carried_nixos_gen_a = build_generation!("carrier##{NIXOS_MACHINE}")
           confctl!('deploy', '--yes', "carrier##{NIXOS_MACHINE}")
           wait_for_carrier_netboot_services!
-          wait_for_nixos_netboot_artifacts!(generation: carried_nixos_generation)
+          wait_for_nixos_netboot_artifacts!(generation: @carried_nixos_gen_a)
         end
 
         it 'deploys the carried vpsAdminOS machine to the carrier' do
-          carried_vpsadminos_generation = build_generation!("carrier##{VPSADMINOS_MACHINE}")
+          @carried_vpsadminos_gen_a = build_generation!("carrier##{VPSADMINOS_MACHINE}")
           confctl!('deploy', '--yes', "carrier##{VPSADMINOS_MACHINE}")
           wait_for_carrier_netboot_services!
-          wait_for_vpsadminos_netboot_artifacts!(generation: carried_vpsadminos_generation)
+          wait_for_vpsadminos_netboot_artifacts!(generation: @carried_vpsadminos_gen_a)
         end
 
         it 'boots the carried NixOS machine over PXE from the carrier' do
           boot_pxe_client!(nixos, timeout: 360)
           assert_marker!(nixos, 'A')
           wait_for_netboot_http!(nixos, timeout: 120)
+
+          _, cmdline = nixos.succeeds('cat /proc/cmdline')
+          expect(cmdline).to include('httproot=http://192.168.100.1/')
         end
 
         it 'boots the carried vpsAdminOS machine over PXE from the carrier' do
@@ -670,6 +769,72 @@ import ../../make-test.nix (
 
           _, cmdline = vpsadminos.succeeds('cat /proc/cmdline')
           expect(cmdline).to include('httproot=http://192.168.100.1/')
+        end
+
+        it 'kexec-netboots the carried NixOS machine to the latest and selected generation' do
+          expect(@carried_nixos_gen_a).not_to be_nil
+
+          update_nixos_generation!(marker: 'B')
+          @carried_nixos_gen_b = build_generation!("carrier##{NIXOS_MACHINE}")
+          confctl!('deploy', '--yes', "carrier##{NIXOS_MACHINE}")
+          wait_for_carrier_netboot_services!
+          wait_for_nixos_netboot_artifacts!(
+            generation: @carried_nixos_gen_b,
+            previous_generations: [@carried_nixos_gen_a]
+          )
+
+          machine_json = carrier_netboot_machine(NIXOS_FQDN)
+          gen_a = machine_json.fetch('generations').detect { |g| g.fetch('store_path') == @carried_nixos_gen_a['toplevel'] }
+          gen_b = machine_json.fetch('generations').detect { |g| g.fetch('store_path') == @carried_nixos_gen_b['toplevel'] }
+
+          expect(gen_a).not_to be_nil
+          expect(gen_b).not_to be_nil
+          expect(gen_b.fetch('current')).to be(true)
+
+          kexec_netboot!(nixos, boot_timeout: 360)
+          assert_marker!(nixos, 'B')
+          wait_for_netboot_http!(nixos, timeout: 120)
+
+          kexec_netboot!(
+            nixos,
+            load_args: ['--generation', gen_a.fetch('generation').to_s],
+            boot_timeout: 360
+          )
+          assert_marker!(nixos, 'A')
+          wait_for_netboot_http!(nixos, timeout: 120)
+        end
+
+        it 'kexec-netboots the carried vpsAdminOS machine to the latest and selected generation' do
+          expect(@carried_vpsadminos_gen_a).not_to be_nil
+
+          update_vpsadminos_generation!(marker: 'B')
+          @carried_vpsadminos_gen_b = build_generation!("carrier##{VPSADMINOS_MACHINE}")
+          confctl!('deploy', '--yes', "carrier##{VPSADMINOS_MACHINE}")
+          wait_for_carrier_netboot_services!
+          wait_for_vpsadminos_netboot_artifacts!(
+            generation: @carried_vpsadminos_gen_b,
+            previous_generations: [@carried_vpsadminos_gen_a]
+          )
+
+          machine_json = carrier_netboot_machine(VPSADMINOS_FQDN)
+          gen_a = machine_json.fetch('generations').detect { |g| g.fetch('store_path') == @carried_vpsadminos_gen_a['toplevel'] }
+          gen_b = machine_json.fetch('generations').detect { |g| g.fetch('store_path') == @carried_vpsadminos_gen_b['toplevel'] }
+
+          expect(gen_a).not_to be_nil
+          expect(gen_b).not_to be_nil
+          expect(gen_b.fetch('current')).to be(true)
+
+          kexec_netboot!(vpsadminos, boot_timeout: 360)
+          assert_marker!(vpsadminos, 'B')
+          wait_for_netboot_http!(vpsadminos, timeout: 120)
+
+          kexec_netboot!(
+            vpsadminos,
+            load_args: ['--generation', gen_a.fetch('generation').to_s],
+            boot_timeout: 360
+          )
+          assert_marker!(vpsadminos, 'A')
+          wait_for_netboot_http!(vpsadminos, timeout: 120)
         end
       end
     '';
