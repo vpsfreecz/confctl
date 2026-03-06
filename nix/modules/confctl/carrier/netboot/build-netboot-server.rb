@@ -434,14 +434,14 @@ class TftpBuilder < RootBuilder
         MENU LABEL <%= m.label %>
         LINUX boot/<%= m.fqdn %>/<%= m.current.generation %>/bzImage
         INITRD boot/<%= m.fqdn %>/<%= m.current.generation %>/initrd
-        APPEND init=<%= m.current.toplevel %>/init loglevel=7
+        APPEND <%= m.current.pxe_kernel_params.join(' ') %>
 
       <% m.generations[1..].each do |g| -%>
       LABEL <%= m.fqdn %>-<%= g.generation %>
         MENU LABEL Gen <%= g.generation %> - <%= g.time_s %> - <%= g.shortrev %>
         LINUX boot/<%= m.fqdn %>/<%= g.generation %>/bzImage
         INITRD boot/<%= m.fqdn %>/<%= g.generation %>/initrd
-        APPEND init=<%= g.toplevel %>/init loglevel=7
+        APPEND <%= g.pxe_kernel_params.join(' ') %>
 
       <% end -%>
       <% if enable_memtest -%>
@@ -466,6 +466,20 @@ class TftpBuilder < RootBuilder
       },
       "pxeserver/machines/#{machine.fqdn}/menu.cfg"
     )
+
+    tpl = <<~ERB
+      DEFAULT <%= m.fqdn %>
+      PROMPT 0
+      TIMEOUT 50
+
+      LABEL <%= m.fqdn %>
+        MENU LABEL <%= m.label %>
+        LINUX boot/<%= m.fqdn %>/<%= m.current.generation %>/bzImage
+        INITRD boot/<%= m.fqdn %>/<%= m.current.generation %>/initrd
+        APPEND <%= m.current.pxe_kernel_params.join(' ') %>
+    ERB
+
+    render_to(tpl, { m: machine }, "pxeserver/machines/#{machine.fqdn}/auto.cfg")
   end
 
   def render_machine_vpsadminos(machine)
@@ -852,6 +866,15 @@ class Generation
       variants:,
       swpins_info: json['swpins-info']
     }.to_json(*)
+  end
+
+  def pxe_kernel_params
+    return kernel_params if kernel_params.any?
+
+    [
+      "init=#{toplevel}/init",
+      'loglevel=7'
+    ]
   end
 
   protected
