@@ -25,5 +25,10 @@
 
 ## Commit & Pull Request Guidelines
 - Commit subjects are short and imperative. Without a prefix, capitalize the first word. With a `topic/component:` prefix, keep the first word after `:` lowercase. Avoid trailing periods and bundle related changes together.
+- Flake input updates (`vpsadminos`) flow:
+  1. Read current rev: `nix flake metadata --json . | jq -r '.locks.nodes.vpsadminos.locked.rev'`.
+  2. Update input: `nix flake update vpsadminos` (or `nix flake lock --update-input vpsadminos`).
+  3. Verify only `flake.lock` changed for this update commit.
+  4. Commit with subject format: `flake: vpsadminos <old9> -> <new9>` (example: `flake: vpsadminos 2cab01000 -> 08bb11324`).
 - Describe PRs clearly with motivation, scope, and manual verification notes; link relevant issues and update docs/manpages when behavior changes.
 - Run rspec, rubocop, and nixfmt before pushing; ensure generated artifacts (`man/`, `pkg/` when releasing) reflect your changes.
