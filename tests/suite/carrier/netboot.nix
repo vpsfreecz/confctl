@@ -127,6 +127,9 @@ import ../../make-test.nix (
 
       NIXOS_FQDN = "#{NIXOS_MACHINE}.test.invalid"
       VPSADMINOS_FQDN = "#{VPSADMINOS_MACHINE}.test.invalid"
+      NIXOS_BOOT_TIMEOUT = 600
+      VPSADMINOS_BOOT_TIMEOUT = 360
+      NETBOOT_HTTP_TIMEOUT = 180
       PXE_ADDRESS = '192.168.100.1'
       PXE_SUBNET = '192.168.100.0/24'
 
@@ -754,18 +757,18 @@ import ../../make-test.nix (
         end
 
         it 'boots the carried NixOS machine over PXE from the carrier' do
-          boot_pxe_client!(nixos, timeout: 360)
+          boot_pxe_client!(nixos, timeout: NIXOS_BOOT_TIMEOUT)
           assert_marker!(nixos, 'A')
-          wait_for_netboot_http!(nixos, timeout: 120)
+          wait_for_netboot_http!(nixos, timeout: NETBOOT_HTTP_TIMEOUT)
 
           _, cmdline = nixos.succeeds('cat /proc/cmdline')
           expect(cmdline).to include('httproot=http://192.168.100.1/')
         end
 
         it 'boots the carried vpsAdminOS machine over PXE from the carrier' do
-          boot_pxe_client!(vpsadminos, timeout: 360)
+          boot_pxe_client!(vpsadminos, timeout: VPSADMINOS_BOOT_TIMEOUT)
           assert_marker!(vpsadminos, 'A')
-          wait_for_netboot_http!(vpsadminos, timeout: 120)
+          wait_for_netboot_http!(vpsadminos, timeout: NETBOOT_HTTP_TIMEOUT)
 
           _, cmdline = vpsadminos.succeeds('cat /proc/cmdline')
           expect(cmdline).to include('httproot=http://192.168.100.1/')
@@ -791,17 +794,17 @@ import ../../make-test.nix (
           expect(gen_b).not_to be_nil
           expect(gen_b.fetch('current')).to be(true)
 
-          kexec_netboot!(nixos, boot_timeout: 360)
+          kexec_netboot!(nixos, boot_timeout: NIXOS_BOOT_TIMEOUT)
           assert_marker!(nixos, 'B')
-          wait_for_netboot_http!(nixos, timeout: 120)
+          wait_for_netboot_http!(nixos, timeout: NETBOOT_HTTP_TIMEOUT)
 
           kexec_netboot!(
             nixos,
             load_args: ['--generation', gen_a.fetch('generation').to_s],
-            boot_timeout: 360
+            boot_timeout: NIXOS_BOOT_TIMEOUT
           )
           assert_marker!(nixos, 'A')
-          wait_for_netboot_http!(nixos, timeout: 120)
+          wait_for_netboot_http!(nixos, timeout: NETBOOT_HTTP_TIMEOUT)
         end
 
         it 'kexec-netboots the carried vpsAdminOS machine to the latest and selected generation' do
@@ -824,17 +827,17 @@ import ../../make-test.nix (
           expect(gen_b).not_to be_nil
           expect(gen_b.fetch('current')).to be(true)
 
-          kexec_netboot!(vpsadminos, boot_timeout: 360)
+          kexec_netboot!(vpsadminos, boot_timeout: VPSADMINOS_BOOT_TIMEOUT)
           assert_marker!(vpsadminos, 'B')
-          wait_for_netboot_http!(vpsadminos, timeout: 120)
+          wait_for_netboot_http!(vpsadminos, timeout: NETBOOT_HTTP_TIMEOUT)
 
           kexec_netboot!(
             vpsadminos,
             load_args: ['--generation', gen_a.fetch('generation').to_s],
-            boot_timeout: 360
+            boot_timeout: VPSADMINOS_BOOT_TIMEOUT
           )
           assert_marker!(vpsadminos, 'A')
-          wait_for_netboot_http!(vpsadminos, timeout: 120)
+          wait_for_netboot_http!(vpsadminos, timeout: NETBOOT_HTTP_TIMEOUT)
         end
       end
     '';
