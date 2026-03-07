@@ -7,11 +7,12 @@ require 'open3'
 module ConfctlTestHelpers
   STORE_PATH_RE = %r{/nix/store/[0-9a-z]{32}-[^\s'"]+}
 
-  def confctl_setup!(bin:, src:, conf_dir:, home_dir:)
+  def confctl_setup!(bin:, src:, conf_dir:, home_dir:, nix_path: nil)
     @confctl_bin = bin
     @confctl_src = src
     @conf_dir = conf_dir
     @home_dir = home_dir
+    @nix_path = nix_path
   end
 
   def confctl_bin
@@ -28,6 +29,10 @@ module ConfctlTestHelpers
 
   def home_dir
     @home_dir || raise('confctl_setup! must be called before confctl helpers are used')
+  end
+
+  def nix_path
+    @nix_path
   end
 
   def run_local(argv, chdir: nil, env: {})
@@ -155,6 +160,7 @@ module ConfctlTestHelpers
       'CONFCTL_TTY' => '0',
       'CONFCTL_SSH_CONFIG' => ssh_config,
       'NIX_SSHOPTS' => ssh_opts,
+      'NIX_PATH' => [nix_path, ENV.fetch('NIX_PATH', nil)].compact.join(':'),
       'NIX_CONFIG' => [ENV.fetch('NIX_CONFIG', nil), 'sandbox = false'].compact.join("\n"),
       'NO_COLOR' => '1',
       'PAGER' => ''

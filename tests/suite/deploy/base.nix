@@ -486,7 +486,8 @@ import ../../make-test.nix (
           bin: "${confctlBin}",
           src: "${confctlSource}",
           conf_dir: @conf_dir,
-          home_dir: @home_dir
+          home_dir: @home_dir,
+          nix_path: "nixpkgs=#{NIXPKGS_PATH}"
         )
 
         @dummy_rev_a = setup_dummy_repo!(@dummy_repo)
