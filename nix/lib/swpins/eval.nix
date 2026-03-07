@@ -47,7 +47,10 @@ let
           ]
         );
       in
-      pkgs.fetchgit (filter opts);
+      if opts ? path && builtins.pathExists opts.path then
+        builtins.storePath opts.path
+      else
+        pkgs.fetchgit (filter opts);
 
     zip = opts: pkgs.fetchzip opts;
 
