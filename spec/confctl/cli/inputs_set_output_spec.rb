@@ -11,7 +11,7 @@ RSpec.describe 'flake input set output' do
   let(:resolved_info) { { short_rev: '5361648e', rev: '5361648e4a29f58b5c208d3f185d95cd0a43fe54' } }
 
   around do |example|
-    old_tty = ENV['CONFCTL_TTY']
+    old_tty = ENV.fetch('CONFCTL_TTY', nil)
     ENV['CONFCTL_TTY'] = '0'
     example.run
   ensure
