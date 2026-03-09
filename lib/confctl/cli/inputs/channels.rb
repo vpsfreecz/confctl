@@ -119,8 +119,12 @@ module ConfCtl::Cli
         downgrade: opts[:downgrade],
         editor: opts[:editor]
       )
+
+      lock = ConfCtl::FlakeLock.load(File.join(ConfCtl::ConfDir.path, 'flake.lock'))
       targets.each do |t|
-        puts "Configuring #{t[:role]} in #{t[:channel]} -> #{rev}"
+        info = lock.input_info(t[:input])
+        resolved_rev = info[:short_rev] || info[:rev] || '-'
+        puts "Configuring #{t[:role]} in #{t[:channel]} -> #{resolved_rev}"
       end
     end
 

@@ -65,7 +65,11 @@ module ConfCtl::Cli
         downgrade: opts[:downgrade],
         editor: opts[:editor]
       )
-      puts "Configuring #{role} in #{machine_name} -> #{rev}"
+
+      lock = ConfCtl::FlakeLock.load(File.join(ConfCtl::ConfDir.path, 'flake.lock'))
+      info = lock.input_info(input)
+      resolved_rev = info[:short_rev] || info[:rev] || '-'
+      puts "Configuring #{role} in #{machine_name} -> #{resolved_rev}"
     end
 
     protected
