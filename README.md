@@ -55,8 +55,14 @@ A minimal flake skeleton looks like this:
     {
       confctl = confctlOutputs;
 
-      # Reusable dev shell provided by confctl
-      devShells.x86_64-linux.default = confctl.lib.mkDevShell { system = "x86_64-linux"; };
+      # Shell modes:
+      # - minimal: no Gemfile, best default
+      # - tools: Gemfile for repo tools such as overcommit or rubocop
+      # - bundled-confctl: Gemfile includes confctl and scripts/ can use bundle gems
+      devShells.x86_64-linux.default = confctl.lib.mkConfigDevShell {
+        system = "x86_64-linux";
+        mode = "minimal";
+      };
     };
 }
 ```
@@ -67,8 +73,15 @@ Then enter the dev shell:
 nix develop
 ```
 
-This makes `confctl` available and installs Ruby gems into `./.gems`.
-It also generates man pages into `./.man` so `man confctl` works.
+This makes `confctl` available from the pinned flake input package and exposes
+its man pages on `MANPATH`.
+
+For the Bundler modes, commit `Gemfile.lock` whenever possible. `confctl` can
+bootstrap those shells without it, but the lockfile makes CI and local shells
+reproducible.
+
+Legacy non-flake configuration repositories can continue importing
+[`shell.nix`](shell.nix).
 
 To update flake inputs, use the `confctl inputs ...` commands (instead of `swpins`):
 
@@ -122,8 +135,8 @@ import ../confctl/shell.nix
 EOF
 ```
 
-4. Enter the `nix-shell`. This will make confctl available and install its
-dependencies into `.gems/`:
+4. Enter the `nix-shell`. This uses the legacy bundled-confctl shell and
+installs confctl's dependencies into `.gems/`:
 ```
 nix-shell
 ```
@@ -187,11 +200,14 @@ See also existing configurations:
     │   └── swpins.nix          # User-defined software pin channels
     ├── data/                   # User-defined datasets available in machine configurations as confData
     ├── environments/           # Environment presets for various types of machines, optional
+    ├── flake.nix               # Flake entrypoint (recommended)
+    ├── Gemfile                 # Optional Bundler config for tools/bundled-confctl modes
+    ├── Gemfile.lock            # Recommended for Bundler modes
     ├── modules/                # User-defined modules
     │   └── cluster/default.nix # User-defined extensions of `cluster.` options used in `<machine>/module.nix` files
     ├── scripts/                # User-defined scripts
-    ├── swpins/                 # confctl-generated software pins configuration
-    └── shell.nix               # Nix expression for nix-shell
+    ├── shell.nix               # Legacy nix-shell entrypoint
+    └── swpins/                 # confctl-generated software pins configuration
 
 ## Software pins
 Software pins in confctl allow you to use specific revisions of

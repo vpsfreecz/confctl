@@ -14,6 +14,8 @@ RSpec.describe 'configuration commands' do
       expect(File).to exist(File.join(dir, 'cluster', 'cluster.nix'))
       expect(File).to exist(File.join(dir, 'configs', 'confctl.nix'))
       expect(File).to exist(File.join(dir, 'data', 'ssh-keys.nix'))
+      expect(File.read(File.join(dir, 'flake.nix'))).to include('confctl.lib.mkConfigDevShell')
+      expect(File.read(File.join(dir, 'flake.nix'))).to include('mode = "minimal";')
     end
   end
 

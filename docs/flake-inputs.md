@@ -89,8 +89,11 @@ A minimal pattern:
         inherit inputs channels;
       };
 
-      # Optional: reuse the confctl dev shell for this repo
-      devShells.x86_64-linux.default = confctl.lib.mkDevShell { system = "x86_64-linux"; };
+      # Optional: configuration-repo dev shell
+      devShells.x86_64-linux.default = confctl.lib.mkConfigDevShell {
+        system = "x86_64-linux";
+        mode = "minimal";
+      };
     };
 }
 ```

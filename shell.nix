@@ -39,11 +39,14 @@ stdenv.mkDerivation rec {
 
     if [ -n "$bundler_version" ]; then
       export BUNDLER_VERSION="$bundler_version"
-      gem list -i bundler -v "$bundler_version" >/dev/null 2>&1 \
-        || gem install --no-document bundler -v "$bundler_version"
-    else
-      gem list -i bundler >/dev/null 2>&1 \
-        || gem install --no-document bundler
+      # Ruby can ship Bundler as a default gem without creating a wrapper in
+      # GEM_HOME/bin, but the shell below executes Bundler through that path.
+      if [ ! -x "$GEM_HOME/bin/bundle" ] \
+         || ! gem list -i bundler -v "$bundler_version" >/dev/null 2>&1; then
+        gem install --no-document bundler -v "$bundler_version"
+      fi
+    elif [ ! -x "$GEM_HOME/bin/bundle" ]; then
+      gem install --no-document bundler
     fi
     bundle_bin="$GEM_HOME/bin/bundle"
 

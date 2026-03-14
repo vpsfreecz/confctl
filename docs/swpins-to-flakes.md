@@ -68,8 +68,11 @@ A minimal, practical skeleton looks like this:
         inherit inputs channels;
       };
 
-      # Recommended: reuse confctl's development shell
-      devShells.x86_64-linux.default = confctl.lib.mkDevShell { system = "x86_64-linux"; };
+      # Recommended: configuration-repo dev shell
+      devShells.x86_64-linux.default = confctl.lib.mkConfigDevShell {
+        system = "x86_64-linux";
+        mode = "minimal";
+      };
     };
 }
 ```

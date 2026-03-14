@@ -22,7 +22,8 @@
       forTestSystems = f: nixpkgs.lib.genAttrs testSystems (system: f system);
       hasTestRunner = system: builtins.elem system testSystems;
 
-      mkDevShell = import ./nix/flake/mk-devshell.nix { inherit self nixpkgs; };
+      mkConfigDevShell = import ./nix/flake/mk-config-devshell.nix { inherit self nixpkgs; };
+      mkConfctlDevShell = import ./nix/flake/mk-confctl-devshell.nix { inherit nixpkgs; };
       mkConfctlPackage = import ./nix/package.nix;
 
       mkRspecCheck =
@@ -114,11 +115,14 @@
     {
       lib.mkConfctlOutputs = import ./nix/flake/mk-confctl-outputs.nix;
 
-      # Reusable dev shell for cluster configuration repos (vpsfconf etc.)
-      lib.mkDevShell = mkDevShell;
+      # Dev shells for cluster configuration repos.
+      lib.mkConfigDevShell = mkConfigDevShell;
+
+      # Dev shell for working on confctl itself.
+      lib.mkConfctlDevShell = mkConfctlDevShell;
 
       devShells = forAllSystems (system: {
-        default = mkDevShell { inherit system; };
+        default = mkConfctlDevShell { inherit system; };
       });
 
       packages = forAllSystems (
