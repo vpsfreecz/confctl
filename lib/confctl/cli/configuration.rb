@@ -271,6 +271,7 @@ module ConfCtl::Cli
               nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
               # vpsadminos.url = "github:vpsfreecz/vpsadminos/staging";
+              # vpsadminos.inputs.nixpkgs.follows = "nixpkgs";
             };
 
             outputs = inputs@{ self, confctl, ... }:

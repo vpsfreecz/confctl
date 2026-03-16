@@ -27,24 +27,38 @@ confctl works best with a flake-based configuration repository. The repository
 defines flake inputs (nixpkgs/vpsadminos/etc.), maps them into **channels**, and
 machines select channels via `cluster.<name>.inputs.channels`.
 
-A minimal flake skeleton looks like this:
+Create a new configuration directory and initialize it:
+
+```bash
+mkdir cluster-configuration
+cd cluster-configuration
+confctl init
+```
+
+`confctl init` generates a `flake.nix` like this:
 
 ```nix
 {
-  description = "my cluster config (confctl flake)";
+  description = "confctl configuration (flake)";
 
   inputs = {
-    confctl.url = "github:vpsfreecz/confctl/2026-02-15-flakes";
+    confctl.url = "github:vpsfreecz/confctl";
 
-    nixpkgsStable.url = "github:NixOS/nixpkgs/nixos-25.11";
-    vpsadminosStaging.url = "github:vpsfreecz/vpsadminos/staging";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+    # vpsadminos.url = "github:vpsfreecz/vpsadminos/staging";
+    # vpsadminos.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = inputs@{ self, confctl, ... }:
     let
       channels = {
-        production = { nixpkgs = "nixpkgsStable"; vpsadminos = "vpsadminosStaging"; };
-        staging    = { nixpkgs = "nixpkgsStable"; vpsadminos = "vpsadminosStaging"; };
+        nixos-unstable = { nixpkgs = "nixpkgs"; };
+
+        # vpsadminos = {
+        #   nixpkgs = "nixpkgs";
+        #   vpsadminos = "vpsadminos";
+        # };
       };
 
       confctlOutputs = confctl.lib.mkConfctlOutputs {
@@ -67,6 +81,9 @@ A minimal flake skeleton looks like this:
 }
 ```
 
+The optional `vpsadminos` input is commented out by default because most new
+configurations deploy NixOS only.
+
 Then enter the dev shell:
 
 ```bash
@@ -80,15 +97,40 @@ For the Bundler modes, commit `Gemfile.lock` whenever possible. `confctl` can
 bootstrap those shells without it, but the lockfile makes CI and local shells
 reproducible.
 
-Legacy non-flake configuration repositories can continue importing
-[`shell.nix`](shell.nix).
+Before the first build or deploy, make sure the per-user gcroot directory
+exists:
 
-To update flake inputs, use the `confctl inputs ...` commands (instead of `swpins`):
+```bash
+sudo mkdir -p /nix/var/nix/gcroots/per-user/$USER
+sudo chown $USER /nix/var/nix/gcroots/per-user/$USER
+```
+
+Add a new machine to be deployed:
+
+```bash
+confctl add my-machine
+```
+
+You can now edit the machine's configuration in directory `cluster/my-machine`.
+
+Build the machine:
+
+```bash
+confctl build my-machine
+```
+
+Deploy the machine:
+
+```bash
+confctl deploy my-machine
+```
+
+To update flake inputs, use the `confctl inputs ...` commands:
 
 ```bash
 confctl inputs ls
-confctl inputs update --commit nixpkgsStable vpsadminosStaging
-confctl inputs channel update --commit '{production,staging}' vpsadminos
+confctl inputs update --commit nixpkgs
+confctl inputs channel update --commit nixos-unstable nixpkgs
 ```
 
 If you are migrating an existing configuration repository that uses `configs/swpins.nix`
@@ -97,83 +139,40 @@ and the `swpins/` directory, confctl includes an interactive helper: `confctl mi
 
 ### Legacy configuration (non-flake)
 
-The following steps describe the original non-flake workflow.
+The original non-flake workflow is still supported. Use `confctl init --swpins`
+instead of `confctl init`; the `confctl add`, `confctl build`, and `confctl deploy`
+workflow is otherwise the same as above.
 
-1. Either install confctl as a gem:
-```
-gem install confctl
-```
+Legacy non-flake configuration repositories can continue importing
+[`shell.nix`](shell.nix). If you use this workflow, create `shell.nix` in the
+configuration directory and adjust the import path as needed:
 
-Or clone this repository:
-
-```
-git clone https://github.com/vpsfreecz/confctl
-```
-
-This guide assumes you have cloned the repository, because otherwise man will
-not find confctl's manual pages. If you install confctl using gem, you can
-ignore steps with `shell.nix`.
-
-confctl requires per-user garbage collection directory to be created:
-
-```
-sudo mkdir /nix/var/nix/gcroots/per-user/$USER
-sudo chown $USER /nix/var/nix/gcroots/per-user/$USER
-```
-
-2. Create a new directory, where your confctl-managed configuration will be
-stored:
-
-```
-mkdir cluster-configuration
-```
-3. Create `shell.nix` and import the same file from confctl:
-```
-cd cluster-configuration
+```bash
 cat > shell.nix <<EOF
 import ../confctl/shell.nix
 EOF
 ```
 
-4. Enter the `nix-shell`. This uses the legacy bundled-confctl shell and
-installs confctl's dependencies into `.gems/`:
-```
+Enter the `nix-shell`. This uses the legacy bundled-confctl shell and installs
+confctl's dependencies into `.gems/`:
+
+```bash
 nix-shell
 ```
 
 From within the shell, you can access the [manual](./man/man8/confctl.8.md)
 and a list of [configuration options](./man/man8/confctl-options.nix.8.md):
 
-```
+```bash
 man confctl
 man confctl-options.nix
 ```
 
-5. Initialize the configuration directory with confctl (legacy swpins layout):
-```
-confctl init --swpins
-```
+Update pre-configured software pins to fetch current nixpkgs. In flake-based
+configurations, use `confctl inputs ...` instead:
 
-6. Add a new machine to be deployed:
-```
-confctl add my-machine
-```
-
-You can now edit the machine's configuration in directory `cluster/my-machine`.
-
-7. Update pre-configured software pins to fetch current nixpkgs. In flake-based configurations, use `confctl inputs ...` instead:
-```
+```bash
 confctl swpins update
-```
-
-8. Build the machine
-```
-confctl build my-machine
-```
-
-9. Deploy the machine
-```
-confctl deploy my-machine
 ```
 
 ## Example configuration
@@ -221,7 +220,7 @@ or selected machines in the configuration. Or, if needed, custom software pins
 can be configured on selected machines. See below for usage examples.
 
 ## Software pin channels
-Software pin channels are defined in file `confctl/swpins.nix`:
+Software pin channels are defined in file `configs/swpins.nix`:
 
 ```nix
 { config, ... }:

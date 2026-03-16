@@ -8,14 +8,18 @@ RSpec.describe 'configuration commands' do
   it 'initializes a flake configuration directory' do
     Dir.mktmpdir('confctl-config-init-') do |dir|
       result = run_confctl('init', chdir: dir)
+      flake = File.read(File.join(dir, 'flake.nix'))
 
       expect(result.success?).to be(true), result.err
       expect(File).to exist(File.join(dir, 'flake.nix'))
       expect(File).to exist(File.join(dir, 'cluster', 'cluster.nix'))
       expect(File).to exist(File.join(dir, 'configs', 'confctl.nix'))
       expect(File).to exist(File.join(dir, 'data', 'ssh-keys.nix'))
-      expect(File.read(File.join(dir, 'flake.nix'))).to include('confctl.lib.mkConfigDevShell')
-      expect(File.read(File.join(dir, 'flake.nix'))).to include('mode = "minimal";')
+      expect(flake).to include('nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";')
+      expect(flake).to include('# vpsadminos.url = "github:vpsfreecz/vpsadminos/staging";')
+      expect(flake).to include('# vpsadminos.inputs.nixpkgs.follows = "nixpkgs";')
+      expect(flake).to include('confctl.lib.mkConfigDevShell')
+      expect(flake).to include('mode = "minimal";')
     end
   end
 
