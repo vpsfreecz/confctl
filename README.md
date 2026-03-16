@@ -242,7 +242,7 @@ Software pin channels are defined in file `confctl/swpins.nix`:
           fetchSubmodules = false;
 
           # git reference to use for manual/automated update using
-	  # `confctl swpins channel update`
+          # `confctl swpins channel update`
           update.ref = "refs/heads/nixos-unstable";
 
           # Whether to enable automated updates triggered by `confctl build | deploy`
@@ -251,7 +251,7 @@ Software pin channels are defined in file `confctl/swpins.nix`:
           # If update.auto is true, this determines how frequently will confctl
           # try to update the channel, in seconds
           update.interval = 60*60;
-	};
+        };
       };
     };
 
@@ -263,7 +263,7 @@ Software pin channels are defined in file `confctl/swpins.nix`:
         git-rev = {
           url = "https://github.com/vpsfreecz/vpsadminos";
           update.ref = "refs/heads/staging";
-	  update.auto = true;
+          update.auto = true;
         };
       };
     };
@@ -359,11 +359,11 @@ Per-machine software pins are configured in the machine's `module.nix` file:
     # Per-machine swpins
     swpins.pins = {
       "pin-name" = {
-          type = "git-rev";
-	  git-rev = {
-            # ...pin definition...
-	  };
-       };
+        type = "git-rev";
+        git-rev = {
+          # ...pin definition...
+        };
+      };
     };
   };
 }
