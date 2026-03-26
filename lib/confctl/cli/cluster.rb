@@ -300,7 +300,7 @@ module ConfCtl::Cli
           t_info = st.target_inputs_info && st.target_inputs_info[role]
           d_info = st.inputs_info && st.inputs_info[role]
           state = inputs_info_state(t_info, d_info)
-          row[role] = format_inputs_state(state, d_info, t_info)
+          row[role] = format_inputs_state(state, d_info)
         end
 
         rows << row
@@ -1841,16 +1841,16 @@ module ConfCtl::Cli
       mirror.log(old_rev, new_rev, opts: log_opts)
     end
 
-    def format_inputs_state(state, deployed_info, target_info)
+    def format_inputs_state(state, deployed_info)
+      rev = inputs_short_rev(deployed_info) || 'unknown'
+
       case state
       when :same
-        Rainbow(inputs_short_rev(deployed_info) || 'unknown').green
+        Rainbow(rev).green
       when :changed
-        old = inputs_short_rev(deployed_info) || 'unknown'
-        new = inputs_short_rev(target_info) || 'unknown'
-        Rainbow("#{old} -> #{new}").red
+        Rainbow(rev).red
       else
-        Rainbow('unknown').yellow
+        Rainbow(rev).yellow
       end
     end
 
