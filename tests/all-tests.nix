@@ -2,6 +2,8 @@
   pkgs ? <nixpkgs>,
   system ? builtins.currentSystem,
   suiteArgs ? { },
+  testConfig ? { },
+  configuration ? null,
 }:
 let
   vpsadminosPath = suiteArgs.vpsadminosPath or (throw "suiteArgs.vpsadminosPath is required");
@@ -13,6 +15,8 @@ let
       system
       lib
       suiteArgs
+      testConfig
+      configuration
       ;
     suitePath = ./suite;
   };
