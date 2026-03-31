@@ -25,6 +25,11 @@
 
 ## Commit & Pull Request Guidelines
 - Commit subjects are short and imperative. Without a prefix, capitalize the first word. With a `topic/component:` prefix, keep the first word after `:` lowercase. Avoid trailing periods and bundle related changes together.
+- Write commit messages in a temporary file and pass them to `git commit -F`
+  or `git commit --amend -F`. Wrap message lines to 80 columns.
+- Commit messages must explain what problem or goal the change addresses.
+- For fixes, explain how the change fixes or works around the problem. For
+  new functionality, explain how the new behavior works.
 - Flake input updates (`vpsadminos`) flow:
   1. Read current rev: `nix flake metadata --json . | jq -r '.locks.nodes.vpsadminos.locked.rev'`.
   2. Update input: `nix flake update vpsadminos` (or `nix flake lock --update-input vpsadminos`).
