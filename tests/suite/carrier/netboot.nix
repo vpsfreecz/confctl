@@ -616,6 +616,7 @@ import ../../make-test.nix (
             next(false) unless nixos_auto.include?("DEFAULT #{NIXOS_FQDN}")
 
             nixos_kernel_params = carrier_file(netboot_kernel_params_path(NIXOS_FQDN, current_generation.fetch('generation')))
+            next(false) unless nixos_kernel_params.include?("init=#{current_generation.fetch('toplevel')}/init")
             next(false) unless nixos_kernel_params.include?('httproot=http://192.168.100.1/')
           rescue JSON::ParserError, OsVm::Error
             next(false)

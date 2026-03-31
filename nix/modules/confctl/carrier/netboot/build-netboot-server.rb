@@ -842,6 +842,7 @@ class Generation
     @boot_files = find_boot_files
     @variants = Variant.for_machine(machine)
     @kernel_params.reject! { |v| v.start_with?('httproot=') }
+    ensure_nixos_init_param
 
     httproot =
       if machine.spin == 'vpsadminos'
@@ -884,6 +885,13 @@ class Generation
   end
 
   protected
+
+  def ensure_nixos_init_param
+    return unless machine.spin == 'nixos'
+    return if @kernel_params.any? { |v| v.start_with?('init=') }
+
+    @kernel_params.unshift("init=#{toplevel}/init")
+  end
 
   def extract_kernel_version
     link = File.readlink(File.join(toplevel, 'kernel'))
