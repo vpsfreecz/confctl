@@ -65,7 +65,7 @@ import ../../make-test.nix (
               PasswordAuthentication = false;
             };
           };
-          services.logrotate.checkConfig = false;
+          systemd.services.logrotate-checkconf.enable = false;
           networking.firewall.enable = false;
           environment.systemPackages = with pkgs; [
             git
@@ -282,7 +282,7 @@ import ../../make-test.nix (
                 dhcp-boot = "pxelinux.0,carrier,#{PXE_ADDRESS}";
               };
             };
-            services.logrotate.checkConfig = false;
+            systemd.services.logrotate-checkconf.enable = false;
 
             confctl.carrier.netboot = {
               enable = true;
