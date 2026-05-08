@@ -2,6 +2,7 @@ require 'confctl/flake_lock'
 require 'confctl/flake_lock_diff'
 require 'confctl/inputs/commit_message'
 require 'confctl/inputs/git_commit'
+require 'confctl/inputs/nix_output_guard'
 require 'confctl/system_command'
 require 'fileutils'
 require 'json'
@@ -113,7 +114,8 @@ module ConfCtl
           args << '--output-lock-file' << tmpfile
 
           begin
-            Dir.chdir(conf_dir) { cmd.run(*args) }
+            result = Dir.chdir(conf_dir) { cmd.run(*args) }
+            ConfCtl::Inputs::NixOutputGuard.check!(result)
             break
           rescue TTY::Command::ExitError => e
             if !extra_experimental && experimental_error?(e.message)
