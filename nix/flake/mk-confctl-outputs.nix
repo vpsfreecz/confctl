@@ -483,6 +483,7 @@ in
   machineNames = machineNames;
   machineKeys = machineKeys;
   machines = machinesAttrs;
+  machinesJson = corePkgs.writeText "machine-list.json" (builtins.toJSON machinesAttrs);
   buildPlan = buildPlan;
   inputs = inputsOutput;
   inputsInfo = inputsInfoOutput;

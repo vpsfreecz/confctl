@@ -26,7 +26,8 @@ module ConfCtl
     # Return machines and their config in a hash
     # @return [Hash]
     def list_machines
-      machines = nix_eval_json('.#confctl.machines')
+      machines_json = nix_build_output_path('.#confctl.machinesJson')
+      machines = JSON.parse(File.read(machines_json))
       machines = demodulify(machines)
       refresh_machine_key_maps(machines)
       machines
@@ -238,6 +239,17 @@ module ConfCtl
           raise
         end
       end
+    end
+
+    def nix_build_output_path(installable)
+      outputs = nix_build_json([installable])
+      output_path = outputs.dig(0, 'outputs', 'out')
+
+      unless output_path
+        raise ConfCtl::Error, "missing output path for #{installable.inspect}"
+      end
+
+      output_path
     end
 
     def run_nix_with_fallback
