@@ -608,6 +608,19 @@ import ../../make-test.nix (
           )
         end
 
+        it 'skips repeated boot deploy with reboot when generation is already current' do
+          expect(@nixos_gen_b).not_to be_nil
+
+          out, = confctl!('deploy', '--yes', '--reboot', '--generation', @nixos_gen_b['name'], NIXOS_MACHINE, 'boot')
+          expect(out).to include("Skipping #{NIXOS_MACHINE}: already using target generation")
+          expect(out).not_to include("Rebooting #{NIXOS_MACHINE}")
+          assert_machine_state(
+            NIXOS_MACHINE,
+            profile: @nixos_gen_b['toplevel'],
+            current: @nixos_gen_b['toplevel']
+          )
+        end
+
         it 'builds third generation for generation-selection tests' do
           expect(@nixos_gen_b).not_to be_nil
 

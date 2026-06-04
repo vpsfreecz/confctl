@@ -79,6 +79,9 @@ module ConfCtl::Cli
         end
 
       nix = ConfCtl::Nix.new(show_trace: opts['show-trace'])
+      machines, host_generations = skip_current_deploy_targets(machines, host_generations, action)
+
+      return if host_generations.empty?
 
       if opts['one-by-one']
         deploy_one_by_one(machines, host_generations, nix, action)
@@ -513,6 +516,64 @@ module ConfCtl::Cli
     protected
 
     attr_reader :wait_online
+
+    def skip_current_deploy_targets(machines, host_generations, action)
+      return [machines, host_generations] if opts['copy-only']
+
+      statuses = deploy_target_statuses(machines, host_generations)
+
+      filtered_generations = host_generations.reject do |host, generation|
+        machine = machines[host]
+        status = statuses[host]
+
+        if already_using_target_generation?(machine, status, generation, action)
+          puts Rainbow("Skipping #{host}: already using target generation #{generation.name}").yellow
+          true
+        else
+          false
+        end
+      end
+
+      filtered_machines = machines.select do |host, _machine|
+        filtered_generations.has_key?(host)
+      end
+
+      [filtered_machines, filtered_generations]
+    end
+
+    def deploy_target_statuses(machines, host_generations)
+      statuses = {}
+      executor = ConfCtl::ParallelExecutor.new([host_generations.length, 5].min)
+
+      host_generations.each_key do |host|
+        statuses[host] = ConfCtl::MachineStatus.new(machines[host])
+
+        executor.add do
+          statuses[host].query(toplevel: true, generations: true, swpins: false)
+        end
+      end
+
+      executor.run
+      statuses
+    end
+
+    def already_using_target_generation?(machine, status, generation, action)
+      return false if status.nil? || status.current_toplevel.nil?
+
+      target_current = status.current_toplevel == generation.toplevel
+
+      return target_current if machine.carried? || %w[test dry-activate].include?(action)
+      return target_current && current_profile_toplevel(status) == generation.toplevel if %w[boot switch].include?(action)
+
+      false
+    end
+
+    def current_profile_toplevel(status)
+      return if status.generations.nil?
+
+      current = status.generations.current
+      current && current.toplevel
+    end
 
     def deploy_in_bulk(machines, host_generations, nix, action)
       skipped_copy = []

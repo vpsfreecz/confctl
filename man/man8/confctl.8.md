@@ -129,6 +129,9 @@ the generation before last and so on.
 
 `confctl deploy` [*options*] [*machine-pattern* [`boot`|`switch`|`test`|`dry-activate`]]
   Deploy either a new or an existing build generation to matching machines.
+  Machines that already use the target generation are skipped before copy,
+  activation, reboot and health checks. For carried machines, the
+  carrier-managed profile is used as the deployed state.
 
   *switch-action* is the argument to `switch-to-configuration` called on
   the target machine. The default action is `switch`.

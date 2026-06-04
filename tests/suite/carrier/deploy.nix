@@ -620,6 +620,23 @@ import ../../make-test.nix (
           expect(log_out).to include("/nix/var/nix/profiles/confctl-#{VPSADMINOS_MACHINE}")
         end
 
+        it 'skips repeated carried deploy when the carrier-managed profile is already current' do
+          log_before, = confctl_ssh!(CARRIER_MACHINE, 'cat', '/var/log/confctl-carrier-events.log')
+
+          out, = confctl!('deploy', '--yes', '--generation', @carried_nixos_gen_a['name'], CARRIED_NIXOS_MACHINE)
+          expect(out).to include("Skipping #{CARRIED_NIXOS_MACHINE}: already using target generation")
+
+          log_after, = confctl_ssh!(CARRIER_MACHINE, 'cat', '/var/log/confctl-carrier-events.log')
+          expect(log_after).to eq(log_before)
+
+          assert_carried_profile!(
+            NIXOS_MACHINE,
+            generation: @carried_nixos_gen_a,
+            number: 1,
+            expected_entries: NIXOS_CARRIED_ENTRIES
+          )
+        end
+
         it 'builds updated standalone and carried generations for all machines' do
           write_nixos_config!(@conf_dir, CARRIER_MACHINE, marker: 'B', carrier_enabled: true, build_dist: false)
           write_nixos_config!(@conf_dir, NIXOS_MACHINE, marker: 'B', carrier_enabled: false, build_dist: true)
