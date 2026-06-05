@@ -1,0 +1,4 @@
+interface:
+  display_name: "confctl NixOS release upgrade"
+  short_description: "Upgrade NixOS releases with confctl"
+  default_prompt: "Use $confctl-configuration-update for a confctl NixOS release upgrade."
