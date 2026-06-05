@@ -3,6 +3,7 @@ require 'digest'
 require 'etc'
 require 'json'
 require 'securerandom'
+require 'shellwords'
 require 'tempfile'
 
 module ConfCtl
@@ -304,7 +305,7 @@ module ConfCtl
       mc = MachineControl.new(machine, logger:)
 
       loop do
-        out, = mc.execute!('cat', check_file, '2>/dev/null')
+        out, = mc.execute!('sh', '-c', "cat #{Shellwords.escape(check_file)} 2>/dev/null")
         stripped = out.strip
         break if stripped == 'switched' || ((t + timeout + 10) < Time.now && stripped != 'switching')
 
@@ -312,12 +313,7 @@ module ConfCtl
       end
 
       # Confirm it
-      confirm_cmd =
-        if machine.localhost?
-          ['sh', '-c', "echo confirmed > #{check_file}"]
-        else
-          ['sh', '-c', "'echo confirmed > #{check_file}'"]
-        end
+      confirm_cmd = ['sh', '-c', "echo confirmed > #{Shellwords.escape(check_file)}"]
 
       10.times do
         break if mc.execute!(*confirm_cmd).success?

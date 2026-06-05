@@ -64,7 +64,7 @@ module ConfCtl
 
     # @return [MachineList]
     def runnable
-      select { |_host, machine| !machine.carried? && machine.target_host }
+      select { |_host, machine| machine.runnable? }
     end
 
     # @param host [String]
@@ -99,7 +99,7 @@ module ConfCtl
       checks = []
 
       machines.each_value do |machine|
-        next if machine.carried?
+        next unless machine.runnable?
 
         checks.concat(machine.health_checks)
       end

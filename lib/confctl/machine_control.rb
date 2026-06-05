@@ -1,4 +1,5 @@
 require 'etc'
+require 'shellwords'
 
 module ConfCtl
   class MachineControl
@@ -158,7 +159,7 @@ module ConfCtl
         if machine.localhost?
           command
         else
-          ssh_args + command
+          ssh_args + [Shellwords.join(command)]
         end
 
       cmd.method(method).call(*args, **kwargs, &)

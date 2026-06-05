@@ -380,6 +380,15 @@ import ../../make-test.nix (
                   description = "true";
                   command = [ "true" ];
                 }
+                {
+                  description = "argv with space";
+                  command = [
+                    "printf"
+                    "%s"
+                    "space ok"
+                  ];
+                  standardOutput.match = "space ok";
+                }
               ];
             };
           }
@@ -398,6 +407,15 @@ import ../../make-test.nix (
                   {
                     description = "true";
                     command = [ "true" ];
+                  }
+                  {
+                    description = "argv with space";
+                    command = [
+                      "printf"
+                      "%s"
+                      "space ok"
+                    ];
+                    standardOutput.match = "space ok";
                   }
                 ];
               };
@@ -731,9 +749,9 @@ import ../../make-test.nix (
         end
 
         it 'prints expected output from confctl ssh' do
-          ssh_out, = confctl!('ssh', '--yes', NIXOS_MACHINE, 'printf', 'ssh-ok')
+          ssh_out, = confctl!('ssh', '--yes', NIXOS_MACHINE, 'printf', '%s', 'ssh ok')
           expect(ssh_out).to include('nixos-machine')
-          expect(ssh_out).to include('ssh-ok')
+          expect(ssh_out).to include('ssh ok')
         end
 
         it 'keeps both machines reachable at the end' do

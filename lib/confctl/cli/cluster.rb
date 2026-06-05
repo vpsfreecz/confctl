@@ -2,6 +2,7 @@ require_relative 'command'
 require_relative '../hook'
 require 'json'
 require 'rainbow'
+require 'shellwords'
 require 'tty-pager'
 require 'tty-progressbar'
 require 'tty-spinner'
@@ -91,10 +92,10 @@ module ConfCtl::Cli
     end
 
     def health_check
-      machines = select_machines(args[0]).managed.select do |_host, machine|
+      machines = select_machines(args[0]).managed.runnable.select do |_host, machine|
         machine.health_checks.any?
       end
-      raise 'No machines to check or no health checks configured' if machines.empty?
+      raise 'No runnable machines to check or no health checks configured' if machines.empty?
 
       run_checks = machines.health_checks
 
@@ -1168,7 +1169,7 @@ module ConfCtl::Cli
         puts 'Run command over SSH on the following machines:'
         list_machines(machines)
         puts
-        puts "Command: #{cmd.map(&:inspect).join(' ')}"
+        puts "Command: #{Shellwords.join(cmd)}"
       end
 
       if opts[:parallel]
@@ -1212,7 +1213,7 @@ module ConfCtl::Cli
 
       if ui_enabled?
         LogView.open_with_logger(
-          header: Rainbow('Executing').bright + " #{cmd.join(' ')}\n",
+          header: Rainbow('Executing').bright + " #{Shellwords.join(cmd)}\n",
           title: Rainbow('Live view').bright,
           size: :auto,
           reserved_lines: 10
@@ -1238,7 +1239,7 @@ module ConfCtl::Cli
           lw.flush
         end
       else
-        puts "Executing #{cmd.join(' ')} on #{machines.length} machines"
+        puts "Executing #{Shellwords.join(cmd)} on #{machines.length} machines"
 
         machines.each do |host, machine|
           tw.add do

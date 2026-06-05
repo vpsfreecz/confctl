@@ -105,6 +105,10 @@ module ConfCtl
       target_host == 'localhost'
     end
 
+    def runnable?
+      !carried? && !target_host.nil?
+    end
+
     # @return [String] path to nix-env managed profile
     def profile
       if carried?
@@ -157,6 +161,8 @@ module ConfCtl
           end
 
         when 'builderCommands', 'machineCommands'
+          next if type == 'machineCommands' && !runnable?
+
           checks.each do |cmd|
             health_checks << HealthChecks::RunCommand.new(
               self,

@@ -1,4 +1,5 @@
 require 'confctl/health_checks/base'
+require 'shellwords'
 
 module ConfCtl
   class HealthChecks::RunCommand < HealthChecks::Base
@@ -82,7 +83,7 @@ module ConfCtl
       end
 
       def to_s
-        @command.join(' ')
+        Shellwords.join(@command)
       end
 
       protected
