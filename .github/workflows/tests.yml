@@ -51,12 +51,6 @@ jobs:
 
           find "$gcroot_dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
 
-      - name: Determine job count
-        id: determine-test-jobs
-        uses: vpsfreecz/vpsadminos/.github/actions/determine-test-jobs@staging
-        with:
-          per_job_gib: "20"
-
       - name: Run tests
         id: run-tests
         timeout-minutes: 320
@@ -64,7 +58,10 @@ jobs:
         run: |
           set -o pipefail
           rm -rf /tmp/os-test-runner
-          ./test-runner.sh test -f -j "${{ steps.determine-test-jobs.outputs.jobs }}" -t ci --state-dir /tmp/os-test-runner | tee test.log
+          ./test-runner.sh test -f --jobs auto \
+            -t ci \
+            --state-dir /tmp/os-test-runner \
+            | tee test.log
 
       - name: Evaluate test results
         if: always()
