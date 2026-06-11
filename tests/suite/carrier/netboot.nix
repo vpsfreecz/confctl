@@ -1,9 +1,12 @@
+{ testFramework, ... }@args:
+let
+  vpsadminosSource = testFramework.sourcePath;
+in
 import ../../make-test.nix (
   {
     pkgs,
     confctlPackage,
     confctlSrc,
-    vpsadminosPath,
     ...
   }:
   let
@@ -14,9 +17,6 @@ import ../../make-test.nix (
         "${confctlPackage}/bin/confctl";
 
     confctlSource = if confctlSrc == null then throw "suiteArgs.confctlSrc is required" else confctlSrc;
-    vpsadminosSource =
-      if vpsadminosPath == null then throw "suiteArgs.vpsadminosPath is required" else vpsadminosPath;
-
     carrierMgmtMac = "52:54:00:10:00:01";
     carrierPxeMac = "52:54:00:10:00:02";
     nixosPxeMac = "52:54:00:10:00:11";
@@ -846,4 +846,4 @@ import ../../make-test.nix (
       end
     '';
   }
-)
+) args

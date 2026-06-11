@@ -93,7 +93,6 @@
           pkgsPath = nixpkgs.outPath;
           testsRoot = ./tests;
           suiteArgs = {
-            vpsadminosPath = vpsadminos.outPath;
             confctlSrc = self.outPath;
             confctlPackage = self.packages.${system}.confctl;
           };
@@ -106,7 +105,6 @@
           pkgsPath = nixpkgs.outPath;
           testsRoot = ./tests;
           suiteArgs = {
-            vpsadminosPath = vpsadminos.outPath;
             confctlSrc = self.outPath;
             confctlPackage = self.packages.${system}.confctl;
           };

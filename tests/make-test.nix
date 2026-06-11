@@ -1,9 +1,9 @@
 testFn:
-{ vpsadminosPath, ... }@args:
+{ testFramework, ... }@args:
 let
-  upstream = import (vpsadminosPath + "/tests/make-test.nix") testFn;
+  upstream = testFramework.makeTest testFn;
   mergedExtraArgs = {
-    vpsadminos = vpsadminosPath;
+    vpsadminos = testFramework.sourcePath;
     confctlSrc = args.confctlSrc or null;
     confctlPackage = args.confctlPackage or null;
   }

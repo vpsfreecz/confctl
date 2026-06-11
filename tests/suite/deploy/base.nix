@@ -11,12 +11,15 @@ let
     else
       throw "unsupported deployMode '${deployMode}'";
 in
+{ testFramework, ... }@args:
+let
+  vpsadminosSource = testFramework.sourcePath;
+in
 import ../../make-test.nix (
   {
     pkgs,
     confctlPackage,
     confctlSrc,
-    vpsadminosPath,
     ...
   }:
   let
@@ -28,8 +31,6 @@ import ../../make-test.nix (
 
     confctlSource = if confctlSrc == null then throw "suiteArgs.confctlSrc is required" else confctlSrc;
 
-    vpsadminosSource =
-      if vpsadminosPath == null then throw "suiteArgs.vpsadminosPath is required" else vpsadminosPath;
   in
   {
     name = "deploy-${mode}";
@@ -761,4 +762,4 @@ import ../../make-test.nix (
       end
     '';
   }
-)
+) args
