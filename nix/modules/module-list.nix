@@ -6,6 +6,7 @@ let
     ./confctl/nix.nix
     ./confctl/swpins.nix
     ./confctl/inputs-info.nix
+    ./confctl/configuration-info.nix
   ];
 
   nixos = [

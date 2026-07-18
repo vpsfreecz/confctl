@@ -447,6 +447,7 @@ import ../../make-test.nix (
         cluster_modules = [ 'nixos-machine/module.nix' ]
         cluster_modules << 'vpsadminos-machine/module.nix' if include_vpsadminos_machine?
         write_cluster_modules!(conf_dir, cluster_modules)
+        run_local!(%w[nix flake lock], chdir: conf_dir) if flake_mode?
         init_fixture_repo!(conf_dir)
       end
 
@@ -488,6 +489,18 @@ import ../../make-test.nix (
         confctl_store_path_exists!(machine_name, store_path)
       end
 
+      def configuration_info(machine_name)
+        out, = confctl_ssh!(machine_name, 'cat', '/etc/confctl/configuration-info.json')
+        json = out.lines.find { |line| line.lstrip.start_with?('{') }
+        raise "unable to parse configuration info from #{machine_name}: #{out.inspect}" if json.nil?
+
+        JSON.parse(json)
+      end
+
+      def assert_no_configuration_info(machine_name)
+        confctl_ssh!(machine_name, 'sh', '-c', 'test ! -e /etc/confctl/configuration-info.json')
+      end
+
       def build_generation!(host)
         confctl!('build', '--yes', host)
         confctl_generation_info(host)
@@ -525,7 +538,6 @@ import ../../make-test.nix (
           vpsadminos_port: @vpsadminos_port,
           pubkey: @pubkey
         )
-
         prepare_mode_state!
       end
 
@@ -533,6 +545,11 @@ import ../../make-test.nix (
         before(:context) do
           out = wait_for_confctl_connectivity!(expected_successes: expected_successful_hosts, timeout: 180)
           expect(out).to include("#{expected_successful_hosts} successful")
+
+          if flake_mode?
+            out, = run_local!(%w[git rev-parse HEAD], chdir: @conf_dir)
+            @configuration_revision = out.strip
+          end
 
           @nixos_gen_a = build_generation!(NIXOS_MACHINE)
           @vps_gen_a = build_generation!(VPSADMINOS_MACHINE) if include_vpsadminos_machine?
@@ -555,6 +572,21 @@ import ../../make-test.nix (
               profile: @vps_gen_a['toplevel'],
               current: @vps_gen_a['toplevel']
             )
+          end
+
+          if flake_mode?
+            expect(configuration_info(NIXOS_MACHINE)).to eq(
+              'schemaVersion' => 1,
+              'revision' => @configuration_revision,
+              'revisionDirty' => false
+            )
+            expect(configuration_info(VPSADMINOS_MACHINE)).to eq(
+              'schemaVersion' => 1,
+              'revision' => @configuration_revision,
+              'revisionDirty' => false
+            )
+          else
+            assert_no_configuration_info(NIXOS_MACHINE)
           end
         end
 
@@ -625,6 +657,15 @@ import ../../make-test.nix (
             profile: @nixos_gen_b['toplevel'],
             current: @nixos_gen_b['toplevel']
           )
+          if flake_mode?
+            expect(configuration_info(NIXOS_MACHINE)).to eq(
+              'schemaVersion' => 1,
+              'revision' => @configuration_revision,
+              'revisionDirty' => true
+            )
+          else
+            assert_no_configuration_info(NIXOS_MACHINE)
+          end
         end
 
         it 'skips repeated boot deploy with reboot when generation is already current' do

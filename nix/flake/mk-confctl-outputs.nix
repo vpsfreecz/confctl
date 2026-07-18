@@ -21,6 +21,26 @@ let
 
   flakeInputs = coreLib.filterAttrs (n: _: n != "self") inputs;
 
+  configurationSource = inputs.self or null;
+  configurationRevision =
+    if configurationSource == null then
+      null
+    else if configurationSource ? rev then
+      configurationSource.rev
+    else if configurationSource ? dirtyRev then
+      coreLib.removeSuffix "-dirty" configurationSource.dirtyRev
+    else
+      null;
+  configurationInfo =
+    if configurationRevision != null && builtins.match "[0-9a-f]{40}" configurationRevision != null then
+      {
+        schemaVersion = 1;
+        revision = configurationRevision;
+        revisionDirty = !(configurationSource ? rev) && configurationSource ? dirtyRev;
+      }
+    else
+      null;
+
   confLib = import (confctlSrc + "/nix/lib") {
     inherit confDir;
     coreLib = coreLib;
@@ -291,6 +311,7 @@ let
     (confctlSrc + "/nix/modules/confctl/cli.nix")
     (confctlSrc + "/nix/modules/confctl/nix.nix")
     (confctlSrc + "/nix/modules/confctl/inputs-info.nix")
+    (confctlSrc + "/nix/modules/confctl/configuration-info.nix")
   ];
 
   confctlConfig = confDir + "/configs/confctl.nix";
@@ -318,7 +339,12 @@ let
     { ... }:
     {
       _module.args = {
-        inherit confDir confLib flakeInputs;
+        inherit
+          confDir
+          confLib
+          configurationInfo
+          flakeInputs
+          ;
         inherit confData;
       };
     };
@@ -356,6 +382,7 @@ let
       inherit
         confDir
         confLib
+        configurationInfo
         flakeInputs
         confData
         ;

@@ -391,6 +391,10 @@ Machine configs can use the following extra module arguments:
   being built, contains key `name` and all options from
   [machine metadata module](##machine-metadata-and-software-pins)
 - `flakeInputs` - flake inputs passed to `mkConfctlOutputs` (excluding `self`)
+- `configurationInfo` - exact source revision and dirty state of the
+  configuration flake when Git metadata is available, exposed as
+  `confctl.configurationInfo` and written to
+  `/etc/confctl/configuration-info.json`
 - `inputs` - attrset of flake input store paths selected for the machine build
 - `swpins` - (legacy configs only) attrset of prefetched software pins of the machine that is currently being built
 - `inputsInfo` - metadata about flake inputs selected for the machine (keys are
