@@ -58,6 +58,10 @@ jobs:
 
           find "$gcroot_dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
 
+      - name: Prepare test state
+        id: prepare-tests
+        uses: vpsfreecz/vpsadminos/.github/actions/prepare-test-state@0b102133b917eea19ddf6f44bbac2302fb4698d4
+
       - name: Run tests
         id: run-tests
         timeout-minutes: 320
@@ -66,14 +70,13 @@ jobs:
           STOP_ON_FAILURE: ${{ github.event.inputs.stop_on_failure || 'false' }}
         run: |
           set -o pipefail
-          rm -rf /tmp/os-test-runner
 
           args=(
             test
             -f
             --jobs auto
             -t ci
-            --state-dir /tmp/os-test-runner
+            --state-dir "$TEST_RUNNER_STATE_DIR"
           )
 
           if [[ "$STOP_ON_FAILURE" == "true" ]]; then
@@ -83,25 +86,44 @@ jobs:
           ./test-runner.sh "${args[@]}" | tee test.log
 
       - name: Upload full test logs
-        if: failure() || cancelled()
-        uses: vpsfreecz/vpsadminos/.github/actions/upload-test-logs@staging
+        id: upload-test-logs
+        if: >-
+          (failure() || cancelled()) &&
+          steps.prepare-tests.outcome == 'success' &&
+          steps.run-tests.outcome != 'skipped'
+        uses: vpsfreecz/vpsadminos/.github/actions/upload-test-logs@0b102133b917eea19ddf6f44bbac2302fb4698d4
         with:
           name: confctl-test-logs-${{ github.run_id }}
           paths: |
-            /tmp/os-test-runner/**/*.log
-            /tmp/os-test-runner/**/*.txt
+            ${{ steps.prepare-tests.outputs.state-directory }}/**/*.log
+            ${{ steps.prepare-tests.outputs.state-directory }}/**/*.txt
 
       - name: Evaluate test results
-        if: always()
-        uses: vpsfreecz/vpsadminos/.github/actions/evaluate-test-results@staging
+        if: >-
+          always() &&
+          steps.prepare-tests.outcome == 'success' &&
+          steps.run-tests.outcome != 'skipped'
+        uses: vpsfreecz/vpsadminos/.github/actions/evaluate-test-results@0b102133b917eea19ddf6f44bbac2302fb4698d4
         with:
           log-file: test.log
 
       - name: Summarise test logs
-        if: always()
-        uses: vpsfreecz/vpsadminos/.github/actions/summarise-test-logs@staging
+        if: >-
+          always() &&
+          steps.prepare-tests.outcome == 'success' &&
+          steps.run-tests.outcome != 'skipped'
+        uses: vpsfreecz/vpsadminos/.github/actions/summarise-test-logs@0b102133b917eea19ddf6f44bbac2302fb4698d4
         with:
-          logs-root: /tmp/os-test-runner
+          logs-root: ${{ steps.prepare-tests.outputs.state-directory }}
+
+      - name: Cleanup test state
+        if: always()
+        uses: vpsfreecz/vpsadminos/.github/actions/cleanup-test-state@0b102133b917eea19ddf6f44bbac2302fb4698d4
+        with:
+          state-directory: ${{ steps.prepare-tests.outputs.state-directory }}
+          prepare-outcome: ${{ steps.prepare-tests.outcome }}
+          test-outcome: ${{ steps.run-tests.outcome }}
+          upload-outcome: ${{ steps.upload-test-logs.outcome }}
 
       - name: Cleanup per-user Nix gcroots
         if: always()
