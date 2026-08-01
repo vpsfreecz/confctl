@@ -1,6 +1,13 @@
 name: Tests
 
 on:
+  workflow_dispatch:
+    inputs:
+      stop_on_failure:
+        description: Stop scheduling after the first unexpected result
+        required: true
+        default: false
+        type: boolean
   push:
     paths:
       - .github/workflows/tests.yml
@@ -55,13 +62,34 @@ jobs:
         id: run-tests
         timeout-minutes: 320
         shell: bash
+        env:
+          STOP_ON_FAILURE: ${{ github.event.inputs.stop_on_failure || 'false' }}
         run: |
           set -o pipefail
           rm -rf /tmp/os-test-runner
-          ./test-runner.sh test -f --jobs auto \
-            -t ci \
-            --state-dir /tmp/os-test-runner \
-            | tee test.log
+
+          args=(
+            test
+            -f
+            --jobs auto
+            -t ci
+            --state-dir /tmp/os-test-runner
+          )
+
+          if [[ "$STOP_ON_FAILURE" == "true" ]]; then
+            args+=(--stop-on-failure)
+          fi
+
+          ./test-runner.sh "${args[@]}" | tee test.log
+
+      - name: Upload full test logs
+        if: failure() || cancelled()
+        uses: vpsfreecz/vpsadminos/.github/actions/upload-test-logs@staging
+        with:
+          name: confctl-test-logs-${{ github.run_id }}
+          paths: |
+            /tmp/os-test-runner/**/*.log
+            /tmp/os-test-runner/**/*.txt
 
       - name: Evaluate test results
         if: always()
@@ -74,15 +102,6 @@ jobs:
         uses: vpsfreecz/vpsadminos/.github/actions/summarise-test-logs@staging
         with:
           logs-root: /tmp/os-test-runner
-
-      - name: Upload full test logs
-        if: failure()
-        uses: vpsfreecz/vpsadminos/.github/actions/upload-test-logs@staging
-        with:
-          name: confctl-test-logs-${{ github.run_id }}
-          paths: |
-            /tmp/os-test-runner/**/*.log
-            /tmp/os-test-runner/**/*.txt
 
       - name: Cleanup per-user Nix gcroots
         if: always()
