@@ -60,7 +60,7 @@ jobs:
 
       - name: Prepare test state
         id: prepare-tests
-        uses: vpsfreecz/vpsadminos/.github/actions/prepare-test-state@0b102133b917eea19ddf6f44bbac2302fb4698d4
+        uses: vpsfreecz/vpsadminos/.github/actions/prepare-test-state@staging
 
       - name: Run tests
         id: run-tests
@@ -91,7 +91,7 @@ jobs:
           (failure() || cancelled()) &&
           steps.prepare-tests.outcome == 'success' &&
           steps.run-tests.outcome != 'skipped'
-        uses: vpsfreecz/vpsadminos/.github/actions/upload-test-logs@0b102133b917eea19ddf6f44bbac2302fb4698d4
+        uses: vpsfreecz/vpsadminos/.github/actions/upload-test-logs@staging
         with:
           name: confctl-test-logs-${{ github.run_id }}
           paths: |
@@ -103,7 +103,7 @@ jobs:
           always() &&
           steps.prepare-tests.outcome == 'success' &&
           steps.run-tests.outcome != 'skipped'
-        uses: vpsfreecz/vpsadminos/.github/actions/evaluate-test-results@0b102133b917eea19ddf6f44bbac2302fb4698d4
+        uses: vpsfreecz/vpsadminos/.github/actions/evaluate-test-results@staging
         with:
           log-file: test.log
 
@@ -112,13 +112,13 @@ jobs:
           always() &&
           steps.prepare-tests.outcome == 'success' &&
           steps.run-tests.outcome != 'skipped'
-        uses: vpsfreecz/vpsadminos/.github/actions/summarise-test-logs@0b102133b917eea19ddf6f44bbac2302fb4698d4
+        uses: vpsfreecz/vpsadminos/.github/actions/summarise-test-logs@staging
         with:
           logs-root: ${{ steps.prepare-tests.outputs.state-directory }}
 
       - name: Cleanup test state
         if: always()
-        uses: vpsfreecz/vpsadminos/.github/actions/cleanup-test-state@0b102133b917eea19ddf6f44bbac2302fb4698d4
+        uses: vpsfreecz/vpsadminos/.github/actions/cleanup-test-state@staging
         with:
           state-directory: ${{ steps.prepare-tests.outputs.state-directory }}
           prepare-outcome: ${{ steps.prepare-tests.outcome }}
