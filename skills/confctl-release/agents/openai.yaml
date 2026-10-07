@@ -1,0 +1,4 @@
+interface:
+  display_name: "confctl version release"
+  short_description: "Prepare and publish verified confctl releases"
+  default_prompt: "Use $confctl-release to prepare a confctl version release."

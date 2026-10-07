@@ -24,6 +24,9 @@
 - When fixing a bug, add a minimal regression check in RSpec if practical and document the manual steps you executed.
 
 ## Commit & Pull Request Guidelines
+- Before preparing or publishing a confctl version release, read
+  [`skills/confctl-release/SKILL.md`](skills/confctl-release/SKILL.md). It covers
+  Bundix metadata, release commit ordering, package verification and publication.
 - Commit subjects are short and imperative. Without a prefix, capitalize the first word. With a `topic/component:` prefix, keep the first word after `:` lowercase. Avoid trailing periods and bundle related changes together.
 - Write commit messages in a temporary file and pass them to `git commit -F`
   or `git commit --amend -F`. Wrap message lines to 80 columns.
