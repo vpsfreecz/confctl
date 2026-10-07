@@ -119,7 +119,7 @@
       path = ./.;
       type = "path";
     };
-    version = "2.2.3";
+    version = "3.0.0";
   };
   connection_pool = {
     groups = [ "default" ];

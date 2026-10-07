@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    confctl (2.2.3)
+    confctl (3.0.0)
       curses
       gli (~> 2.22.0)
       json

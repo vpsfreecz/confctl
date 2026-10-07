@@ -1,3 +1,57 @@
+# Wed Oct 07 2026 -- version 3.0.0
+
+Software pins (`swpins`) remain supported in v3.0.0 and will be removed in v4.
+Use [the migration guide](docs/swpins-to-flakes.md) to move existing
+configurations to flake inputs.
+
+## Flake configurations
+
+- Add a flake backend for building and deploying NixOS and vpsAdminOS machines
+- Create flake-based configurations by default with `confctl init`; use
+  `confctl init --swpins` for the legacy software pin workflow
+- Add `confctl inputs` commands to list, update and set input revisions at the
+  root, channel and machine levels, with optional commits and changelogs
+- Map dependency roles to flake inputs through channels and per-machine overrides;
+  see [docs/flake-inputs.md](docs/flake-inputs.md)
+- Add `confctl migrate swpins-to-flakes`, including `--dry-run` and individual
+  migration steps
+- Record flake inputs in build generations and show their revisions in generation
+  listings, status, diffs and changelogs
+- Record the configuration source revision in deployed machine metadata
+- Add flake packages, configuration development shells and an example flake
+  configuration
+- Support optional impure evaluation and legacy `NIX_PATH` mappings for flake
+  builds
+- Evaluate only requested flake build outputs and build machine metadata as JSON
+- Group shared input changelogs and report resolved revisions after setting inputs
+- Fail input updates when Nix falls back to cached GitHub metadata
+
+## Deployment and fixes
+
+- Skip deployment to machines already using the target generation, avoiding
+  unnecessary copying, activation, reboots and health checks
+- Support custom SSH ports through `host.port`, including Nix copies
+- Preserve spaces and shell metacharacters in remote command arguments
+- Fix deployment confirmation on localhost
+- Support CLI output and progress reporting without a terminal
+- Reuse prefetched Git checkouts when updating software pins and fix commits of
+  changed software pin files
+- Fix garbage collection roots for software pin paths
+- Support NixOS in `kexec-netboot`, stream downloads and add `--no-sync`
+- Honor NixOS PXE kernel parameters and preserve the init path for carried images
+- Add RSpec coverage and integration tests for flakes, software pins, automatic
+  rollback, carriers and netboot
+- Refresh Ruby dependencies, including the vpsAdmin and HaveAPI clients
+
+## Upgrade notes
+
+- Require Ruby 3.3 or newer (previously Ruby 3.1)
+- Remove the `confReplaceVarsWith` compatibility wrapper; confctl's Nix modules
+  now require `pkgs.replaceVarsWith`
+- Existing software pin configurations and generations remain supported. Migrating
+  to flakes is optional in v3.0.0. Keep the migration on a configuration branch;
+  confctl v2 cannot use the resulting flake configuration.
+
 # Fri Jun 06 2025 -- version 2.2.3
 - Open git commit editor only when running in a terminal
 
