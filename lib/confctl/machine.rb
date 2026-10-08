@@ -118,15 +118,6 @@ module ConfCtl
       end
     end
 
-    def nix_paths
-      meta['nix']['nixPath'].to_h do |v|
-        eq = v.index('=')
-        raise "'#{v}' is not a valid nix path entry " if eq.nil?
-
-        [v[0..(eq - 1)], v[(eq + 1)..]]
-      end
-    end
-
     def auto_rollback?
       meta.fetch('autoRollback', {}).fetch('enable', true)
     end

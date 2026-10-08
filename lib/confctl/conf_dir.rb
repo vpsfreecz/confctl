@@ -6,6 +6,12 @@ module ConfCtl
     include Singleton
 
     class << self
+      def require_flake!(path = self.path)
+        return if File.file?(File.join(path, 'flake.nix'))
+
+        raise Error, "#{path} has no flake.nix; migrate software-pin configurations with confctl v3 before using this version (see docs/swpins-to-flakes.md)"
+      end
+
       %i[
         path
         hash
@@ -14,19 +20,11 @@ module ConfCtl
         generation_dir
         log_dir
         user_script_dir
-        changed?
-        unchanged?
-        state_mtime
-        update_state
       ].each do |v|
         define_method(v) do |*args, **kwargs, &block|
           instance.send(v, *args, **kwargs, &block)
         end
       end
-    end
-
-    def initialize
-      @cache = ConfCache.new(self)
     end
 
     # Path to the directory containing cluster configuration
@@ -67,22 +65,6 @@ module ConfCtl
 
     def user_script_dir
       @user_script_dir ||= File.join(path, 'scripts')
-    end
-
-    def changed?
-      !unchanged?
-    end
-
-    def unchanged?
-      @cache.uptodate?
-    end
-
-    def state_mtime
-      @cache.mtime
-    end
-
-    def update_state
-      @cache.update
     end
   end
 end

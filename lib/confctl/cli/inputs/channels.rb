@@ -1,5 +1,5 @@
 require 'confctl/cli/command'
-require 'confctl/config_type'
+require 'confctl/conf_dir'
 require 'confctl/flake_lock'
 require 'confctl/nix'
 require 'confctl/pattern'
@@ -131,9 +131,7 @@ module ConfCtl::Cli
     protected
 
     def ensure_flake_config!
-      return if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
-
-      raise ConfCtl::Error, 'confctl inputs channel is available only in flake configs'
+      ConfCtl::ConfDir.require_flake!
     end
 
     def eval_channels

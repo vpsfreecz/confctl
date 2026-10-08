@@ -19,14 +19,11 @@ module ConfCtl::Cli
 
       init_common
 
-      if swpins_mode?
-        init_swpins
-      else
-        init_flake
-      end
+      init_flake
     end
 
     def add
+      ConfCtl::ConfDir.require_flake!
       require_args!('name')
 
       name = args[0]
@@ -38,13 +35,12 @@ module ConfCtl::Cli
       mkdir_p(dir)
 
       mkfile(File.join(dir, 'module.nix')) do |f|
-        channels_attr = flake_config? ? 'inputs.channels' : 'swpins.channels'
         f.puts(<<~END
           { config, ... }:
           {
             cluster."#{name}" = {
               spin = "nixos";
-              #{channels_attr} = [ "nixos-unstable" ];
+              inputs.channels = [ "nixos-unstable" ];
               host = { name = "machine"; domain = "example.com"; };
             };
           }
@@ -72,6 +68,7 @@ module ConfCtl::Cli
     end
 
     def rename
+      ConfCtl::ConfDir.require_flake!
       require_args!('old-name', 'new-name')
 
       src = args[0]
@@ -90,14 +87,11 @@ module ConfCtl::Cli
       mkdir_p(dst_dir)
       mv(src_path, dst_path)
 
-      src_swpins = File.join('swpins/cluster', "#{src.gsub('/', ':')}.json")
-      dst_swpins = File.join('swpins/cluster', "#{dst.gsub('/', ':')}.json")
-      mv(src_swpins, dst_swpins) if File.exist?(src_swpins)
-
       rediscover
     end
 
     def rediscover
+      ConfCtl::ConfDir.require_flake!
       hosts = discover_dir('cluster').sort
 
       replace_file('cluster/cluster.nix') do |f|
@@ -142,11 +136,11 @@ module ConfCtl::Cli
           { config, ... }:
           {
             confctl = {
-              # listColumns = {
+              # list.columns = [
               #   "name"
               #   "spin"
               #   "host.fqdn"
-              # };
+              # ];
             };
           }
         END
@@ -221,45 +215,6 @@ module ConfCtl::Cli
       end
     end
 
-    def init_swpins
-      mkfile('configs/swpins.nix') do |f|
-        f.puts(<<~END
-          { config, ... }:
-          let
-            nixpkgsBranch = branch: {
-              type = "git-rev";
-
-              git-rev = {
-                url = "https://github.com/NixOS/nixpkgs";
-                update.ref = "refs/heads/${branch}";
-              };
-            };
-
-            vpsadminosBranch = branch: {
-              type = "git-rev";
-
-              git-rev = {
-                url = "https://github.com/vpsfreecz/vpsadminos";
-                update.ref = "refs/heads/${branch}";
-              };
-            };
-          in {
-            confctl.swpins.channels = {
-              nixos-unstable = { nixpkgs = nixpkgsBranch "nixos-unstable"; };
-
-              # nixos-stable = { nixpkgs = nixpkgsBranch "nixos-20.09"; };
-
-              # vpsadminos-staging = { vpsadminos = vpsadminosBranch "staging"; };
-            };
-          }
-        END
-              )
-      end
-
-      mkdir('swpins')
-      mkdir('swpins/channels')
-    end
-
     def init_flake
       mkfile('flake.nix') do |f|
         f.puts(<<~END
@@ -302,14 +257,6 @@ module ConfCtl::Cli
         END
               )
       end
-    end
-
-    def swpins_mode?
-      opts[:swpins] || opts[:legacy]
-    end
-
-    def flake_config?
-      ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
     end
 
     def discover_dir(dir_path, rel_path = nil)

@@ -76,16 +76,9 @@ module ConfCtl
 
       if build_generation && gen.is_a?(Generation::Build)
         build_generation.name == gen.name \
-          && build_generation.mode == gen.mode \
-          && build_generation.pin_paths == gen.pin_paths
+          && build_generation.inputs == gen.inputs
       else
         true
-      end
-    end
-
-    %i[swpin_names swpin_specs].each do |v|
-      define_method(v) do
-        build_generation ? build_generation.send(v) : []
       end
     end
 
@@ -95,10 +88,6 @@ module ConfCtl
 
     def inputs
       build_generation ? build_generation.inputs : nil
-    end
-
-    def flakes_mode?
-      build_generation ? build_generation.flakes_mode? : false
     end
 
     def current_str

@@ -1,5 +1,5 @@
 require 'confctl/cli/command'
-require 'confctl/config_type'
+require 'confctl/conf_dir'
 require 'confctl/nix'
 require 'confctl/inputs/setter'
 require 'confctl/inputs/updater'
@@ -75,9 +75,7 @@ module ConfCtl::Cli
     protected
 
     def ensure_flake_config!
-      return if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
-
-      raise ConfCtl::Error, 'confctl inputs machine is available only in flake configs'
+      ConfCtl::ConfDir.require_flake!
     end
   end
 end

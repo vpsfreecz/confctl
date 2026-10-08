@@ -68,7 +68,7 @@ RSpec.describe ConfCtl::Cli::Cluster do
       captured_cols = cols
     end
 
-    command.status_flake
+    command.status
 
     expect(captured_cols).to include('nixpkgs', 'vpsadmin')
 
@@ -79,5 +79,23 @@ RSpec.describe ConfCtl::Cli::Cluster do
     expect(row['vpsadmin'].to_s).to eq('cb295166')
     expect(row['nixpkgs'].to_s).not_to include('->')
     expect(row['vpsadmin'].to_s).not_to include('->')
+  end
+  it 'reports unknown revisions when old nodes have no input metadata' do
+    status.inputs_info = nil
+    rows = nil
+    allow(ConfCtl::Cli::OutputFormatter).to receive(:print) { |value, _columns, **| rows = value }
+    command.status
+    expect(rows.first['nixpkgs'].to_s).to eq('unknown')
+    expect(rows.first['status'].to_s).to eq('outdated')
+  end
+
+  it 'reports an offline machine without input metadata' do
+    status.inputs_info = nil
+    status.uptime = nil
+    rows = nil
+    allow(ConfCtl::Cli::OutputFormatter).to receive(:print) { |value, _columns, **| rows = value }
+    command.status
+    expect(rows.first['online']).to be(false)
+    expect(rows.first['nixpkgs'].to_s).to eq('unknown')
   end
 end

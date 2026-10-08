@@ -1,5 +1,5 @@
 require 'confctl/cli/command'
-require 'confctl/config_type'
+require 'confctl/conf_dir'
 require 'confctl/flake_lock'
 require 'confctl/pattern'
 require 'confctl/inputs/setter'
@@ -81,9 +81,7 @@ module ConfCtl::Cli
     protected
 
     def ensure_flake_config!
-      return if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
-
-      raise ConfCtl::Error, 'inputs is for flake configs only; this config has no flake.nix; use swpins.'
+      ConfCtl::ConfDir.require_flake!
     end
 
     def print_update_summary(changes)

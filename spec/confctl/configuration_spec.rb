@@ -43,3 +43,48 @@ RSpec.describe 'configuration commands' do
     end
   end
 end
+
+RSpec.describe 'flake-only configuration validation' do
+  include CliHelper
+
+  it 'rejects removed commands and init flags without changing the directory' do
+    Dir.mktmpdir do |dir|
+      [%w[swpins], %w[migrate swpins-to-flakes], %w[init --swpins], %w[init --legacy]].each do |command|
+        result = run_confctl(*command, chdir: dir)
+        expect(result.success?).to be(false)
+        expect(Dir.children(dir)).to be_empty
+      end
+      result = run_confctl('help', chdir: dir)
+      expect(result.success?).to be(true)
+      expect(result.out).not_to match(/swpins|migrate/)
+    end
+  end
+
+  it 'requires a flake before adding, renaming or rediscovering machines' do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, 'cluster', 'old'))
+      File.write(File.join(dir, 'cluster', 'cluster.nix'), 'unchanged')
+      [%w[add new], %w[rename old new], %w[rediscover]].each do |command|
+        result = run_confctl(*command, chdir: dir)
+        expect(result.success?).to be(false)
+        expect(result.err).to include('has no flake.nix', 'confctl v3')
+        expect(File.read(File.join(dir, 'cluster', 'cluster.nix'))).to eq('unchanged')
+        expect(File).not_to exist(File.join(dir, 'cluster', 'new'))
+        expect(File).to exist(File.join(dir, 'cluster', 'old'))
+      end
+    end
+  end
+
+  it 'uses the generated channel and correct nested import depth' do
+    Dir.mktmpdir do |dir|
+      expect(run_confctl('init', chdir: dir).success?).to be(true)
+      expect(run_confctl('add', 'nested/host', chdir: dir).success?).to be(true)
+      expect(File.read(File.join(dir, 'cluster/nested/host/module.nix')))
+        .to include('inputs.channels = [ "nixos-unstable" ];')
+      expect(File.read(File.join(dir, 'cluster/nested/host/config.nix')))
+        .to include('../../../environments/base.nix')
+      expect(File.read(File.join(dir, 'configs/confctl.nix'))).to include('# list.columns = [')
+      expect(File).not_to exist(File.join(dir, 'swpins'))
+    end
+  end
+end

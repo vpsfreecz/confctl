@@ -114,115 +114,6 @@ module ConfCtl::Cli
     end
 
     def status
-      return status_flake if flake_config?
-
-      machines = select_machines(args[0]).managed.select do |_host, machine|
-        machine.target_host || machine.carried?
-      end
-
-      raise 'No machines to check' if machines.empty?
-
-      ask_confirmation! do
-        if opts[:generation]
-          puts 'The following machines will be checked:'
-        else
-          puts 'The following machines will be built and then checked:'
-        end
-
-        list_machines(machines)
-        puts
-        puts "Generation: #{opts[:generation] || 'new build'}"
-      end
-
-      statuses = machines.transform_values do |machine|
-        ConfCtl::MachineStatus.new(machine)
-      end
-
-      # Evaluate toplevels
-      if opts[:generation] == 'none'
-        host_generations = nil
-      elsif opts[:generation]
-        host_generations = find_generations(machines, opts[:generation])
-
-        # Ignore statuses when no generation was found
-        statuses.delete_if do |host, _st|
-          !host_generations.has_key?(host)
-        end
-      else
-        host_generations = do_build(machines)
-        puts
-      end
-
-      # Assign configured toplevel and swpins
-      if host_generations
-        host_generations.each do |host, gen|
-          statuses[host].target_toplevel = gen.toplevel
-          statuses[host].target_swpin_specs = gen.swpin_specs
-        end
-      else
-        # We're not comparing a system generation, only configured swpins
-        ConfCtl::Swpins::ClusterNameList.new(machines:).each do |cn|
-          cn.parse
-
-          statuses[cn.name].target_swpin_specs = cn.specs
-        end
-      end
-
-      # Check runtime status
-      tw = ConfCtl::ParallelExecutor.new(machines.length)
-
-      statuses.each_value do |st|
-        tw.add do
-          st.query(toplevel: opts[:generation] != 'none')
-        end
-      end
-
-      tw.run
-
-      # Collect all swpins
-      swpins = []
-
-      statuses.each_value do |st|
-        st.target_swpin_specs.each_key do |name|
-          swpins << name unless swpins.include?(name)
-        end
-
-        st.evaluate
-      end
-
-      # Render results
-      cols = %w[host online uptime status generations] + swpins
-      rows = []
-
-      statuses.each do |host, st|
-        build_generations = ConfCtl::Generation::BuildList.new(host)
-
-        row = {
-          'host' => host,
-          'online' => st.online? && Rainbow('yes').green,
-          'uptime' => st.uptime && format_duration(st.uptime),
-          'status' => st.status ? Rainbow('ok').green : Rainbow('outdated').red,
-          'generations' => "#{build_generations.count}:#{st.generations && st.generations.count}"
-        }
-
-        swpins.each do |name|
-          swpin_state = st.swpins_state[name]
-
-          row[name] =
-            if swpin_state
-              Rainbow(swpin_state.current_version).color(
-                swpin_state.uptodate? ? :green : :red
-              )
-            end
-        end
-
-        rows << row
-      end
-
-      OutputFormatter.print(rows, cols, layout: :columns, color: use_color?)
-    end
-
-    def status_flake
       machines = select_machines(args[0]).managed.select do |_host, machine|
         machine.target_host || machine.carried?
       end
@@ -274,7 +165,7 @@ module ConfCtl::Cli
 
       statuses.each_value do |st|
         tw.add do
-          st.query(toplevel: opts[:generation] != 'none', swpins: false, inputs: true)
+          st.query(toplevel: opts[:generation] != 'none', inputs: true)
         end
       end
 
@@ -314,40 +205,6 @@ module ConfCtl::Cli
     end
 
     def changelog
-      return changelog_flake if flake_config?
-
-      compare_swpins do |io, _host, status, sw_name, spec|
-        s = spec.string_changelog_info(
-          opts[:downgrade] ? :downgrade : :upgrade,
-          status.swpins_info[sw_name],
-          color: use_color?,
-          verbose: opts[:verbose],
-          patch: opts[:patch]
-        )
-      rescue ConfCtl::Error => e
-        io.puts e.message
-      else
-        io.puts(s || 'no changes')
-      end
-    end
-
-    def diff
-      return diff_flake if flake_config?
-
-      compare_swpins do |io, _host, status, sw_name, spec|
-        s = spec.string_diff_info(
-          opts[:downgrade] ? :downgrade : :upgrade,
-          status.swpins_info[sw_name],
-          color: use_color?
-        )
-      rescue ConfCtl::Error => e
-        io.puts e.message
-      else
-        io.puts(s || 'no changes')
-      end
-    end
-
-    def changelog_flake
       compare_inputs_info do |io, host, target_info, deployed_info|
         roles = inputs_roles(target_info, deployed_info)
         if roles.empty?
@@ -395,7 +252,7 @@ module ConfCtl::Cli
       end
     end
 
-    def diff_flake
+    def diff
       compare_inputs_info do |io, host, target_info, deployed_info|
         roles = inputs_roles(target_info, deployed_info)
         if roles.empty?
@@ -550,7 +407,7 @@ module ConfCtl::Cli
         statuses[host] = ConfCtl::MachineStatus.new(machines[host])
 
         executor.add do
-          statuses[host].query(toplevel: true, generations: true, swpins: false)
+          statuses[host].query(toplevel: true, generations: true)
         end
       end
 
@@ -1311,7 +1168,7 @@ module ConfCtl::Cli
           if generation_offset
             list.at_offset(generation_offset)
           elsif generation_name == 'current'
-            list.current
+            list.select_current!
           else
             list[generation_name]
           end
@@ -1347,16 +1204,9 @@ module ConfCtl::Cli
     end
 
     def list_generations(host_generations, missing_hosts:)
-      swpin_names = []
       input_roles = []
 
       host_generations.each_value do |gen|
-        gen.swpin_names.each do |name|
-          swpin_names << name unless swpin_names.include?(name)
-        end
-
-        next unless flake_generation?(gen)
-
         inputs_info = normalized_inputs_info(gen)
         next if inputs_info.nil? || inputs_info.empty?
 
@@ -1367,7 +1217,7 @@ module ConfCtl::Cli
 
       input_column_names = {}
       input_columns = input_roles.map do |role|
-        name = swpin_names.include?(role) ? "input:#{role}" : role
+        name = role
         input_column_names[role] = name
         { name: name, label: role.to_s.upcase }
       end
@@ -1379,15 +1229,9 @@ module ConfCtl::Cli
           'kernel' => gen.kernel_version
         }
 
-        gen.swpin_specs.each do |name, spec|
-          row[name] = spec.version
-        end
-
-        if flake_generation?(gen)
-          inputs_info = normalized_inputs_info(gen) || {}
-          input_roles.each do |role|
-            row[input_column_names[role]] = inputs_short_rev(inputs_info[role])
-          end
+        inputs_info = normalized_inputs_info(gen) || {}
+        input_roles.each do |role|
+          row[input_column_names[role]] = inputs_short_rev(inputs_info[role])
         end
 
         row
@@ -1399,7 +1243,7 @@ module ConfCtl::Cli
 
       OutputFormatter.print(
         rows,
-        %w[name generation kernel] + swpin_names + input_columns,
+        %w[name generation kernel] + input_columns,
         layout: :columns,
         sort: %w[name generation]
       )
@@ -1412,24 +1256,10 @@ module ConfCtl::Cli
         cores: opts['cores']
       )
 
-      autoupdate_swpins(machines)
-      host_swpin_specs = check_swpins(machines)
+      puts Rainbow("Evaluating inputs for #{machines.length} machines...").bright
+      hosts_input_paths = nix.eval_host_inputs(machines.map { |host, _| host })
 
-      raise 'one or more swpins need to be updated' unless host_swpin_specs
-
-      if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
-        puts Rainbow("Evaluating inputs for #{machines.length} machines...").bright
-      else
-        puts Rainbow("Evaluating swpins for #{machines.length} machines...").bright
-      end
-
-      hosts_swpin_paths = nix.eval_host_swpins(machines.map { |host, _| host })
-
-      machines.each do |host, m|
-        hosts_swpin_paths[host].update(m.nix_paths)
-      end
-
-      grps = swpin_build_groups(hosts_swpin_paths, nix)
+      grps = input_build_groups(hosts_input_paths, nix)
       puts
       puts "Machines will be built in #{grps.length} groups"
       puts
@@ -1440,14 +1270,13 @@ module ConfCtl::Cli
       puts
 
       grps.each_with_index do |grp, i|
-        hosts, swpin_paths = grp
+        hosts, input_paths = grp
 
         built_generations = do_build_group(
           i,
           grps.length,
           hosts,
-          swpin_paths,
-          host_swpin_specs,
+          input_paths,
           nix,
           time
         )
@@ -1472,11 +1301,11 @@ module ConfCtl::Cli
       host_generations
     end
 
-    def do_build_group(group_index, group_count, hosts, swpin_paths, host_swpin_specs, nix, time)
+    def do_build_group(group_index, group_count, hosts, input_paths, nix, time)
       puts Rainbow('Building machines').bright
       hosts.each { |h| puts "  #{h}" }
-      puts ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path) ? 'with inputs' : 'with swpins'
-      swpin_paths.each { |k, v| puts "  #{k}=#{v}" }
+      puts 'with inputs'
+      input_paths.each { |k, v| puts "  #{k}=#{v}" }
 
       header = '' \
         << Rainbow('Command:').bright \
@@ -1497,7 +1326,7 @@ module ConfCtl::Cli
           reserved_lines: 10
         ) do |lw|
           multibar = TTY::ProgressBar::Multi.new(
-            'nix-build [:bar] :current/:total (:percent)',
+            'nix build [:bar] :current/:total (:percent)',
             width: 80
           )
 
@@ -1511,9 +1340,7 @@ module ConfCtl::Cli
 
           built_generations = nix.build_attributes(
             hosts:,
-            swpin_paths:,
-            time:,
-            host_swpin_specs:
+            time:
           ) do |type, _progress, total, _path|
             if type == :build
               lw.sync_console do
@@ -1540,154 +1367,19 @@ module ConfCtl::Cli
         puts header
         nix.build_attributes(
           hosts:,
-          swpin_paths:,
-          time:,
-          host_swpin_specs:
+          time:
         ) do |type, progress, total, path|
           puts "[#{type}] #{progress}/#{total} #{path}"
         end
       end
     end
 
-    def autoupdate_swpins(machines)
-      if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
-        puts Rainbow('Skipping swpins auto updates for flake config').bright
-        return
+    def input_build_groups(hosts_inputs, nix)
+      return [[hosts_inputs.keys, {}]] unless nix.confctl_settings.dig('nix', 'legacyNixPath') == true
+
+      hosts_inputs.values.uniq.map do |inputs|
+        [hosts_inputs.select { |_host, paths| paths == inputs }.keys, inputs]
       end
-
-      puts Rainbow('Running swpins auto updates...').bright
-      channels_update = []
-      any_updated = false
-
-      core = ConfCtl::Swpins::Core.get
-
-      core.channels.each do |c|
-        channels_update << c unless channels_update.include?(c)
-      end
-
-      cluster_names = ConfCtl::Swpins::ClusterNameList.new(machines:)
-
-      cluster_names.each do |cn|
-        cn.parse
-
-        cn.channels.each do |c|
-          channels_update << c unless channels_update.include?(c)
-        end
-      end
-
-      channels_update.each do |c|
-        updated = false
-
-        c.specs.each do |name, s|
-          next unless s.auto_update?
-
-          puts " updating #{c.name}.#{name}"
-          s.prefetch_update
-          updated = true
-        end
-
-        if updated
-          c.save
-          any_updated = true
-        end
-      end
-
-      core_updated = false
-
-      core.specs.each do |name, s|
-        next unless !s.from_channel? && s.auto_update?
-
-        puts " updating #{core.name}.#{name}"
-        s.prefetch_update
-        core_updated = true
-      end
-
-      if core_updated
-        core.save
-        core.pre_evaluate
-      end
-
-      cluster_names.each do |cn|
-        updated = false
-
-        cn.specs.each do |name, s|
-          next unless !s.from_channel? && s.auto_update?
-
-          puts " updating #{cn.name}.#{name}"
-          s.prefetch_update
-          updated = true
-        end
-
-        if updated
-          cn.save
-          any_updated = true
-        end
-      end
-
-      return unless any_updated || core_updated
-
-      ConfCtl::Swpins::ChannelList.refresh
-    end
-
-    def check_swpins(machines)
-      if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
-        puts Rainbow('Skipping swpins checks for flake config').bright
-        ret = {}
-        machines.each_key { |host| ret[host] = {} }
-        return ret
-      end
-
-      ret = {}
-      valid = true
-
-      puts Rainbow('Checking core swpins...').bright
-
-      ConfCtl::Swpins::Core.get.specs.each do |name, s|
-        puts "  #{name} ... " +
-             (s.valid? ? Rainbow('ok').green : Rainbow('needs update').cyan)
-        valid = false unless s.valid?
-      end
-
-      ConfCtl::Swpins::ClusterNameList.new(machines:).each do |cn|
-        cn.parse
-
-        puts Rainbow("Checking swpins for #{cn.name}...").bright
-
-        cn.specs.each do |name, s|
-          puts "  #{name} ... " +
-               (s.valid? ? Rainbow('ok').green : Rainbow('needs update').cyan)
-          valid = false unless s.valid?
-        end
-
-        ret[cn.name] = cn.specs
-      end
-
-      valid ? ret : false
-    end
-
-    def swpin_build_groups(hosts_swpins, nix = nil)
-      if ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
-        legacy_nix_path = false
-        if nix
-          legacy_nix_path = nix.confctl_settings.dig('nix', 'legacyNixPath') == true
-        end
-        return [[hosts_swpins.keys, {}]] unless legacy_nix_path
-      end
-
-      ret = []
-      all_swpins = hosts_swpins.values.uniq
-
-      all_swpins.each do |swpins|
-        hosts = []
-
-        hosts_swpins.each do |host, host_swpins|
-          hosts << host if swpins == host_swpins
-        end
-
-        ret << [hosts, swpins]
-      end
-
-      ret
     end
 
     def compare_inputs_info
@@ -1719,7 +1411,7 @@ module ConfCtl::Cli
 
       TTY::Pager.page(enabled: use_pager?) do |io|
         statuses.each do |host, st|
-          st.query(toplevel: false, generations: false, swpins: false, inputs: true)
+          st.query(toplevel: false, generations: false, inputs: true)
 
           if st.uptime.nil?
             io.puts "#{host} is offline"
@@ -1730,66 +1422,6 @@ module ConfCtl::Cli
           deployed_info = st.inputs_info || {}
 
           yield(io, host, target_info, deployed_info)
-        end
-      end
-    end
-
-    def compare_swpins
-      machines = select_machines(args[0]).managed
-
-      ask_confirmation! do
-        puts 'Compare swpins on the following machines:'
-        list_machines(machines)
-        puts
-        puts "Generation: #{opts[:generation] || 'current configuration'}"
-      end
-
-      statuses = machines.transform_values do |machine|
-        ConfCtl::MachineStatus.new(machine)
-      end
-
-      if opts[:generation]
-        host_generations = find_generations(machines, opts[:generation])
-
-        host_generations.each do |host, gen|
-          statuses[host].target_swpin_specs = gen.swpin_specs
-        end
-
-        # Ignore statuses when no generation was found
-        statuses.delete_if do |host, _st|
-          !host_generations.has_key?(host)
-        end
-      else
-        ConfCtl::Swpins::ClusterNameList.new(machines:).each do |cn|
-          cn.parse
-
-          statuses[cn.name].target_swpin_specs = cn.specs
-        end
-      end
-
-      TTY::Pager.page(enabled: use_pager?) do |io|
-        statuses.each do |host, st|
-          st.query(toplevel: false, generations: false)
-          st.evaluate
-
-          unless st.online?
-            io.puts "#{host} is offline"
-            next
-          end
-
-          st.target_swpin_specs.each do |name, spec|
-            next if args[1] && !ConfCtl::Pattern.match?(args[1], name)
-
-            if st.swpins_info[name]
-              io.puts "#{host} @ #{name}:"
-
-              yield(io, host, st, name, spec)
-            else
-              io.puts "#{host} @ #{name} in unknown state"
-            end
-
-            io.puts ''
-          end
         end
       end
     end
@@ -1877,10 +1509,6 @@ module ConfCtl::Cli
       ConfCtl::InputsInfo.normalize(gen.inputs_info)
     end
 
-    def flake_generation?(gen)
-      gen.respond_to?(:flakes_mode?) && gen.flakes_mode?
-    end
-
     def inputs_url(target_info, deployed_info)
       (target_info && target_info['url']) || (deployed_info && deployed_info['url'])
     end
@@ -1914,10 +1542,6 @@ module ConfCtl::Cli
       else
         Rainbow(rev).yellow
       end
-    end
-
-    def flake_config?
-      ConfCtl::ConfigType.flake?(ConfCtl::ConfDir.path)
     end
 
     def parse_wait_online

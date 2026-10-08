@@ -20,7 +20,7 @@ RSpec.describe 'flake input set output' do
 
   before do
     allow(ConfCtl::ConfDir).to receive(:path).and_return('/conf')
-    allow(ConfCtl::ConfigType).to receive(:flake?).with('/conf').and_return(true)
+    allow(ConfCtl::ConfDir).to receive(:require_flake!)
     allow(ConfCtl::Inputs::Setter).to receive(:run!).and_return(changed: true, changes: [])
     allow(ConfCtl::FlakeLock).to receive(:load).with('/conf/flake.lock').and_return(lock)
     allow(lock).to receive(:input_info).with('vpsadmin-input').and_return(resolved_info)

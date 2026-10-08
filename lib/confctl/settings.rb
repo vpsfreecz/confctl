@@ -16,18 +16,6 @@ module ConfCtl
       read_settings { |s| s['nix']['maxJobs'] }
     end
 
-    def nix_paths
-      read_settings { |s| s['nix']['nixPath'] }
-    end
-
-    def core_swpin_channels
-      read_settings { |s| s['swpins']['core']['channels'] }
-    end
-
-    def core_swpin_pins
-      read_settings { |s| s['swpins']['core']['pins'] }
-    end
-
     def build_generations
       read_settings { |s| s['buildGenerations'] }
     end

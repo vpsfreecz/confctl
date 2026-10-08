@@ -147,7 +147,10 @@ module ConfCtl::Cli
 
       if include_local
         machines.each_key do |host|
-          gens.add_build_generations(ConfCtl::Generation::BuildList.new(host))
+          builds = ConfCtl::Generation::BuildList.new(host)
+          builds.check_selection!(pattern)
+          builds.require_resolved_current! if pattern == 'old'
+          gens.add_build_generations(builds)
         end
       end
 
@@ -159,7 +162,9 @@ module ConfCtl::Cli
 
       if pattern
         gens.delete_if do |gen|
-          if select_old
+          if pattern == 'current'
+            !gen.current
+          elsif select_old
             gen.current
           elsif select_older_than
             gen.date >= select_older_than
@@ -179,8 +184,10 @@ module ConfCtl::Cli
       ret = []
 
       machines.each do |host, machine|
+        builds = ConfCtl::Generation::BuildList.new(host)
+        builds.require_resolved_current!
         to_delete = generations_rotate(
-          ConfCtl::Generation::BuildList.new(host),
+          builds,
           min: machine['buildGenerations']['min'] || global['min'],
           max: machine['buildGenerations']['max'] || global['max'],
           max_age: machine['buildGenerations']['maxAge'] || global['maxAge']
@@ -354,16 +361,9 @@ module ConfCtl::Cli
     end
 
     def list_generations(gens)
-      swpin_names = []
       input_roles = []
 
       gens.each do |gen|
-        gen.swpin_names.each do |name|
-          swpin_names << name unless swpin_names.include?(name)
-        end
-
-        next unless flake_generation?(gen)
-
         inputs_info = normalized_inputs_info(gen)
         next if inputs_info.nil? || inputs_info.empty?
 
@@ -374,7 +374,7 @@ module ConfCtl::Cli
 
       input_column_names = {}
       input_columns = input_roles.map do |role|
-        name = swpin_names.include?(role) ? "input:#{role}" : role
+        name = role
         input_column_names[role] = name
         { name: name, label: role.to_s.upcase }
       end
@@ -389,15 +389,9 @@ module ConfCtl::Cli
           'kernel' => gen.kernel_version
         }
 
-        gen.swpin_specs.each do |name, spec|
-          row[name] = spec.version
-        end
-
-        if flake_generation?(gen)
-          inputs_info = normalized_inputs_info(gen) || {}
-          input_roles.each do |role|
-            row[input_column_names[role]] = inputs_short_rev(inputs_info[role])
-          end
+        inputs_info = normalized_inputs_info(gen) || {}
+        input_roles.each do |role|
+          row[input_column_names[role]] = inputs_short_rev(inputs_info[role])
         end
 
         row
@@ -405,7 +399,7 @@ module ConfCtl::Cli
 
       OutputFormatter.print(
         rows,
-        %w[host name id presence current kernel] + swpin_names + input_columns,
+        %w[host name id presence current kernel] + input_columns,
         layout: :columns,
         sort: %w[name host]
       )
@@ -421,10 +415,6 @@ module ConfCtl::Cli
       return nil unless info.is_a?(Hash)
 
       info['shortRev'] || (info['rev'] && info['rev'][0, 8])
-    end
-
-    def flake_generation?(gen)
-      gen.respond_to?(:flakes_mode?) && gen.flakes_mode?
     end
   end
 end

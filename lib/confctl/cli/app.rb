@@ -36,9 +36,6 @@ module ConfCtl::Cli
 
       desc 'Create a new configuration'
       command :init do |c|
-        c.desc 'Create legacy swpins-based configuration (non-flake)'
-        c.switch %i[swpins legacy], default_value: false
-
         c.action(&Command.run(c, Configuration, :init))
       end
 
@@ -59,96 +56,7 @@ module ConfCtl::Cli
         c.action(&Command.run(c, Configuration, :rediscover))
       end
 
-      desc 'Manage software pins'
-      command :swpins do |pins|
-        pins.desc 'Manage software pins channels'
-        pins.command :channel do |ch|
-          ch.desc 'List configured sw pins'
-          ch.arg_name '[channel [sw]]'
-          ch.command :ls do |c|
-            c.action(&Command.run(c, Swpins::Channel, :list))
-          end
-
-          swpins_commands(ch, Swpins::Channel, 'channel')
-        end
-
-        pins.desc 'Manage cluster software pins'
-        pins.command :cluster do |cl|
-          cl.desc 'List configured sw pins'
-          cl.arg_name '[cluster-name [sw]]'
-          cl.command :ls do |c|
-            c.action(&Command.run(c, Swpins::Cluster, :list))
-          end
-
-          swpins_commands(cl, Swpins::Cluster, 'name')
-        end
-
-        pins.desc 'Manage core software pins'
-        pins.command :core do |core|
-          core.desc 'List configured sw pins'
-          core.arg_name '[sw]'
-          core.command :ls do |c|
-            c.action(&Command.run(c, Swpins::Core, :list))
-          end
-
-          core.desc 'Set to specific version'
-          core.arg_name '<sw> <ref>'
-          core.command :set do |c|
-            c.desc 'Commit changes to git'
-            c.switch :commit, default_value: false
-
-            c.desc 'Include changelog in the commit message'
-            c.switch :changelog, default_value: true
-
-            c.desc 'Open $EDITOR with commit message'
-            c.switch :editor, default_value: true
-
-            c.desc 'Generate changelog for downgrade'
-            c.switch %i[d downgrade], default_value: false
-
-            c.action(&Command.run(c, Swpins::Core, :set))
-          end
-
-          core.desc 'Update to newest version'
-          core.arg_name '[<sw> [<version...>]]]'
-          core.command :update do |c|
-            c.desc 'Commit changes to git'
-            c.switch :commit, default_value: false
-
-            c.desc 'Include changelog in the commit message'
-            c.switch :changelog, default_value: true
-
-            c.desc 'Open $EDITOR with commit message'
-            c.switch :editor, default_value: true
-
-            c.desc 'Generate changelog for downgrade'
-            c.switch %i[d downgrade], default_value: false
-
-            c.action(&Command.run(c, Swpins::Core, :update))
-          end
-        end
-
-        pins.desc 'Update all swpins'
-        pins.command :update do |c|
-          c.desc 'Commit changes to git'
-          c.switch :commit, default_value: false
-
-          c.desc 'Include changelog in the commit message'
-          c.switch :changelog, default_value: true
-
-          c.desc 'Generate changelog for downgrade'
-          c.switch %i[d downgrade], default_value: false
-
-          c.action(&Command.run(c, Swpins::Base, :update))
-        end
-
-        pins.desc 'Generate confctl-managed JSON files for configured swpins'
-        pins.command :reconfigure do |c|
-          c.action(&Command.run(c, Swpins::Base, :reconfigure))
-        end
-      end
-
-      desc 'Manage flake inputs (replacement for swpins in flake configs)'
+      desc 'Manage flake inputs'
       command :inputs do |inputs|
         inputs.desc 'List root-level flake inputs and their locked revisions'
         inputs.arg_name '[input-pattern]'
@@ -246,46 +154,6 @@ module ConfCtl::Cli
             c.switch :editor, default_value: true
             c.switch %i[d downgrade], default_value: false
             c.action(&Command.run(c, Inputs::Machines, :set))
-          end
-        end
-      end
-
-      desc 'Migration helpers'
-      command :migrate do |m|
-        m.desc 'Migrate swpins-based configuration repository to flake-based inputs'
-        m.command :'swpins-to-flakes' do |stf|
-          stf.desc 'Assume yes for all prompts'
-          stf.switch %i[y yes], default_value: false
-
-          stf.desc 'Do not modify files, only print what would be done'
-          stf.switch %i[n dry-run], default_value: false
-
-          # Default action = run full migration
-          stf.action(&Command.run(stf, Migrate::SwpinsToFlakes, :all))
-
-          stf.desc 'Create flake.nix (+ lock revisions from swpins)'
-          stf.command :flake do |c|
-            c.action(&Command.run(c, Migrate::SwpinsToFlakes, :flake))
-          end
-
-          stf.desc 'Rewrite cluster/**/module.nix metadata to use inputs.*'
-          stf.command :machines do |c|
-            c.action(&Command.run(c, Migrate::SwpinsToFlakes, :machines))
-          end
-
-          stf.desc 'Scan for legacy <...> imports and optionally enable legacyNixPath'
-          stf.command :imports do |c|
-            c.action(&Command.run(c, Migrate::SwpinsToFlakes, :imports))
-          end
-
-          stf.desc 'Remove swpins/ and other legacy files'
-          stf.command :clean do |c|
-            c.action(&Command.run(c, Migrate::SwpinsToFlakes, :clean))
-          end
-
-          stf.desc 'Run the full migration (same as running without a subcommand)'
-          stf.command :all do |c|
-            c.action(&Command.run(c, Migrate::SwpinsToFlakes, :all))
           end
         end
       end
@@ -430,8 +298,8 @@ module ConfCtl::Cli
         c.action(&Command.run(c, Cluster, :status))
       end
 
-      desc 'Changelog between deployed and configured swpins'
-      arg_name '[machine-pattern [sw-pattern]]'
+      desc 'Changelog between deployed and configured input roles'
+      arg_name '[machine-pattern [role-pattern]]'
       command :changelog do |c|
         c.desc 'Filter by attribute'
         c.flag %i[a attr], multiple: true
@@ -442,7 +310,7 @@ module ConfCtl::Cli
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w[y yes]
 
-        c.desc 'Show changelog against swpins from selected generation'
+        c.desc 'Show changelog against input roles from selected generation'
         c.flag %i[g generation]
 
         c.desc 'Show a changelog for downgrade'
@@ -459,8 +327,8 @@ module ConfCtl::Cli
         c.action(&Command.run(c, Cluster, :changelog))
       end
 
-      desc 'Diff between deployed and configured swpins'
-      arg_name '[machine-pattern [sw-pattern]]'
+      desc 'Diff between deployed and configured input roles'
+      arg_name '[machine-pattern [role-pattern]]'
       command :diff do |c|
         c.desc 'Filter by attribute'
         c.flag %i[a attr], multiple: true
@@ -471,7 +339,7 @@ module ConfCtl::Cli
         c.desc 'Assume the answer to confirmations is yes'
         c.switch %w[y yes]
 
-        c.desc 'Show diff against swpins from selected generation'
+        c.desc 'Show diff against input roles from selected generation'
         c.flag %i[g generation]
 
         c.desc 'Show a changelog for downgrade'
@@ -678,49 +546,11 @@ module ConfCtl::Cli
 
     protected
 
-    def swpins_commands(cmd, klass, arg_name)
-      cmd.desc 'Set to specific version'
-      cmd.arg_name "<#{arg_name}> <sw> <ref>"
-      cmd.command :set do |c|
-        c.desc 'Commit changes to git'
-        c.switch :commit, default_value: false
-
-        c.desc 'Include changelog in the commit message'
-        c.switch :changelog, default_value: true
-
-        c.desc 'Open $EDITOR with commit message'
-        c.switch :editor, default_value: true
-
-        c.desc 'Generate changelog for downgrade'
-        c.switch %i[d downgrade], default_value: false
-
-        c.action(&Command.run(c, klass, :set))
-      end
-
-      cmd.desc 'Update to newest version'
-      cmd.arg_name "[<#{arg_name}> [<sw> [<version...>]]]"
-      cmd.command :update do |c|
-        c.desc 'Commit changes to git'
-        c.switch :commit, default_value: false
-
-        c.desc 'Include changelog in the commit message'
-        c.switch :changelog, default_value: true
-
-        c.desc 'Open $EDITOR with commit message'
-        c.switch :editor, default_value: true
-
-        c.desc 'Generate changelog for downgrade'
-        c.switch %i[d downgrade], default_value: false
-
-        c.action(&Command.run(c, klass, :update))
-      end
-    end
-
     def nix_build_options(cmd)
-      cmd.desc 'Maximum number of build jobs (see nix-build)'
+      cmd.desc 'Maximum number of build jobs (see nix build)'
       cmd.flag %w[j max-jobs], arg_name: 'number'
 
-      cmd.desc 'Number of CPU cores to be used (see nix-build)'
+      cmd.desc 'Number of CPU cores to be used (see nix build)'
       cmd.flag :cores, arg_name: 'number'
     end
   end
