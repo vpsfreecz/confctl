@@ -1,1 +1,1 @@
-import ./base.nix { deployMode = "flakes"; }
+{ ... }@args: import ./base.nix args

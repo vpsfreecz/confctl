@@ -1,10 +1,10 @@
 { config, ... }:
 {
   confctl = {
-    # listColumns = {
+    # list.columns = [
     #   "name"
     #   "spin"
     #   "host.fqdn"
-    # };
+    # ];
   };
 }

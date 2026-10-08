@@ -25,6 +25,5 @@ testLib.makeTests [
   "carrier/deploy"
   "carrier/netboot"
   "deploy/flakes"
-  "deploy/swpins"
   "auto_rollback"
 ]

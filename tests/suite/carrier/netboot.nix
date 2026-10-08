@@ -502,7 +502,7 @@ import ../../make-test.nix (
         prepare_fixture_dir!(conf_dir)
         write_flake_root!(conf_dir)
         FileUtils.rm_f(File.join(conf_dir, 'flake.lock'))
-        run_local!(%w[nix flake lock], chdir: conf_dir)
+        run_local!(['nix', 'flake', 'lock', "path:#{conf_dir}"], chdir: conf_dir)
         write_machine_modules!(conf_dir, carrier_port:)
         write_carrier_config!(conf_dir)
         write_nixos_config!(conf_dir, marker: 'A')

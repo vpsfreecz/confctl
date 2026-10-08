@@ -55,16 +55,15 @@ module ConfctlTestHelpers
     raise msg.join("\n\n")
   end
 
-  def prepare_fixture_dir!(path, template: 'example-flake')
+  def prepare_fixture_dir!(path, template: 'example')
     FileUtils.rm_rf(path)
     FileUtils.mkdir_p(path)
 
     run_local!(['cp', '-r', "#{File.join(confctl_src, template)}/.", path])
     run_local!(['chmod', '-R', 'u+w', path])
 
-    # Test fixtures regenerate local state such as swpins pins and channels.
-    # Drop any copied state from the repository template to keep runs deterministic.
-    %w[.bin .confctl .gems .man swpins].each do |dir|
+    # Keep fixture runs independent of copied local caches.
+    %w[.confctl .gems].each do |dir|
       FileUtils.rm_rf(File.join(path, dir))
     end
   end
