@@ -18,6 +18,7 @@ on:
       - bin/**
       - lib/**
       - libexec/**
+      - example/**
       - nix/**
       - tests/**
       - test-runner.sh

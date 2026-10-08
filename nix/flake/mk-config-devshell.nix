@@ -141,7 +141,6 @@ pkgs.mkShell {
       man-db
       groff
       less
-      nix-prefetch-git
       nixfmt
       nixfmt-tree
     ])

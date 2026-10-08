@@ -9,7 +9,6 @@ stdenv.mkDerivation rec {
   buildInputs = with pkgs; [
     git
     ncurses
-    nix-prefetch-git
     nixfmt
     nixfmt-tree
     openssl

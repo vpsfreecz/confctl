@@ -17,7 +17,6 @@ pkgs.mkShell {
     pkgs.man-db
     pkgs.groff
     pkgs.less
-    pkgs.nix-prefetch-git
     pkgs.nixfmt
     pkgs.nixfmt-tree
   ]

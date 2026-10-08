@@ -46,7 +46,6 @@
             pkgs.git
             pkgs.openssh
             pkgs.nix
-            pkgs.nix-prefetch-git
           ];
           gemBin = "${deps}/${ruby.gemPath}/bin";
         in
@@ -60,7 +59,6 @@
             pkgs.git
             pkgs.nix
             pkgs.openssh
-            pkgs.nix-prefetch-git
           ];
           installPhase = ''
             export HOME="$TMPDIR/home"
@@ -73,8 +71,6 @@
             export NO_COLOR=1
             export PAGER=
             export CONFCTL_BIN="${self.packages.${system}.confctl}/bin/confctl"
-            export NIX_PATH="nixpkgs=${nixpkgs.outPath}"
-            export CONFCTL_TEST_NIXPKGS="${nixpkgs.outPath}"
             export CONFCTL_RSPEC_SANDBOX=1
             export CONFCTL_MAX_JOBS=auto
 

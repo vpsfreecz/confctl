@@ -19,7 +19,6 @@ let
     pkgs.git
     pkgs.openssh
     pkgs.nix
-    pkgs.nix-prefetch-git
   ];
 in
 (pkgs.writeShellScriptBin "confctl" ''

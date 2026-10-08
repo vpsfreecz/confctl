@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -35,22 +35,6 @@ jobs:
 
           sudo mkdir -p "$gcroot_dir"
           sudo chown "${user}:${group}" "$gcroot_dir"
-
-      - name: Set up Nix test dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          nix profile install --accept-flake-config nixpkgs#nix-prefetch-git
-
-          nixpkgs_path="$(
-            nix eval --raw --impure \
-              --extra-experimental-features 'nix-command flakes' \
-              --expr '(let f = builtins.getFlake (toString ./.); in f.inputs.nixpkgs.outPath)'
-          )"
-
-          echo "CONFCTL_TEST_NIXPKGS=${nixpkgs_path}" >>"$GITHUB_ENV"
-          echo "NIX_PATH=nixpkgs=${nixpkgs_path}" >>"$GITHUB_ENV"
 
       - name: Set up Ruby + Bundler cache
         uses: ruby/setup-ruby@v1
