@@ -3,7 +3,7 @@
 ## Project Structure & Module Organization
 - `lib/` Ruby sources; CLI commands under `lib/confctl/cli`, Nix build helpers in `lib/confctl/nix*`, health checks in `lib/confctl/health_checks`.
 - `bin/confctl` entrypoint; `libexec/` helper scripts; `template/` ERB for generated docs; rendered man pages live in `man/man8/`.
-- `nix/` contains Nix modules and overlays; `example/` provides a sample cluster and swpins setup; `docs/` holds focused guides; release gems are stored in `pkg/`.
+- `nix/` contains Nix modules and overlays; `example/` provides a sample flake cluster; `docs/` holds focused guides; release gems are stored in `pkg/`.
 
 ## Build, Test, and Development Commands
 - Enter `nix develop` to get Ruby, bundler, nixfmt, and the `confctl` binstub wired to the local sources.
@@ -20,7 +20,7 @@
 
 ## Testing Guidelines
 - Run `bundle exec rspec` for automated coverage and `bundle exec rubocop` for linting.
-- Keep focused manual runs of the commands you touch (build, deploy, swpins, health checks) against a local configuration such as `example/`.
+- Keep focused manual runs of the commands you touch (build, deploy, inputs, generation selection, health checks) against a local configuration such as `example/`.
 - When fixing a bug, add a minimal regression check in RSpec if practical and document the manual steps you executed.
 
 ## Commit & Pull Request Guidelines

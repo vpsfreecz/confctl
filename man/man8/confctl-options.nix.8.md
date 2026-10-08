@@ -1,19 +1,17 @@
-# confctl-options.nix 8           2024-05-07                             master
+# confctl-options.nix 8           2026-10-08                             master
 
 ## NAME
 `confctl-options.nix` - confctl configuration documentation
 
 ## DESCRIPTION
-This document describes Nix options, which can be used in confctl(8) cluster
-configurations to configure `confctl` and machines within the cluster.
+Nix options for confctl(8) cluster configurations and machine systems.
 
 ## CONFCTL SETTINGS
-The following `confctl` settings can be configured in `configs/confctl.nix`
-within the deployment configuration directory:
+Configure these `confctl` settings in `configs/confctl.nix`:
 
 `confctl.buildGenerations.max`
   The maximum number of build generations to be kept.
-  
+
   This is the default value, which can be overriden per host.
 
     *Type:* signed integer
@@ -27,7 +25,7 @@ within the deployment configuration directory:
   `confctl.buildGenerations.maxAge` seconds. Old generations
   are deleted even if `confctl.buildGenerations.max` is
   not reached.
-  
+
   This is the default value, which can be overriden per host.
 
     *Type:* signed integer
@@ -38,7 +36,7 @@ within the deployment configuration directory:
 
 `confctl.buildGenerations.min`
   The minimum number of build generations to be kept.
-  
+
   This is the default value, which can be overriden per host.
 
     *Type:* signed integer
@@ -58,7 +56,7 @@ within the deployment configuration directory:
 
 `confctl.hostGenerations.max`
   The maximum number of generations to be kept on machines.
-  
+
   This is the default value, which can be overriden per host.
 
     *Type:* signed integer
@@ -73,7 +71,7 @@ within the deployment configuration directory:
   machines. Old generations
   are deleted even if `confctl.hostGenerations.max` is
   not reached.
-  
+
   This is the default value, which can be overriden per host.
 
     *Type:* signed integer
@@ -84,7 +82,7 @@ within the deployment configuration directory:
 
 `confctl.hostGenerations.min`
   The minimum number of generations to be kept on machines.
-  
+
   This is the default value, which can be overriden per host.
 
     *Type:* signed integer
@@ -108,8 +106,41 @@ within the deployment configuration directory:
 
     *Declared by:* `<confctl/nix/modules/confctl/cli.nix>`
 
+`confctl.nix.impureEval`
+  Enable impure evaluation/builds (allows reading host paths outside the Nix store when they are referenced as Nix paths).
+
+    *Type:* boolean
+
+    *Default:* `false`
+
+    *Declared by:* `<confctl/nix/modules/confctl/nix.nix>`
+
+`confctl.nix.legacyNixPath`
+  If true, confctl adds -I mappings for selected inputs during flake
+  builds to support legacy `<nixpkgs>` or `<vpsadminos>` imports.
+
+    *Type:* boolean
+
+    *Default:* `false`
+
+    *Declared by:* `<confctl/nix/modules/confctl/nix.nix>`
+
+`confctl.nix.legacyNixPathMap`
+  List of input roles that should be mapped to NIX_PATH when
+  legacyNixPath is enabled.
+
+    *Type:* list of string
+
+    *Default:* `[
+  "nixpkgs"
+  "vpsadminos"
+  "vpsadmin"
+]`
+
+    *Declared by:* `<confctl/nix/modules/confctl/nix.nix>`
+
 `confctl.nix.maxJobs`
-  Maximum number of build jobs, passed to `nix-build`
+  Maximum number of build jobs, passed to `nix build`
   commands.
 
     *Type:* null or signed integer or value "auto" (singular enum)
@@ -118,382 +149,23 @@ within the deployment configuration directory:
 
     *Declared by:* `<confctl/nix/modules/confctl/nix.nix>`
 
-`confctl.nix.nixPath`
-  List of extra paths added to environment variable
-  `NIX_PATH` for all `nix-build`
-  invokations
-
-    *Type:* list of string
-
-    *Default:* `[ ]`
-
-    *Declared by:* `<confctl/nix/modules/confctl/nix.nix>`
-
-
-
-## SOFTWARE PIN CHANNELS
-The following `confctl` settings for software pin channels can be configured
-in `configs/swpins.nix` within the deployment configuration directory:
-
-`confctl.swpins.channels`
-  Software pin channels
-
-    *Type:* attribute set of attribute set of (submodule)
-
-    *Default:* `{ }`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.channels.<name>.<name>.directory`
-  This option has no description.
-
-    *Type:* null or (submodule)
-
-    *Default:* `null`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.channels.<name>.<name>.directory.path`
-  Absolute path to the directory
-
-    *Type:* string
-
-    *Default:* `null`
-
-    *Example:* `"/opt/my-swpin"`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.channels.<name>.<name>.git`
-  This option has no description.
-
-    *Type:* null or (submodule)
-
-    *Default:* `null`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.channels.<name>.<name>.git.fetchSubmodules`
-  Fetch git submodules
-
-    *Type:* boolean
-
-    *Default:* `false`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.channels.<name>.<name>.git.update.auto`
-  When enabled, the pin is automatically updated to
-  `ref` before building machines.
-
-    *Type:* boolean
-
-    *Default:* `false`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.channels.<name>.<name>.git.update.interval`
-  Number of seconds from the last update to trigger the next
-  auto-update, if auto-update is enabled.
-
-    *Type:* signed integer
-
-    *Default:* `3600`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.channels.<name>.<name>.git.update.ref`
-  Implicit git reference to use for both manual and automatic updates
-
-    *Type:* null or string
-
-    *Default:* `null`
-
-    *Example:* `"refs/heads/master"`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.channels.<name>.<name>.git.url`
-  URL of the git repository
-
-    *Type:* string
-
-    *Default:* `null`
-
-    *Example:* `"https://github.com/vpsfreecz/vpsadminos"`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.channels.<name>.<name>.git-rev`
-  This option has no description.
-
-    *Type:* null or (submodule)
-
-    *Default:* `null`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.channels.<name>.<name>.git-rev.fetchSubmodules`
-  Fetch git submodules
-
-    *Type:* boolean
-
-    *Default:* `false`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.channels.<name>.<name>.git-rev.update.auto`
-  When enabled, the pin is automatically updated to
-  `ref` before building machines.
-
-    *Type:* boolean
-
-    *Default:* `false`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.channels.<name>.<name>.git-rev.update.interval`
-  Number of seconds from the last update to trigger the next
-  auto-update, if auto-update is enabled.
-
-    *Type:* signed integer
-
-    *Default:* `3600`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.channels.<name>.<name>.git-rev.update.ref`
-  Implicit git reference to use for both manual and automatic updates
-
-    *Type:* null or string
-
-    *Default:* `null`
-
-    *Example:* `"refs/heads/master"`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.channels.<name>.<name>.git-rev.url`
-  URL of the git repository
-
-    *Type:* string
-
-    *Default:* `null`
-
-    *Example:* `"https://github.com/vpsfreecz/vpsadminos"`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.channels.<name>.<name>.type`
-  This option has no description.
-
-    *Type:* one of "directory", "git", "git-rev"
-
-    *Default:* `"git"`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.channels`
-  List of channels from `confctl.swpins.channels`
-  to use for core swpins
-
-    *Type:* list of string
-
-    *Default:* `[ ]`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins`
-  Core software packages used internally by confctl
-  
-  It has to contain package `nixpkgs`, which is used
-  to resolve other software pins from channels or cluster machines.
-
-    *Type:* attribute set of (submodule)
-
-    *Default:* `{
-  nixpkgs = {
-    git-rev = {
-      update = {
-        auto = true;
-        interval = 2592000;
-        ref = "refs/heads/nixos-unstable";
-      };
-      url = "https://github.com/NixOS/nixpkgs";
-    };
-    type = "git-rev";
-  };
-}`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins.<name>.directory`
-  This option has no description.
-
-    *Type:* null or (submodule)
-
-    *Default:* `null`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins.<name>.directory.path`
-  Absolute path to the directory
-
-    *Type:* string
-
-    *Default:* `null`
-
-    *Example:* `"/opt/my-swpin"`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins.<name>.git`
-  This option has no description.
-
-    *Type:* null or (submodule)
-
-    *Default:* `null`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins.<name>.git.fetchSubmodules`
-  Fetch git submodules
-
-    *Type:* boolean
-
-    *Default:* `false`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins.<name>.git.update.auto`
-  When enabled, the pin is automatically updated to
-  `ref` before building machines.
-
-    *Type:* boolean
-
-    *Default:* `false`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins.<name>.git.update.interval`
-  Number of seconds from the last update to trigger the next
-  auto-update, if auto-update is enabled.
-
-    *Type:* signed integer
-
-    *Default:* `3600`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins.<name>.git.update.ref`
-  Implicit git reference to use for both manual and automatic updates
-
-    *Type:* null or string
-
-    *Default:* `null`
-
-    *Example:* `"refs/heads/master"`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins.<name>.git.url`
-  URL of the git repository
-
-    *Type:* string
-
-    *Default:* `null`
-
-    *Example:* `"https://github.com/vpsfreecz/vpsadminos"`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins.<name>.git-rev`
-  This option has no description.
-
-    *Type:* null or (submodule)
-
-    *Default:* `null`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins.<name>.git-rev.fetchSubmodules`
-  Fetch git submodules
-
-    *Type:* boolean
-
-    *Default:* `false`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins.<name>.git-rev.update.auto`
-  When enabled, the pin is automatically updated to
-  `ref` before building machines.
-
-    *Type:* boolean
-
-    *Default:* `false`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins.<name>.git-rev.update.interval`
-  Number of seconds from the last update to trigger the next
-  auto-update, if auto-update is enabled.
-
-    *Type:* signed integer
-
-    *Default:* `3600`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins.<name>.git-rev.update.ref`
-  Implicit git reference to use for both manual and automatic updates
-
-    *Type:* null or string
-
-    *Default:* `null`
-
-    *Example:* `"refs/heads/master"`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins.<name>.git-rev.url`
-  URL of the git repository
-
-    *Type:* string
-
-    *Default:* `null`
-
-    *Example:* `"https://github.com/vpsfreecz/vpsadminos"`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
-`confctl.swpins.core.pins.<name>.type`
-  This option has no description.
-
-    *Type:* one of "directory", "git", "git-rev"
-
-    *Default:* `"git"`
-
-    *Declared by:* `<confctl/nix/modules/confctl/swpins.nix>`
-
 
 
 ## MACHINE CONFIGURATION
-The following options can be configured in per-machine `module.nix` files within
-the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`:
+Configure machine metadata in `cluster/<machine-name>/module.nix`:
 
 `cluster.<name>.addresses`
   IP addresses
 
     *Type:* null or (submodule)
 
-    *Default:* `null`
+    *Default:* `{ }`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.addresses.primary`
   Default address other machines should use to connect to this machine
-  
+
   Defaults to the first IPv4 address if not set
 
     *Type:* null or (submodule)
@@ -601,9 +273,29 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
+`cluster.<name>.autoRollback.enable`
+  Enable automatic rollback in case the machine is unresponsive after
+  deploy
+
+    *Type:* boolean
+
+    *Default:* `true`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.autoRollback.timeout`
+  Number of seconds after which if the machine is unreachable, auto-rollback
+  is initiated
+
+    *Type:* signed integer
+
+    *Default:* `60`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
 `cluster.<name>.buildAttribute`
   Path to the attribute in machine system config that should be built
-  
+
   For example, `[ "system" "build" "toplevel" ]` will select attribute
   `config.system.build.toplevel`.
 
@@ -681,7 +373,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
 `cluster.<name>.carrier.machines.*.buildAttribute`
   Path to the attribute in machine system config that should be built
-  
+
   For example, `[ "system" "build" "toplevel" ]` will select attribute
   `config.system.build.toplevel`.
 
@@ -731,7 +423,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 `cluster.<name>.carrier.machines.*.extraModules`
   A list of additional NixOS modules to be imported for this machine
 
-    *Type:* list of path
+    *Type:* list of absolute path
 
     *Default:* `[ ]`
 
@@ -810,14 +502,14 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
 `cluster.<name>.healthChecks.builderCommands.*.command`
   Command and its arguments
-  
+
   It is possible to access machine attributes as from CLI using curly
   brackets. For example, {host.fqdn} would be replaced by machine FQDN.
   See confctl ls -L for a list of available attributes.
 
     *Type:* list of string
 
-    *Default:* `null`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -913,7 +605,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
 `cluster.<name>.healthChecks.machineCommands`
   Check commands run on the target machine
-  
+
   Note that the commands have to be available on the machine.
 
     *Type:* list of (submodule)
@@ -928,14 +620,14 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
 `cluster.<name>.healthChecks.machineCommands.*.command`
   Command and its arguments
-  
+
   It is possible to access machine attributes as from CLI using curly
   brackets. For example, {host.fqdn} would be replaced by machine FQDN.
   See confctl ls -L for a list of available attributes.
 
     *Type:* list of string
 
-    *Default:* `null`
+    *Default:* `[ ]`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -1089,7 +781,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
     *Declared by:* `<confctl/nix/modules/cluster>`
 
 `cluster.<name>.healthChecks.systemd.unitProperties`
-  Check systemd unit properties reported by systemctl show <unit>
+  Check systemd unit properties reported by systemctl show `<unit>`
 
     *Type:* attribute set of list of (submodule)
 
@@ -1193,9 +885,18 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
+`cluster.<name>.host.port`
+  SSH port used to connect to this machine.
+
+    *Type:* signed integer
+
+    *Default:* `22`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
 `cluster.<name>.host.target`
   Address/host to which the configuration is deployed to
-  
+
   Set to null if the machine is not deployable, e.g. when it is only used
   as a carried machine.
 
@@ -1245,6 +946,27 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
+`cluster.<name>.inputs.channels`
+  List of flake input channels to use on this machine.
+
+  This selects entries from the `channels` mapping
+  passed to `mkConfctlOutputs` (e.g. "production", "staging", "os-staging").
+
+    *Type:* list of string
+
+    *Default:* `[ ]`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
+`cluster.<name>.inputs.overrides`
+  Override role -> flake input mapping for this machine
+
+    *Type:* attribute set of string
+
+    *Default:* `{ }`
+
+    *Declared by:* `<confctl/nix/modules/cluster>`
+
 `cluster.<name>.labels`
   Optional user-defined labels to classify the machine
 
@@ -1256,7 +978,7 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
 `cluster.<name>.managed`
   Determines whether the machine is managed using confctl or not
-  
+
   By default, NixOS and vpsAdminOS machines are managed by confctl.
 
     *Type:* null or boolean
@@ -1285,191 +1007,12 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
-`cluster.<name>.nix.nixPath`
-  List of extra paths added to environment variable
-  `NIX_PATH` for `nix-build`
-
-    *Type:* list of string
-
-    *Default:* `[ ]`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
 `cluster.<name>.spin`
   OS type
 
     *Type:* one of "openvz", "nixos", "vpsadminos", "other"
 
     *Default:* `null`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.channels`
-  List of channels from `confctl.swpins.channels`
-  to use on this machine
-
-    *Type:* list of string
-
-    *Default:* `[ ]`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins`
-  List of swpins for this machine, which can supplement or
-  override swpins from configured channels
-
-    *Type:* attribute set of (submodule)
-
-    *Default:* `{ }`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins.<name>.directory`
-  This option has no description.
-
-    *Type:* null or (submodule)
-
-    *Default:* `null`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins.<name>.directory.path`
-  Absolute path to the directory
-
-    *Type:* string
-
-    *Default:* `null`
-
-    *Example:* `"/opt/my-swpin"`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins.<name>.git`
-  This option has no description.
-
-    *Type:* null or (submodule)
-
-    *Default:* `null`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins.<name>.git.fetchSubmodules`
-  Fetch git submodules
-
-    *Type:* boolean
-
-    *Default:* `false`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins.<name>.git.update.auto`
-  When enabled, the pin is automatically updated to
-  `ref` before building machines.
-
-    *Type:* boolean
-
-    *Default:* `false`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins.<name>.git.update.interval`
-  Number of seconds from the last update to trigger the next
-  auto-update, if auto-update is enabled.
-
-    *Type:* signed integer
-
-    *Default:* `3600`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins.<name>.git.update.ref`
-  Implicit git reference to use for both manual and automatic updates
-
-    *Type:* null or string
-
-    *Default:* `null`
-
-    *Example:* `"refs/heads/master"`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins.<name>.git.url`
-  URL of the git repository
-
-    *Type:* string
-
-    *Default:* `null`
-
-    *Example:* `"https://github.com/vpsfreecz/vpsadminos"`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins.<name>.git-rev`
-  This option has no description.
-
-    *Type:* null or (submodule)
-
-    *Default:* `null`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins.<name>.git-rev.fetchSubmodules`
-  Fetch git submodules
-
-    *Type:* boolean
-
-    *Default:* `false`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins.<name>.git-rev.update.auto`
-  When enabled, the pin is automatically updated to
-  `ref` before building machines.
-
-    *Type:* boolean
-
-    *Default:* `false`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins.<name>.git-rev.update.interval`
-  Number of seconds from the last update to trigger the next
-  auto-update, if auto-update is enabled.
-
-    *Type:* signed integer
-
-    *Default:* `3600`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins.<name>.git-rev.update.ref`
-  Implicit git reference to use for both manual and automatic updates
-
-    *Type:* null or string
-
-    *Default:* `null`
-
-    *Example:* `"refs/heads/master"`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins.<name>.git-rev.url`
-  URL of the git repository
-
-    *Type:* string
-
-    *Default:* `null`
-
-    *Example:* `"https://github.com/vpsfreecz/vpsadminos"`
-
-    *Declared by:* `<confctl/nix/modules/cluster>`
-
-`cluster.<name>.swpins.pins.<name>.type`
-  This option has no description.
-
-    *Type:* one of "directory", "git", "git-rev"
-
-    *Default:* `"git"`
 
     *Declared by:* `<confctl/nix/modules/cluster>`
 
@@ -1484,11 +1027,153 @@ the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`
 
 
 
-## SERVICES
-The following options can be configured in per-machine `config.nix` files within
-the deployment configuration directory, i.e. `cluster/<machine-name>/config.nix`,
-or any other imported Nix file. These options are added by `confctl` in addition
-to options from `NixOS` or `vpsAdminOS`.
+## MACHINE SYSTEM CONFIGURATION
+Configure these options in `cluster/<machine-name>/config.nix` or an imported
+Nix module. `confctl` adds them to the options provided by NixOS or vpsAdminOS.
+
+`confctl.carrier.netboot.allowedIPv4Ranges`
+  Allow HTTP access for these IP ranges, if not specified
+  access is not restricted.
+
+    *Type:* list of string
+
+    *Default:* `[ ]`
+
+    *Example:* `"10.0.0.0/24"`
+
+    *Declared by:* `<confctl/nix/modules/confctl/carrier/netboot/nixos.nix>`
+
+`confctl.carrier.netboot.enable`
+  Whether to enable Enable netboot server generated from confctl carrier
+  .
+
+    *Type:* boolean
+
+    *Default:* `false`
+
+    *Example:* `true`
+
+    *Declared by:* `<confctl/nix/modules/confctl/carrier/netboot/nixos.nix>`
+
+`confctl.carrier.netboot.enableACME`
+  Enable ACME and SSL for netboot host
+
+    *Type:* boolean
+
+    *Default:* `false`
+
+    *Declared by:* `<confctl/nix/modules/confctl/carrier/netboot/nixos.nix>`
+
+`confctl.carrier.netboot.host`
+  Hostname or IP address of the netboot server
+
+    *Type:* string
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/confctl/carrier/netboot/nixos.nix>`
+
+`confctl.carrier.netboot.isoImages`
+  A list of ISO images to be included in boot menu
+
+    *Type:* list of (submodule)
+
+    *Default:* `[ ]`
+
+    *Declared by:* `<confctl/nix/modules/confctl/carrier/netboot/nixos.nix>`
+
+`confctl.carrier.netboot.isoImages.*.file`
+  Path to the ISO image file
+
+  If it is a path, the file must be available on the build machine,
+  it will be copied into the Nix store and deployed to the target machine.
+  If it is a string, then the file must be available on the target machine
+  at the given path.
+
+    *Type:* absolute path
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/confctl/carrier/netboot/nixos.nix>`
+
+`confctl.carrier.netboot.isoImages.*.label`
+  Menu label for this image
+
+    *Type:* string
+
+    *Default:* `""`
+
+    *Declared by:* `<confctl/nix/modules/confctl/carrier/netboot/nixos.nix>`
+
+`confctl.carrier.netboot.memtest86.enable`
+  Include memtest in boot menu
+
+    *Type:* boolean
+
+    *Default:* `true`
+
+    *Declared by:* `<confctl/nix/modules/confctl/carrier/netboot/nixos.nix>`
+
+`confctl.carrier.netboot.memtest86.params`
+  See {option}`boot.loader.grub.memtest86.params`
+
+    *Type:* list of string
+
+    *Default:* `[ ]`
+
+    *Example:* `[
+  "console=ttyS0,115200"
+]`
+
+    *Declared by:* `<confctl/nix/modules/confctl/carrier/netboot/nixos.nix>`
+
+`confctl.carrier.netboot.tftp.bindAddress`
+  The address for the TFTP server to bind on
+
+    *Type:* null or string
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/confctl/carrier/netboot/nixos.nix>`
+
+`confctl.carrier.onChangeCommands`
+  Extra commands executed on a carrier machine when carried machine
+  is deployed or removed
+
+    *Type:* strings concatenated with "\n"
+
+    *Default:* `""`
+
+    *Declared by:* `<confctl/nix/modules/confctl/carrier/base.nix>`
+
+`confctl.configurationInfo`
+  Configuration source metadata written to /etc/confctl/configuration-info.json.
+
+    *Type:* null or (attribute set)
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/confctl/configuration-info.nix>`
+
+`confctl.inputsInfo`
+  Flake input metadata written to /etc/confctl/inputs-info.json (provided via module args).
+
+    *Type:* null or (attribute set)
+
+    *Default:* `null`
+
+    *Declared by:* `<confctl/nix/modules/confctl/inputs-info.nix>`
+
+`confctl.programs.kexec-netboot.enable`
+  Whether to enable Enable kexec-netboot utility.
+
+    *Type:* boolean
+
+    *Default:* `false`
+
+    *Example:* `true`
+
+    *Declared by:* `<confctl/nix/modules/confctl/kexec-netboot>`
 
 
 
@@ -1499,6 +1184,6 @@ confctl(8)
 Report bugs to https://github.com/vpsfreecz/confctl/issues.
 
 ## ABOUT
-`confctl` was originally developed for the purposes of
+`confctl` was originally developed for
 [vpsFree.cz](https://vpsfree.org) and its cluster
 [configuration](https://github.com/vpsfreecz/vpsfree-cz-configuration).

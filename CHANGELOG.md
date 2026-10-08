@@ -1,3 +1,14 @@
+# Unreleased
+
+- Remove software-pin configuration, commands, migration helper and pin metadata.
+  Cluster configurations now require `flake.nix`. Migrate with confctl v3 before
+  upgrading; keep v3 and required generations/GC roots for rollback.
+- Exclude unsupported local generation records with explicit diagnostics and
+  safeguards for current, numeric selection and retention. Existing flake JSON
+  and GC-root names are unchanged; excluded state is preserved.
+- Generate the option reference and custom metadata listing from flake outputs,
+  including carrier and program options. Use the flake configuration in `example/`.
+
 # Wed Oct 07 2026 -- version 3.0.0
 
 Software pins (`swpins`) remain supported in v3.0.0 and will be removed in v4.

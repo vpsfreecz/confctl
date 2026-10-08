@@ -10,30 +10,16 @@
 `confctl` is a Nix deployment configuration management tool. It can be used to
 build and deploy *NixOS* and *vpsAdminOS* machines.
 
-## SOFTWARE PINS
-Each machine managed by `confctl` uses predefined software packages
-like `nixpkgs`, `vpsadminos` and possibly other components. These packages
-are pinned to particular versions, e.g. specific git commits.
+## FLAKE INPUTS
+Configurations require `flake.nix` with outputs from
+`confctl.lib.mkConfctlOutputs` and inputs locked in `flake.lock`. Channels map dependency roles to root inputs;
+machines select channels via `cluster.<name>.inputs.channels`. Later channels
+override earlier mappings, and `inputs.overrides` takes precedence over channels.
+Manage locked sources with the `confctl inputs` commands. Build and deploy do
+not update inputs automatically.
 
-Software pins are defined in the Nix configuration and then prefetched using
-`confctl`. Selected software pins are added to environment variable `NIX_PATH`
-for `nix-build` and can also be read by `Nix` while building machines.
-
-Software pins can be defined using channels or on specific machines.
-The advantage of using channels is that changing a pin in a channel changes
-also all machines that use the channel. Channels are defined in file
-`configs/swpins.nix` using option `confctl.swpins.channels` (legacy, non-flake
-configurations).
-
-In flake-based configurations (using `confctl.lib.mkConfctlOutputs`), channel names
-are provided by the flake `channels` mapping and machines select them via
-`cluster.<name>.inputs.channels`. Per-machine role-to-input overrides are configured
-via `cluster.<name>.inputs.overrides`. `cluster.<name>.swpins.*` is not used in flake
-mode; manage `flake.lock` using the `confctl inputs` command family.
-
-Software pins declared in the Nix configuration have to be prefetched before
-they can be used to build machines. See the `confctl swpins` command family
-for more information.
+Software-pin configurations must be migrated using confctl v3 before upgrading.
+See the repository's `docs/swpins-to-flakes.md` for migration and rollback.
 
 ## PATTERNS
 `confctl` commands accept patterns instead of names. These patterns work
@@ -46,6 +32,14 @@ Generations can be selected by *offset*. `0` is the current (last) generation.
 `1` is the first (oldest) generation, `2` the second generation, etc. `-1` is
 the generation before last and so on.
 
+Local lists and retention count supported flake generations. Unsupported or
+invalid records are reported and left untouched, including their GC roots.
+Numeric local selectors fail if any records are excluded; use an explicit
+supported name. `current` fails if its link points to an excluded or missing
+record, and local `old` removal or rotation is blocked in that case. A successful
+new build may update `current`. Remote-only profile selectors are unaffected.
+Use retained confctl v3 for old software-pin generations.
+
 ## GLOBAL OPTIONS
 `-c`, `--color` `always`|`never`|`auto`
   Set output color mode. Defaults to `auto`, which enables colors when
@@ -54,10 +48,7 @@ the generation before last and so on.
 ## COMMANDS
 `confctl init` [*options*]
   Create a new configuration in the current directory. The current directory
-  is set up to be used with `confctl`. Defaults to a flake-based configuration.
-
-    `--swpins`, `--legacy`
-      Create a legacy swpins-based (non-flake) configuration.
+  is set up with a flake configuration for `confctl`.
 
 `confctl add` *name*
   Add new machine to the configuration.
@@ -122,10 +113,10 @@ the generation before last and so on.
       Do not ask for confirmation on standard input, assume the answer is yes.
 
     `-j`, `--max-jobs` *number*
-      Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
+      Maximum number of build jobs, passed to `nix build`. See man nix3-build(1).
 
     `--cores` *number*
-      Number of CPU cores to use, passed to `nix-build`. See man nix-build(1).
+      Number of CPU cores to use, passed to `nix build`. See man nix3-build(1).
 
 `confctl deploy` [*options*] [*machine-pattern* [`boot`|`switch`|`test`|`dry-activate`]]
   Deploy either a new or an existing build generation to matching machines.
@@ -158,10 +149,6 @@ the generation before last and so on.
       Run `confctl status` and deploy only outdated machines. `confctl` will
       first build machines described by *machine-pattern* and then check
       their status.
-
-    `--outdated-swpins`
-      Run `confctl status -g none` and deploy only machines that have outdated
-      software pins.
 
     `-i`, `--interactive`
       Deploy machines one by one while asking for confirmation for activation.
@@ -197,10 +184,10 @@ the generation before last and so on.
       if `--reboot` is used. `confctl` will wait for `600 seconds` by default.
 
     `-j`, `--max-jobs` *number*
-      Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
+      Maximum number of build jobs, passed to `nix build`. See man nix3-build(1).
 
     `--cores` *number*
-      Number of CPU cores to use, passed to `nix-build`. See man nix-build(1).
+      Number of CPU cores to use, passed to `nix build`. See man nix3-build(1).
 
     `--no-health-checks`
       Do not run configured health checks. Health checks are run by default
@@ -244,27 +231,26 @@ the generation before last and so on.
 
     `-g`, `--generation` *generation*|*offset*|`current`|`none`
       Check status against a selected generation instead of a new build. If set
-      to `none`, only the currently configured software pins are checked and not
+      to `none`, only the currently configured input roles are checked and not
       the system version itself.
 
     `-j`, `--max-jobs` *number*
-      Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
+      Maximum number of build jobs, passed to `nix build`. See man nix3-build(1).
 
     `--cores` *number*
-      Number of CPU cores to use, passed to `nix-build`. See man nix-build(1).
+      Number of CPU cores to use, passed to `nix build`. See man nix3-build(1).
 
-`confctl changelog` [*options*] [*machine-pattern* [*sw-pattern*]]
-  Show differences in deployed and configured software pins. For git software
-  pins, it's a git log.
+`confctl changelog` [*options*] [*machine-pattern* [*role-pattern*]]
+  Show differences in deployed and configured input roles using the Git log.
 
   By default, `confctl` assumes that the configuration contains upgraded
-  software pins, i.e. that the configuration is equal to or ahead of the deployed
-  machines. `confctl changelog` then prints a lists of changes that are missing
-  from the deployed machines. Too see a changelog for downgrade, use option
+  input roles, i.e. that the configuration is equal to or ahead of the deployed
+  machines. `confctl changelog` then prints a list of changes that are missing
+  from the deployed machines. To see a changelog for downgrade, use option
   `-d`, `--downgrade`.
 
   `confctl changelog` will not show changes to the deployment configuration
-  itself, it works only on software pins.
+  itself, it works only on input roles.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
       Filter machines by selected attribute, which is either tested for
@@ -279,13 +265,13 @@ the generation before last and so on.
       Do not ask for confirmation on standard input, assume the answer is yes.
 
     `-g`, `--generation` *generation*|*offset*|`current`
-      Show changelog against software pins from a selected generation instead
+      Show changelog against input roles from a selected generation instead
       of the current configuration.
 
     `-d`, `--downgrade`
-      Use when the configuration has older software pins than deployed machines,
+      Use when the configuration has older input roles than deployed machines,
       e.g. when doing a downgrade. Show a list of changes that are deployed
-      on the machines and are missing in the configured software pins.
+      on the machines and are missing in the configured input roles.
 
     `-v`, `--verbose`
       Show full-length changelog descriptions.
@@ -294,23 +280,22 @@ the generation before last and so on.
       Show patches.
 
     `-j`, `--max-jobs` *number*
-      Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
+      Maximum number of build jobs, passed to `nix build`. See man nix3-build(1).
 
     `--cores` *number*
-      Number of CPU cores to use, passed to `nix-build`. See man nix-build(1).
+      Number of CPU cores to use, passed to `nix build`. See man nix3-build(1).
 
-`confctl diff` [*options*] [*machine-pattern* [*sw-pattern*]]
-  Show differences in deployed and configured software pins. For git software
-  pins, it's a git diff.
+`confctl diff` [*options*] [*machine-pattern* [*role-pattern*]]
+  Show differences in deployed and configured input roles using git diff.
 
   By default, `confctl` assumes that the configuration contains upgraded
-  software pins, i.e. that the configuration is equal to or ahead of the deployed
+  input roles, i.e. that the configuration is equal to or ahead of the deployed
   machines. `confctl diff` then considers changes that are missing from the
-  deployed machines. Too see a diff for downgrade, use option
+  deployed machines. To see a diff for downgrade, use option
   `-d`, `--downgrade`.
 
   `confctl diff` will not show changes to the deployment configuration
-  itself, it works only on software pins.
+  itself, it works only on input roles.
 
     `-a`, `--attr` *attribute*`=`*value* | *attribute*`!=`*value*
       Filter machines by selected attribute, which is either tested for
@@ -325,19 +310,19 @@ the generation before last and so on.
       Do not ask for confirmation on standard input, assume the answer is yes.
 
     `-g`, `--generation` *generation*|*offset*|`current`
-      Show diff against software pins from a selected generation instead
+      Show diff against input roles from a selected generation instead
       of the current configuration.
 
     `-d`, `--downgrade`
-      Use when the configuration has older software pins than deployed machines,
+      Use when the configuration has older input roles than deployed machines,
       e.g. when doing a downgrade. Show a list of changes that are deployed
-      on the machines and are missing in the configured software pins.
+      on the machines and are missing in the configured input roles.
 
     `-j`, `--max-jobs` *number*
-      Maximum number of build jobs, passed to `nix-build`. See man nix-build(1).
+      Maximum number of build jobs, passed to `nix build`. See man nix3-build(1).
 
     `--cores` *number*
-      Number of CPU cores to use, passed to `nix-build`. See man nix-build(1).
+      Number of CPU cores to use, passed to `nix build`. See man nix3-build(1).
 
 `confctl test-connection` [*options*] [*machine-pattern*]
   Try to open a SSH connection to the selected machines. This command can be
@@ -655,149 +640,6 @@ the generation before last and so on.
     `-d`, `--downgrade`
       Use when the new version is older than the previously set version. Used for
       generating the commit changelog direction.
-
-`confctl swpins cluster ls` [*name-pattern* [*sw-pattern*]]
-  List cluster machines with pinned software packages.
-
-`confctl swpins cluster set` *name-pattern* *sw-pattern* *version...*
-  Set selected software packages to new *version*. The value of *version* depends
-  on the type of the software pin, for git it is a git reference, e.g. a revision.
-
-    `--[no-]commit`
-      Commit changed swpins files to git. Disabled by default.
-
-    `--[no-]changelog`
-      Include changelog in the commit message when `--commit` is used. Enabled by
-      default.
-
-    `--[no]-editor`
-      Open `$EDITOR` with the commit message. Enabled by default.
-
-    `-d`, `--downgrade`
-      Use when the new version is older than the previously set version. Used for
-      generating changelog for the commit message.
-
-`confctl swpins cluster update` [*name-pattern* [*sw-pattern*]]
-  Update selected or all software packages that have been configured to support
-  this command. The usual case for git is to pin to the current branch head.
-
-    `--[no-]commit`
-      Commit changed swpins files to git. Disabled by default.
-
-    `--[no-]changelog`
-      Include changelog in the commit message when `--commit` is used. Enabled by
-      default.
-
-    `--[no]-editor`
-      Open `$EDITOR` with the commit message. Enabled by default.
-
-    `-d`, `--downgrade`
-      Use when the new version is older than the previously set version. Used for
-      generating changelog for the commit message.
-
-`confctl swpins channel ls` [*channel-pattern* [*sw-pattern*]]
-  List existing channels with pinned software packages.
-
-`confctl swpins channel set` *channel-pattern* *sw-pattern* *version...*
-  Set selected software packages in channels to new *version*. The value
-  of *version* depends on the type of the software pin, for git it is a git
-  reference, e.g. a revision.
-
-    `--[no-]commit`
-      Commit changed swpins files to git. Disabled by default.
-
-    `--[no-]changelog`
-      Include changelog in the commit message when `--commit` is used. Enabled by
-      default.
-
-    `--[no]-editor`
-      Open `$EDITOR` with the commit message. Enabled by default.
-
-    `-d`, `--downgrade`
-      Use when the new version is older than the previously set version. Used for
-      generating changelog for the commit message.
-
-`confctl swpins channel update` [*channel-pattern* [*sw-pattern*]]
-  Update selected or all software packages in channels that have been configured
-  to support this command. The usual case for git is to pin to the current
-  branch head.
-
-    `--[no-]commit`
-      Commit changed swpins files to git. Disabled by default.
-
-    `--[no-]changelog`
-      Include changelog in the commit message when `--commit` is used. Enabled by
-      default.
-
-    `--[no]-editor`
-      Open `$EDITOR` with the commit message. Enabled by default.
-
-    `-d`, `--downgrade`
-      Use when the new version is older than the previously set version. Used for
-      generating changelog for the commit message.
-
-`confctl swpins core ls` [*sw-pattern*]
-  List core software packages used internally by confctl.
-
-`confctl swpins core set` *sw-pattern* *version...*
-  Set selected core software package to new *version*. The value
-  of *version* depends on the type of the software pin, for git it is a git
-  reference, e.g. a revision.
-
-    `--[no-]commit`
-      Commit changed swpins files to git. Disabled by default.
-
-    `--[no-]changelog`
-      Include changelog in the commit message when `--commit` is used. Enabled by
-      default.
-
-    `--[no]-editor`
-      Open `$EDITOR` with the commit message. Enabled by default.
-
-    `-d`, `--downgrade`
-      Use when the new version is older than the previously set version. Used for
-      generating changelog for the commit message.
-
-`confctl swpins core update` [*sw-pattern*]
-  Update selected or all core software packages that have been configured
-  to support this command. The usual case for git is to pin to the current
-  branch head.
-
-    `--[no-]commit`
-      Commit changed swpins files to git. Disabled by default.
-
-    `--[no-]changelog`
-      Include changelog in the commit message when `--commit` is used. Enabled by
-      default.
-
-    `--[no]-editor`
-      Open `$EDITOR` with the commit message. Enabled by default.
-
-    `-d`, `--downgrade`
-      Use when the new version is older than the previously set version. Used for
-      generating changelog for the commit message.
-
-`confctl swpins update`
-  Update software pins that have been configured for updates, including pins
-  in all channels, all machine-specific pins and the core pins.
-
-    `--[no-]commit`
-      Commit changed swpins files to git. Disabled by default.
-
-    `--[no-]changelog`
-      Include changelog in the commit message when `--commit` is used. Enabled by
-      default.
-
-    `--[no]-editor`
-      Open `$EDITOR` with the commit message. Enabled by default.
-
-    `-d`, `--downgrade`
-      Use when the new version is older than the previously set version. Used for
-      generating changelog for the commit message.
-
-`confctl swpins reconfigure`
-  Regenerate all confctl-managed software pin files according to the Nix
-  configuration.
 
 ## USER-DEFINED COMMANDS
 User-defined Ruby scripts can be placed in directory `scripts`. Each script

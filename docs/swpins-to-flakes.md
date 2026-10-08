@@ -1,6 +1,10 @@
-# Migrating from swpins to flakes
+# Upgrading software-pin configurations with confctl v3
 
-This guide explains how to convert an existing **confctl configuration repository** from the legacy *swpins* workflow (pins and channels defined in `configs/swpins.nix`, state in `swpins/*.json`, updates via `confctl swpins ...`) to a **flake-based** workflow (pins are normal flake inputs locked in `flake.lock`, updates via `confctl inputs ...`).
+Use confctl v3 to convert a software-pin configuration to flakes before upgrading
+to the flake-only tool. Software pins and channels are defined in
+`configs/swpins.nix`, with state in `swpins/*.json` and updates through
+`confctl swpins ...`. After conversion, dependencies are flake inputs locked in
+`flake.lock` and managed through `confctl inputs ...`.
 
 After the migration:
 
@@ -10,28 +14,41 @@ After the migration:
 - per-machine pin differences are expressed via `cluster.<name>.inputs.overrides`
 - you no longer need `configs/swpins.nix` or the generated `swpins/` directory
 
-If you are new to the flake model in confctl, read `docs/flake-inputs.md` after this guide.
+See the [flake input guide](flake-inputs.md) for channels and input management.
 
 ---
 
 ## Before you start
 
-- Do the migration on a branch.
-- Make sure your Nix has flakes enabled (`nix-command` + `flakes`).
-- Your configuration repo layout is assumed to be the usual confctl layout with `cluster/`, `configs/`, etc.
+This guide applies to a software-pin configuration managed with confctl v3,
+upgrading to a confctl version that supports only flakes. Perform migration
+before updating the tool or configuration's confctl input. The new executable
+has no `swpins`, `migrate`, `init --swpins` or `init --legacy` commands.
+
+- Work on a branch and retain the previous configuration revision and pin files.
+- Keep a runnable v3 binary or source and its Nix/Bundler environment. The name
+  `confctl-v3` below refers to that retained executable; it is not a command
+  provided by the new tool. Other `confctl` commands in steps 1 through 8 also use v3.
+- Enable Nix's `nix-command` and `flakes` features.
+- Preserve local generations and their GC roots, and required remote profiles.
+  JSON backups do not preserve store closures.
+- Review custom Ruby scripts and imported confctl APIs for removed pin constants,
+  the old backend/cache API, `nixosModules.swpins`, and pin options. External
+  netboot-index readers must accept input metadata instead of pin metadata.
+
 
 ---
 
 ## Automated migration (recommended)
 
-confctl includes an interactive migration helper that performs the steps in this guide:
+confctl v3 includes the interactive helper for this migration:
 
 ```bash
-confctl migrate swpins-to-flakes --dry-run
-confctl migrate swpins-to-flakes --yes
+confctl-v3 migrate swpins-to-flakes --dry-run
+confctl-v3 migrate swpins-to-flakes --yes
 ```
 
-You can also run individual steps (`flake`, `machines`, `imports`, `clean`); see `confctl migrate swpins-to-flakes --help`.
+You can also run individual steps (`flake`, `machines`, `imports`, `clean`); see `confctl-v3 migrate swpins-to-flakes --help`.
 
 ## Step 1: Add `flake.nix`
 
@@ -45,7 +62,8 @@ A minimal, practical skeleton looks like this:
 
   inputs = {
     # confctl itself
-    confctl.url = "github:vpsfreecz/confctl";
+    # Keep the current v3 input revision during migration.
+    confctl.url = "github:vpsfreecz/confctl/<retained-v3-revision>";
 
     # mkConfctlOutputs needs an input named `nixpkgs` for evaluation.
     # If you want a specific nixpkgs for that purpose, pin it here.
@@ -323,3 +341,61 @@ confctl inputs machine update --commit my-machine nixpkgs
 ```
 
 `flake.lock` is now the source of truth for pinned revisions.
+
+
+## Switch to the flake-only tool
+
+After reviewing the channel and override mappings and completing a representative
+flake build with v3, select the new confctl tool and update the configuration's
+confctl input together. The new input provides `confctl.moduleOptions`, which
+`confctl ls -L` needs for custom metadata listing. Remove obsolete configured
+pin options and update any affected user scripts before using the new tool.
+
+Verify machine listing, input status, explicit generation selection and a
+representative build. Running nodes can continue using their existing system
+profiles while operator tooling changes. Deployment is a separate operation;
+retain required remote profiles throughout the rollback window. Nodes without
+input metadata show unknown inputs until a flake-built system is deployed.
+
+## Saved generations and GC roots
+
+The new tool accepts only records with explicit `mode: "flakes"` in
+`.confctl/generations/<escaped-host>/<generation>/generation.json`. It retains
+the existing flake schema, input links and root names; v3 can read new flake
+generations too. Missing-mode, software-pin, unknown-mode and invalid records
+are reported with path and reason and are excluded from usable local generations.
+
+Excluded records, `*.swpin` links, old `.confctl/build` caches, pin state and
+associated GC roots are left untouched. Roots live beneath
+`/nix/var/nix/gcroots/per-user/<login>/confctl-<configuration-path-hash>`;
+old root names include the host, generation and `swpin.<name>`, toplevel or
+rollback suffixes. These roots may keep disk use above the new retention count.
+Do not move or delete `.confctl` casually: roots point into it and their namespace
+depends on the real configuration path.
+
+If an existing `current` link targets an excluded, invalid or missing record,
+the new tool leaves the link unchanged and refuses `current` selection and local
+`old` removal or rotation. It does not substitute a supported generation.
+Numeric local selectors fail whenever records have been excluded; select a
+supported generation explicitly. A successful new build may update `current`
+through the ordinary build path.
+
+Use retained v3's local generation commands to remove an unwanted old generation
+while v3 can still load it, or keep it until rollback is no longer required.
+Broader cache/root cleanup needs a separate inventory; the new tool cannot remove
+excluded records. Remote profile listing and removal remain available regardless
+of which tool built them. Local roots do not protect remote copies; deleting
+remote profiles or collecting remote garbage can remove needed closures.
+
+## Rollback
+
+Retain the previous configuration Git revision and lock, runnable v3 environment,
+and required local and remote roots. To restore the operator tooling, select v3
+and the previous configuration revision. To restore a pre-flake configuration,
+restore its matching configuration and pin files too; v2 cannot use flake
+configurations. New builds may have changed `current`, so select the required
+old generation explicitly with v3.
+
+Machine rollback uses retained system profiles and closures. Changing the tool
+version cannot recover a closure that has already been removed or collected.
+There is no automatic state conversion to reverse.

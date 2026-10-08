@@ -1,8 +1,7 @@
 # Flake inputs
 
-confctl supports flake-based configuration repositories via `confctl.lib.mkConfctlOutputs`.
-
-In flake configs:
+confctl requires a configuration flake whose outputs use
+`confctl.lib.mkConfctlOutputs`:
 
 - inputs are normal flake inputs locked in `flake.lock`
 - machines select “channels” via `inputs.channels`
@@ -52,6 +51,7 @@ A minimal pattern:
   inputs = {
     confctl.url = "github:vpsfreecz/confctl";
 
+    nixpkgs.follows = "nixpkgsStable";
     nixpkgsStable.url = "github:NixOS/nixpkgs/nixos-25.11";
     vpsadminosStaging.url = "github:vpsfreecz/vpsadminos/staging";
     vpsadminosProduction.url = "github:vpsfreecz/vpsadminos/staging";
@@ -122,7 +122,7 @@ To override one role for a single machine:
 cluster."my-machine".inputs.overrides.nixpkgs = "nixpkgsMunin";
 ```
 
-Use this sparingly. The default model is: select channels, update channels.
+Per-machine overrides take precedence over every selected channel.
 
 ## Updating inputs
 
@@ -157,3 +157,31 @@ inputs.vpsadminStaging = {
 ```
 
 Because `follows` is per-input-name, you typically need separate inputs per environment (staging vs production) to pin independently.
+
+## Source inputs and evaluation
+
+Inputs used only as source directories may use `flake = false`:
+
+```nix
+inputs.myToolInput = {
+  url = "github:example/my-tool/main";
+  flake = false;
+};
+```
+
+Path inputs and `follows` links are supported. `inputs` in machine modules maps
+roles to selected source store paths; use it to import raw files.
+`flakeInputs` exposes root inputs, and `inputsInfo.<role>.input` identifies the
+selected root input for accessing flake exports. Raw sources have no flake
+exports, and revision fields may be absent for sources without Git metadata.
+
+Flake builds are pure by default. If existing `<nixpkgs>`-style imports require
+NIX_PATH, set both `confctl.nix.impureEval = true` and
+`confctl.nix.legacyNixPath = true`. `legacyNixPathMap` selects the role names
+exposed with `-I`; machines with conflicting source paths build in separate
+groups. This bridge does not provide a non-flake configuration backend.
+
+The tool and configuration's confctl input must both include `moduleOptions`
+support to use the option reference and `confctl ls -L`. That output evaluates
+public confctl and cluster options, including `modules/cluster/default.nix`,
+without building machine systems.

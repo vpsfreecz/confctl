@@ -148,3 +148,11 @@ the latest generation found on the netboot server at the moment of execution. Us
 loaded. See `kexec-netboot --help` for all available options.
 
 The loaded kernel can be run either by `kexec-netboot -e` or `kexec -e` directly.
+
+## Input metadata in the netboot index
+
+The netboot server's generation JSON exports `inputs_info` when the carried
+`machine.json` contains `inputs-info`. It uses the same role metadata as
+`/etc/confctl/inputs-info.json`; systems without it report unknown inputs.
+Machine boot paths, versions, revisions, MAC addresses and kernel parameters are
+independent of this metadata.
