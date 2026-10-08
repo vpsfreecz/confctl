@@ -24,7 +24,7 @@ desc 'Generate man/man8/confctl-options.nix.8.md'
 task 'confctl-options' do
   ConfCtl::Logger.open('rake', output: $stdout)
 
-  opts = ConfCtl::ModuleOptions.new(nix: ConfCtl::Nix.stateless)
+  opts = ConfCtl::ModuleOptions.new(nix: ConfCtl::Nix.stateless, documentation: true)
   opts.read
 
   ConfCtl::ErbTemplate.render_to('confctl-options.nix/main', {
@@ -34,7 +34,11 @@ task 'confctl-options' do
     print_options: proc do |opt_list|
       ConfCtl::ErbTemplate.render('confctl-options.nix/options', {
         opts: opt_list,
-        indent: proc { |s, n| s.split("\n").join("\n#{' ' * n}") }
+        indent: proc do |s, n|
+          s.split("\n").map.with_index do |line, i|
+            i == 0 || line.empty? ? line : "#{' ' * n}#{line}"
+          end.join("\n")
+        end
       })
     end
   }, 'man/man8/confctl-options.nix.8.md')

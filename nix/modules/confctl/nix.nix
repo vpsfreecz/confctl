@@ -8,18 +8,8 @@ with lib;
           type = types.nullOr (types.either types.int (types.enum [ "auto" ]));
           default = null;
           description = ''
-            Maximum number of build jobs, passed to <literal>nix-build</literal>
+            Maximum number of build jobs, passed to <literal>nix build</literal>
             commands.
-          '';
-        };
-
-        nixPath = mkOption {
-          type = types.listOf types.str;
-          default = [ ];
-          description = ''
-            List of extra paths added to environment variable
-            <literal>NIX_PATH</literal> for all <literal>nix-build</literal>
-            invokations
           '';
         };
 
@@ -36,7 +26,7 @@ with lib;
           default = false;
           description = ''
             If true, confctl adds -I mappings for selected inputs during flake
-            builds to support legacy <nixpkgs> or <vpsadminos> imports.
+            builds to support legacy <literal>&lt;nixpkgs&gt;</literal> or <literal>&lt;vpsadminos&gt;</literal> imports.
           '';
         };
 
@@ -48,7 +38,7 @@ with lib;
             "vpsadmin"
           ];
           description = ''
-            List of input names that should be mapped to NIX_PATH when
+            List of input roles that should be mapped to NIX_PATH when
             legacyNixPath is enabled.
           '';
         };

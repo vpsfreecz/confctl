@@ -4,34 +4,23 @@
 `confctl-options.nix` - confctl configuration documentation
 
 ## DESCRIPTION
-This document describes Nix options, which can be used in confctl(8) cluster
-configurations to configure `confctl` and machines within the cluster.
+Nix options for confctl(8) cluster configurations and machine systems.
 
 ## CONFCTL SETTINGS
-The following `confctl` settings can be configured in `configs/confctl.nix`
-within the deployment configuration directory:
+Configure these `confctl` settings in `configs/confctl.nix`:
 
 <%= print_options(opts.confctl_settings) %>
 
-## SOFTWARE PIN CHANNELS
-The following `confctl` settings for software pin channels can be configured
-in `configs/swpins.nix` within the deployment configuration directory:
-
-<%= print_options(opts.swpin_settings) %>
-
 ## MACHINE CONFIGURATION
-The following options can be configured in per-machine `module.nix` files within
-the deployment configuration directory, i.e. `cluster/<machine-name>/module.nix`:
+Configure machine metadata in `cluster/<machine-name>/module.nix`:
 
 <%= print_options(opts.machine_settings) %>
 
-## SERVICES
-The following options can be configured in per-machine `config.nix` files within
-the deployment configuration directory, i.e. `cluster/<machine-name>/config.nix`,
-or any other imported Nix file. These options are added by `confctl` in addition
-to options from `NixOS` or `vpsAdminOS`.
+## MACHINE SYSTEM CONFIGURATION
+Configure these options in `cluster/<machine-name>/config.nix` or an imported
+Nix module. `confctl` adds them to the options provided by NixOS or vpsAdminOS.
 
-<%= print_options(opts.service_settings) %>
+<%= print_options(opts.system_settings) %>
 
 ## SEE ALSO
 confctl(8)
@@ -40,6 +29,6 @@ confctl(8)
 Report bugs to https://github.com/vpsfreecz/confctl/issues.
 
 ## ABOUT
-`confctl` was originally developed for the purposes of
+`confctl` was originally developed for
 [vpsFree.cz](https://vpsfree.org) and its cluster
 [configuration](https://github.com/vpsfreecz/vpsfree-cz-configuration).

@@ -111,6 +111,12 @@
         };
     in
     {
+      moduleOptions = import ./nix/module-options.nix {
+        nixpkgs = nixpkgs;
+        confDir = self.outPath;
+        system = "x86_64-linux";
+      };
+
       lib.mkConfctlOutputs = import ./nix/flake/mk-confctl-outputs.nix;
 
       # Dev shells for cluster configuration repos.
@@ -172,7 +178,6 @@
         generations = import ./nix/modules/confctl/generations.nix;
         cli = import ./nix/modules/confctl/cli.nix;
         nix = import ./nix/modules/confctl/nix.nix;
-        swpins = import ./nix/modules/confctl/swpins.nix;
         inputs-info = import ./nix/modules/confctl/inputs-info.nix;
         configuration-info = import ./nix/modules/confctl/configuration-info.nix;
         default = {

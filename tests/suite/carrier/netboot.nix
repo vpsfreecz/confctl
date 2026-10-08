@@ -760,6 +760,16 @@ import ../../make-test.nix (
           wait_for_vpsadminos_netboot_artifacts!(generation: @carried_vpsadminos_gen_a)
         end
 
+        it 'exports input metadata without software-pin fields in the netboot index' do
+          [NIXOS_FQDN, VPSADMINOS_FQDN].each do |fqdn|
+            machine = carrier_netboot_machine(fqdn)
+            current = machine.fetch('generations').detect { |gen| gen.fetch('current') }
+            generation = carrier_json(netboot_generation_path(fqdn, current.fetch('generation')))
+            expect(generation.fetch('inputs_info')).to have_key('nixpkgs')
+            expect(generation).not_to have_key('swpins_info')
+          end
+        end
+
         it 'boots the carried NixOS machine over PXE from the carrier' do
           boot_pxe_client!(nixos, timeout: NIXOS_BOOT_TIMEOUT)
           assert_marker!(nixos, 'A')

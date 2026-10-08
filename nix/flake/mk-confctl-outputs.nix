@@ -505,6 +505,11 @@ let
   toplevelOutput = coreLib.mapAttrs (_: v: v.toplevel) buildOutputs;
 in
 {
+  moduleOptions = import ../module-options.nix {
+    nixpkgs = coreNixpkgs;
+    inherit confDir flakeInputs;
+    system = resolvedSystem;
+  };
   settings = settings;
   channels = channels;
   machineNames = machineNames;

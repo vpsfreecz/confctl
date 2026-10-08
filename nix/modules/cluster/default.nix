@@ -43,39 +43,15 @@ let
           description = "OS type";
         };
 
-        swpins = {
-          channels = mkOption {
-            type = types.listOf types.str;
-            default = [ ];
-            description = ''
-              List of channels from <option>confctl.swpins.channels</option>
-              to use on this machine
-
-              This option is legacy in flake mode, prefer <option>cluster.&lt;name&gt;.inputs.channels</option>.
-            '';
-          };
-
-          pins = mkOption {
-            type = types.attrsOf (types.submodule swpinOptions.specModule);
-            default = { };
-            description = ''
-              List of swpins for this machine, which can supplement or
-              override swpins from configured channels
-            '';
-          };
-        };
-
         inputs = {
           channels = mkOption {
             type = types.listOf types.str;
             default = [ ];
             description = ''
-              List of flake pin channels to use on this machine.
+              List of flake input channels to use on this machine.
 
-              In flake mode, this selects entries from the `channels` mapping
+              This selects entries from the `channels` mapping
               passed to `mkConfctlOutputs` (e.g. "production", "staging", "os-staging").
-
-              This replaces legacy `swpins.channels`.
             '';
           };
 
@@ -153,17 +129,6 @@ let
           description = ''
             Optional user-defined tags to classify the machine
           '';
-        };
-
-        nix = {
-          nixPath = mkOption {
-            type = types.listOf types.str;
-            default = [ ];
-            description = ''
-              List of extra paths added to environment variable
-              <literal>NIX_PATH</literal> for <literal>nix-build</literal>
-            '';
-          };
         };
 
         buildGenerations = {
@@ -288,7 +253,7 @@ let
                 }
               '';
               description = ''
-                Check systemd unit properties reported by systemctl show <unit>
+                Check systemd unit properties reported by systemctl show <literal>&lt;unit&gt;</literal>
               '';
             };
           };
@@ -323,8 +288,6 @@ let
         };
       };
     };
-
-  swpinOptions = import ../../lib/swpins/options.nix { inherit lib; };
 
   addresses =
     { config, ... }:

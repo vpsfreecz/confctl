@@ -855,7 +855,7 @@ class Generation
   end
 
   def to_json(*)
-    {
+    data = {
       url:,
       store_path:,
       generation:,
@@ -870,9 +870,10 @@ class Generation
       kernel_version:,
       kernel_params:,
       boot_files:,
-      variants:,
-      swpins_info: json['swpins-info']
-    }.to_json(*)
+      variants:
+    }
+    data[:inputs_info] = json['inputs-info'] if json['inputs-info']
+    data.to_json(*)
   end
 
   def pxe_kernel_params

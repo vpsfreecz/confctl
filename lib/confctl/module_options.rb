@@ -12,9 +12,8 @@ module ConfCtl
         @default = extract_expression(nixos_opt['default'])
         @example = extract_expression(nixos_opt['example'])
         @declarations = nixos_opt['declarations'].map do |v|
-          raise "unable to place module '#{v}'" unless %r{/confctl/([^$]+)} =~ v
-
-          "<confctl/#{::Regexp.last_match(1)}>"
+          match = v.match(%r{\A(?:#{Regexp.escape(ConfCtl.root)}|/nix/store/[^/]+)/(nix/modules/(?:confctl|cluster)(?:/.*)?)\z})
+          match ? "<confctl/#{match[1]}>" : v
         end
       end
 
@@ -58,38 +57,38 @@ module ConfCtl
     attr_reader :options
 
     # @param nix [Nix, nil]
-    def initialize(nix: nil)
+    def initialize(nix: nil, documentation: false)
       @nix = nix || Nix.new
+      @documentation = documentation
       @options = []
     end
 
     def read
-      @options = nix.module_options.map do |opt|
+      @options = (@documentation ? nix.documentation_options : nix.module_options).map do |opt|
         Option.new(opt)
       end
     end
 
     def confctl_settings
-      options.select do |opt|
-        opt.name.start_with?('confctl.') \
-          && !opt.name.start_with?('confctl.swpins.')
-      end
-    end
-
-    def swpin_settings
-      options.select { |opt| opt.name.start_with?('confctl.swpins.') }
+      options.select { |opt| opt.name.start_with?('confctl.') && !system_option?(opt) }
     end
 
     def machine_settings
       options.select { |opt| opt.name.start_with?('cluster.') }
     end
 
-    def service_settings
-      options.select { |opt| opt.name.start_with?('services.') }
+    def system_settings
+      options.select { |opt| system_option?(opt) }
     end
 
     protected
 
     attr_reader :nix
+
+    def system_option?(opt)
+      %w[confctl.carrier. confctl.programs. confctl.inputsInfo confctl.configurationInfo].any? do |prefix|
+        opt.name.start_with?(prefix)
+      end
+    end
   end
 end

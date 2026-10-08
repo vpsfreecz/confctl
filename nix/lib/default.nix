@@ -5,15 +5,6 @@
 }:
 with coreLib;
 let
-  machine = import ./machine {
-    inherit
-      confDir
-      corePkgs
-      coreLib
-      findMetaConfig
-      ;
-  };
-
   findMetaConfig = { cluster, name }: cluster.${name};
 
   makeMachine =
@@ -24,7 +15,6 @@ let
       alias ? null,
       clusterName ? null,
       extraModules ? [ ],
-      buildAttribute ? null,
     }:
     let
       ensuredClusterName = if isNull clusterName then name else clusterName;
@@ -39,25 +29,7 @@ let
         ;
       clusterName = ensuredClusterName;
 
-      build = {
-        attribute = if isNull buildAttribute then metaConfig.buildAttribute else buildAttribute;
-        toplevel = buildConfig {
-          name = ensuredClusterName;
-          inherit metaConfig;
-        };
-      };
     };
-
-  buildConfig =
-    { name, metaConfig }:
-    if !metaConfig.managed then
-      null
-    else if metaConfig.spin == "nixos" then
-      machine.nixos { inherit name metaConfig; }
-    else if metaConfig.spin == "vpsadminos" then
-      machine.vpsadminos { inherit name metaConfig; }
-    else
-      null;
 
   expandCarriers =
     machineAttrs:
@@ -77,7 +49,6 @@ let
         clusterName = cm.machine;
         carrier = carrierMachine.name;
         extraModules = cm.extraModules;
-        buildAttribute = cm.buildAttribute;
         metaConfig = coreLib.updateManyAttrsByPath (
           [
             {
