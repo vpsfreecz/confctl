@@ -1,0 +1,1 @@
+{"version":7,"root":"root","nodes":{"root":{"inputs":{"confctl":"confctl","nixpkgs":"nixpkgs"}},"confctl":{"flake":false,"locked":{"type":"path","path":"@CONFCTL_SOURCE@"},"original":{"type":"path","path":"@CONFCTL_SOURCE@"}},"nixpkgs":{"locked":{"type":"path","path":"@NIXPKGS_SOURCE@"},"original":{"type":"path","path":"@NIXPKGS_SOURCE@"}}}}

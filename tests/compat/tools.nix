@@ -7,6 +7,7 @@ pkgs.buildGoModule {
   subPackages = [
     "cmd/compat"
     "cmd/compat-bench"
+    "cmd/compat-real"
     "cmd/fixture-tool"
   ];
   checkPhase = ''
