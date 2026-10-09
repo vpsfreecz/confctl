@@ -16,6 +16,13 @@ machines.
 * Automatically roll back faulty configurations
 * Support for creating netboot servers with option to kexec, see [docs/carrier.md](docs/carrier.md)
 
+## Experimental language evaluation
+
+The separately packaged [Go measurement prototype](experiments/confctl-go/README.md)
+and [compatibility harness](tests/compat/README.md) characterize a bounded CLI
+subset against the pinned Ruby implementation. They do not change the normal
+package or deployment workflow.
+
 ## Requirements
 
 * [Nix](https://nixos.org)

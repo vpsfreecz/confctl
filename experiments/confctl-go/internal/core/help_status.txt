@@ -1,0 +1,16 @@
+NAME
+    status - Check machine status
+
+SYNOPSIS
+
+    confctl [global options] status [command options] [machine-pattern]
+
+COMMAND OPTIONS
+    -a, --attr=arg       - Filter by attribute (may be used more than once,
+                           default: none)
+    -g, --generation=arg - Check status against selected generation (default:
+                           none)
+    -t, --tag=arg        - Filter by tag (may be used more than once, default:
+                           none)
+    -y, --[no-]yes       - Assume the answer to confirmations is yes
+

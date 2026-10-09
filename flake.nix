@@ -123,6 +123,15 @@
 
       devShells = forAllSystems (system: {
         default = mkConfctlDevShell { inherit system; };
+        experimental = (import nixpkgs { inherit system; }).mkShell {
+          packages = with (import nixpkgs { inherit system; }); [
+            go
+            nixfmt
+            git
+            openssh
+            nix
+          ];
+        };
       });
 
       packages = forAllSystems (
@@ -131,6 +140,8 @@
           pkgs = import nixpkgs { inherit system; };
         in
         {
+          confctl-go-prototype = import ./experiments/confctl-go/package.nix { inherit pkgs; };
+          confctl-compat-tools = import ./tests/compat/tools.nix { inherit pkgs; };
           confctl = mkConfctlPackage {
             inherit pkgs;
             src = self.outPath;
@@ -159,6 +170,8 @@
         system:
         {
           rspec = mkRspecCheck system;
+          confctl-go-prototype = self.packages.${system}.confctl-go-prototype;
+          confctl-compat-tools = self.packages.${system}.confctl-compat-tools;
         }
         // nixpkgs.lib.optionalAttrs (hasTestRunner system) (mkTests system)
       );

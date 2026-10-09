@@ -1,0 +1,18 @@
+NAME
+    ls - List configured machines
+
+SYNOPSIS
+
+    confctl [global options] ls [command options] [machine-pattern]
+
+COMMAND OPTIONS
+    -H, --[no-]hide-header - Do not show the header
+    -L, --list             - List possible attributes to output
+    -a, --attr=arg         - Filter by attribute (may be used more than once,
+                             default: none)
+    --managed=arg          - Filter (un)managed machines (default: none)
+    -o, --output=arg       - Select attributes to output (default: none)
+    --[no-]show-trace      - Enable traces in Nix
+    -t, --tag=arg          - Filter by tag (may be used more than once, default:
+                             none)
+
