@@ -1,0 +1,23 @@
+{
+  "config_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-observations-final39/parser-version-33219701/config",
+  "run_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-observations-final39/parser-version-33219701",
+  "schema": 1,
+  "case": "parser-version",
+  "executable": "/nix/store/hwvcw1wyknlvk7xsclkasrl7lkcf41yx-confctl/bin/confctl",
+  "executable_sha256": "5bbb91ece29ffc9e7e3fd9be837e48f6eb8c6df2667055e6242e9ef128859e09",
+  "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "fixture_sha256": "5c073b6663d03e5dcc9d398c85b37357bd951cd7b51bde89594540d88b705526",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "stdout": "",
+  "stderr": "confctl: version unknown\nerror: confctl: version unknown\n",
+  "exit": 1,
+  "before": {},
+  "after": {},
+  "events": null,
+  "git_before": {},
+  "git_after": {},
+  "wall_ns": 0,
+  "user_ns": 0,
+  "system_ns": 0,
+  "max_rss_kb": 0
+}

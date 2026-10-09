@@ -1,0 +1,95 @@
+{
+  "config_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-observations-final39/list-invalid-managed-3517051541/config",
+  "run_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-observations-final39/list-invalid-managed-3517051541",
+  "schema": 1,
+  "case": "list-invalid-managed",
+  "executable": "/nix/store/hwvcw1wyknlvk7xsclkasrl7lkcf41yx-confctl/bin/confctl",
+  "executable_sha256": "5bbb91ece29ffc9e7e3fd9be837e48f6eb8c6df2667055e6242e9ef128859e09",
+  "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "fixture_sha256": "9e720d4cd21ec36cf894bafe57069501d610220bec817405db17aeb78d31f4ed",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "stdout": "NAME\n    ls - List configured machines\n\nSYNOPSIS\n\n    confctl [global options] ls [command options] [machine-pattern]\n\nCOMMAND OPTIONS\n    -H, --[no-]hide-header - Do not show the header\n    -L, --list             - List possible attributes to output\n    -a, --attr=arg         - Filter by attribute (may be used more than once,\n                             default: none)\n    --managed=arg          - Filter (un)managed machines (default: none)\n    -o, --output=arg       - Select attributes to output (default: none)\n    --[no-]show-trace      - Enable traces in Nix\n    -t, --tag=arg          - Filter by tag (may be used more than once, default:\n                             none)\n\n",
+  "stderr": "error: invalid argument: --managed bad\n\n",
+  "exit": 64,
+  "before": {
+    "cluster": {
+      "mode": 2147484141
+    },
+    "cluster/cluster.nix": {
+      "text": "[]\n",
+      "mode": 420
+    },
+    "configs": {
+      "mode": 2147484141
+    },
+    "configs/node": {
+      "mode": 2147484141
+    },
+    "configs/node/.keep": {
+      "mode": 420
+    },
+    "fixtures": {
+      "mode": 2147484141
+    },
+    "fixtures/machines.json": {
+      "text": "{\"alpha/site\": {\"name\": \"alpha/site\", \"key\": \"ka\", \"clusterName\": \"alpha/site\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": true, \"spin\": \"vpsadminos\", \"tags\": [\"node\", \"east\"], \"host\": {\"target\": \"alpha.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \"beta\": {\"name\": \"beta\", \"key\": \"kb\", \"clusterName\": \"beta\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": true, \"spin\": \"nixos\", \"tags\": [\"web\"], \"host\": {\"target\": \"beta.example\", \"port\": 2222}, \"netboot\": {\"enable\": false}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \".hidden\": {\"name\": \".hidden\", \"key\": \"kh\", \"clusterName\": \".hidden\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": false, \"spin\": \"vpsadminos\", \"tags\": [\"node\"], \"host\": {\"target\": \"hidden.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \"alpha/carried\": {\"name\": \"alpha/carried\", \"key\": \"kc\", \"clusterName\": \"alpha/carried\", \"carrier\": \"alpha/site\", \"alias\": \"guest/one\", \"metaConfig\": {\"managed\": true, \"spin\": \"vpsadminos\", \"tags\": [\"node\"], \"host\": {\"target\": \"own.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}}",
+      "mode": 420
+    },
+    "fixtures/module-options.json": {
+      "text": "[{\"name\": \"cluster.\u003cname\u003e.spin\"}, {\"name\": \"cluster.\u003cname\u003e.host.target\"}, {\"name\": \"unrelated\"}]",
+      "mode": 420
+    },
+    "fixtures/settings.json": {
+      "text": "{\"list\": {\"columns\": [\"name\", \"spin\", \"managed\", \"host.target\"]}, \"nix\": {\"maxJobs\": \"auto\", \"impureEval\": true, \"legacyNixPath\": false}}",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "after": {
+    "cluster": {
+      "mode": 2147484141
+    },
+    "cluster/cluster.nix": {
+      "text": "[]\n",
+      "mode": 420
+    },
+    "configs": {
+      "mode": 2147484141
+    },
+    "configs/node": {
+      "mode": 2147484141
+    },
+    "configs/node/.keep": {
+      "mode": 420
+    },
+    "fixtures": {
+      "mode": 2147484141
+    },
+    "fixtures/machines.json": {
+      "text": "{\"alpha/site\": {\"name\": \"alpha/site\", \"key\": \"ka\", \"clusterName\": \"alpha/site\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": true, \"spin\": \"vpsadminos\", \"tags\": [\"node\", \"east\"], \"host\": {\"target\": \"alpha.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \"beta\": {\"name\": \"beta\", \"key\": \"kb\", \"clusterName\": \"beta\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": true, \"spin\": \"nixos\", \"tags\": [\"web\"], \"host\": {\"target\": \"beta.example\", \"port\": 2222}, \"netboot\": {\"enable\": false}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \".hidden\": {\"name\": \".hidden\", \"key\": \"kh\", \"clusterName\": \".hidden\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": false, \"spin\": \"vpsadminos\", \"tags\": [\"node\"], \"host\": {\"target\": \"hidden.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \"alpha/carried\": {\"name\": \"alpha/carried\", \"key\": \"kc\", \"clusterName\": \"alpha/carried\", \"carrier\": \"alpha/site\", \"alias\": \"guest/one\", \"metaConfig\": {\"managed\": true, \"spin\": \"vpsadminos\", \"tags\": [\"node\"], \"host\": {\"target\": \"own.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}}",
+      "mode": 420
+    },
+    "fixtures/module-options.json": {
+      "text": "[{\"name\": \"cluster.\u003cname\u003e.spin\"}, {\"name\": \"cluster.\u003cname\u003e.host.target\"}, {\"name\": \"unrelated\"}]",
+      "mode": 420
+    },
+    "fixtures/settings.json": {
+      "text": "{\"list\": {\"columns\": [\"name\", \"spin\", \"managed\", \"host.target\"]}, \"nix\": {\"maxJobs\": \"auto\", \"impureEval\": true, \"legacyNixPath\": false}}",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "events": null,
+  "git_before": {},
+  "git_after": {},
+  "wall_ns": 0,
+  "user_ns": 0,
+  "system_ns": 0,
+  "max_rss_kb": 0
+}

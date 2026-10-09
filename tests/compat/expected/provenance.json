@@ -1,0 +1,559 @@
+{
+  "schema": 1,
+  "role": "original-Ruby-reference-only",
+  "tier": "packaged-semantic-tools",
+  "scope": "Only these 39 cases are observed. No candidate parity, broad catalogue coverage or benchmark conclusion is asserted.",
+  "copy_policy": "Expected files are byte-for-byte copies of accepted normalized.json records; no renormalization or candidate-derived values.",
+  "capture": {
+    "root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-observations-final39",
+    "manifest": {
+      "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-observations-final39/manifest.json",
+      "sha256": "ad1a8e30c712b3a8bb0d1079ba6080a7d49fcf965a0c0f990d5e21fd79bb3b85"
+    },
+    "created_utc": "2026-10-09T19:48:55.089437+00:00",
+    "fixture_integrity": {
+      "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-observations-final39/fixture-integrity.log",
+      "sha256": "ec0dd4d497532297eb533c38efd2d1b9c3a100a854b06f4bd796eb8df50d4f5f"
+    },
+    "case_count": 39,
+    "exit_counts": {
+      "0": 36,
+      "64": 1,
+      "1": 2
+    }
+  },
+  "source": {
+    "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+    "site_revision": "ae670dc0d4a5d43adf9560da1a6a0a35925cd2e5",
+    "oracle_contract_source": "/nix/store/687gh0mm2wkglzjadgchdnymam67jm9a-source",
+    "oracle_runtime_source": "/nix/store/5m2n2m6ipnfmlnzybwibdymh53xa80gq-687gh0mm2wkglzjadgchdnymam67jm9a-source",
+    "site_source": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-source/vpsfree-cz-configuration",
+    "ruby_executable": "/nix/store/pnyd647xzsszp5r6vicpsl7q9fsz5xyk-ruby-3.4.9/bin/ruby",
+    "ruby_executable_sha256": "d7adfd6b3a374eb88d12b0e5d201504e53fd56906abb3e55b77c684119d2a095",
+    "gem_dependencies": "/nix/store/bynmn4awmv94frj6q2mphvmxggdpwih2-confctl-deps"
+  },
+  "packages": {
+    "tools": {
+      "store_path": "/nix/store/sw1i25y1938n845x5hjmw12xrc9agspb-confctl-compat-tools-0.1.0",
+      "nar_hash": "sha256-vMHBKF3Y1lDHfoRxqboF1g1D2yE4iy+r7gaG5XVHQnc=",
+      "derivation": "/nix/store/2wynszgg6f5ssldxnwm715fzjnmgfvpj-confctl-compat-tools-0.1.0.drv",
+      "derivation_sha256": "dec6e3ca6b9fedcaed9dd5001f9f3ee2171f96b628dbf441d24b6bacb443a05a",
+      "references": [
+        "/nix/store/myfhrp2wqlzlrjvga5xszgnz0wp13akk-tzdata-2026c"
+      ],
+      "source_store_path": "/nix/store/lyy2nmr78337cjczkcp2krm06i9rn6mx-compat"
+    },
+    "fixture-oracle": {
+      "store_path": "/nix/store/hwvcw1wyknlvk7xsclkasrl7lkcf41yx-confctl",
+      "nar_hash": "sha256-6z0C2uU8ctOErDzK+Icv8Z1YZgdqeILe5JCrsBFrhko=",
+      "derivation": "/nix/store/dii41wwnqm6x8w7nri1m34npp6dv1viy-confctl.drv",
+      "derivation_sha256": "f820aebcbbd5d8df40c2170828225b3d9371ed60c248330ea6ab73784c356818",
+      "references": [
+        "/nix/store/1sr8rmx4v0v994lkbzhwc1f0qr1gxxs9-bash-5.3p9",
+        "/nix/store/5m2n2m6ipnfmlnzybwibdymh53xa80gq-687gh0mm2wkglzjadgchdnymam67jm9a-source",
+        "/nix/store/bynmn4awmv94frj6q2mphvmxggdpwih2-confctl-deps",
+        "/nix/store/pnyd647xzsszp5r6vicpsl7q9fsz5xyk-ruby-3.4.9",
+        "/nix/store/sw1i25y1938n845x5hjmw12xrc9agspb-confctl-compat-tools-0.1.0"
+      ]
+    },
+    "oracle-hooks": {
+      "store_path": "/nix/store/slivsxi3ki1qa0zn8mgmy2ixq8mh1ml1-oracle-hook-driver",
+      "nar_hash": "sha256-hAs5b0uPXklL/1PDqlpjF3il0pn4hOUk+t04HBc1Xb0=",
+      "derivation": "/nix/store/hpqhfkkw7yqr70w1mr6i042i0hiqibh0-oracle-hook-driver.drv",
+      "derivation_sha256": "1c6496f6cc8ef6231345c12967d0c6dfcd179add98bd70d4eeabb8fbe223afc3",
+      "references": [
+        "/nix/store/1sr8rmx4v0v994lkbzhwc1f0qr1gxxs9-bash-5.3p9",
+        "/nix/store/5m2n2m6ipnfmlnzybwibdymh53xa80gq-687gh0mm2wkglzjadgchdnymam67jm9a-source",
+        "/nix/store/bynmn4awmv94frj6q2mphvmxggdpwih2-confctl-deps",
+        "/nix/store/c65kpaz5b31cxz1143ap0hj9f8hbmz0a-oracle-hook-driver.rb",
+        "/nix/store/pnyd647xzsszp5r6vicpsl7q9fsz5xyk-ruby-3.4.9",
+        "/nix/store/sw1i25y1938n845x5hjmw12xrc9agspb-confctl-compat-tools-0.1.0"
+      ]
+    }
+  },
+  "executables": {
+    "cli": {
+      "path": "/nix/store/hwvcw1wyknlvk7xsclkasrl7lkcf41yx-confctl/bin/confctl",
+      "sha256": "5bbb91ece29ffc9e7e3fd9be837e48f6eb8c6df2667055e6242e9ef128859e09"
+    },
+    "hooks": {
+      "path": "/nix/store/slivsxi3ki1qa0zn8mgmy2ixq8mh1ml1-oracle-hook-driver/bin/oracle-hook-driver",
+      "sha256": "c0c4f8a20a430418219ba058502bde1e062918f204d6aa0610e094635027378c"
+    }
+  },
+  "normalizer_source_sha256": {
+    "tests/compat/harness/log_normalize.go": "4a1923da540d1c7d6584e1b8031f2675386aa3e1b6a2077cdf5ff114a204d899",
+    "tests/compat/harness/normalize_test.go": "b024b945060d04bce9d5f44e6bb195559b4e3e885c7b7a622d86cc66d932610c",
+    "tests/compat/harness/normalize.go": "cf781ef29a989e8624ea129aa87dc4a9ebbcaf82cd7f2484532d76d2211f01de"
+  },
+  "cases": [
+    {
+      "case": "list-all",
+      "fixture": "tests/compat/fixtures/list-all.json",
+      "fixture_sha256": "415601da46c9075201c2983298319b5a6a349e2a515967a763f95cf5094076d6",
+      "original_fixture_sha256": "415601da46c9075201c2983298319b5a6a349e2a515967a763f95cf5094076d6",
+      "expected": "tests/compat/expected/list-all.json",
+      "normalized_sha256": "76fa6b40de22b730ed27ede0f9506ffbb7922218cc493e712901d7ac2c84c5ef",
+      "raw_directory": "list-all-720726825",
+      "raw_sha256": "4a0b11936a1eed7c2fb6817c0af59c2c4c09c6720af6e310381db99dabc06a28",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "list-attached-managed",
+      "fixture": "tests/compat/fixtures/list-attached-managed.json",
+      "fixture_sha256": "f30c39c6669c44a7c8aceae28856a3fbb11a82600bbfbe4fd291d7bb94c18180",
+      "original_fixture_sha256": "f30c39c6669c44a7c8aceae28856a3fbb11a82600bbfbe4fd291d7bb94c18180",
+      "expected": "tests/compat/expected/list-attached-managed.json",
+      "normalized_sha256": "4881e83e65931575c15ecc02f28f1103d29bcce939ec87e21a6300f2b187f9c6",
+      "raw_directory": "list-attached-managed-3112378975",
+      "raw_sha256": "688aea3fb94dc743ac8050318c2d391b577be982e2a78d4a631091c7890e5427",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "list-attributes",
+      "fixture": "tests/compat/fixtures/list-attributes.json",
+      "fixture_sha256": "94a04c8b5b6a4099ba728c9e25e88ec83a7de65307511d0976c15d1a776dc88e",
+      "original_fixture_sha256": "94a04c8b5b6a4099ba728c9e25e88ec83a7de65307511d0976c15d1a776dc88e",
+      "expected": "tests/compat/expected/list-attributes.json",
+      "normalized_sha256": "66881a1c4efa21a59ef0f75fa110a5a68373501b9e2d2827b32bbf1fd5979034",
+      "raw_directory": "list-attributes-3364388938",
+      "raw_sha256": "69994ae592f9f5d2ea085785e0b8a90e3783125eaf9dd7bab91b888dc358532c",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "list-attributes-trace",
+      "fixture": "tests/compat/fixtures/list-attributes-trace.json",
+      "fixture_sha256": "cdb8373e8ce851925002bac88faa0a296b18ba271525ba3bbd13d32662899cd5",
+      "original_fixture_sha256": "cdb8373e8ce851925002bac88faa0a296b18ba271525ba3bbd13d32662899cd5",
+      "expected": "tests/compat/expected/list-attributes-trace.json",
+      "normalized_sha256": "ffcc693e28fe6518478c26fd9d75172e12fa1c66a1e9dd63d3eca7ed52ce7866",
+      "raw_directory": "list-attributes-trace-2846517891",
+      "raw_sha256": "b0b9070c4a34d0a80fef81ec6bdbfd530e94e5acaaed3c89dac0553ed736c004",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "list-carried-checks",
+      "fixture": "tests/compat/fixtures/list-carried-checks.json",
+      "fixture_sha256": "1842c7be762936df316c6fdc2353a4599f0698b48eb0ddaa2483782735868684",
+      "original_fixture_sha256": "1842c7be762936df316c6fdc2353a4599f0698b48eb0ddaa2483782735868684",
+      "expected": "tests/compat/expected/list-carried-checks.json",
+      "normalized_sha256": "f8491a60c2383b6b5bf50ae0d6381225993fba683d60024215c92dc1c6b5818c",
+      "raw_directory": "list-carried-checks-424245805",
+      "raw_sha256": "be62a2c7cda3b578337dca3467535f63054818876ead65e099c92d35ffa7c5dc",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "list-cluster-negation",
+      "fixture": "tests/compat/fixtures/list-cluster-negation.json",
+      "fixture_sha256": "915dd65d07d44c9bb3f62b4c67558c0c619ef9883f1c093283f197649b660176",
+      "original_fixture_sha256": "915dd65d07d44c9bb3f62b4c67558c0c619ef9883f1c093283f197649b660176",
+      "expected": "tests/compat/expected/list-cluster-negation.json",
+      "normalized_sha256": "26ea4b5b859758b9dc27b50ab3e69672eac49573d8d9ad9c877bad3507753f02",
+      "raw_directory": "list-cluster-negation-996874612",
+      "raw_sha256": "9419005072d851baf4519f4452b5f38ac7fcd8bab02eaa1028a885c6e9a9017b",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "list-columns",
+      "fixture": "tests/compat/fixtures/list-columns.json",
+      "fixture_sha256": "92504d58c8b2cf5abecf19d7e11a98e8e9aa62c227ed7b89f81cea0fd737c837",
+      "original_fixture_sha256": "92504d58c8b2cf5abecf19d7e11a98e8e9aa62c227ed7b89f81cea0fd737c837",
+      "expected": "tests/compat/expected/list-columns.json",
+      "normalized_sha256": "225ee6252b2536f33cba4b44eae241510adcb6c780de6db0c64345e738b19176",
+      "raw_directory": "list-columns-3369790999",
+      "raw_sha256": "b98650d6a65e3dd910d024c485e098f2d0bc9ee3d72b5dacc3bf89a6ddd333c3",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "list-default",
+      "fixture": "tests/compat/fixtures/list-default.json",
+      "fixture_sha256": "6846c3780cba39be384c5dd8155f1d921897807395e7ffc1132b361f5151a702",
+      "original_fixture_sha256": "6846c3780cba39be384c5dd8155f1d921897807395e7ffc1132b361f5151a702",
+      "expected": "tests/compat/expected/list-default.json",
+      "normalized_sha256": "d05afcefb2398fbff2bfed34d6d19251dfaa6f7545aead25308fc090cb26bbe8",
+      "raw_directory": "list-default-2729534496",
+      "raw_sha256": "baef3f506648c7d731ee41d08bbd91bb1466f780248f126ffd2db421059361d7",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "list-empty",
+      "fixture": "tests/compat/fixtures/list-empty.json",
+      "fixture_sha256": "abc2b8136c9ccef0caf181a7224e3ead312a351002ef293bc6ab3639873120c9",
+      "original_fixture_sha256": "abc2b8136c9ccef0caf181a7224e3ead312a351002ef293bc6ab3639873120c9",
+      "expected": "tests/compat/expected/list-empty.json",
+      "normalized_sha256": "f56e740be5e0faa640b6ccdaaac90516545873030cfe893437abb26830f9eb5a",
+      "raw_directory": "list-empty-1398024468",
+      "raw_sha256": "a04010cce7331aa20864d4dceba69b5d18dc4b45b01fb707919b070cf7657a81",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "list-empty-columns",
+      "fixture": "tests/compat/fixtures/list-empty-columns.json",
+      "fixture_sha256": "00df35822f283a92c4738735fec035a13aec5305c8b6af085e9f52642bd82025",
+      "original_fixture_sha256": "00df35822f283a92c4738735fec035a13aec5305c8b6af085e9f52642bd82025",
+      "expected": "tests/compat/expected/list-empty-columns.json",
+      "normalized_sha256": "4404b07a806c01332dc89a94d6af202195244185d610b1f11c230664660450b8",
+      "raw_directory": "list-empty-columns-449049153",
+      "raw_sha256": "45e0d4c80762018e5844c834c2f1586a99d1656dd0864e18711e6bb5b40031b2",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "list-invalid-managed",
+      "fixture": "tests/compat/fixtures/list-invalid-managed.json",
+      "fixture_sha256": "9e720d4cd21ec36cf894bafe57069501d610220bec817405db17aeb78d31f4ed",
+      "original_fixture_sha256": "9e720d4cd21ec36cf894bafe57069501d610220bec817405db17aeb78d31f4ed",
+      "expected": "tests/compat/expected/list-invalid-managed.json",
+      "normalized_sha256": "865d1eebb0a6b3c5e342d4e6da0e1d4dfc2fa8efe93c56889d25534b99286c1f",
+      "raw_directory": "list-invalid-managed-3517051541",
+      "raw_sha256": "21e53583bbafa51753628ab803b0010cf7043d77a0c62ff5f33dd5ee3daef9c4",
+      "executable": "cli",
+      "exit": 64
+    },
+    {
+      "case": "list-numeric-metadata",
+      "fixture": "tests/compat/fixtures/list-numeric-metadata.json",
+      "fixture_sha256": "434998ffc58aa0a9134c0143b6f5459ae340a4dbd2a9aaeac7507f98ef34cb0e",
+      "original_fixture_sha256": "434998ffc58aa0a9134c0143b6f5459ae340a4dbd2a9aaeac7507f98ef34cb0e",
+      "expected": "tests/compat/expected/list-numeric-metadata.json",
+      "normalized_sha256": "9c8ce706b1594305703b6f4e3574c9cfd310952ec45ff0c59cb6b7b2d357cde2",
+      "raw_directory": "list-numeric-metadata-2197348372",
+      "raw_sha256": "9214b50465767c71dd34430aeb0509e6ed2dbcfeeaba17aa85263480535e2650",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "list-postarg-option",
+      "fixture": "tests/compat/fixtures/list-postarg-option.json",
+      "fixture_sha256": "109181a9278d796a89cf54fdd462244ed8c452787efb43f89cf49bfe7d7d0602",
+      "original_fixture_sha256": "109181a9278d796a89cf54fdd462244ed8c452787efb43f89cf49bfe7d7d0602",
+      "expected": "tests/compat/expected/list-postarg-option.json",
+      "normalized_sha256": "409a220dec1e7f3178e523b58c2dcf563f24e54b99e27233d9a71b2b69b6b1ad",
+      "raw_directory": "list-postarg-option-3001229294",
+      "raw_sha256": "4fd246c077f5f7cc632e6db7a07d7486a51e08b337aaa339994dbeb211f57cfd",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "list-unmanaged",
+      "fixture": "tests/compat/fixtures/list-unmanaged.json",
+      "fixture_sha256": "16b537d362fef4fefcb60166c6a6d6fd332dbaf59827dc47910e9e4a1eb29bf3",
+      "original_fixture_sha256": "16b537d362fef4fefcb60166c6a6d6fd332dbaf59827dc47910e9e4a1eb29bf3",
+      "expected": "tests/compat/expected/list-unmanaged.json",
+      "normalized_sha256": "060fd83c242caec622449ce7e425827aaadb80e2edd2e19bb9d886ad765bad78",
+      "raw_directory": "list-unmanaged-2778857934",
+      "raw_sha256": "5a24dc8cdde0a3cd465488a54b5a4fb662fb661a828e727abcb53344954e144c",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "parser-help",
+      "fixture": "tests/compat/fixtures/parser-help.json",
+      "fixture_sha256": "e9f9d0134944d7367d48c11ceacfdff4e9ba05826decc6d6bd8a7304d6e71c0f",
+      "original_fixture_sha256": "e9f9d0134944d7367d48c11ceacfdff4e9ba05826decc6d6bd8a7304d6e71c0f",
+      "expected": "tests/compat/expected/parser-help.json",
+      "normalized_sha256": "6c175b91b02b68bd14fd0796fa36b67574f162f8555f5ef6112091c14c59fb48",
+      "raw_directory": "parser-help-1445517187",
+      "raw_sha256": "79bc96c1efd61f4b5e820993e9a60bedf3dac023dd46c6cc936ce1fe1a62a1bb",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "parser-version",
+      "fixture": "tests/compat/fixtures/parser-version.json",
+      "fixture_sha256": "5c073b6663d03e5dcc9d398c85b37357bd951cd7b51bde89594540d88b705526",
+      "original_fixture_sha256": "5c073b6663d03e5dcc9d398c85b37357bd951cd7b51bde89594540d88b705526",
+      "expected": "tests/compat/expected/parser-version.json",
+      "normalized_sha256": "3d826089738e6f73fcee0b5704433a761a4b74080c6d33fb77c24e75c2f17c5f",
+      "raw_directory": "parser-version-33219701",
+      "raw_sha256": "d6bcd06dc6335fdd6645e4d40743f55fc50dddc8a833c20b84f4dbc90508a15d",
+      "executable": "cli",
+      "exit": 1
+    },
+    {
+      "case": "selection-attr-tag",
+      "fixture": "tests/compat/fixtures/selection-attr-tag.json",
+      "fixture_sha256": "56c0e18c302263279cb84c820efc6a10b29f14ca3878ece62f95ef836bfad131",
+      "original_fixture_sha256": "56c0e18c302263279cb84c820efc6a10b29f14ca3878ece62f95ef836bfad131",
+      "expected": "tests/compat/expected/selection-attr-tag.json",
+      "normalized_sha256": "88e84a9213020edb1581e3fcd61e95cb04dc853cce829e306c04d3f392370a14",
+      "raw_directory": "selection-attr-tag-275761359",
+      "raw_sha256": "c3a46dc5a0f259a9ed6eeac60da61de0ea1357cc88859474c7b649e6d5a57dc8",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "selection-brace",
+      "fixture": "tests/compat/fixtures/selection-brace.json",
+      "fixture_sha256": "cd35ce58c51824d02ec7c5260be2ad7c0f4e8fe3952d65b7dc130d1da69f4252",
+      "original_fixture_sha256": "cd35ce58c51824d02ec7c5260be2ad7c0f4e8fe3952d65b7dc130d1da69f4252",
+      "expected": "tests/compat/expected/selection-brace.json",
+      "normalized_sha256": "3d49070c5dd1a708ff11fb9ea18b966c6d834f4de7b31b1c49d2d0713256f031",
+      "raw_directory": "selection-brace-2266942192",
+      "raw_sha256": "dbb6942434a09e1854e6f1cd27ae231f2b351409dbeabc73b94a7a2049ffef2a",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "selection-dot",
+      "fixture": "tests/compat/fixtures/selection-dot.json",
+      "fixture_sha256": "cd09cf259471dd741b6837a8b657f6ac28725a60c64f52039ad6a7dcfb5a0552",
+      "original_fixture_sha256": "cd09cf259471dd741b6837a8b657f6ac28725a60c64f52039ad6a7dcfb5a0552",
+      "expected": "tests/compat/expected/selection-dot.json",
+      "normalized_sha256": "9ca7a52d6d89442937dbf1c505d5b871ec431357e93a1768a52a7817a661049f",
+      "raw_directory": "selection-dot-1030157374",
+      "raw_sha256": "670931afb80725eb8c34d31b8e66232eb6d9b63a79de69baf84a033516352910",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "selection-escaped",
+      "fixture": "tests/compat/fixtures/selection-escaped.json",
+      "fixture_sha256": "58e4ddabf0ea469b1b95d5ae78bae3828008de4c27a4088adeffd79ae66d7e1f",
+      "original_fixture_sha256": "58e4ddabf0ea469b1b95d5ae78bae3828008de4c27a4088adeffd79ae66d7e1f",
+      "expected": "tests/compat/expected/selection-escaped.json",
+      "normalized_sha256": "0f748972f615d27f9757d304dc16f3a878d013150700956113efee3fb9fd2ede",
+      "raw_directory": "selection-escaped-2075529875",
+      "raw_sha256": "837b71c9ef4104700a0e21b8a1fa334837af45411db4ad467efa145529a982d7",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "selection-key",
+      "fixture": "tests/compat/fixtures/selection-key.json",
+      "fixture_sha256": "067aac1875d7c418d1a4a51758b82a4c6869e0915b7ed1b95495240e7ed82c32",
+      "original_fixture_sha256": "067aac1875d7c418d1a4a51758b82a4c6869e0915b7ed1b95495240e7ed82c32",
+      "expected": "tests/compat/expected/selection-key.json",
+      "normalized_sha256": "b32f7d637da4a1dae2343f4378191205fcbaaad7bd84b323cff23f715c277b02",
+      "raw_directory": "selection-key-242685697",
+      "raw_sha256": "bd6b29a5be86d90042854ebc43a1ba43613fbd6726619098e392da0f36e9c898",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "selection-literal-dot",
+      "fixture": "tests/compat/fixtures/selection-literal-dot.json",
+      "fixture_sha256": "1c368e0d188463ae2d3b356be3e939256fcceca5d5d1ab0d14bb8fd64c757c0b",
+      "original_fixture_sha256": "1c368e0d188463ae2d3b356be3e939256fcceca5d5d1ab0d14bb8fd64c757c0b",
+      "expected": "tests/compat/expected/selection-literal-dot.json",
+      "normalized_sha256": "02b01f5aed17173194ee0b72f3751afeb633ee785dc9ede3d467f6bc4603d258",
+      "raw_directory": "selection-literal-dot-3112493452",
+      "raw_sha256": "fcb9ca053553c36e4ff1b61465a08eaacd0522db43633e7277877ccfd2e71059",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "selection-malformed-brace",
+      "fixture": "tests/compat/fixtures/selection-malformed-brace.json",
+      "fixture_sha256": "ddeab882eb94f5968c032c9ea46de2f72831e1f88d63090ec4692311959600a0",
+      "original_fixture_sha256": "ddeab882eb94f5968c032c9ea46de2f72831e1f88d63090ec4692311959600a0",
+      "expected": "tests/compat/expected/selection-malformed-brace.json",
+      "normalized_sha256": "6c1f5d0d9255fdf76486ba1f37f581916d752d9610fc055ced2832db53aa83cd",
+      "raw_directory": "selection-malformed-brace-647980419",
+      "raw_sha256": "84b95c980e2778a7c5dd568d5494e7b0b65dee5df15351d9c85b99bc34497e9c",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "selection-metadata-values",
+      "fixture": "tests/compat/fixtures/selection-metadata-values.json",
+      "fixture_sha256": "996bb2986f3c374c95ca9438406539bf5961132028dbfbe29d7fb52b59bfb064",
+      "original_fixture_sha256": "996bb2986f3c374c95ca9438406539bf5961132028dbfbe29d7fb52b59bfb064",
+      "expected": "tests/compat/expected/selection-metadata-values.json",
+      "normalized_sha256": "dad3d6c0130957fe1859f4c7b88e4c9c1019ab3092479b27f97c3ac048e4ee26",
+      "raw_directory": "selection-metadata-values-2322156456",
+      "raw_sha256": "6b1411b69bd30500fe56ffb809103197c4c354ce30f63b7aca65971b7c87e270",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "selection-negative-metadata",
+      "fixture": "tests/compat/fixtures/selection-negative-metadata.json",
+      "fixture_sha256": "09f54f8a562f97191207276205c1d0cd0f99fc05b22f5910105e297026e03557",
+      "original_fixture_sha256": "09f54f8a562f97191207276205c1d0cd0f99fc05b22f5910105e297026e03557",
+      "expected": "tests/compat/expected/selection-negative-metadata.json",
+      "normalized_sha256": "d1976c1e4066859b2e468333b3e681da2ae5930f6861d54c3a817076d6e6e5fc",
+      "raw_directory": "selection-negative-metadata-930937650",
+      "raw_sha256": "88e6d99560ba7148887a43319587b6a1085760b8a2945c2e10eb1ea71e0dda6e",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "selection-slash",
+      "fixture": "tests/compat/fixtures/selection-slash.json",
+      "fixture_sha256": "635e3a8771dcbd690106fadd9435814c00c7941afd0ef0d44795f85ac1172d5b",
+      "original_fixture_sha256": "635e3a8771dcbd690106fadd9435814c00c7941afd0ef0d44795f85ac1172d5b",
+      "expected": "tests/compat/expected/selection-slash.json",
+      "normalized_sha256": "7b0af5d68ea0f39509629d70aeac98442d3d51864048656da0cb7cf9450c1560",
+      "raw_directory": "selection-slash-2610376345",
+      "raw_sha256": "d59d94a9ce6e1e75a8a6da99a00b389b2fc1d79f4582f2ba8b621b63a7c3f727",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "site-kernels-corrupt",
+      "fixture": "tests/compat/fixtures/site-kernels-corrupt.json",
+      "fixture_sha256": "617ebfc0a6d4097da586139b71d189a8b0559dbfdd0598aeef158fe39c65c95d",
+      "original_fixture_sha256": "617ebfc0a6d4097da586139b71d189a8b0559dbfdd0598aeef158fe39c65c95d",
+      "expected": "tests/compat/expected/site-kernels-corrupt.json",
+      "normalized_sha256": "6d9eeef857b32d7cb9ea7fefba173a8a0f96a8b097e55edf8ec3e22794623cb1",
+      "raw_directory": "site-kernels-corrupt-1386419780",
+      "raw_sha256": "0384ea743f744ffd5c858c93003da0d5edee2cb7db744f6d29ead58768bdaca7",
+      "executable": "cli",
+      "exit": 1
+    },
+    {
+      "case": "site-kernels-deploy-prepare",
+      "fixture": "tests/compat/fixtures/site-kernels-deploy-prepare.json",
+      "fixture_sha256": "f7b475e97666ad66e9f99fed91de598914652d0c3a816b86f87e2d5bcacb0f6e",
+      "original_fixture_sha256": "f7b475e97666ad66e9f99fed91de598914652d0c3a816b86f87e2d5bcacb0f6e",
+      "expected": "tests/compat/expected/site-kernels-deploy-prepare.json",
+      "normalized_sha256": "5bf285fa2e524871f46c87bb796ecf4809d4a5a4295a3a635059ab23f9669514",
+      "raw_directory": "site-kernels-deploy-prepare-1836789153",
+      "raw_sha256": "6d4a992551ba856880471d177e5f3bd1831305b019cde468cd64e84d27d13070",
+      "executable": "hooks",
+      "exit": 0
+    },
+    {
+      "case": "site-kernels-empty",
+      "fixture": "tests/compat/fixtures/site-kernels-empty.json",
+      "fixture_sha256": "ece860f1cd94ae146016a1d9698254e0664731beac2e4f74c6ce1e4ea5a232fd",
+      "original_fixture_sha256": "ece860f1cd94ae146016a1d9698254e0664731beac2e4f74c6ce1e4ea5a232fd",
+      "expected": "tests/compat/expected/site-kernels-empty.json",
+      "normalized_sha256": "fd8b208ce6d3860e1f784c3e6a96bb6a6a261d867095583fbe67d4e0de1f737a",
+      "raw_directory": "site-kernels-empty-985144879",
+      "raw_sha256": "0a847e359d25f69081f95e1c6fefffbb5fa332dc85e6ddb98201ce16553dcd0e",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "site-kernels-manual",
+      "fixture": "tests/compat/fixtures/site-kernels-manual.json",
+      "fixture_sha256": "e3a87f55042ae3cde32c444c2e9db4c572dfadc0018c2a86db36c0cf61507f89",
+      "original_fixture_sha256": "e3a87f55042ae3cde32c444c2e9db4c572dfadc0018c2a86db36c0cf61507f89",
+      "expected": "tests/compat/expected/site-kernels-manual.json",
+      "normalized_sha256": "7cdb35f2e7f001e3c3c96989f4ae3333086049092041299f8b15242b3ff57ff8",
+      "raw_directory": "site-kernels-manual-3109909088",
+      "raw_sha256": "265e30dec9d9869913a3bd7d8ee233f237a415594688aa99d8a3acf03643f659",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "site-kernels-missing",
+      "fixture": "tests/compat/fixtures/site-kernels-missing.json",
+      "fixture_sha256": "e961fd26002b5fb4ad925c19f3cb930f4eb003a9b441211b485964cd2c616e9f",
+      "original_fixture_sha256": "e961fd26002b5fb4ad925c19f3cb930f4eb003a9b441211b485964cd2c616e9f",
+      "expected": "tests/compat/expected/site-kernels-missing.json",
+      "normalized_sha256": "a0241647adc0654cd05e2abb738cfadd0ecdca322fb970e506e65628abe2b45b",
+      "raw_directory": "site-kernels-missing-41122727",
+      "raw_sha256": "2c407f9f289e1b28f02fe5be1b5281523df54b992658c077488e1073f43d6e64",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "site-kernels-partial-failure",
+      "fixture": "tests/compat/fixtures/site-kernels-partial-failure.json",
+      "fixture_sha256": "195ea3dc8b0e6fc15bf47eaf7628c816a94cd2be301f9d98e4c255abaf8cd1be",
+      "original_fixture_sha256": "195ea3dc8b0e6fc15bf47eaf7628c816a94cd2be301f9d98e4c255abaf8cd1be",
+      "expected": "tests/compat/expected/site-kernels-partial-failure.json",
+      "normalized_sha256": "ca098d8c7eb70d87834ebe6c3fc8e187c3a7b26029c59fa3bb4f1ff65c60c5eb",
+      "raw_directory": "site-kernels-partial-failure-522938782",
+      "raw_sha256": "100ccbd9a3c6d253c9b43c86e14d120ee8c78ab767b2cbe47054eaf5f44ba624",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "site-netboot-rediscover",
+      "fixture": "tests/compat/fixtures/site-netboot-rediscover.json",
+      "fixture_sha256": "0b6ac0a2394911d0ac26e123c6ba7aba85f7b71a0e1f57db72ca303f5e63c51f",
+      "original_fixture_sha256": "0b6ac0a2394911d0ac26e123c6ba7aba85f7b71a0e1f57db72ca303f5e63c51f",
+      "expected": "tests/compat/expected/site-netboot-rediscover.json",
+      "normalized_sha256": "41199f408d73c56a0855b000539a927afb224391b917039a01c8f1ac5e910eb1",
+      "raw_directory": "site-netboot-rediscover-1895239241",
+      "raw_sha256": "dad1b737186a04f40926d656247334244c18da4570ec9bf5d5862d52b6f513fb",
+      "executable": "hooks",
+      "exit": 0
+    },
+    {
+      "case": "status-offline",
+      "fixture": "tests/compat/fixtures/status-offline.json",
+      "fixture_sha256": "952fbe6f00baeb3a914945bba5a9b82e4c42cf178e325c13e630b170f644b2a9",
+      "original_fixture_sha256": "952fbe6f00baeb3a914945bba5a9b82e4c42cf178e325c13e630b170f644b2a9",
+      "expected": "tests/compat/expected/status-offline.json",
+      "normalized_sha256": "fdcf4afa4f6922c6a2d413bde0435b6f2c6b8f741a4fe45a48e99450fd7d9ebf",
+      "raw_directory": "status-offline-780339652",
+      "raw_sha256": "61f50b5f1286b69a5aa552463cb56d5c7657de653654bd52d24d02c8994f94da",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "status-old-node",
+      "fixture": "tests/compat/fixtures/status-old-node.json",
+      "fixture_sha256": "35bad1edca0db630f1470e85d286a4d4b7e9d4c1a8bdd940965386b1c73f8a9d",
+      "original_fixture_sha256": "35bad1edca0db630f1470e85d286a4d4b7e9d4c1a8bdd940965386b1c73f8a9d",
+      "expected": "tests/compat/expected/status-old-node.json",
+      "normalized_sha256": "e7c9e102606ccc8e8ab5bff09dfb900ef4348eb9d808ce93e3d3ddd75d3af427",
+      "raw_directory": "status-old-node-1883375594",
+      "raw_sha256": "feee4f80874c91b3fab6729be40edb31b92971004bf2c47954d40e2eac9dc465",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "status-query-roles",
+      "fixture": "tests/compat/fixtures/status-query-roles.json",
+      "fixture_sha256": "2fcd8ed4bab571d7b86747c56722e0a15bbd3c500108b103d76dff6df17f138e",
+      "original_fixture_sha256": "2fcd8ed4bab571d7b86747c56722e0a15bbd3c500108b103d76dff6df17f138e",
+      "expected": "tests/compat/expected/status-query-roles.json",
+      "normalized_sha256": "73aa0c1ba6bd760225a5f97ea23413e36d64eb985077cddc8d87bc130df9c6e6",
+      "raw_directory": "status-query-roles-2791134517",
+      "raw_sha256": "e7ac33ac67243806aad54273e01c79ed9734908c9f2ee3b17873822026937b60",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "ui-kernels-confirm",
+      "fixture": "tests/compat/fixtures/ui-kernels-confirm.json",
+      "fixture_sha256": "0c905991b1d5e1af5ac7e915aac3f3728c4135afa921eff6230f91d970c4d14d",
+      "original_fixture_sha256": "0c905991b1d5e1af5ac7e915aac3f3728c4135afa921eff6230f91d970c4d14d",
+      "expected": "tests/compat/expected/ui-kernels-confirm.json",
+      "normalized_sha256": "aac60e90000ece83de0eec474bdcf7b79f4345d07c1f77cc74eb994431628e3a",
+      "raw_directory": "ui-kernels-confirm-985653938",
+      "raw_sha256": "58c2bff2a709bfb0e53f6fd449629d3c5087e14cc37d8de88bd0b28b28bf87bb",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "ui-status-confirm",
+      "fixture": "tests/compat/fixtures/ui-status-confirm.json",
+      "fixture_sha256": "23c7e44b9ba41ba0d7a17380c1b46ff15d60f7fced4c6959d1c4da5f80693e33",
+      "original_fixture_sha256": "23c7e44b9ba41ba0d7a17380c1b46ff15d60f7fced4c6959d1c4da5f80693e33",
+      "expected": "tests/compat/expected/ui-status-confirm.json",
+      "normalized_sha256": "1a8c14e573cd125eeec12c365cdcd6200972d045f1ae82680b51ce0b67699298",
+      "raw_directory": "ui-status-confirm-1290467503",
+      "raw_sha256": "a3cf2c88c2ab3d6fae397c3020f6eef2d3b7638acab480f466b92c7831c528fa",
+      "executable": "cli",
+      "exit": 0
+    },
+    {
+      "case": "ui-status-tty",
+      "fixture": "tests/compat/fixtures/ui-status-tty.json",
+      "fixture_sha256": "7e37dad8824111f16dac3ac48d3fee042cdb677933ac739b94d5c416ac1f7afc",
+      "original_fixture_sha256": "7e37dad8824111f16dac3ac48d3fee042cdb677933ac739b94d5c416ac1f7afc",
+      "expected": "tests/compat/expected/ui-status-tty.json",
+      "normalized_sha256": "5a5c0d4fc7e5ad844a4caffd424d9c5eb7680d1a2ecff440cc4c701ba83ef829",
+      "raw_directory": "ui-status-tty-2481748363",
+      "raw_sha256": "cb340561f2d97434838bf3154ddebeeb43919b56a679f0ee4740a0c3f2fb4fce",
+      "executable": "cli",
+      "exit": 0
+    }
+  ]
+}
