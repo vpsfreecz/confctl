@@ -3,18 +3,18 @@ package cli
 // Declarations follow the pinned Ruby lib/confctl/cli/app.rb. Usage is display
 // metadata, not a new handler argument-count policy.
 func switchOption(names []string, description string, def, negatable bool) OptionSpec {
-	return OptionSpec{Key: names[len(names)-1], Names: names, Kind: Switch, Default: Bool(def), Negatable: negatable, Description: description}
+	return OptionSpec{Key: names[len(names)-1], Names: names, Kind: Switch, Default: Bool(def), DefaultPresent: true, Negatable: negatable, Description: description}
 }
 func stringOption(names []string, description string) OptionSpec {
 	return OptionSpec{Key: names[len(names)-1], Names: names, Kind: String, Metavar: "arg", Description: description}
 }
 func repeatedOption(names []string, description string) OptionSpec {
 	o := stringOption(names, description)
-	o.Multiple, o.Default = true, List()
+	o.Multiple, o.Default, o.DefaultPresent = true, List(), true
 	return o
 }
 func integerOption(names []string, description, metavar string, def int) OptionSpec {
-	return OptionSpec{Key: names[len(names)-1], Names: names, Kind: Integer, Default: Int(def), Metavar: metavar, Description: description}
+	return OptionSpec{Key: names[len(names)-1], Names: names, Kind: Integer, Default: Int(def), DefaultPresent: true, Metavar: metavar, Description: description}
 }
 func filters() []OptionSpec {
 	return []OptionSpec{repeatedOption([]string{"a", "attr"}, "Filter by attribute"), repeatedOption([]string{"t", "tag"}, "Filter by tag")}
@@ -96,6 +96,7 @@ func leaf(path []string, summary, usage string, arguments []ArgumentSpec, opts [
 
 func BuiltinRegistry() *Registry {
 	color := stringOption([]string{"c", "color"}, "Toggle color mode")
+	color.DefaultPresent = true
 	color.Default, color.Choices = Str("auto"), []string{"always", "never", "auto"}
 	help := switchOption([]string{"h", "help"}, "Show this message", false, false)
 	root := group(nil, "Nix deployment configuration management tool")
@@ -135,7 +136,7 @@ func BuiltinRegistry() *Registry {
 			switchOption([]string{"enable-auto-rollback"}, "Enable auto-rollback", false, false),
 			switchOption([]string{"disable-auto-rollback"}, "Disable auto-rollback", false, false),
 			switchOption([]string{"reboot"}, "Reboot target systems after deployment", false, true),
-			{Key: "wait-online", Names: []string{"wait-online"}, Kind: String, Default: Str("600"), Metavar: "arg", Description: "Wait for the machine to boot"},
+			{Key: "wait-online", Names: []string{"wait-online"}, Kind: String, Default: Str("600"), DefaultPresent: true, Metavar: "arg", Description: "Wait for the machine to boot"},
 		}, nixOptions(), []OptionSpec{switchOption([]string{"health-checks"}, "Toggle health checks", true, true), switchOption([]string{"keep-going"}, "Do not abourt on failed health checks", false, true)})),
 		leaf([]string{"health-check"}, "Run machine health-checks", "[machine-pattern]", args("machine-pattern"), options(filters(), ConfirmationOptions(), []OptionSpec{integerOption([]string{"j", "max-jobs"}, "Maximum number of health-check jobs", "number", 5)})),
 	)

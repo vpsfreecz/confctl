@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,22 +13,22 @@ import (
 
 func Main(ctx context.Context, argv []string) int {
 	builtins := cli.BuiltinRegistry()
-	globals, commandArgv, err := builtins.ParseGlobals(argv)
-	if err != nil {
-		fmt.Fprint(os.Stderr, "error: "+err.Error()+"\n\n")
-		text, _ := builtins.Help(nil, 80)
-		fmt.Print(text)
-		return 64
-	}
+	globals, commandArgv, globalErr := builtins.ParseGlobals(argv)
 	// Keep the accepted version failure before any extension registry read.
-	if len(commandArgv) == 1 && commandArgv[0] == "--version" {
+	if globalErr == nil && len(commandArgv) == 1 && commandArgv[0] == "--version" {
 		fmt.Fprint(os.Stderr, "confctl: version unknown\nerror: confctl: version unknown\n")
 		return 1
 	}
-	registrations, err := ReadRegistry(os.Getenv("CONFCTL_EXTENSION_REGISTRY"))
+	registrations, err := LoadRegistry()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
+	}
+	if globalErr != nil {
+		fmt.Fprint(os.Stderr, "error: "+globalErr.Error()+"\n\n")
+		text, _ := builtins.Help(nil, 80)
+		fmt.Print(text)
+		return 64
 	}
 	registry, registered, err := commandRegistry(registrations)
 	if err != nil {
@@ -60,17 +61,20 @@ func Main(ctx context.Context, argv []string) int {
 		return 2
 	}
 	cmd := inv.Command.Path[0]
-	opts := handlerOptions(inv)
 	extensionCommand := inv.Command.Handler == cli.KnownExtension
 	var registration Registration
 	var command Command
 	if extensionCommand {
 		bound := registered[strings.Join(inv.Command.Path, " ")]
 		registration, command = bound.Registration, bound.Command
-		if len(opts.Args) > 1 {
-			fmt.Fprintln(os.Stderr, "error: unknown argument: "+strings.Join(opts.Args[1:], " "))
+		if err = checkExtensionArity(inv); err != nil {
+			fmt.Fprintln(os.Stderr, "error: "+err.Error())
 			return 64
 		}
+	}
+	var opts Options
+	if !extensionCommand || supportedRuntimeCommand(command) {
+		opts = handlerOptions(inv)
 	}
 	color := globals["color"].Value.String
 	e, err := New(ctx)
@@ -79,8 +83,8 @@ func Main(ctx context.Context, argv []string) int {
 		return 1
 	}
 	e.Color = color
-	e.Yes = opts.Yes
-	e.ShowTrace = opts.Trace
+	e.Yes = inv.Options["yes"].Value.Bool
+	e.ShowTrace = inv.Options["show-trace"].Value.Bool
 	logName := cmd
 	if extensionCommand {
 		logName = strings.Join(command.Path, "-")
@@ -89,7 +93,12 @@ func Main(ctx context.Context, argv []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	e.LogCLI(cmd, opts, commandArgv)
+	if !extensionCommand || supportedRuntimeCommand(command) {
+		e.LogCLI(cmd, opts, commandArgv)
+	} else {
+		b, _ := json.Marshal(commandInvocation(e.Root, registered[strings.Join(inv.Command.Path, " ")], inv, commandArgv))
+		e.logText(string(b) + "\n")
+	}
 	fail := func(err error, code int) int {
 		fmt.Fprintf(os.Stderr, "\nLog file: %s\n", e.Log.Name())
 		fmt.Fprintln(os.Stderr, "error: "+err.Error())
@@ -98,7 +107,7 @@ func Main(ctx context.Context, argv []string) int {
 	success := false
 	defer func() { e.CloseLog(success) }()
 	if extensionCommand {
-		in := extensionInvocation(e.Root, registration, command, opts, commandArgv)
+		in := commandInvocation(e.Root, registered[strings.Join(inv.Command.Path, " ")], inv, commandArgv)
 		code, err := e.Invoke(registration, command.Handler, in)
 		if err != nil {
 			return fail(err, 1)

@@ -1,5 +1,6 @@
 {
   "schema": 1,
+  "bound_sources": [],
   "extensions": [
     {
       "id": "vpsfree.netboot",

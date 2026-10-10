@@ -21,11 +21,14 @@ The compatibility driver and immutable Ruby observations live in
 [docs/compatibility](../../docs/compatibility/README.md). Builds and comparison
 results are snapshot evidence; this README makes no performance claim.
 
-The packaged static registry is
-`share/confctl-go-prototype/registry.json`. Set `CONFCTL_EXTENSION_REGISTRY` to
-that absolute file to enable `runtime-kernels update`. The test-only
-`hook-driver` executes `rediscover.after-write` and `deploy.prepare`; the
-prototype has no native rediscover/deploy implementation. Netboot output uses
+The packaged `share/confctl-go-prototype/registry.json` is a fixture template
+with empty `bound_sources`, so it is not a valid operational registry. The
+compatibility driver copies it outside the configuration tree, binds the actual
+fixture `flake.nix` bytes and supplies both `CONFCTL_EXTENSION_REGISTRY` and
+`CONFCTL_EXTENSION_ROOT`. Original Ruby runs use no candidate preparation.
+The test-only `hook-driver` uses the same bound loader and executes
+`rediscover.after-write` and `deploy.prepare`; the prototype has no native
+rediscover/deploy implementation. Netboot output uses
 `cluster/netbootable.nix`; kernel state retains `configs/node/kernels.json`.
 Both handlers are separate executable processes using the [public experimental
 SDK](../../extension/README.md), including when the registry points to the same site
@@ -37,7 +40,8 @@ and drives parsing and the execution guard. Existing help text files are test
 references; the executable does not load them. Root and `ls` help retain their
 reference bytes. Detailed status help limits execution to `--generation none`;
 other unavailable leaf and group help identifies the current capabilities.
-Help reads only the explicit registry JSON and runs no tools or extensions.
+Help validates the explicit registry, live root and finite declared source
+bytes, and runs no tools or extensions.
 
 Parsing stops at the first positional or `--`, preserving the remaining tokens
 for the handler and log. A later `--help` is a literal argument. Displayed usage
@@ -49,12 +53,19 @@ signed radix and separator syntax and arbitrary precision. Nix count options
 remain strings. Framework abbreviations and full terminal-width parity remain
 unverified.
 
-Extension registration still accepts only the packaged schema-1
-`runtime-kernels update` shape. Its validated metadata joins the same command
-tree for parsing and help. Other shapes and unknown registry fields are rejected
-before effects. A hook-only netboot registry adds no command, and help works
-even when the declared extension executable is absent. The extension SDK,
-invocation fields, services and hook-driver boundaries remain unchanged.
+Schema1 registrations now declare general static groups, executable commands,
+option aliases/types/defaults and required/optional/variadic arguments through
+the same command tree. Both authority variables absent means builtin-only;
+partial/empty pairs, root mismatches, stale or symlinked bound files, invalid
+declarations and collisions fail before help, logs or external processes.
+A hook-only registry adds no command. Help works when an absolute declared
+executable is missing. Arity is checked before execution. Only the finite
+`bound_sources` bytes are checked; unrelated edits are allowed and there is no
+automatic rebinding or concurrent-edit lock. The public [SDK contract](../../extension/README.md)
+describes default presence and exact JSON-number options. The existing
+runtime-kernels payload/log adapter, services, supervisor and hook-driver
+boundaries remain unchanged. No production registry or configuration operation
+is adopted by this slice.
 
 The following table is checked against the command registry:
 

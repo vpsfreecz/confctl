@@ -27,6 +27,10 @@ func TestCLIStage1Subprocess(t *testing.T) {
 }
 
 func actualCLI(t *testing.T, argv []string, registry string) (int, string, string, string) {
+	return actualCLIWithSetup(t, argv, registry, nil)
+}
+
+func actualCLIWithSetup(t *testing.T, argv []string, registry string, setup func(string, string, *[]string)) (int, string, string, string) {
 	t.Helper()
 	root := t.TempDir()
 	configuration := filepath.Join(root, "configuration")
@@ -49,7 +53,32 @@ func actualCLI(t *testing.T, argv []string, registry string) (int, string, strin
 	b, _ := json.Marshal(argv)
 	cmd := exec.Command(os.Args[0], "-test.run=^TestCLIStage1Subprocess$")
 	cmd.Dir = configuration
-	cmd.Env = append(os.Environ(), "CONFCTL_STAGE1_SUBPROCESS=1", "CONFCTL_STAGE1_ARGV="+string(b), "CONFCTL_EXTENSION_REGISTRY="+registry, "CONFCTL_STAGE1_SENTINEL="+marker, "PATH="+tools+":"+os.Getenv("PATH"), "PAGER=", "HOME="+root)
+	var env []string
+	for _, value := range os.Environ() {
+		if !strings.HasPrefix(value, "CONFCTL_EXTENSION_REGISTRY=") && !strings.HasPrefix(value, "CONFCTL_EXTENSION_ROOT=") {
+			env = append(env, value)
+		}
+	}
+	if registry != "" {
+		// Only test input is bound here. Invalid JSON is retained for rejection cases.
+		rb, readErr := os.ReadFile(registry)
+		if readErr == nil {
+			if r, decodeErr := decodeRegistry(rb); decodeErr == nil {
+				r = bindTestRegistry(t, configuration, r)
+				rb, _ = json.Marshal(r)
+				registry = filepath.Join(root, "registry.json")
+				if err = os.WriteFile(registry, rb, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		env = append(env, "CONFCTL_EXTENSION_REGISTRY="+registry, "CONFCTL_EXTENSION_ROOT="+configuration)
+	}
+	if setup != nil {
+		setup(configuration, registry, &env)
+	}
+	before := testConfigurationState(t, configuration)
+	cmd.Env = append(env, "CONFCTL_STAGE1_SUBPROCESS=1", "CONFCTL_STAGE1_ARGV="+string(b), "CONFCTL_STAGE1_SENTINEL="+marker, "PATH="+tools+":"+os.Getenv("PATH"), "PAGER=", "HOME="+root)
 	var out, stderr strings.Builder
 	cmd.Stdout, cmd.Stderr = &out, &stderr
 	err = cmd.Run()
@@ -68,9 +97,9 @@ func actualCLI(t *testing.T, argv []string, registry string) (int, string, strin
 	} else if !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
-	files, err := os.ReadDir(configuration)
-	if err != nil || len(files) != 0 {
-		t.Fatal("pre-execution path changed configuration", argv, files, err)
+	after := testConfigurationState(t, configuration)
+	if !reflect.DeepEqual(before, after) {
+		t.Fatal("pre-execution path changed configuration", argv, before, after)
 	}
 	return code, out.String(), stderr.String(), configuration
 }
@@ -174,6 +203,85 @@ func TestActualCLIIntegerParsingHasNoEffects(t *testing.T) {
 	}
 }
 
+func TestActualCLIGlobalErrorsRespectRegistryAuthority(t *testing.T) {
+	p := writeTestRegistry(t, genericTestRegistry(t))
+	help := referenceRecord(t, "parser-help").Stdout
+	version := referenceRecord(t, "parser-version")
+	for _, authority := range []struct {
+		name     string
+		registry string
+		setup    func(string, string, *[]string)
+		stderr   string
+	}{
+		{name: "absent"},
+		{name: "valid", registry: p},
+		{
+			name: "partial-registry", registry: p,
+			setup:  func(_, _ string, env *[]string) { replaceAuthority(env, "CONFCTL_EXTENSION_ROOT", nil) },
+			stderr: "extension registry requires nonempty CONFCTL_EXTENSION_REGISTRY and CONFCTL_EXTENSION_ROOT\n",
+		},
+		{
+			name: "partial-root", registry: p,
+			setup:  func(_, _ string, env *[]string) { replaceAuthority(env, "CONFCTL_EXTENSION_REGISTRY", nil) },
+			stderr: "extension registry requires nonempty CONFCTL_EXTENSION_REGISTRY and CONFCTL_EXTENSION_ROOT\n",
+		},
+		{
+			name: "empty", registry: p,
+			setup: func(_, _ string, env *[]string) {
+				empty := ""
+				replaceAuthority(env, "CONFCTL_EXTENSION_REGISTRY", &empty)
+				replaceAuthority(env, "CONFCTL_EXTENSION_ROOT", &empty)
+			},
+			stderr: "extension registry requires nonempty CONFCTL_EXTENSION_REGISTRY and CONFCTL_EXTENSION_ROOT\n",
+		},
+		{
+			name: "wrong-root", registry: p,
+			setup: func(root, _ string, env *[]string) {
+				parent := filepath.Dir(root)
+				replaceAuthority(env, "CONFCTL_EXTENSION_ROOT", &parent)
+			},
+			stderr: "extension root differs from current directory\n",
+		},
+		{
+			name: "stale", registry: p,
+			setup: func(root, _ string, _ *[]string) {
+				if err := os.WriteFile(filepath.Join(root, "flake.nix"), []byte("changed"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			},
+			stderr: "stale bound source \"flake.nix\"\n",
+		},
+	} {
+		t.Run(authority.name, func(t *testing.T) {
+			for _, tc := range []struct {
+				name, message string
+				argv          []string
+			}{
+				{"unknown", "invalid option: --bad", []string{"--bad"}},
+				{"missing-value", "missing argument: --color", []string{"--color"}},
+				{"invalid-prefix-version", "invalid option: --bad", []string{"--bad", "--version"}},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					wantCode, wantOut, wantErr := 64, help, "error: "+tc.message+"\n\n"
+					if authority.stderr != "" {
+						wantCode, wantOut, wantErr = 1, "", authority.stderr
+					}
+					code, out, stderr, _ := actualCLIWithSetup(t, tc.argv, authority.registry, authority.setup)
+					if code != wantCode || out != wantOut || stderr != wantErr {
+						t.Fatalf("argv %q: exit=%d stdout=%q stderr=%q; want exit=%d stdout=%q stderr=%q", tc.argv, code, out, stderr, wantCode, wantOut, wantErr)
+					}
+				})
+			}
+			for _, argv := range [][]string{{"--version"}, {"--color", "never", "--version"}} {
+				code, out, stderr, _ := actualCLIWithSetup(t, argv, authority.registry, authority.setup)
+				if code != version.Exit || out != version.Stdout || stderr != version.Stderr {
+					t.Fatal("valid version-only bypass changed", argv, code, out, stderr)
+				}
+			}
+		})
+	}
+}
+
 func TestActualCLIRegistryFailuresHaveNoEffects(t *testing.T) {
 	for _, body := range []string{
 		`not JSON`,
@@ -261,7 +369,7 @@ func TestRegistryCollisionUsesBuiltinTree(t *testing.T) {
 		if err := os.WriteFile(p, b, 0600); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := ReadRegistry(p); err == nil || !strings.Contains(err.Error(), "collision") {
+		if _, _, err := commandRegistry(r); err == nil || !strings.Contains(err.Error(), "collision") {
 			t.Fatal(c.Path, err)
 		}
 		code, _, _, _ := actualCLI(t, []string{"--help"}, p)
@@ -357,4 +465,42 @@ func TestLogCLIOriginalPPReference(t *testing.T) {
 	if string(b) != want {
 		t.Fatalf("PP log changed:\n%s\nwant:\n%s", b, want)
 	}
+}
+
+func testConfigurationState(t *testing.T, root string) map[string]string {
+	t.Helper()
+	state := map[string]string{}
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == root {
+			return nil
+		}
+		rel, _ := filepath.Rel(root, path)
+		info, err := os.Lstat(path)
+		if err != nil {
+			return err
+		}
+		value := info.Mode().String()
+		if info.Mode()&os.ModeSymlink != 0 {
+			target, err := os.Readlink(path)
+			if err != nil {
+				return err
+			}
+			value += target
+		} else if info.Mode().IsRegular() {
+			b, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			value += fmt.Sprintf("%x", sha256.Sum256(b))
+		}
+		state[rel] = value
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return state
 }

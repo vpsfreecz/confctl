@@ -315,7 +315,7 @@ func serve(handlers map[string]Handler, required []string) int {
 				return nil, fmt.Errorf("run before initialize")
 			}
 			var run Run
-			if e := json.Unmarshal(b, &run); e != nil {
+			if e := decodeRun(b, &run); e != nil {
 				return nil, e
 			}
 			handler := handlers[run.Handler]
@@ -344,4 +344,19 @@ func serve(handlers map[string]Handler, required []string) int {
 	_ = out.Close()
 	_ = in.Close()
 	return code
+}
+
+// Run is the arbitrary JSON option boundary. Preserve numeric tokens and accept
+// exactly one JSON value; Peer.Call already applies this policy to responses.
+func decodeRun(b []byte, run *Run) error {
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.UseNumber()
+	if err := d.Decode(run); err != nil {
+		return err
+	}
+	var trailing json.RawMessage
+	if err := d.Decode(&trailing); err != io.EOF {
+		return fmt.Errorf("trailing run JSON")
+	}
+	return nil
 }

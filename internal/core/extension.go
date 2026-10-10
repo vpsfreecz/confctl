@@ -19,103 +19,6 @@ import (
 
 var Services = []string{"settings.get", "machines.select", "exec.run", "ui.write", "ui.machines", "ui.table", "ui.confirm", "format.nix"}
 
-type Registry struct {
-	Schema     int            `json:"schema"`
-	Extensions []Registration `json:"extensions"`
-}
-type Registration struct {
-	ID       string      `json:"id"`
-	Protocol ext.Version `json:"protocol"`
-	Argv     []string    `json:"argv"`
-	Groups   []Group     `json:"groups"`
-	Commands []Command   `json:"commands"`
-	Hooks    []Hook      `json:"hooks"`
-}
-type Group struct {
-	Path        []string `json:"path"`
-	Description string   `json:"description"`
-}
-type Command struct {
-	Path        []string         `json:"path"`
-	Handler     string           `json:"handler"`
-	Description string           `json:"description"`
-	OptionSets  []string         `json:"option_sets"`
-	Arguments   []map[string]any `json:"arguments"`
-}
-type Hook struct {
-	Event   string `json:"event"`
-	Handler string `json:"handler"`
-	Order   int    `json:"order"`
-}
-
-func ReadRegistry(path string) (Registry, error) {
-	var r Registry
-	if path == "" {
-		return r, nil
-	}
-	b, e := os.ReadFile(path)
-	if e != nil {
-		return r, e
-	}
-	d := json.NewDecoder(strings.NewReader(string(b)))
-	d.DisallowUnknownFields()
-	if e = d.Decode(&r); e != nil {
-		return r, e
-	}
-	var trailing json.RawMessage
-	if e = d.Decode(&trailing); e != io.EOF {
-		return r, fmt.Errorf("trailing registry JSON")
-	}
-	if r.Schema != 1 {
-		return r, fmt.Errorf("unsupported registry schema %d", r.Schema)
-	}
-	ids, cmds := map[string]bool{}, map[string]bool{}
-	builtinCommands := cli.BuiltinRegistry()
-	for _, x := range r.Extensions {
-		if x.ID == "" || ids[x.ID] || len(x.Argv) == 0 || x.Protocol.Major != ext.Major {
-			return r, fmt.Errorf("invalid extension %q", x.ID)
-		}
-		ids[x.ID] = true
-		if len(x.Groups) > 1 || (len(x.Groups) > 0 && len(x.Commands) == 0) {
-			return r, fmt.Errorf("unsupported command group in %q", x.ID)
-		}
-		for _, g := range x.Groups {
-			if strings.Join(g.Path, " ") != "runtime-kernels" || g.Description != "Manage node runtime kernel versions" {
-				return r, fmt.Errorf("unsupported command group in %q", x.ID)
-			}
-		}
-		for _, c := range x.Commands {
-			key := strings.Join(c.Path, " ")
-			if len(c.Path) == 0 || builtinCommands.ReservedRoot(c.Path[0]) || cmds[key] || c.Handler == "" {
-				return r, fmt.Errorf("command collision/invalid handler %q", key)
-			}
-			if !supportedRuntimeCommand(c) {
-				return r, fmt.Errorf("unsupported command registration %q", key)
-			}
-			cmds[key] = true
-		}
-		for _, h := range x.Hooks {
-			if h.Event != "rediscover.after-write" && h.Event != "deploy.prepare" {
-				return r, fmt.Errorf("unsupported hook %s", h.Event)
-			}
-		}
-	}
-	return r, nil
-}
-
-// Schema1 accepts only this known command shape. Its metadata is adapted into
-// the shared CLI tree; broader registration remains a later SDK boundary.
-func supportedRuntimeCommand(c Command) bool {
-	if len(c.Path) != 2 || c.Path[0] != "runtime-kernels" || c.Path[1] != "update" || c.Handler != "runtime.update" || c.Description != "Update runtime kernels" {
-		return false
-	}
-	if len(c.OptionSets) != 2 || c.OptionSets[0] != "machine-filter" || c.OptionSets[1] != "confirmation" || len(c.Arguments) != 1 {
-		return false
-	}
-	a := c.Arguments[0]
-	return len(a) == 2 && a["name"] == "machine-pattern" && a["required"] == false
-}
-
 type supervisor struct {
 	e         *Engine
 	in        ext.Invocation
@@ -442,6 +345,16 @@ func (e *Engine) Invoke(reg Registration, handler string, in ext.Invocation) (in
 	return result.ExitCode, nil
 }
 func (e *Engine) Hooks(r Registry, event string, names []string) (int, error) {
+	return e.hooks(r, event, names, nil)
+}
+
+// HooksFrom carries the actual compiled origin; the fixture-only Hooks adapter
+// retains its established context when no native origin command exists.
+func (e *Engine) HooksFrom(r Registry, event string, names []string, origin cli.Invocation) (int, error) {
+	return e.hooks(r, event, names, &origin)
+}
+
+func (e *Engine) hooks(r Registry, event string, names []string, origin *cli.Invocation) (int, error) {
 	type item struct {
 		reg  Registration
 		hook Hook
@@ -465,6 +378,12 @@ func (e *Engine) Hooks(r Registry, event string, names []string) (int, error) {
 	})
 	for _, x := range items {
 		in := ext.Invocation{Root: e.Root, ExtensionID: x.reg.ID, Event: event, SelectedNames: names, Action: "switch", Options: map[string]any{}}
+		if origin != nil {
+			in.OriginCommand = append([]string(nil), origin.Command.Path...)
+			in.Options = invocationOptions(*origin)
+			in.Arguments = append([]string(nil), origin.Args...)
+			in.RawArgv = append([]string(nil), origin.RawArgv...)
+		}
 		code, err := e.Invoke(x.reg, x.hook.Handler, in)
 		e.Inventory = nil
 		e.SettingsCache = nil

@@ -13,12 +13,12 @@ func main() {
 	if len(os.Args) < 2 {
 		os.Exit(2)
 	}
-	e, err := core.New(context.Background())
+	r, err := core.LoadRegistry()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	r, err := core.ReadRegistry(os.Getenv("CONFCTL_EXTENSION_REGISTRY"))
+	e, err := core.New(context.Background())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

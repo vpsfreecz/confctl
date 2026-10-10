@@ -1,8 +1,7 @@
 package core
 
 import (
-	"fmt"
-	"strings"
+	"encoding/json"
 
 	ext "github.com/vpsfreecz/confctl/extension"
 	"github.com/vpsfreecz/confctl/internal/cli"
@@ -21,43 +20,6 @@ type registeredCommand struct {
 	Command      Command
 }
 
-func commandRegistry(extensions Registry) (*cli.Registry, map[string]registeredCommand, error) {
-	builtins := cli.BuiltinRegistry()
-	commands := builtins.Commands()
-	registered := map[string]registeredCommand{}
-	for _, reg := range extensions.Extensions {
-		for _, c := range reg.Commands {
-			// ReadRegistry has already validated the only supported schema1 shape.
-			group := Group{Path: []string{"runtime-kernels"}, Description: "Manage node runtime kernel versions"}
-			if len(reg.Groups) > 0 {
-				group = reg.Groups[0]
-			}
-			commands = append(commands, cli.CommandSpec{Path: group.Path, Summary: group.Description, ArgumentPolicy: cli.GroupArguments})
-			opts := []cli.OptionSpec{}
-			for _, set := range c.OptionSets {
-				switch set {
-				case "machine-filter":
-					opts = append(opts, cli.MachineFilterOptions()...)
-				case "confirmation":
-					opts = append(opts, cli.ConfirmationOptions()...)
-				default:
-					return nil, nil, fmt.Errorf("unsupported option set %q", set)
-				}
-			}
-			arguments := []cli.ArgumentSpec{}
-			for _, a := range c.Arguments {
-				name, _ := a["name"].(string)
-				required, _ := a["required"].(bool)
-				arguments = append(arguments, cli.ArgumentSpec{Name: name, Required: required})
-			}
-			commands = append(commands, cli.CommandSpec{Path: c.Path, Summary: c.Description, Usage: "[machine-pattern]", Arguments: arguments, ArgumentPolicy: cli.FreeForm, Options: opts, Handler: cli.KnownExtension, Availability: cli.Availability{Mode: cli.Available}})
-			registered[strings.Join(c.Path, " ")] = registeredCommand{reg, c}
-		}
-	}
-	r, err := cli.NewRegistry(builtins.Globals(), commands)
-	return r, registered, err
-}
-
 func handlerOptions(inv cli.Invocation) Options {
 	text := func(key string) string { return inv.Options[key].Value.String }
 	boolean := func(key string) bool { return inv.Options[key].Value.Bool }
@@ -74,4 +36,37 @@ func handlerOptions(inv cli.Invocation) Options {
 // Keep the existing schema1 invocation payload at this adapter boundary.
 func extensionInvocation(root string, registration Registration, command Command, opts Options, raw []string) ext.Invocation {
 	return ext.Invocation{Root: root, ExtensionID: registration.ID, CommandPath: command.Path, OriginCommand: command.Path, Options: map[string]any{"yes": opts.Yes, "attr": opts.Attrs, "tag": opts.Tags, "show-trace": opts.Trace}, Arguments: opts.Args, RawArgv: raw}
+}
+
+// One projection serves command and actual origin-hook options. Parser-internal
+// zero values do not imply a declaration default or wire presence.
+func invocationOptions(inv cli.Invocation) map[string]any {
+	out := map[string]any{}
+	for _, spec := range inv.Command.Options {
+		parsed := inv.Options[spec.Key]
+		if !parsed.Present && !spec.DefaultPresent {
+			continue
+		}
+		v := parsed.Value
+		switch v.Kind {
+		case cli.Null:
+			out[spec.Key] = nil
+		case cli.Boolean:
+			out[spec.Key] = v.Bool
+		case cli.Text:
+			out[spec.Key] = v.String
+		case cli.Number:
+			out[spec.Key] = json.Number(v.Integer.String())
+		case cli.TextList:
+			out[spec.Key] = append([]string{}, v.Strings...)
+		}
+	}
+	return out
+}
+
+func commandInvocation(root string, bound registeredCommand, inv cli.Invocation, raw []string) ext.Invocation {
+	if supportedRuntimeCommand(bound.Command) {
+		return extensionInvocation(root, bound.Registration, bound.Command, handlerOptions(inv), raw)
+	}
+	return ext.Invocation{Root: root, ExtensionID: bound.Registration.ID, CommandPath: append([]string(nil), inv.Command.Path...), OriginCommand: append([]string(nil), inv.Command.Path...), Options: invocationOptions(inv), Arguments: append([]string(nil), inv.Args...), RawArgv: append([]string(nil), inv.RawArgv...)}
 }

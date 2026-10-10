@@ -160,10 +160,6 @@ func RunCached(ctx context.Context, c Case, binary, tools, evidence, registry, h
 	for k, v := range c.Env {
 		env[k] = strings.ReplaceAll(v, "${ROOT}", config)
 	}
-	if registry != "" && c.Extensions {
-		env["CONFCTL_EXTENSION_REGISTRY"] = registry
-		env["CONFCTL_EXTENSION_ROOT"] = config
-	}
 	// The pinned scripts are copied verbatim by the caller for the Ruby baseline.
 	if c.Extensions {
 		source := os.Getenv("COMPAT_SITE_SOURCE")
@@ -179,6 +175,14 @@ func RunCached(ctx context.Context, c Case, binary, tools, evidence, registry, h
 				return o, root, e
 			}
 		}
+	}
+	if registry != "" && c.Extensions {
+		prepared, err := prepareCandidateRegistry(registry, config, root)
+		if err != nil {
+			return o, root, err
+		}
+		env["CONFCTL_EXTENSION_REGISTRY"] = prepared
+		env["CONFCTL_EXTENSION_ROOT"] = config
 	}
 	o.ConfigRoot = config
 	o.RunRoot = root
@@ -307,4 +311,44 @@ func RunCached(ctx context.Context, c Case, binary, tools, evidence, registry, h
 		return o, root, captureErr
 	}
 	return o, root, e
+}
+
+// Test-only candidate preparation. It runs after the actual fixture writes and
+// script copying, outside both the configuration snapshot and process trace.
+func prepareCandidateRegistry(template, config, runRoot string) (string, error) {
+	b, err := os.ReadFile(template)
+	if err != nil {
+		return "", err
+	}
+	var fields map[string]json.RawMessage
+	if err = json.Unmarshal(b, &fields); err != nil {
+		return "", err
+	}
+	if fields == nil {
+		return "", fmt.Errorf("candidate registry template must be an object")
+	}
+	flake, err := os.ReadFile(filepath.Join(config, "flake.nix"))
+	if err != nil {
+		return "", err
+	}
+	digest := fmt.Sprintf("%x", sha256.Sum256(flake))
+	fields["bound_sources"], err = json.Marshal([]map[string]string{{"path": "flake.nix", "sha256": digest}})
+	if err != nil {
+		return "", err
+	}
+	prepared, err := json.MarshalIndent(fields, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	prepared = append(prepared, '\n')
+	path := filepath.Join(runRoot, "candidate-registry.json")
+	if err = os.WriteFile(path, prepared, 0600); err != nil {
+		return "", err
+	}
+	sidecar, err := json.MarshalIndent(map[string]string{"template_sha256": fmt.Sprintf("%x", sha256.Sum256(b)), "prepared_sha256": fmt.Sprintf("%x", sha256.Sum256(prepared)), "flake_sha256": digest}, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	err = os.WriteFile(filepath.Join(runRoot, "candidate-registry-preparation.json"), append(sidecar, '\n'), 0600)
+	return path, err
 }

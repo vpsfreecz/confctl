@@ -64,8 +64,11 @@ type OptionSpec struct {
 	Names                     []string
 	Kind                      OptionKind
 	Default                   Value
-	Multiple, Negatable       bool
-	Choices                   []string
+	// DefaultPresent is declaration presence, including an explicit null.
+	// Parser initialization alone does not establish invocation wire presence.
+	DefaultPresent      bool
+	Multiple, Negatable bool
+	Choices             []string
 }
 
 type ParsedValue struct {

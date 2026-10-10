@@ -17,7 +17,7 @@ and decimal representation through `json.Number`.
 The core sends `initialize` with protocol `{major:1,minor:0}`, extension ID and
 available service names. The extension declares required services. One `run`
 then names the handler and supplies `Invocation`: root, command/event, options,
-arguments, selected names and action. Commands get parsed attrs/tags/yes;
+arguments, selected names and action. Commands get their declared typed options;
 `deploy.prepare` gets an effective `switch` action, whereas the old fixture
 hook's `opts[:action]` is absent. This intentional payload difference is separate
 from output/state parity. Unknown handlers and required services fail.
@@ -73,11 +73,57 @@ Explicit cancellation uses the approved TERM/two-second/KILL/wait lifecycle.
 An executable can still perform its own filesystem effects: this is a trusted
 extension boundary, not a security sandbox or rollback transaction.
 
-The static registry schema is version 1. Entries declare IDs, protocol, argv,
-command paths/options and the two supported hook events. Command help and
-parsing are static: only the packaged `runtime-kernels update` command shape,
-descriptions, option sets and optional machine-pattern argument are accepted.
-Unsupported shapes and unknown registry fields fail before effects; a
-hook-only registry adds no command to help. There is no discovery
-daemon, dynamic Ruby loading, persistent worker, new operation lock or automatic
-retry. Existing site JSON/Nix files keep their old paths and save behavior.
+The static registry schema is version 1. Public DTOs in `registry.go` describe
+registration IDs, protocol versions, literal executable argv, groups, commands,
+options, arguments and the two supported hook events. Each extension owns its
+command-root subtree; builtin roots and framework help are reserved. Parent
+groups must be declared. Option aliases, negation, ordered repeated strings,
+choices and typed defaults join the same CLI metadata tree used by help and
+parsing. Required arguments precede optional arguments; only the last may be
+variadic. Arity is checked before execution. Help does not start an executable
+and does not require its absolute argv[0] to exist.
+
+The caller explicitly sets both `CONFCTL_EXTENSION_REGISTRY` and
+`CONFCTL_EXTENSION_ROOT`. With both absent the CLI has only builtins. A partial
+or empty pair fails before help, logs or tools. The live root must resolve to
+the current directory. Required, nonempty `bound_sources` records contain unique
+clean relative file paths and lowercase SHA-256 digests of actual regular-file
+bytes. Symlinks in any source path component, stale bytes, unknown fields and
+trailing JSON are rejected. Identical clones work with their own explicit live
+root. Only the declared files are checked, once per invocation; this is stale
+source detection, not a lock against concurrent editing. Configuration owners
+choose the same finite source set for their package and registry, and rebuild
+deliberately after bound edits. There is no discovery or automatic rebinding.
+
+An option declares `key`, `names`, `kind` (`switch`, `string`, `integer`), and
+optional `default`, `multiple`, `negatable`, `choices`, `metavar`, `description`.
+Absent defaults remain absent from generic invocation options unless supplied
+on the CLI. Explicit null defaults are allowed for scalar string/integer options;
+false, zero, empty text and empty lists remain present. Repeated options are
+string lists. Integer defaults must be decimal JSON integers, without fractions,
+exponents or quotes. CLI integers retain Ruby's radix/separator grammar. The
+wire carries canonical decimal JSON numbers, and SDK handlers receive exact
+`json.Number` values, including values beyond int64. For example:
+
+```go
+n, ok := in.Options["count"].(json.Number)
+if ok {
+    value, valid := new(big.Int).SetString(n.String(), 10)
+    // The handler owns any resource/range policy for value.
+    _, _ = value, valid
+}
+```
+
+The example requires `encoding/json` and `math/big`. Origin hooks use the same
+projection of their actual compiled command. The existing runtime-kernels
+command retains its established four-field `yes`/`attr`/`tag`/`show-trace`
+adapter, including nil slices; the fixture hook driver has no native origin.
+The machine-filter option set is show-trace/attr/tag and confirmation is yes;
+neither adds managed filtering. The packaged registry is fixture input with an
+empty binding, not operational configuration authority. The private compatibility
+driver binds only the actual fixture flake before launching a candidate.
+
+There is no discovery daemon, dynamic Ruby loading, persistent worker, new
+operation lock or automatic retry. Existing site JSON/Nix files keep their old
+paths and save behavior. This experimental registry has no production adopter;
+configuration operations and moving site ownership are separate later slices.

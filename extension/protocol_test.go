@@ -102,3 +102,21 @@ func TestPeerPreservesMetadataNumbers(t *testing.T) {
 		t.Fatal(result)
 	}
 }
+
+func TestRunDecodePreservesNumbersAndSingleValue(t *testing.T) {
+	var run Run
+	if err := decodeRun([]byte(`{"handler":"x","context":{"options":{"huge":92233720368547758081234567890,"null":null}}}`), &run); err != nil {
+		t.Fatal(err)
+	}
+	if n, ok := run.Context.Options["huge"].(json.Number); !ok || n.String() != "92233720368547758081234567890" {
+		t.Fatal(run)
+	}
+	if _, ok := run.Context.Options["null"]; !ok {
+		t.Fatal("null lost")
+	}
+	for _, b := range []string{`{} {}`, `{} trailing`} {
+		if err := decodeRun([]byte(b), &run); err == nil {
+			t.Fatal("trailing Run accepted", b)
+		}
+	}
+}
