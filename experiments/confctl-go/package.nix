@@ -6,7 +6,6 @@ pkgs.buildGoModule {
   vendorHash = null;
   subPackages = [
     "cmd/confctl-go-prototype"
-    "cmd/vpsfree-confctl-ext"
     "cmd/hook-driver"
   ];
   nativeBuildInputs = [ pkgs.makeWrapper ];
@@ -26,8 +25,5 @@ pkgs.buildGoModule {
         ]
       }
     done
-    mkdir -p "$out/share/confctl-go-prototype"
-    substitute ${../../registry.json} "$out/share/confctl-go-prototype/registry.json" \
-      --replace-fail '@SITE@' "$out"
   '';
 }

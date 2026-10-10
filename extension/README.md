@@ -119,11 +119,15 @@ projection of their actual compiled command. The existing runtime-kernels
 command retains its established four-field `yes`/`attr`/`tag`/`show-trace`
 adapter, including nil slices; the fixture hook driver has no native origin.
 The machine-filter option set is show-trace/attr/tag and confirmation is yes;
-neither adds managed filtering. The packaged registry is fixture input with an
-empty binding, not operational configuration authority. The private compatibility
-driver binds only the actual fixture flake before launching a candidate.
+neither adds managed filtering. Core packages contain no site handlers or
+operational registry. Fixture composition takes an explicit external site
+package and its registry template; the private compatibility driver binds only
+the actual fixture flake before launching a candidate. Configuration owners
+keep their executable, declarations and finite source list in their own module.
 
 There is no discovery daemon, dynamic Ruby loading, persistent worker, new
 operation lock or automatic retry. Existing site JSON/Nix files keep their old
 paths and save behavior. This experimental registry has no production adopter;
-configuration operations and moving site ownership are separate later slices.
+site handlers and their pure/public-protocol tests live in the configuration
+repository. Core executable conformance uses an explicitly supplied external
+binary, as described in the [experimental CLI guide](../experiments/confctl-go/README.md).

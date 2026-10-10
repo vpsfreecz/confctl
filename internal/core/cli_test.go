@@ -322,7 +322,7 @@ func TestActualCLIUnavailableLeavesHaveNoEffects(t *testing.T) {
 }
 
 func TestActualCLINestedAndExtensionHelp(t *testing.T) {
-	r := packagedRegistry(t)
+	r := syntheticSiteRegistry(t)
 	for i := range r.Extensions {
 		r.Extensions[i].Argv = []string{"/no/such/extension"}
 	}
@@ -362,7 +362,7 @@ func TestActualCLINestedAndExtensionHelp(t *testing.T) {
 
 func TestRegistryCollisionUsesBuiltinTree(t *testing.T) {
 	for _, c := range cli.BuiltinRegistry().Children(nil) {
-		r := packagedRegistry(t)
+		r := syntheticSiteRegistry(t)
 		r.Extensions[1].Commands[0].Path = []string{c.Path[0], "update"}
 		b, _ := json.Marshal(r)
 		p := filepath.Join(t.TempDir(), "registry.json")
@@ -380,7 +380,7 @@ func TestRegistryCollisionUsesBuiltinTree(t *testing.T) {
 }
 
 func TestParsedAdapterPreservesLogAndExtensionValues(t *testing.T) {
-	registrations := packagedRegistry(t)
+	registrations := syntheticSiteRegistry(t)
 	r, registered, err := commandRegistry(registrations)
 	if err != nil {
 		t.Fatal(err)
@@ -430,7 +430,7 @@ func TestParsedAdapterPreservesLogAndExtensionValues(t *testing.T) {
 }
 
 func TestLogCLIOriginalPPReference(t *testing.T) {
-	r, registered, err := commandRegistry(packagedRegistry(t))
+	r, registered, err := commandRegistry(syntheticSiteRegistry(t))
 	if err != nil {
 		t.Fatal(err)
 	}

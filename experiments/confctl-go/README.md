@@ -2,16 +2,17 @@
 
 `confctl-go-prototype` is the separately packaged experimental Go CLI. The normal
 `confctl` package remains the operational tool. This package executes help,
-`init`, `add`, `rename`, `rediscover`, `ls`, `status --generation none` and the
-two registered site extensions. Other commands and generation modes fail before
-opening logs, evaluating Nix, running SSH or
-changing configuration.
+`init`, `add`, `rename`, `rediscover`, `ls`, `status --generation none` and
+explicitly registered external extensions. Other commands and generation modes
+fail before opening logs, evaluating Nix, running SSH or changing configuration.
 Root help shows the reference builtin inventory. Detailed help describes the
 execution limits of unavailable commands and status modes.
 
-The Go module `github.com/vpsfreecz/confctl` and its `cmd`, `internal`, `extension`
-and bundled `site` packages live at the repository root. This directory retains
-the opt-in package definitions and this capability table.
+The Go module `github.com/vpsfreecz/confctl` and its `cmd`, `internal` and
+`extension` packages live at the repository root. The normal Go package builds
+only `confctl-go-prototype` and `hook-driver`, with no site executable, registry
+or configuration dependency. This directory retains the opt-in package
+definitions and this capability table.
 
 Build the explicit package with `nix build --no-write-lock-file
 .#confctl-go-prototype`. Unit checks run through its package check phase, or in
@@ -22,9 +23,13 @@ The compatibility driver and immutable Ruby observations live in
 [docs/compatibility](../../docs/compatibility/README.md). Builds and comparison
 results are snapshot evidence; this README makes no performance claim.
 
-The packaged `share/confctl-go-prototype/registry.json` is a fixture template
-with empty `bound_sources`, so it is not a valid operational registry. The
-compatibility driver copies it outside the configuration tree, binds the actual
+The configuration-owned site package supplies its executable and registry
+declarations. `fixture-package.nix` requires explicit `pkgs`, `fixtureTools`,
+`sitePackage` and `registryTemplate` inputs. Only this fixture composition
+substitutes `@SITE@` with the supplied package and installs
+`share/confctl-go-prototype/registry.json`. That template has empty
+`bound_sources` and is not a valid operational registry. The compatibility
+driver copies it outside the configuration tree, binds the actual
 fixture `flake.nix` bytes and supplies both `CONFCTL_EXTENSION_REGISTRY` and
 `CONFCTL_EXTENSION_ROOT`. Original Ruby runs use no candidate preparation.
 The test-only `hook-driver` uses the same bound loader and executes
@@ -32,9 +37,25 @@ The test-only `hook-driver` uses the same bound loader and executes
 Native rediscovery invokes `rediscover.after-write` after replacing the inventory,
 including rediscovery called by add/rename. Netboot output uses
 `cluster/netbootable.nix`; kernel state retains `configs/node/kernels.json`.
-Both handlers are separate executable processes using the [public experimental
-SDK](../../extension/README.md), including when the registry points to the same site
-binary for both registrations.
+The configuration-owned handlers are separate executable processes using the
+[public experimental SDK](../../extension/README.md), including when the registry
+points to the same site binary for both registrations. The Go CLI does not load
+Ruby files from `scripts/`.
+
+Ordinary module/package checks have no site dependency. The two executable
+state/error-order cases are core-owned conformance tests with an explicit
+external binary:
+
+```sh
+CONFCTL_TEST_SITE_EXECUTABLE=/absolute/path/to/vpsfree-confctl-ext \
+  go test -tags siteconformance ./internal/core \
+  -run '^TestKernel(ErrorValueRetainsPriorAndAbsentKeys|FailureDetailsUseCompletionOrder)$' -count=1
+```
+
+Requested conformance fails when the supplied executable is absent or missing;
+it never compiles a bundled handler or skips that dependency. The tests use the
+actual core supervisor and a disposable SSH endpoint. Pure and public-protocol
+site tests belong to the configuration-owned module.
 
 One typed command tree in `internal/cli` owns all builtin groups and 29 leaves,
 options, defaults, aliases, argument usage and availability. It generates help
@@ -153,6 +174,6 @@ The built-in generation reader is
 bounded to current flake-generation records; it is not an implementation of
 native build, deployment, rotation or legacy software-pin migration.
 
-The SDK module is unpublished and experimental. No production configuration pin
-selects it. Recovery is selecting the unchanged normal package while retaining
+The SDK remains experimental. No production configuration pin selects the Go
+CLI. Recovery is selecting the unchanged normal package while retaining
 existing site state; no schema migration or daemon rollout is involved.

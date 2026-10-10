@@ -24,6 +24,9 @@ subset against the pinned Ruby implementation. They do not change the normal
 package or deployment workflow.
 The Go module lives at the repository root; its experimental public
 [extension SDK](extension/README.md) uses `github.com/vpsfreecz/confctl/extension`.
+The Go package provides the CLI and hook driver. Site executables and registries
+are configuration-owned and supplied explicitly for fixture composition and
+[executable conformance](experiments/confctl-go/README.md).
 
 ## Requirements
 

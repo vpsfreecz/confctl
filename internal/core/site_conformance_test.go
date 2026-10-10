@@ -1,11 +1,12 @@
-package site
+//go:build siteconformance
+
+package core
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	ext "github.com/vpsfreecz/confctl/extension"
-	"github.com/vpsfreecz/confctl/internal/core"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,8 +32,6 @@ func TestKernelHandlerHelper(t *testing.T) {
 		return
 	}
 	switch os.Args[separator+1] {
-	case "extension":
-		ext.Serve(Handlers(), []string{"machines.select", "exec.run", "ui.table", "ui.write"})
 	case "ssh":
 		var replies map[string]hostReply
 		if err := json.Unmarshal([]byte(os.Getenv("KERNEL_TEST_REPLIES")), &replies); err != nil {
@@ -50,10 +49,21 @@ func TestKernelHandlerHelper(t *testing.T) {
 	}
 }
 
-// Exercise the actual migrated handler through its executable supervisor and
-// reverse exec service. Only the semantic SSH endpoint is a disposable helper.
+// Exercise the explicitly supplied site executable through the core supervisor
+// and reverse exec service. Only SSH is a disposable helper; no site code is linked.
 func runKernelHandler(t *testing.T, names []string, initial string, replies map[string]hostReply) (string, string) {
 	t.Helper()
+	executable := os.Getenv("CONFCTL_TEST_SITE_EXECUTABLE")
+	if executable == "" {
+		t.Fatal("siteconformance requires CONFCTL_TEST_SITE_EXECUTABLE")
+	}
+	if !filepath.IsAbs(executable) {
+		t.Fatal("CONFCTL_TEST_SITE_EXECUTABLE must be an absolute executable path")
+	}
+	info, err := os.Stat(executable)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 {
+		t.Fatalf("CONFCTL_TEST_SITE_EXECUTABLE is not an executable regular file: %s: %v", executable, err)
+	}
 	root := t.TempDir()
 	state := filepath.Join(root, "configs/node/kernels.json")
 	if err := os.MkdirAll(filepath.Dir(state), 0700); err != nil {
@@ -67,7 +77,7 @@ func runKernelHandler(t *testing.T, names []string, initial string, replies map[
 	if err != nil {
 		t.Fatal(err)
 	}
-	script := "#!" + sh + "\nexec " + core.ShellJoin([]string{os.Args[0], "-test.run=^TestKernelHandlerHelper$", "--", "ssh"}) + " \"$@\"\n"
+	script := "#!" + sh + "\nexec " + ShellJoin([]string{os.Args[0], "-test.run=^TestKernelHandlerHelper$", "--", "ssh"}) + " \"$@\"\n"
 	if err = os.WriteFile(filepath.Join(bin, "ssh"), []byte(script), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -81,10 +91,10 @@ func runKernelHandler(t *testing.T, names []string, initial string, replies map[
 	t.Setenv("CONFCTL_SSH_CONFIG", "")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	e := &core.Engine{Root: root, Context: ctx, Color: "never"}
+	e := &Engine{Root: root, Context: ctx, Color: "never"}
 	for _, name := range names {
 		host := name + ".example"
-		e.Inventory = append(e.Inventory, core.Machine{Name: name, Key: name, Spin: "vpsadminos", Managed: true, Target: core.Target{Host: &host, Port: 22}, Attributes: map[string]any{}})
+		e.Inventory = append(e.Inventory, Machine{Name: name, Key: name, Spin: "vpsadminos", Managed: true, Target: Target{Host: &host, Port: 22}, Attributes: map[string]any{}})
 	}
 	f, err := os.Create(filepath.Join(t.TempDir(), "stdout"))
 	if err != nil {
@@ -93,7 +103,7 @@ func runKernelHandler(t *testing.T, names []string, initial string, replies map[
 	old := os.Stdout
 	os.Stdout = f
 	defer func() { os.Stdout = old; f.Close() }()
-	reg := core.Registration{ID: "test.kernels", Protocol: ext.Version{Major: 1}, Argv: []string{os.Args[0], "-test.run=^TestKernelHandlerHelper$", "--", "extension"}}
+	reg := Registration{ID: "test.kernels", Protocol: ext.Version{Major: 1}, Argv: []string{executable}}
 	code, err := e.Invoke(reg, "runtime.update", ext.Invocation{Root: root, Options: map[string]any{"yes": true}})
 	if code != 0 || err != nil {
 		t.Fatal(code, err)

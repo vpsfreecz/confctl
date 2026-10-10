@@ -14,17 +14,36 @@ import (
 	"github.com/vpsfreecz/confctl/internal/cli"
 )
 
-func packagedRegistry(t *testing.T) Registry {
+// Private synthetic declarations exercise the known adapter without depending
+// on a packaged registry or configuration-owned source.
+func syntheticSiteRegistry(t *testing.T) Registry {
 	t.Helper()
-	b, err := os.ReadFile("../../registry.json")
-	if err != nil {
-		t.Fatal(err)
+	return Registry{
+		Schema:       1,
+		BoundSources: []ext.BoundSource{},
+		Extensions: []Registration{
+			{
+				ID:       "vpsfree.netboot",
+				Protocol: ext.Version{Major: 1},
+				Argv:     []string{"/missing-site/bin/vpsfree-confctl-ext"},
+				Hooks:    []Hook{{Event: "rediscover.after-write", Handler: "netboot.rediscover", Order: 100}},
+			},
+			{
+				ID:       "vpsfree.runtime-kernels",
+				Protocol: ext.Version{Major: 1},
+				Argv:     []string{"/missing-site/bin/vpsfree-confctl-ext"},
+				Groups:   []Group{{Path: []string{"runtime-kernels"}, Description: "Manage node runtime kernel versions"}},
+				Commands: []Command{{
+					Path:        []string{"runtime-kernels", "update"},
+					Handler:     "runtime.update",
+					Description: "Update runtime kernels",
+					OptionSets:  []string{"machine-filter", "confirmation"},
+					Arguments:   []ext.Argument{{Name: "machine-pattern"}},
+				}},
+				Hooks: []Hook{{Event: "deploy.prepare", Handler: "runtime.prepare", Order: 100}},
+			},
+		},
 	}
-	r, err := decodeRegistry([]byte(strings.ReplaceAll(string(b), "@SITE@", "/missing-site")))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return r
 }
 
 func bindTestRegistry(t *testing.T, root string, r Registry) Registry {
@@ -83,7 +102,7 @@ func registryMain(t *testing.T, r Registry, argv []string) (int, string, string)
 }
 
 func TestHookOnlyRegistryHelp(t *testing.T) {
-	r := packagedRegistry(t)
+	r := syntheticSiteRegistry(t)
 	r.Extensions = r.Extensions[:1]
 	code, out, _ := registryMain(t, r, []string{"--help"})
 	want, _ := cli.BuiltinRegistry().Help(nil, 80)
@@ -92,7 +111,7 @@ func TestHookOnlyRegistryHelp(t *testing.T) {
 	}
 }
 func TestSupportedRegistryHelp(t *testing.T) {
-	code, out, _ := registryMain(t, packagedRegistry(t), []string{"--help"})
+	code, out, _ := registryMain(t, syntheticSiteRegistry(t), []string{"--help"})
 	if code != 0 || !strings.Contains(out, "    runtime-kernels - Manage node runtime kernel versions\n") {
 		t.Fatal(code, out)
 	}
@@ -123,7 +142,7 @@ func TestInvalidDeclarationsRejectBeforeEffects(t *testing.T) {
 		{"major", func(r *Registration) { r.Protocol.Major = 2 }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			r := packagedRegistry(t)
+			r := syntheticSiteRegistry(t)
 			tc.edit(&r.Extensions[1])
 			code, out, _ := registryMain(t, r, []string{"--help"})
 			if code != 1 || out != "" {

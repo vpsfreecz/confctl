@@ -16,9 +16,14 @@ integration or benchmark success is implied by a package build.
 substitutes only Git/OpenSSH/Nix packages. Named tool aliases are in `$out/bin`,
 which the original wrapper prepends. An outer PATH substitution does not replace
 those fixed tool paths. `experiments/confctl-go/fixture-package.nix` provides the
-same substitution for the candidate; standard packages are reserved for the real
-tier. The test hook driver retains the oracle's Ruby/deps/source without runtime
-monkey patches or native deployment.
+same substitution for the candidate and requires all four inputs: `pkgs`,
+`fixtureTools`, `sitePackage` and `registryTemplate`. Supply the configuration-owned
+site package and its private fixture template explicitly. Only this composition
+installs `share/confctl-go-prototype/registry.json`, substituting the supplied
+site package for `@SITE@`; the normal Go package provides only the CLI and hook
+driver. Standard packages are reserved for the real tier. The test hook driver
+retains the oracle's Ruby/deps/source without runtime monkey patches or native
+deployment.
 
 A case declares source references, literal CLI argv, environment, stdin, TTY,
 initial files, semantic tool/host/argv/stdin/occurrence response rules, a driver
