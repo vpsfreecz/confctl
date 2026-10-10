@@ -136,19 +136,24 @@ func (r *Registry) Help(path []string, width int) (string, error) {
 		b.WriteString(renderOptions(r.globals, true, width))
 		b.WriteString("\n\nCOMMANDS\n")
 	} else {
-		b.WriteString("NAME\n    " + name + " - " + c.Summary + "\n\nSYNOPSIS\n\n    confctl [global options] " + name)
+		inputsWithoutOptions := c.Handler == InputsReadHandler && len(c.Options) == 0 && (name == "inputs ls" || name == "inputs channel ls")
+		heading := name
+		if inputsWithoutOptions {
+			heading = c.Path[len(c.Path)-1]
+		}
+		b.WriteString("NAME\n    " + heading + " - " + c.Summary + "\n\nSYNOPSIS\n\n    confctl [global options] " + name)
 		if c.ArgumentPolicy == GroupArguments {
 			b.WriteString(" command")
 		}
 		configurationWithoutOptions := c.Handler == ConfigurationHandler && len(c.Options) == 0
-		if !configurationWithoutOptions {
+		if !configurationWithoutOptions && !inputsWithoutOptions {
 			b.WriteString(" [command options]")
 		}
 		if c.Usage != "" {
 			b.WriteString(" " + c.Usage)
 		}
 		b.WriteString("\n")
-		if !configurationWithoutOptions {
+		if !configurationWithoutOptions && !inputsWithoutOptions {
 			b.WriteString("\n")
 		}
 		if c.ArgumentPolicy == GroupArguments {

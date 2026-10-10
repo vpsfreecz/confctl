@@ -1,0 +1,148 @@
+{
+  "config_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-empty-3925531527/config",
+  "run_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-empty-3925531527",
+  "schema": 1,
+  "case": "inputs-channel-empty",
+  "executable": "/nix/store/x96jzlpaq69bkdardsn56px7czybkbs8-confctl/bin/confctl",
+  "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de",
+  "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "fixture_sha256": "b323691e6794802edd7f4440076c099817d663e75b4d4d4d0d6116690aa17cb3",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "stdout": "CHANNEL   ROLE   INPUT   REV   URL\n",
+  "stderr": "",
+  "exit": 0,
+  "before": {
+    "flake.lock": {
+      "text": "{\"version\":7,\"root\":\"alternate\",\"nodes\":{\"root\":{\"inputs\":{\"zeta\":\"git-node\",\"alpha\":[\"github-node\",\"unfollowed\"],\"missing\":\"no-node\",\".hidden\":\"path-node\",\"slash/name\":\"path-node\"}},\"alternate\":{\"inputs\":{\"wrong\":\"git-node\"}},\"git-node\":{\"original\":{\"type\":\"git\",\"ref\":\"main\",\"url\":\"git+https://original.invalid/repository?dir=sub\"},\"locked\":{\"type\":\"git\",\"ref\":\"locked-ref\",\"url\":\"git+ssh://locked.invalid/repository\",\"rev\":\"0123456789abcdef\"}},\"github-node\":{\"original\":{\"type\":\"github\",\"owner\":\"original-owner\",\"repo\":\"original-repo\",\"ref\":\"stable\"},\"locked\":{\"type\":\"github\",\"owner\":\"locked-owner\",\"repo\":\"locked-repo\",\"rev\":\"abcdef0123456789\"}},\"path-node\":{\"original\":{\"type\":\"path\",\"path\":\"./vendor\"}}}}\n",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "after": {
+    ".confctl": {
+      "mode": 2147484141
+    },
+    ".confctl/logs": {
+      "mode": 2147484141
+    },
+    "flake.lock": {
+      "text": "{\"version\":7,\"root\":\"alternate\",\"nodes\":{\"root\":{\"inputs\":{\"zeta\":\"git-node\",\"alpha\":[\"github-node\",\"unfollowed\"],\"missing\":\"no-node\",\".hidden\":\"path-node\",\"slash/name\":\"path-node\"}},\"alternate\":{\"inputs\":{\"wrong\":\"git-node\"}},\"git-node\":{\"original\":{\"type\":\"git\",\"ref\":\"main\",\"url\":\"git+https://original.invalid/repository?dir=sub\"},\"locked\":{\"type\":\"git\",\"ref\":\"locked-ref\",\"url\":\"git+ssh://locked.invalid/repository\",\"rev\":\"0123456789abcdef\"}},\"github-node\":{\"original\":{\"type\":\"github\",\"owner\":\"original-owner\",\"repo\":\"original-repo\",\"ref\":\"stable\"},\"locked\":{\"type\":\"github\",\"owner\":\"locked-owner\",\"repo\":\"locked-repo\",\"rev\":\"abcdef0123456789\"}},\"path-node\":{\"original\":{\"type\":\"path\",\"path\":\"./vendor\"}}}}\n",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "events": [
+    {
+      "occurrence": 1,
+      "stdout": "{\"nix\":{\"maxJobs\":\"7\",\"impureEval\":true,\"legacyNixPath\":false},\"list\":{\"columns\":[\"name\"]}}\n",
+      "stderr": "",
+      "stdin_mode": "empty-open",
+      "tool": "nix",
+      "argv": [
+        "eval",
+        "--json",
+        "--no-write-lock-file",
+        "--no-update-lock-file",
+        "--option",
+        "max-jobs",
+        "auto",
+        ".#confctl.settings"
+      ],
+      "env": {
+        "COMPAT_CASE": "${RUN_ROOT}/case.json",
+        "CONFCTL_MAX_JOBS": "",
+        "CONFCTL_SSH_CONFIG": "",
+        "HOME": "${RUN_ROOT}/home",
+        "NIX_SSHOPTS": "",
+        "PWD": "${ROOT}",
+        "TMPDIR": "${RUN_ROOT}/tmp"
+      },
+      "stdin": "",
+      "cwd": "${ROOT}",
+      "pid": 0,
+      "start_ns": 0,
+      "end_ns": 0,
+      "exit": 0,
+      "rule": 0
+    },
+    {
+      "occurrence": 1,
+      "stdout": "{\"nix\":{\"maxJobs\":\"7\",\"impureEval\":true,\"legacyNixPath\":false},\"list\":{\"columns\":[\"name\"]}}\n",
+      "stderr": "",
+      "stdin_mode": "empty-open",
+      "tool": "nix",
+      "argv": [
+        "eval",
+        "--json",
+        "--no-write-lock-file",
+        "--no-update-lock-file",
+        "--option",
+        "max-jobs",
+        "7",
+        ".#confctl.settings"
+      ],
+      "env": {
+        "COMPAT_CASE": "${RUN_ROOT}/case.json",
+        "CONFCTL_MAX_JOBS": "",
+        "CONFCTL_SSH_CONFIG": "",
+        "HOME": "${RUN_ROOT}/home",
+        "NIX_SSHOPTS": "",
+        "PWD": "${ROOT}",
+        "TMPDIR": "${RUN_ROOT}/tmp"
+      },
+      "stdin": "",
+      "cwd": "${ROOT}",
+      "pid": 0,
+      "start_ns": 0,
+      "end_ns": 0,
+      "exit": 0,
+      "rule": 1
+    },
+    {
+      "occurrence": 1,
+      "stdout": "{}\n",
+      "stderr": "",
+      "stdin_mode": "empty-open",
+      "tool": "nix",
+      "argv": [
+        "eval",
+        "--json",
+        "--impure",
+        "--no-write-lock-file",
+        "--no-update-lock-file",
+        "--option",
+        "max-jobs",
+        "7",
+        ".#confctl.channels"
+      ],
+      "env": {
+        "COMPAT_CASE": "${RUN_ROOT}/case.json",
+        "CONFCTL_MAX_JOBS": "",
+        "CONFCTL_SSH_CONFIG": "",
+        "HOME": "${RUN_ROOT}/home",
+        "NIX_SSHOPTS": "",
+        "PWD": "${ROOT}",
+        "TMPDIR": "${RUN_ROOT}/tmp"
+      },
+      "stdin": "",
+      "cwd": "${ROOT}",
+      "pid": 0,
+      "start_ns": 0,
+      "end_ns": 0,
+      "exit": 0,
+      "rule": 2
+    }
+  ],
+  "git_before": {},
+  "git_after": {},
+  "wall_ns": 0,
+  "user_ns": 0,
+  "system_ns": 0,
+  "max_rss_kb": 0
+}

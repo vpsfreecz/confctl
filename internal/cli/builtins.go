@@ -165,6 +165,9 @@ func BuiltinRegistry() *Registry {
 		case "init", "add", "rename", "rediscover":
 			commands[i].Handler = ConfigurationHandler
 			commands[i].Availability = Availability{Mode: Available}
+		case "inputs ls", "inputs channel ls":
+			commands[i].Handler = InputsReadHandler
+			commands[i].Availability = Availability{Mode: Available}
 		}
 	}
 	r, err := NewRegistry([]OptionSpec{color, help}, commands)

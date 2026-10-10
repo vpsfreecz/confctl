@@ -1,11 +1,38 @@
 package cli
 
 import (
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestInputsHelpReferences(t *testing.T) {
+	var reference struct {
+		SourceRevision string `json:"source_revision"`
+		HelpExtracts   []struct {
+			Case, Asset, SHA256 string
+		} `json:"help_extracts"`
+	}
+	b, err := os.ReadFile("../core/testdata/inputs_reference.json")
+	if err != nil || json.Unmarshal(b, &reference) != nil || reference.SourceRevision != "cc40679d267165aecfa569128438bb55fe910268" || len(reference.HelpExtracts) != 2 {
+		t.Fatal("invalid original inputs help provenance", err)
+	}
+	for _, record := range reference.HelpExtracts {
+		path := []string{"inputs", "ls"}
+		if record.Case == "inputs-channel-help" {
+			path = []string{"inputs", "channel", "ls"}
+		}
+		want, err := os.ReadFile("../core/testdata/" + record.Asset)
+		got, helpErr := BuiltinRegistry().Help(path, 80)
+		if err != nil || helpErr != nil || fmt.Sprintf("%x", sha256.Sum256(want)) != record.SHA256 || got != string(want) {
+			t.Fatal(record.Case, got, string(want), err, helpErr)
+		}
+	}
+}
 
 func TestBuiltinDeclarations(t *testing.T) {
 	r := BuiltinRegistry()
@@ -128,6 +155,48 @@ func TestRegistryValidation(t *testing.T) {
 				t.Fatal("accepted malformed declarations")
 			}
 		})
+	}
+}
+
+func TestInputsReadOnlyDeclarations(t *testing.T) {
+	r := BuiltinRegistry()
+	available := 0
+	for _, c := range r.Leaves() {
+		if c.Path[0] != "inputs" {
+			continue
+		}
+		inv, err := r.Parse(append(append([]string{}, c.Path...), "first", "--help", "extra"))
+		if err != nil || inv.Help || !reflect.DeepEqual(inv.Args, []string{"first", "--help", "extra"}) {
+			t.Fatal("inputs positional contract changed", c.Path, inv, err)
+		}
+		if c.Handler == InputsReadHandler {
+			available++
+			if c.Availability.Mode != Available || len(c.Options) != 0 || r.CheckAvailability(inv) != nil {
+				t.Fatal("read-only metadata changed", c)
+			}
+		} else if r.CheckAvailability(inv) == nil {
+			t.Fatal("input mutation advertised as available", c.Path)
+		}
+	}
+	if available != 2 {
+		t.Fatal("unexpected executing inputs leaf count", available)
+	}
+	// A derived registry's metadata still owns help and parsing.
+	commands := r.Commands()
+	for i := range commands {
+		if pathKey(commands[i].Path) == "inputs ls" {
+			commands[i].Summary, commands[i].Usage = "Changed input reader", "[selection]"
+			commands[i].Options = []OptionSpec{stringOption([]string{"q", "query"}, "Select input")}
+		}
+	}
+	derived, err := NewRegistry(r.Globals(), commands)
+	if err != nil {
+		t.Fatal(err)
+	}
+	help, _ := derived.Help([]string{"inputs", "ls"}, 80)
+	inv, err := derived.Parse([]string{"inputs", "ls", "-q", "a"})
+	if err != nil || inv.Options["query"].Value.String != "a" || !strings.Contains(help, "Changed input reader") || !strings.Contains(help, "[selection]") || !strings.Contains(help, "--query=arg") {
+		t.Fatal(help, inv, err)
 	}
 }
 

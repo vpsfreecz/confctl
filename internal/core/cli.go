@@ -88,12 +88,16 @@ func Main(ctx context.Context, argv []string) int {
 	logName := cmd
 	if extensionCommand {
 		logName = strings.Join(command.Path, "-")
+	} else if inv.Command.Handler == cli.InputsReadHandler {
+		logName = strings.Join(inv.Command.Path, "-")
 	}
 	if err = e.OpenLog(logName); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	if !extensionCommand || supportedRuntimeCommand(command) {
+	if inv.Command.Handler == cli.InputsReadHandler {
+		e.LogInputsCLI(inv.Command.Path, inv.Args)
+	} else if !extensionCommand || supportedRuntimeCommand(command) {
 		e.LogCLI(cmd, opts, commandArgv)
 	} else {
 		b, _ := json.Marshal(commandInvocation(e.Root, registered[strings.Join(inv.Command.Path, " ")], inv, commandArgv))
@@ -114,6 +118,23 @@ func Main(ctx context.Context, argv []string) int {
 		}
 		success = code == 0
 		return code
+	}
+	if inv.Command.Handler == cli.InputsReadHandler {
+		text, err := e.ListInputs(len(inv.Command.Path) == 3, inv.Args)
+		if err != nil {
+			var argumentErr *inputsArgumentError
+			if errors.As(err, &argumentErr) {
+				code := fail(err, 64)
+				fmt.Fprintln(os.Stderr)
+				help, _ := registry.Help(inv.Command.Path, 80)
+				fmt.Print(help)
+				return code
+			}
+			return fail(err, 1)
+		}
+		fmt.Print(text)
+		success = true
+		return 0
 	}
 	if inv.Command.Handler == cli.ConfigurationHandler {
 		operation := configurationOperation{Registry: registrations, Origin: inv}

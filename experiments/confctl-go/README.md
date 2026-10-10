@@ -2,9 +2,10 @@
 
 `confctl-go-prototype` is the separately packaged experimental Go CLI. The normal
 `confctl` package remains the operational tool. This package executes help,
-`init`, `add`, `rename`, `rediscover`, `ls`, `status --generation none` and
-explicitly registered external extensions. Other commands and generation modes
-fail before opening logs, evaluating Nix, running SSH or changing configuration.
+`init`, `add`, `rename`, `rediscover`, `ls`, `inputs ls`, `inputs channel ls`,
+`status --generation none` and explicitly registered external extensions. Other
+commands and generation modes fail before opening logs, evaluating Nix, running
+SSH or changing configuration.
 Root help shows the reference builtin inventory. Detailed help describes the
 execution limits of unavailable commands and status modes.
 
@@ -109,6 +110,21 @@ machine restriction. Inventory stays lazy when no hook requests it. Separate
 Configuration cases live under `tests/compat/stage2-b/fixtures`; their original
 Ruby captures and acceptance remain distinct from the unchanged 41 references.
 
+`inputs ls` reads the sorted names under `nodes.root.inputs` in `flake.lock`
+without evaluating Nix. An array reference uses only its first element when that
+element is a string. The first positional token filters input names; later
+positional tokens are ignored. `inputs channel ls` accepts at most one
+selector and evaluates `confctl.channels` with the existing settings and impure
+policy. Patterns sort matching channels; comma/brace lists preserve their literal
+order and repeated names. Role rows preserve the returned mapping order.
+Both commands require `flake.nix` before reading the lock or validating handler
+arguments. Failures retain logs; successful reads leave the lock bytes unchanged.
+The lock reader translates the observed initial invalid-value JSON diagnostic;
+other malformed JSON classes keep Go diagnostics and are not claimed equivalent.
+Separate original references live in `tests/compat/stage3-i1`; the machine-role
+resolver is tested preparatory code, and all input mutation commands remain
+unavailable.
+
 The following table is checked against the command registry:
 
 <!-- command-registry-capabilities:start -->
@@ -129,10 +145,10 @@ The following table is checked against the command registry:
 | `generation rotate` | Unavailable |
 | `health-check` | Unavailable |
 | `init` | Available |
-| `inputs channel ls` | Unavailable |
+| `inputs channel ls` | Available |
 | `inputs channel set` | Unavailable |
 | `inputs channel update` | Unavailable |
-| `inputs ls` | Unavailable |
+| `inputs ls` | Available |
 | `inputs machine set` | Unavailable |
 | `inputs machine update` | Unavailable |
 | `inputs set` | Unavailable |

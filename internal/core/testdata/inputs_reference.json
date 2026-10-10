@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "acceptance_sha256": "ee41457e0ad2948bcb35cf32ab8ef7c949729de71016f957f1e1cb8a9c9e9342",
+  "help_extracts": [
+    {
+      "case": "inputs-channel-help",
+      "asset": "inputs_channel_help.txt",
+      "sha256": "219f866912edb7d728fc9e5d56df69bf02fa770cdc2186c939c6926e2ffbcad0",
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-help-3377152159/raw.json",
+        "sha256": "5f7d50588b4c313cc91eb6fc36af2f88a71d4616818a42e56a41f74a9aafdfa9",
+        "bytes": 1121
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-help-3377152159/normalized.json",
+        "sha256": "5275d046905fe778de89f48fd9869f4f8e6c3614e6292cd9d9a3bb551c116e4f",
+        "bytes": 1091
+      },
+      "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de"
+    },
+    {
+      "case": "inputs-root-help",
+      "asset": "inputs_root_help.txt",
+      "sha256": "389bd3107341e3198a093cce60f6a222b5f67c460fb3f43146995090cbb4707e",
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-help-131830791/raw.json",
+        "sha256": "2c4062e8282625a96f5526a95ee4b55239e30e5e4aa5075c3b3ee1c055d7926d",
+        "bytes": 1083
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-help-131830791/normalized.json",
+        "sha256": "b1260507583a85289f81018dbb0c59a9220ae2bde6942896cb84f00f237ddc6c",
+        "bytes": 1053
+      },
+      "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de"
+    }
+  ],
+  "failure_logs": {
+    "inputs-channel-extra": "{command: [\"inputs\", \"channel\", \"ls\"],\n global_options: {\"c\" => \"auto\", \"color\" => \"auto\", \"help\" => false},\n command_options:\n  {#<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> =>\n    {#<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> => {}}},\n arguments: [\"alpha\", \"extra\"]}\n",
+    "inputs-channel-missing-flake": "{command: [\"inputs\", \"channel\", \"ls\"],\n global_options: {\"c\" => \"auto\", \"color\" => \"auto\", \"help\" => false},\n command_options:\n  {#<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> =>\n    {#<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> => {}}},\n arguments: [\"alpha\", \"extra\"]}\n",
+    "inputs-root-corrupt-lock": "{command: [\"inputs\", \"ls\"],\n global_options: {\"c\" => \"auto\", \"color\" => \"auto\", \"help\" => false},\n command_options: {#<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> => {}},\n arguments: []}\n",
+    "inputs-root-missing-lock": "{command: [\"inputs\", \"ls\"],\n global_options: {\"c\" => \"auto\", \"color\" => \"auto\", \"help\" => false},\n command_options: {#<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> => {}},\n arguments: []}\n"
+  },
+  "failure_errors": {
+    "inputs-channel-extra": "usage: confctl inputs channel ls [channel-pattern]\n\n",
+    "inputs-channel-missing-flake": "${ROOT} has no flake.nix; migrate software-pin configurations with confctl v3 before using this version (see docs/swpins-to-flakes.md)\n",
+    "inputs-root-corrupt-lock": "unexpected character: 'bad' at line 1 column 1\n",
+    "inputs-root-missing-lock": "No such file or directory @ rb_sysopen - ${ROOT}/flake.lock\n"
+  }
+}

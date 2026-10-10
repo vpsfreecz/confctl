@@ -136,3 +136,21 @@ func (e *Engine) LogCLI(cmd string, o Options, raw []string) {
 	b.WriteString("},\n arguments: " + rubyInspect(args) + "}\n")
 	e.logText(b.String())
 }
+
+// The two option-free inputs leaves retain the original PP parent-key layout.
+// GLI uses one PARENT constant at both depths; its address is log-scoped only.
+func (e *Engine) LogInputsCLI(path []string, args []string) {
+	command, arguments := make([]any, len(path)), make([]any, len(args))
+	for i, p := range path {
+		command[i] = p
+	}
+	for i, a := range args {
+		arguments[i] = a
+	}
+	parent := "#<GLI::Command::ParentKey:0x0000000000000000>"
+	options := " {" + parent + " => {}}"
+	if len(path) == 3 {
+		options = "\n  {" + parent + " =>\n    {" + parent + " => {}}}"
+	}
+	e.logText(fmt.Sprintf("{command: %s,\n global_options: {\"c\" => %s, \"color\" => %s, \"help\" => false},\n command_options:%s,\n arguments: %s}\n", rubyInspect(command), rubyInspect(e.Color), rubyInspect(e.Color), options, rubyInspect(arguments)))
+}

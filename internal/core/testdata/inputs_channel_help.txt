@@ -1,0 +1,6 @@
+NAME
+    ls - List channels and their role->input mapping (with locked revisions)
+
+SYNOPSIS
+
+    confctl [global options] inputs channel ls [channel-pattern]

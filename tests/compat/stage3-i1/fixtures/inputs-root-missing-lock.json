@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "id": "inputs-root-missing-lock",
+  "tier": "fixture-process",
+  "sources": [
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/cli/inputs/root.rb",
+      "lines": "10-34"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/flake_lock.rb",
+      "lines": "1-88"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/cli/app.rb",
+      "lines": "59-155"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/nix.rb",
+      "lines": "336-360,561-592"
+    }
+  ],
+  "argv": [
+    "inputs",
+    "ls"
+  ],
+  "env": {},
+  "stdin": "",
+  "tty": false,
+  "files": {
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n"
+    }
+  },
+  "rules": [],
+  "expected": "UNACCEPTED-inputs-root-missing-lock.json",
+  "normalize": {
+    "root_fields": [
+      "stdout",
+      "stderr",
+      "events.cwd",
+      "events.argv",
+      "events.stdin",
+      "events.env.PWD",
+      "events.stdout",
+      "events.stderr"
+    ],
+    "volatile_fields": [
+      "events.pid",
+      "events.start_ns",
+      "events.end_ns",
+      "wall_ns",
+      "user_ns",
+      "system_ns",
+      "max_rss_kb"
+    ],
+    "concurrent_events": false,
+    "run_root_fields": [
+      "events.env.HOME",
+      "events.env.TMPDIR",
+      "events.env.COMPAT_CASE"
+    ],
+    "log_fields": [
+      "filename-time",
+      "command-uuid",
+      "gli-parent-address",
+      "process-duration",
+      "config-root"
+    ]
+  },
+  "deadline_ms": 30000,
+  "expected_no_calls": true
+}
