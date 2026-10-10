@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vpsfreecz/confctl/experimental/internal/cli"
+	"github.com/vpsfreecz/confctl/internal/cli"
 )
 
 func packagedRegistry(t *testing.T) Registry {

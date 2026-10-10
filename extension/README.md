@@ -1,10 +1,10 @@
 # Experimental executable extension SDK
 
-The actual unpublished module is
-`github.com/vpsfreecz/confctl/experimental`; import
-`github.com/vpsfreecz/confctl/experimental/extension`. This is a bounded prototype
-module, distinct from the proposed future stable public SDK path. It uses only
-the Go standard library and exposes no `internal/core` types.
+The module is `github.com/vpsfreecz/confctl`; import
+`github.com/vpsfreecz/confctl/extension`. Its source lives at the repository root.
+The SDK remains experimental; no versioned release is published. It uses only
+the Go standard library and exposes no `internal/core` types. Go module versions
+are independent of the unchanged protocol version 1.0.
 
 The core starts the registry's literal executable argv in the configuration
 root. FD3 receives newline-delimited JSON-RPC 2.0 and FD4 sends replies and
@@ -27,7 +27,7 @@ package main
 
 import (
     "context"
-    ext "github.com/vpsfreecz/confctl/experimental/extension"
+    ext "github.com/vpsfreecz/confctl/extension"
 )
 
 func main() {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	ext "github.com/vpsfreecz/confctl/experimental/extension"
+	ext "github.com/vpsfreecz/confctl/extension"
 	"os"
 	"os/signal"
 	"path/filepath"

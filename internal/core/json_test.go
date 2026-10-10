@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	ext "github.com/vpsfreecz/confctl/experimental/extension"
+	ext "github.com/vpsfreecz/confctl/extension"
 	"io"
 	"os"
 	"os/exec"

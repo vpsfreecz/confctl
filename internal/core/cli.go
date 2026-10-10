@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/vpsfreecz/confctl/experimental/internal/cli"
+	"github.com/vpsfreecz/confctl/internal/cli"
 )
 
 func Main(ctx context.Context, argv []string) int {

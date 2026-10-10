@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vpsfreecz/confctl/experimental/internal/cli"
+	"github.com/vpsfreecz/confctl/internal/cli"
 )
 
 func TestCLIStage1Subprocess(t *testing.T) {

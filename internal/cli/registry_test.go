@@ -300,7 +300,7 @@ func TestHelpReferences(t *testing.T) {
 }
 
 func TestCapabilityTableMatchesREADME(t *testing.T) {
-	b, err := os.ReadFile("../../README.md")
+	b, err := os.ReadFile("../../experiments/confctl-go/README.md")
 	if err != nil {
 		t.Fatal(err)
 	}

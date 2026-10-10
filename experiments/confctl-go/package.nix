@@ -2,7 +2,7 @@
 pkgs.buildGoModule {
   pname = "confctl-go-prototype";
   version = "0.1.0";
-  src = ./.;
+  src = ../..;
   vendorHash = null;
   subPackages = [
     "cmd/confctl-go-prototype"
@@ -27,7 +27,7 @@ pkgs.buildGoModule {
       }
     done
     mkdir -p "$out/share/confctl-go-prototype"
-    substitute ${./registry.json} "$out/share/confctl-go-prototype/registry.json" \
+    substitute ${../../registry.json} "$out/share/confctl-go-prototype/registry.json" \
       --replace-fail '@SITE@' "$out"
   '';
 }

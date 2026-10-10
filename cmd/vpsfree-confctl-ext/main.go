@@ -1,8 +1,8 @@
 package main
 
 import (
-	ext "github.com/vpsfreecz/confctl/experimental/extension"
-	"github.com/vpsfreecz/confctl/experimental/site"
+	ext "github.com/vpsfreecz/confctl/extension"
+	"github.com/vpsfreecz/confctl/site"
 )
 
 func main() {

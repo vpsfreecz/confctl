@@ -8,10 +8,14 @@ changing configuration.
 Root help shows the reference builtin inventory. Detailed help describes the
 execution limits of unavailable commands and status modes.
 
+The Go module `github.com/vpsfreecz/confctl` and its `cmd`, `internal`, `extension`
+and bundled `site` packages live at the repository root. This directory retains
+the opt-in package definitions and this capability table.
+
 Build the explicit package with `nix build --no-write-lock-file
 .#confctl-go-prototype`. Unit checks run through its package check phase, or in
 `nix develop --no-write-lock-file .#experimental` with `go test ./...` and
-`go vet ./...` from this directory. `go test -race ./...` is a separate check.
+`go vet ./...` from the repository root. `go test -race ./...` is a separate check.
 The compatibility driver and immutable Ruby observations live in
 [tests/compat](../../tests/compat/README.md); the source catalogue is in
 [docs/compatibility](../../docs/compatibility/README.md). Builds and comparison
@@ -24,7 +28,7 @@ that absolute file to enable `runtime-kernels update`. The test-only
 prototype has no native rediscover/deploy implementation. Netboot output uses
 `cluster/netbootable.nix`; kernel state retains `configs/node/kernels.json`.
 Both handlers are separate executable processes using the [public experimental
-SDK](extension/README.md), including when the registry points to the same site
+SDK](../../extension/README.md), including when the registry points to the same site
 binary for both registrations.
 
 One typed command tree in `internal/cli` owns all builtin groups and 29 leaves,

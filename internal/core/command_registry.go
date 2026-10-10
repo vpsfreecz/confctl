@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	ext "github.com/vpsfreecz/confctl/experimental/extension"
-	"github.com/vpsfreecz/confctl/experimental/internal/cli"
+	ext "github.com/vpsfreecz/confctl/extension"
+	"github.com/vpsfreecz/confctl/internal/cli"
 )
 
 // Options is the existing handler/log adapter. New declaration-only options do

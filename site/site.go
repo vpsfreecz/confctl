@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	ext "github.com/vpsfreecz/confctl/experimental/extension"
+	ext "github.com/vpsfreecz/confctl/extension"
 	"io"
 	"os"
 	"path/filepath"

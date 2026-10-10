@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"github.com/vpsfreecz/confctl/experimental/internal/core"
+	"github.com/vpsfreecz/confctl/internal/core"
 	"os"
 	"os/signal"
 	"syscall"

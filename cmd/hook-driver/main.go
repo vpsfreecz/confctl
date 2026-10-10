@@ -4,7 +4,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/vpsfreecz/confctl/experimental/internal/core"
+	"github.com/vpsfreecz/confctl/internal/core"
 	"os"
 	"strings"
 )

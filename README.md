@@ -22,6 +22,8 @@ The separately packaged [Go measurement prototype](experiments/confctl-go/README
 and [compatibility harness](tests/compat/README.md) characterize a bounded CLI
 subset against the pinned Ruby implementation. They do not change the normal
 package or deployment workflow.
+The Go module lives at the repository root; its experimental public
+[extension SDK](extension/README.md) uses `github.com/vpsfreecz/confctl/extension`.
 
 ## Requirements
 
