@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	ext "github.com/vpsfreecz/confctl/experimental/extension"
+	"github.com/vpsfreecz/confctl/experimental/internal/cli"
 	"io"
 	"os"
 	"os/exec"
@@ -69,6 +70,7 @@ func ReadRegistry(path string) (Registry, error) {
 		return r, fmt.Errorf("unsupported registry schema %d", r.Schema)
 	}
 	ids, cmds := map[string]bool{}, map[string]bool{}
+	builtinCommands := cli.BuiltinRegistry()
 	for _, x := range r.Extensions {
 		if x.ID == "" || ids[x.ID] || len(x.Argv) == 0 || x.Protocol.Major != ext.Major {
 			return r, fmt.Errorf("invalid extension %q", x.ID)
@@ -84,7 +86,7 @@ func ReadRegistry(path string) (Registry, error) {
 		}
 		for _, c := range x.Commands {
 			key := strings.Join(c.Path, " ")
-			if len(c.Path) == 0 || Builtins[c.Path[0]] || cmds[key] || c.Handler == "" {
+			if len(c.Path) == 0 || builtinCommands.ReservedRoot(c.Path[0]) || cmds[key] || c.Handler == "" {
 				return r, fmt.Errorf("command collision/invalid handler %q", key)
 			}
 			if !supportedRuntimeCommand(c) {
@@ -101,8 +103,8 @@ func ReadRegistry(path string) (Registry, error) {
 	return r, nil
 }
 
-// Help and parsing are deliberately static in this experiment. Reject manifests
-// that would imply a different command rather than silently ignoring metadata.
+// Schema1 accepts only this known command shape. Its metadata is adapted into
+// the shared CLI tree; broader registration remains a later SDK boundary.
 func supportedRuntimeCommand(c Command) bool {
 	if len(c.Path) != 2 || c.Path[0] != "runtime-kernels" || c.Path[1] != "update" || c.Handler != "runtime.update" || c.Description != "Update runtime kernels" {
 		return false
@@ -112,17 +114,6 @@ func supportedRuntimeCommand(c Command) bool {
 	}
 	a := c.Arguments[0]
 	return len(a) == 2 && a["name"] == "machine-pattern" && a["required"] == false
-}
-
-func (r Registry) hasRuntimeCommand() bool {
-	for _, x := range r.Extensions {
-		for _, c := range x.Commands {
-			if supportedRuntimeCommand(c) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 type supervisor struct {

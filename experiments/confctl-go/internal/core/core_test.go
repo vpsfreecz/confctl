@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -110,15 +109,6 @@ func TestStatusRolesAndDuration(t *testing.T) {
 	}
 	if s, e := formatDuration(60); s != "60.0s" || e != nil {
 		t.Fatal(s, e)
-	}
-}
-func TestHelpDoesNotEvaluate(t *testing.T) {
-	before := RootHelp
-	if !bytes.Contains([]byte(before), []byte("collect-garbage")) {
-		t.Fatal("incomplete help")
-	}
-	if len(Inventory) != 29 {
-		t.Fatal(len(Inventory))
 	}
 }
 

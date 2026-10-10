@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vpsfreecz/confctl/experimental/internal/cli"
 )
 
 func packagedRegistry(t *testing.T) Registry {
@@ -61,7 +63,8 @@ func TestHookOnlyRegistryHelp(t *testing.T) {
 	r := packagedRegistry(t)
 	r.Extensions = r.Extensions[:1]
 	code, out, root := registryMain(t, r, []string{"--help"})
-	if code != 0 || out != RootHelp || strings.Contains(out, "runtime-kernels") {
+	expected, _ := cli.BuiltinRegistry().Help(nil, 80)
+	if code != 0 || out != expected || strings.Contains(out, "runtime-kernels") {
 		t.Fatal(code, out)
 	}
 	files, err := os.ReadDir(root)

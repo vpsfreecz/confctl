@@ -2,268 +2,77 @@ package core
 
 import (
 	"context"
-	_ "embed"
+	"errors"
 	"fmt"
-	ext "github.com/vpsfreecz/confctl/experimental/extension"
 	"os"
 	"strings"
+
+	"github.com/vpsfreecz/confctl/experimental/internal/cli"
 )
 
-// These help bytes are captured from the immutable packaged Ruby CLI. Keeping
-// logical program name confctl is deliberate; executable remains separately named.
-//
-//go:embed help_root.txt
-var RootHelp string
-
-//go:embed help_ls.txt
-var LSHelp string
-
-//go:embed help_status.txt
-var StatusHelp string
-var Builtins = map[string]bool{"init": true, "add": true, "rename": true, "rediscover": true, "inputs": true, "ls": true, "build": true, "deploy": true, "health-check": true, "status": true, "changelog": true, "diff": true, "test-connection": true, "ssh": true, "cssh": true, "generation": true, "collect-garbage": true, "gen-data": true, "help": true}
-var Inventory = []string{"init", "add", "rename", "rediscover", "inputs ls", "inputs update", "inputs set", "inputs channel ls", "inputs channel update", "inputs channel set", "inputs machine update", "inputs machine set", "ls", "build", "deploy", "health-check", "status", "changelog", "diff", "test-connection", "ssh", "cssh", "generation ls", "generation rm", "generation rotate", "collect-garbage", "gen-data vpsadmin all", "gen-data vpsadmin containers", "gen-data vpsadmin network"}
-
-type Options struct {
-	Attrs, Tags, Args                       []string
-	Managed, Output, Generation             string
-	HasOutput, HideHeader, List, Trace, Yes bool
-}
-
-func parse(cmd string, a []string) (Options, error) {
-	o := Options{}
-	for i := 0; i < len(a); i++ {
-		s := a[i]
-		if s == "--" {
-			o.Args = append(o.Args, a[i+1:]...)
-			break
-		}
-		if !strings.HasPrefix(s, "-") || s == "-" {
-			o.Args = append(o.Args, a[i:]...)
-			break
-		}
-		key, value, eq := strings.Cut(s, "=")
-		flag := func() (string, error) {
-			if eq {
-				return value, nil
-			}
-			i++
-			if i == len(a) {
-				return "", fmt.Errorf("missing argument: %s", key)
-			}
-			return a[i], nil
-		}
-		switch key {
-		case "--attr", "-a":
-			v, e := flag()
-			if e != nil {
-				return o, e
-			}
-			o.Attrs = append(o.Attrs, v)
-		case "--tag", "-t":
-			v, e := flag()
-			if e != nil {
-				return o, e
-			}
-			o.Tags = append(o.Tags, v)
-		case "--generation", "-g":
-			if cmd != "status" {
-				return o, fmt.Errorf("invalid option: %s", key)
-			}
-			v, e := flag()
-			if e != nil {
-				return o, e
-			}
-			o.Generation = v
-		case "--yes", "-y":
-			if cmd == "ls" {
-				return o, fmt.Errorf("invalid option: %s", key)
-			}
-			o.Yes = true
-		case "--no-yes":
-			if cmd == "ls" {
-				return o, fmt.Errorf("invalid option: %s", key)
-			}
-			o.Yes = false
-		case "--managed":
-			if cmd != "ls" {
-				return o, fmt.Errorf("invalid option: %s", key)
-			}
-			v, e := flag()
-			if e != nil {
-				return o, e
-			}
-			if v != "y" && v != "yes" && v != "n" && v != "no" && v != "a" && v != "all" {
-				return o, fmt.Errorf("invalid argument: --managed %s", v)
-			}
-			o.Managed = v
-		case "--output", "-o":
-			if cmd != "ls" {
-				return o, fmt.Errorf("invalid option: %s", key)
-			}
-			v, e := flag()
-			if e != nil {
-				return o, e
-			}
-			o.Output = v
-			o.HasOutput = true
-		case "--hide-header", "-H":
-			if cmd != "ls" {
-				return o, fmt.Errorf("invalid option: %s", key)
-			}
-			o.HideHeader = true
-		case "--no-hide-header":
-			if cmd != "ls" {
-				return o, fmt.Errorf("invalid option: %s", key)
-			}
-			o.HideHeader = false
-
-		case "--list", "-L":
-			if cmd != "ls" {
-				return o, fmt.Errorf("invalid option: %s", key)
-			}
-			o.List = true
-		case "--show-trace":
-			if cmd == "status" {
-				return o, fmt.Errorf("invalid option: %s", key)
-			}
-			o.Trace = true
-		case "--no-show-trace":
-			if cmd == "status" {
-				return o, fmt.Errorf("invalid option: %s", key)
-			}
-			o.Trace = false
-		default:
-			// Expand short clusters/attached values into this same ordered pass.
-			if len(key) > 2 && key[0] == '-' && key[1] != '-' {
-				expanded := []string{}
-				for j := 1; j < len(key); j++ {
-					k := "-" + string(key[j])
-					expanded = append(expanded, k)
-					if strings.ContainsRune("atog", rune(key[j])) {
-						if j+1 < len(key) {
-							expanded = append(expanded, key[j+1:])
-						}
-						break
-					}
-				}
-				next := append([]string(nil), a[:i]...)
-				next = append(next, expanded...)
-				next = append(next, a[i+1:]...)
-				a = next
-				i--
-				continue
-			}
-
-			return o, fmt.Errorf("invalid option: %s", key)
-		}
-	}
-	return o, nil
-}
-func help(cmd string) string {
-	switch cmd {
-	case "ls":
-		return LSHelp
-	case "status":
-		return StatusHelp
-	default:
-		return RootHelp
-	}
-}
 func Main(ctx context.Context, argv []string) int {
-	color := "auto"
-	i := 0
-	for i < len(argv) {
-		if argv[i] == "--color" || argv[i] == "-c" {
-			i++
-			if i == len(argv) {
-				fmt.Fprintln(os.Stderr, "error: missing argument: --color")
-				return 64
-			}
-			color = argv[i]
-			i++
-			continue
-		}
-		if strings.HasPrefix(argv[i], "-c") && !strings.HasPrefix(argv[i], "--") && len(argv[i]) > 2 {
-			color = strings.TrimPrefix(argv[i], "-c")
-			i++
-			continue
-		}
-		if strings.HasPrefix(argv[i], "--color=") {
-			color = strings.TrimPrefix(argv[i], "--color=")
-			i++
-			continue
-		}
-		break
-	}
-	argv = argv[i:]
-	if color != "auto" && color != "never" && color != "always" {
-		fmt.Fprintln(os.Stderr, "error: invalid argument: --color "+color)
+	builtins := cli.BuiltinRegistry()
+	globals, commandArgv, err := builtins.ParseGlobals(argv)
+	if err != nil {
+		fmt.Fprint(os.Stderr, "error: "+err.Error()+"\n\n")
+		text, _ := builtins.Help(nil, 80)
+		fmt.Print(text)
 		return 64
 	}
-	if len(argv) == 1 && argv[0] == "--version" {
+	// Keep the accepted version failure before any extension registry read.
+	if len(commandArgv) == 1 && commandArgv[0] == "--version" {
 		fmt.Fprint(os.Stderr, "confctl: version unknown\nerror: confctl: version unknown\n")
 		return 1
 	}
-	r, err := ReadRegistry(os.Getenv("CONFCTL_EXTENSION_REGISTRY"))
+	registrations, err := ReadRegistry(os.Getenv("CONFCTL_EXTENSION_REGISTRY"))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	if len(argv) == 0 || argv[0] == "--help" || argv[0] == "help" {
-		cmd := ""
-		if len(argv) > 1 {
-			cmd = argv[1]
+	registry, registered, err := commandRegistry(registrations)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	inv, err := registry.Parse(argv)
+	if err != nil {
+		fmt.Fprint(os.Stderr, "error: "+err.Error()+"\n\n")
+		var parseErr *cli.ParseError
+		var path []string
+		if errors.As(err, &parseErr) {
+			path = parseErr.HelpPath
 		}
-		text := help(cmd)
-		if cmd == "" && r.hasRuntimeCommand() {
-			text = strings.Replace(text, "    ssh             - Run command over SSH\n", "    runtime-kernels - Manage node runtime kernel versions\n    ssh             - Run command over SSH\n", 1)
+		text, _ := registry.Help(path, 80)
+		fmt.Print(text)
+		return 64
+	}
+	if inv.Help {
+		text, err := registry.Help(inv.HelpPath, 80)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 64
 		}
 		fmt.Print(text)
 		return 0
 	}
-	cmd := argv[0]
-	for _, s := range argv[1:] {
-		if s == "--help" {
-			fmt.Print(help(cmd))
-			return 0
-		}
+	if err = registry.CheckAvailability(inv); err != nil {
+		fmt.Fprintln(os.Stderr, "confctl-go-prototype: "+err.Error())
+		return 2
 	}
-	extensionCommand := false
+	cmd := inv.Command.Path[0]
+	opts := handlerOptions(inv)
+	extensionCommand := inv.Command.Handler == cli.KnownExtension
 	var registration Registration
 	var command Command
-	for _, x := range r.Extensions {
-		for _, c := range x.Commands {
-			if len(argv) >= len(c.Path) && strings.Join(argv[:len(c.Path)], " ") == strings.Join(c.Path, " ") {
-				extensionCommand = true
-				registration = x
-				command = c
-			}
+	if extensionCommand {
+		bound := registered[strings.Join(inv.Command.Path, " ")]
+		registration, command = bound.Registration, bound.Command
+		if len(opts.Args) > 1 {
+			fmt.Fprintln(os.Stderr, "error: unknown argument: "+strings.Join(opts.Args[1:], " "))
+			return 64
 		}
 	}
-	if cmd != "ls" && cmd != "status" && !extensionCommand {
-		fmt.Fprintf(os.Stderr, "confctl-go-prototype: %s is unavailable in the measurement prototype\n", cmd)
-		return 2
-	}
-	args := argv[1:]
-	parserName := cmd
-	if extensionCommand {
-		args = argv[len(command.Path):]
-		parserName = "extension"
-	}
-	opts, err := parse(parserName, args)
-	if err != nil {
-		fmt.Fprint(os.Stderr, "error: "+err.Error()+"\n\n")
-		fmt.Print(help(cmd))
-		return 64
-	}
-	if cmd == "status" && opts.Generation != "none" {
-		fmt.Fprintln(os.Stderr, "confctl-go-prototype: status requires --generation none; other modes are unavailable")
-		return 2
-	}
-	if extensionCommand && len(opts.Args) > 1 {
-		fmt.Fprintln(os.Stderr, "error: unknown argument: "+strings.Join(opts.Args[1:], " "))
-		return 64
-	}
+	color := globals["color"].Value.String
 	e, err := New(ctx)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -280,7 +89,7 @@ func Main(ctx context.Context, argv []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	e.LogCLI(cmd, opts, argv)
+	e.LogCLI(cmd, opts, commandArgv)
 	fail := func(err error, code int) int {
 		fmt.Fprintf(os.Stderr, "\nLog file: %s\n", e.Log.Name())
 		fmt.Fprintln(os.Stderr, "error: "+err.Error())
@@ -289,7 +98,7 @@ func Main(ctx context.Context, argv []string) int {
 	success := false
 	defer func() { e.CloseLog(success) }()
 	if extensionCommand {
-		in := ext.Invocation{Root: e.Root, ExtensionID: registration.ID, CommandPath: command.Path, OriginCommand: command.Path, Options: map[string]any{"yes": opts.Yes, "attr": opts.Attrs, "tag": opts.Tags, "show-trace": opts.Trace}, Arguments: opts.Args, RawArgv: argv}
+		in := extensionInvocation(e.Root, registration, command, opts, commandArgv)
 		code, err := e.Invoke(registration, command.Handler, in)
 		if err != nil {
 			return fail(err, 1)
