@@ -120,6 +120,10 @@ func (e *Engine) LogCLI(cmd string, o Options, raw []string) {
 	}
 	var b strings.Builder
 	b.WriteString("{command: " + rubyInspect(cmds) + ",\n global_options: {\"c\" => " + rubyInspect(e.Color) + ", \"color\" => " + rubyInspect(e.Color) + ", \"help\" => false},\n command_options:\n  {")
+	if cmd == "init" || cmd == "add" || cmd == "rename" || cmd == "rediscover" {
+		e.logText("{command: " + rubyInspect(cmds) + ",\n global_options: {\"c\" => " + rubyInspect(e.Color) + ", \"color\" => " + rubyInspect(e.Color) + ", \"help\" => false},\n command_options: {},\n arguments: " + rubyInspect(args) + "}\n")
+		return
+	}
 	for i, v := range opts {
 		if i > 0 {
 			b.WriteString(",\n   ")

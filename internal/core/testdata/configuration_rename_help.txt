@@ -1,0 +1,6 @@
+NAME
+    rename - Rename an existing machine
+
+SYNOPSIS
+
+    confctl [global options] rename <old-name> <new-name>

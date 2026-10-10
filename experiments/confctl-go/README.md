@@ -1,9 +1,10 @@
 # Experimental confctl Go CLI
 
 `confctl-go-prototype` is the separately packaged experimental Go CLI. The normal
-`confctl` package remains the operational tool. This package executes help, `ls`,
-`status --generation none` and the two registered site extensions. Other commands
-and generation modes fail before opening logs, evaluating Nix, running SSH or
+`confctl` package remains the operational tool. This package executes help,
+`init`, `add`, `rename`, `rediscover`, `ls`, `status --generation none` and the
+two registered site extensions. Other commands and generation modes fail before
+opening logs, evaluating Nix, running SSH or
 changing configuration.
 Root help shows the reference builtin inventory. Detailed help describes the
 execution limits of unavailable commands and status modes.
@@ -27,8 +28,9 @@ compatibility driver copies it outside the configuration tree, binds the actual
 fixture `flake.nix` bytes and supplies both `CONFCTL_EXTENSION_REGISTRY` and
 `CONFCTL_EXTENSION_ROOT`. Original Ruby runs use no candidate preparation.
 The test-only `hook-driver` uses the same bound loader and executes
-`rediscover.after-write` and `deploy.prepare`; the prototype has no native
-rediscover/deploy implementation. Netboot output uses
+`rediscover.after-write` and `deploy.prepare`; deployment remains unavailable.
+Native rediscovery invokes `rediscover.after-write` after replacing the inventory,
+including rediscovery called by add/rename. Netboot output uses
 `cluster/netbootable.nix`; kernel state retains `configs/node/kernels.json`.
 Both handlers are separate executable processes using the [public experimental
 SDK](../../extension/README.md), including when the registry points to the same site
@@ -64,15 +66,34 @@ executable is missing. Arity is checked before execution. Only the finite
 automatic rebinding or concurrent-edit lock. The public [SDK contract](../../extension/README.md)
 describes default presence and exact JSON-number options. The existing
 runtime-kernels payload/log adapter, services, supervisor and hook-driver
-boundaries remain unchanged. No production registry or configuration operation
-is adopted by this slice.
+boundaries remain unchanged. No production registry is adopted.
+
+Configuration commands retain the Ruby templates and filesystem order. Init
+permits only `shell.nix`, `.confctl`, `.gems` and `.gitignore` in the initial
+directory; `.git` is rejected. Add/rename require a flake before validating their
+arguments. Rename moves files without rewriting embedded names or imports.
+Rediscovery follows directory links, includes hidden/nested paths whose
+`module.nix` and `config.nix` exist, and sorts relative paths. Replacement writes
+`cluster.nix.new-<six hex digits>` before renaming it. Failed writes or hooks leave
+completed files in place; there is no transaction or automatic undo.
+Init directory creation and new files respect umask. Add and rename use
+FileUtils's explicit `mkdir_p` mode: newly created directories become 0755,
+existing directory modes are preserved, and new files still respect umask.
+
+Rediscovery invalidates settings and inventory before its first hook and after
+each subscriber, including failure. Hooks run in order, extension ID and handler
+order through the existing supervisor. Their context carries the actual origin
+command/options/arguments/raw argv, empty action, null generation and no selected
+machine restriction. Inventory stays lazy when no hook requests it. Separate
+Configuration cases live under `tests/compat/stage2-b/fixtures`; their original
+Ruby captures and acceptance remain distinct from the unchanged 41 references.
 
 The following table is checked against the command registry:
 
 <!-- command-registry-capabilities:start -->
 | Builtin command | Execution |
 | --- | --- |
-| `add` | Unavailable |
+| `add` | Available |
 | `build` | Unavailable |
 | `changelog` | Unavailable |
 | `collect-garbage` | Unavailable |
@@ -86,7 +107,7 @@ The following table is checked against the command registry:
 | `generation rm` | Unavailable |
 | `generation rotate` | Unavailable |
 | `health-check` | Unavailable |
-| `init` | Unavailable |
+| `init` | Available |
 | `inputs channel ls` | Unavailable |
 | `inputs channel set` | Unavailable |
 | `inputs channel update` | Unavailable |
@@ -96,8 +117,8 @@ The following table is checked against the command registry:
 | `inputs set` | Unavailable |
 | `inputs update` | Unavailable |
 | `ls` | Available |
-| `rediscover` | Unavailable |
-| `rename` | Unavailable |
+| `rediscover` | Available |
+| `rename` | Available |
 | `ssh` | Unavailable |
 | `status` | Only --generation none |
 | `test-connection` | Unavailable |

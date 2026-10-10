@@ -379,6 +379,9 @@ func (e *Engine) hooks(r Registry, event string, names []string, origin *cli.Inv
 	for _, x := range items {
 		in := ext.Invocation{Root: e.Root, ExtensionID: x.reg.ID, Event: event, SelectedNames: names, Action: "switch", Options: map[string]any{}}
 		if origin != nil {
+			if event == "rediscover.after-write" {
+				in.Action = ""
+			}
 			in.OriginCommand = append([]string(nil), origin.Command.Path...)
 			in.Options = invocationOptions(*origin)
 			in.Arguments = append([]string(nil), origin.Args...)

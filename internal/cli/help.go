@@ -140,11 +140,17 @@ func (r *Registry) Help(path []string, width int) (string, error) {
 		if c.ArgumentPolicy == GroupArguments {
 			b.WriteString(" command")
 		}
-		b.WriteString(" [command options]")
+		configurationWithoutOptions := c.Handler == ConfigurationHandler && len(c.Options) == 0
+		if !configurationWithoutOptions {
+			b.WriteString(" [command options]")
+		}
 		if c.Usage != "" {
 			b.WriteString(" " + c.Usage)
 		}
-		b.WriteString("\n\n")
+		b.WriteString("\n")
+		if !configurationWithoutOptions {
+			b.WriteString("\n")
+		}
 		if c.ArgumentPolicy == GroupArguments {
 			b.WriteString("COMMANDS\n")
 		} else if len(c.Options) > 0 {

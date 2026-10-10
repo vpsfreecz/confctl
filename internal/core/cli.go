@@ -115,6 +115,36 @@ func Main(ctx context.Context, argv []string) int {
 		success = code == 0
 		return code
 	}
+	if inv.Command.Handler == cli.ConfigurationHandler {
+		operation := configurationOperation{Registry: registrations, Origin: inv}
+		code := 0
+		switch cmd {
+		case "init":
+			err = e.Init()
+		case "add":
+			code, err = e.Add(operation)
+		case "rename":
+			code, err = e.Rename(operation)
+		case "rediscover":
+			code, err = e.Rediscover(operation)
+		}
+		if err != nil {
+			if code == 0 {
+				code = 1
+			}
+			var argumentErr *configurationArgumentError
+			if errors.As(err, &argumentErr) {
+				code = fail(err, 64)
+				fmt.Fprintln(os.Stderr)
+				text, _ := registry.Help(inv.Command.Path, 80)
+				fmt.Print(text)
+				return code
+			}
+			return fail(err, code)
+		}
+		success = code == 0
+		return code
+	}
 	if cmd == "ls" && opts.List {
 		e.ShowTrace = false
 		n, er := e.evaluator()

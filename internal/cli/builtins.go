@@ -160,6 +160,13 @@ func BuiltinRegistry() *Registry {
 		leaf([]string{"gen-data", "vpsadmin", "containers"}, "Generate container data files", "", nil, nil),
 		leaf([]string{"gen-data", "vpsadmin", "network"}, "Generate network data files", "", nil, nil),
 	)
+	for i := range commands {
+		switch pathKey(commands[i].Path) {
+		case "init", "add", "rename", "rediscover":
+			commands[i].Handler = ConfigurationHandler
+			commands[i].Availability = Availability{Mode: Available}
+		}
+	}
 	r, err := NewRegistry([]OptionSpec{color, help}, commands)
 	if err != nil {
 		panic(err)

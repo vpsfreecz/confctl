@@ -100,7 +100,10 @@ func TestRegistryValidation(t *testing.T) {
 			s[0].Options = []OptionSpec{{Key: "x", Names: []string{"x"}, Kind: String, Negatable: true}}
 			return s
 		}},
-		{"available-without-handler", func(s []CommandSpec) []CommandSpec { s[2].Availability.Mode = Available; return s }},
+		{"available-without-handler", func(s []CommandSpec) []CommandSpec {
+			s[2].Handler, s[2].Availability.Mode = None, Available
+			return s
+		}},
 		{"handler-condition", func(s []CommandSpec) []CommandSpec {
 			s[2].Handler, s[2].Availability.Mode = StatusNone, Available
 			return s
@@ -296,6 +299,49 @@ func TestHelpReferences(t *testing.T) {
 	}
 	if _, err := r.Help([]string{"unknown"}, 80); err == nil {
 		t.Fatal("unknown help succeeded")
+	}
+}
+
+func TestConfigurationHelpReferencesAndMetadata(t *testing.T) {
+	base := BuiltinRegistry()
+	for _, command := range []string{"add", "rename"} {
+		want, err := os.ReadFile("../core/testdata/configuration_" + command + "_help.txt")
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := base.Help([]string{command}, 80)
+		if err != nil || got != string(want) {
+			t.Fatal("configuration help differs from original Ruby", command, got, err)
+		}
+	}
+	specs := base.Commands()
+	for i := range specs {
+		if pathKey(specs[i].Path) == "add" {
+			specs[i].Summary = "Changed machine creation"
+			specs[i].Usage = "<changed-name>"
+		}
+	}
+	r, err := NewRegistry(base.Globals(), specs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text, err := r.Help([]string{"add"}, 80)
+	if err != nil || !strings.Contains(text, "Changed machine creation") || !strings.HasSuffix(text, "add <changed-name>\n") || strings.Contains(text, "[command options]") {
+		t.Fatal(text, err)
+	}
+	for i := range specs {
+		if pathKey(specs[i].Path) == "add" {
+			specs[i].Options = []OptionSpec{stringOption([]string{"q", "label"}, "Changed label")}
+		}
+	}
+	r, err = NewRegistry(base.Globals(), specs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text, err = r.Help([]string{"add"}, 80)
+	inv, parseErr := r.Parse([]string{"add", "-q", "value", "name"})
+	if err != nil || parseErr != nil || !strings.Contains(text, "add [command options] <changed-name>\n\n") || !strings.Contains(text, "-q, --label=arg") || inv.Options["label"].Value.String != "value" {
+		t.Fatal("option-bearing declaration lost existing rendering/parsing", text, inv, err, parseErr)
 	}
 }
 
