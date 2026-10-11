@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/vpsfreecz/confctl/internal/cli"
@@ -314,4 +315,149 @@ func (e *Engine) UpdateInputs(inv cli.Invocation) (string, error) {
 		}
 	}
 	return text.String(), nil
+}
+
+// Set reuses the captured lock runner and optional commit dependencies without
+// the updater's preliminary Load. The inputs package owns every lock operation.
+func (e *Engine) inputSetDeps() inputs.SetDeps {
+	d := e.inputUpdateDeps()
+	return inputs.SetDeps{Run: d.Run, Argument: d.Argument, Changelog: d.Changelog, Commit: d.Commit}
+}
+
+func (e *Engine) SetInputs(inv cli.Invocation, emit func(string)) error {
+	return e.setInputs(inv, e.inputSetDeps(), emit)
+}
+
+func (e *Engine) setInputs(inv cli.Invocation, deps inputs.SetDeps, emit func(string)) error {
+	if err := e.required(); err != nil {
+		return err
+	}
+	path, args := inv.Command.Path, inv.Args
+	var names []any
+	var targets []inputs.Target
+	var rev string
+	switch strings.Join(path, " ") {
+	case "inputs set":
+		if err := inputUpdateArgs(args, []string{"input-name", "rev"}, 0); err != nil {
+			return err
+		}
+		names, rev = []any{args[0]}, args[1]
+	case "inputs channel set":
+		if err := inputUpdateArgs(args, []string{"channels", "role", "rev"}, 0); err != nil {
+			return err
+		}
+		n, err := e.evaluator()
+		if err != nil {
+			return err
+		}
+		b, err := n.inputJSON(".#confctl.channels")
+		if err != nil {
+			return err
+		}
+		channels, err := inputs.DecodeChannels(b)
+		if err != nil {
+			return err
+		}
+		selected := inputs.SelectChannels(channels, &args[0], Match)
+		if len(selected) == 0 {
+			return fmt.Errorf("no channels matched '%s'", args[0])
+		}
+		targets = inputs.ChannelTargets(selected, &args[1])
+		names, rev = inputs.SelectedInputs(targets), args[2]
+		if len(names) == 0 {
+			return errors.New("no inputs selected (check role name?)")
+		}
+		uses := inputs.SharedInputUses(channels, selected, args[1], names)
+		if len(uses) > 0 {
+			message, err := inputs.SharedInputMessage(uses, deps.Argument)
+			if err != nil {
+				return err
+			}
+			if !inv.Options["allow_shared"].Value.Bool {
+				return errors.New(message + " (use --allow-shared to proceed)")
+			}
+			emit("Warning: " + message + "\n")
+		}
+	case "inputs machine set":
+		if err := inputUpdateArgs(args, []string{"machine", "role", "rev"}, 0); err != nil {
+			return err
+		}
+		r, err := e.inputResolver()
+		if err != nil {
+			return err
+		}
+		name, err := r.Resolve(args[0], args[1])
+		if err != nil {
+			return err
+		}
+		names, rev = []any{name}, args[2]
+		targets = []inputs.Target{{Channel: args[0], Role: args[1], Input: name}}
+	default:
+		return errors.New("invalid inputs set route")
+	}
+	opts := inputs.UpdateOptions{Commit: inv.Options["commit"].Value.Bool, Changelog: inv.Options["changelog"].Value.Bool, Editor: inv.Options["editor"].Value.Bool, Downgrade: inv.Options["downgrade"].Value.Bool}
+	result, err := inputs.Set(e.Context, e.Root, names, rev, opts, deps)
+	if err != nil {
+		return err
+	}
+	if len(path) == 2 {
+		if len(result.Changes) == 0 {
+			emit("No changes.\n")
+			return nil
+		}
+		emit(fmt.Sprintf("Updated inputs (%d):\n", len(result.Changes)))
+		for _, change := range result.Changes {
+			emit(fmt.Sprintf("  %s: %s -> %s\n", change.Name, inputShort(change.Old.ShortRev), inputShort(change.New.ShortRev)))
+		}
+		return nil
+	}
+	// The source reloads after Set (and its optional commit), even for no change.
+	lockPath := filepath.Join(e.Root, "flake.lock")
+	lock, err := inputs.LoadLock(lockPath)
+	if err != nil {
+		return inputLockError(err, lockPath)
+	}
+	for _, target := range targets {
+		info, err := lock.InputInfo(target.Input)
+		if err != nil {
+			return err
+		}
+		resolved := info.ShortRev
+		if resolved == nil || resolved == false {
+			resolved = info.Rev
+		}
+		emit(fmt.Sprintf("Configuring %s in %s -> %s\n", target.Role, target.Channel, inputShort(resolved)))
+	}
+	return nil
+}
+
+// Presentation is scoped to the setter's typed phase and matching filesystem
+// operands. Returning a string leaves cancellation and the original cause intact.
+func inputSetDiagnostic(err error) string {
+	var phase *inputs.SetError
+	if !errors.As(err, &phase) {
+		return err.Error()
+	}
+	var errno syscall.Errno
+	if !errors.As(phase.Err, &errno) {
+		return err.Error()
+	}
+	switch phase.Phase {
+	case inputs.FirstRead, inputs.SnapshotRead, inputs.TempRead, inputs.FinalRead, inputs.TempWrite:
+		var path *os.PathError
+		if errors.As(phase.Err, &path) && path.Op == "open" && path.Path == phase.Path {
+			return configurationError(path, "rb_sysopen", phase.Path).Error()
+		}
+	case inputs.Rename:
+		var link *os.LinkError
+		if errors.As(phase.Err, &link) && link.Op == "rename" && link.Old == phase.Path && link.New == phase.Target {
+			message := errno.Error()
+			message = strings.ToUpper(message[:1]) + message[1:]
+			if errno == syscall.EEXIST {
+				return message + " - " + phase.Target
+			}
+			return fmt.Sprintf("%s @ rb_file_s_rename - (%s, %s)", message, phase.Path, phase.Target)
+		}
+	}
+	return err.Error()
 }

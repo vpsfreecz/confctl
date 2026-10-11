@@ -155,7 +155,7 @@ func (r *Registry) Help(path []string, width int) (string, error) {
 		b.WriteString(renderOptions(r.globals, true, width))
 		b.WriteString("\n\nCOMMANDS\n")
 	} else {
-		inputUpdate := c.Handler == InputsUpdateHandler
+		inputUpdate := c.Handler == InputsUpdateHandler || c.Handler == InputsSetHandler
 		inputsWithoutOptions := c.Handler == InputsReadHandler && len(c.Options) == 0 && (name == "inputs ls" || name == "inputs channel ls")
 		heading := name
 		if inputsWithoutOptions {

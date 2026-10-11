@@ -4,6 +4,7 @@
 `confctl` package remains the operational tool. This package executes help,
 `init`, `add`, `rename`, `rediscover`, `ls`, `inputs ls`, `inputs channel ls`,
 `inputs update`, `inputs channel update`, `inputs machine update`,
+`inputs set`, `inputs channel set`, `inputs machine set`,
 `status --generation none` and explicitly registered external extensions. Other
 commands and generation modes fail before opening logs, evaluating Nix, running
 SSH or changing configuration.
@@ -122,7 +123,7 @@ Both commands require `flake.nix` before reading the lock or validating handler
 arguments. Failures retain logs; successful reads leave the lock bytes unchanged.
 The lock reader translates the observed initial invalid-value JSON diagnostic;
 other malformed JSON classes keep Go diagnostics and are not claimed equivalent.
-Separate original references live in `tests/compat/stage3-i1`; the three `set` commands remain unavailable.
+Separate original references live in `tests/compat/stage3-i1`.
 
 Input updates preserve selection order and deduplicate channel input requests in
 first-seen order. Root `--all` uses sorted root inputs and ignores positional
@@ -131,6 +132,15 @@ names; explicit names may create a missing lock. Update invokes literal
 only for a matching failed command. The specific cached GitHub metadata warning
 is an error even after exit0. Failures retain written lock bytes. Diffs compare
 revisions only; metadata-only changes report no changes and skip commit.
+
+Input setters accept a literal revision and preserve each selected input's
+original source metadata after every successful lock operation. Channel set
+refuses inputs shared with other channel/role pairs unless `--allow-shared` is
+set; its warning is printed before mutation. Channel and machine summaries
+reload the final lock after any optional commit. A later failure retains earlier
+lock replacements and logs, without automatic rollback or repair. Inspect those
+retained changes before retrying or returning to the operational Ruby tool.
+Revision-only diffs skip optional commit when no revisions changed.
 
 Optional commits use the existing message grouping and actual-URL mirror cache
 under the private XDG/HOME cache. Ordinary mirror failures become changelog text;
@@ -145,6 +155,10 @@ foreground. Restoration preserves another live foreground group. Helper,
 observer and terminal failures retain their diagnostics; ordinary Git failures
 remain `git commit failed`. Stop/resume, initial background jobs and real editor
 parity still require the original/candidate PTY acceptance checks.
+Real optional-commit job-control, editor and cancellation acceptance remains
+blocked. The experimental setters expose all declared commit options; source
+unit tests and fake processes do not establish installed setter parity or
+production readiness.
 Separate original-only references live in `tests/compat/stage3-i2`. Finite fake
 Git tests establish process/argv boundaries, not real Git or terminal acceptance.
 
@@ -169,12 +183,12 @@ The following table is checked against the command registry:
 | `health-check` | Unavailable |
 | `init` | Available |
 | `inputs channel ls` | Available |
-| `inputs channel set` | Unavailable |
+| `inputs channel set` | Available |
 | `inputs channel update` | Available |
 | `inputs ls` | Available |
-| `inputs machine set` | Unavailable |
+| `inputs machine set` | Available |
 | `inputs machine update` | Available |
-| `inputs set` | Unavailable |
+| `inputs set` | Available |
 | `inputs update` | Available |
 | `ls` | Available |
 | `rediscover` | Available |

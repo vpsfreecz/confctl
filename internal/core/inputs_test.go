@@ -404,7 +404,7 @@ func TestInputsHelpAndMutatorsRemainNoEffect(t *testing.T) {
 		}
 	}
 	for _, leaf := range cli.BuiltinRegistry().Leaves() {
-		if leaf.Path[0] == "inputs" && leaf.Handler != cli.InputsReadHandler && leaf.Handler != cli.InputsUpdateHandler {
+		if leaf.Path[0] == "inputs" && leaf.Handler != cli.InputsReadHandler && leaf.Handler != cli.InputsUpdateHandler && leaf.Handler != cli.InputsSetHandler {
 			code, stdout, stderr, _ := actualCLI(t, append(append([]string{}, leaf.Path...), "a", "os", "rev"), "")
 			if code != 2 || stdout != "" || !strings.Contains(stderr, "unavailable") {
 				t.Fatal(leaf.Path, code, stdout, stderr)

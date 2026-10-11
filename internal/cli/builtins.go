@@ -168,6 +168,9 @@ func BuiltinRegistry() *Registry {
 		case "inputs ls", "inputs channel ls":
 			commands[i].Handler = InputsReadHandler
 			commands[i].Availability = Availability{Mode: Available}
+		case "inputs set", "inputs channel set", "inputs machine set":
+			commands[i].Handler = InputsSetHandler
+			commands[i].Availability = Availability{Mode: Available}
 		case "inputs update", "inputs channel update", "inputs machine update":
 			commands[i].Handler = InputsUpdateHandler
 			commands[i].Availability = Availability{Mode: Available}

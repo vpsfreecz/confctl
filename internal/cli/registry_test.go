@@ -174,12 +174,12 @@ func TestInputsReadOnlyDeclarations(t *testing.T) {
 			if c.Availability.Mode != Available || len(c.Options) != 0 || r.CheckAvailability(inv) != nil {
 				t.Fatal("read-only metadata changed", c)
 			}
-		} else if c.Handler == InputsUpdateHandler {
+		} else if c.Handler == InputsUpdateHandler || c.Handler == InputsSetHandler {
 			if c.Availability.Mode != Available || r.CheckAvailability(inv) != nil {
-				t.Fatal("input update unavailable", c.Path)
+				t.Fatal("input mutation unavailable", c.Path)
 			}
 		} else if r.CheckAvailability(inv) == nil {
-			t.Fatal("input set advertised as available", c.Path)
+			t.Fatal("unsupported input leaf advertised as available", c.Path)
 		}
 	}
 	if available != 2 {
@@ -480,6 +480,69 @@ func TestInputsUpdateHelpReferencesAndMetadata(t *testing.T) {
 		inv, err := derived.Parse(append(append([]string{}, path...), "--commit", "--no-commit", "-d", "--no-downgrade", "a"))
 		if err != nil || inv.Command.Handler != InputsUpdateHandler || derived.CheckAvailability(inv) != nil || inv.Options["commit"].Value.Bool || inv.Options["downgrade"].Value.Bool {
 			t.Fatal(inv, err)
+		}
+	}
+}
+
+func TestInputsSetDeclarationsAndMetadataHelp(t *testing.T) {
+	r := BuiltinRegistry()
+	count := 0
+	for _, c := range r.Leaves() {
+		if c.Handler != InputsSetHandler {
+			continue
+		}
+		count++
+		if c.Path[len(c.Path)-1] != "set" || c.Availability.Mode != Available || len(c.Arguments) != len(c.Path) || c.Arguments[len(c.Arguments)-1].Name != "rev" {
+			t.Fatal(c)
+		}
+		for _, a := range c.Arguments {
+			if !a.Required {
+				t.Fatal("setter required argument", c.Path, a)
+			}
+		}
+		help, err := r.Help(c.Path, 80)
+		if err != nil || !strings.HasPrefix(help, "NAME\n    set - ") || !strings.Contains(help, "confctl [global options] "+pathKey(c.Path)+" [command options] "+c.Usage) || strings.Contains(help, "Unavailable") || !strings.HasSuffix(help, "\n\n") {
+			t.Fatal(c.Path, help, err)
+		}
+		inv, err := r.Parse(c.Path)
+		if err != nil || r.CheckAvailability(inv) != nil {
+			t.Fatal(c.Path, err)
+		}
+	}
+	if count != 3 || InputsSetHandler != InputsUpdateHandler+1 {
+		t.Fatal("unexpected setter handler inventory", count)
+	}
+	help, _ := r.Help([]string{"inputs", "channel", "set"}, 80)
+	if !strings.Contains(help, "--[no-]allow_shared") || strings.Contains(help, "--[no-]allow-shared") {
+		t.Fatal("declaration spelling changed", help)
+	}
+	commands := r.Commands()
+	for i := range commands {
+		if pathKey(commands[i].Path) == "inputs set" {
+			commands[i].Summary = "Changed setter description"
+			commands[i].Usage = "<source> <revision>"
+			commands[i].Options[0].Description = "Changed commit description"
+			commands[i].Options[0].Default = Bool(true)
+		}
+	}
+	derived, err := NewRegistry(r.Globals(), commands)
+	if err != nil {
+		t.Fatal(err)
+	}
+	help, _ = derived.Help([]string{"inputs", "set"}, 80)
+	inv, err := derived.Parse([]string{"inputs", "set"})
+	if err != nil || !inv.Options["commit"].Value.Bool || !strings.Contains(help, "Changed setter description") || !strings.Contains(help, "<source> <revision>") || !strings.Contains(help, "Changed commit description") {
+		t.Fatal(help, inv, err)
+	}
+	for _, mode := range []AvailabilityMode{Unavailable, Conditional} {
+		bad := derived.Commands()
+		for i := range bad {
+			if pathKey(bad[i].Path) == "inputs set" {
+				bad[i].Availability.Mode = mode
+			}
+		}
+		if _, err = NewRegistry(derived.Globals(), bad); err == nil {
+			t.Fatal("accepted setter mode", mode)
 		}
 	}
 }

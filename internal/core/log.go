@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vpsfreecz/confctl/internal/cli"
 )
@@ -190,6 +191,28 @@ func (e *Engine) LogInputUpdateCLI(inv cli.Invocation) {
 	} else {
 		b.WriteString(" {}}")
 	}
-	b.WriteString(",\n arguments: " + rubyInspect(arguments) + "}\n")
+	b.WriteString(inputLogArgumentsField(arguments))
 	e.logText(b.String())
 }
+
+// Logger's final arguments hash field has a 79-character PP context. The closing
+// hash brace participates in fit; the array's comma group breaks together.
+// Count the existing inspected tokens as characters, without splitting them.
+func inputLogArgumentsField(arguments []any) string {
+	tokens := make([]string, len(arguments))
+	for i, argument := range arguments {
+		tokens[i] = rubyInspect(argument)
+	}
+	array := "[" + strings.Join(tokens, ", ") + "]"
+	width := utf8.RuneCountInString(array)
+	if width <= 66 {
+		return ",\n arguments: " + array + "}\n"
+	}
+	if width >= 77 {
+		array = "[" + strings.Join(tokens, ",\n   ") + "]"
+	}
+	return ",\n arguments:\n  " + array + "}\n"
+}
+
+// Set uses the same ordered boolean declarations and PP parent layout.
+func (e *Engine) LogInputSetCLI(inv cli.Invocation) { e.LogInputUpdateCLI(inv) }

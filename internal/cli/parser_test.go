@@ -213,7 +213,7 @@ func TestNestedHelpAndAvailability(t *testing.T) {
 		t.Fatal(group, err)
 	}
 	text, _ := r.Help(group.HelpPath, 80)
-	if !strings.Contains(text, "Unavailable") {
+	if strings.Contains(text, "Unavailable") || strings.Count(text, "(Available)") != 3 {
 		t.Fatal(text)
 	}
 }
@@ -280,5 +280,41 @@ func TestOptionFirstEncounterOnlySuccessfulCallbacks(t *testing.T) {
 	inv, err = r.Parse([]string{"-cnever", "inputs", "update", "--all", "a"})
 	if err != nil || inv.Globals["color"].FirstEncounter != 1 || inv.Options["all"].FirstEncounter != 1 {
 		t.Fatal("scan counters leaked across globals/command", inv, err)
+	}
+}
+
+func TestInputsSetOptionsAliasesNegationsAndLiteralRevision(t *testing.T) {
+	r := BuiltinRegistry()
+	for _, path := range [][]string{{"inputs", "set"}, {"inputs", "channel", "set"}, {"inputs", "machine", "set"}} {
+		positional := []string{"a", "opaque?/# --rev"}
+		if len(path) == 3 {
+			positional = []string{"a", "os", "opaque?/# --rev"}
+		}
+		inv, err := r.Parse(append(append([]string{}, path...), positional...))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for key, want := range map[string]bool{"commit": false, "changelog": true, "editor": true, "downgrade": false} {
+			p := inv.Options[key]
+			if p.Value.Bool != want || p.Present || p.FirstEncounter != 0 {
+				t.Fatal(path, key, p)
+			}
+		}
+		flags := []string{"--commit", "--no-commit", "--no-changelog", "--no-editor", "-d", "--no-downgrade", "--downgrade"}
+		if pathKey(path) == "inputs channel set" {
+			flags = append(flags, "--allow-shared", "--no-allow_shared", "--allow_shared")
+		}
+		argv := append(append(append([]string{}, path...), flags...), positional...)
+		inv, err = r.Parse(argv)
+		if err != nil || !reflect.DeepEqual(inv.Args, positional) || inv.Options["commit"].Value.Bool || inv.Options["changelog"].Value.Bool || inv.Options["editor"].Value.Bool || !inv.Options["downgrade"].Value.Bool || inv.Options["downgrade"].FirstEncounter != 5 {
+			t.Fatal(argv, inv, err)
+		}
+		if pathKey(path) == "inputs channel set" && !inv.Options["allow_shared"].Value.Bool {
+			t.Fatal(inv)
+		}
+		inv, err = r.Parse(append(append([]string{}, path...), "--", "--help", "--commit", ""))
+		if err != nil || inv.Help || !reflect.DeepEqual(inv.Args, []string{"--help", "--commit", ""}) {
+			t.Fatal("setter parser boundary", inv, err)
+		}
 	}
 }

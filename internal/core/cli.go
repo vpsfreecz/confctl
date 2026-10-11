@@ -89,7 +89,7 @@ func Main(ctx context.Context, argv []string) int {
 	logName := cmd
 	if extensionCommand {
 		logName = strings.Join(command.Path, "-")
-	} else if inv.Command.Handler == cli.InputsReadHandler || inv.Command.Handler == cli.InputsUpdateHandler {
+	} else if inv.Command.Handler == cli.InputsReadHandler || inv.Command.Handler == cli.InputsUpdateHandler || inv.Command.Handler == cli.InputsSetHandler {
 		logName = strings.Join(inv.Command.Path, "-")
 	}
 	if err = e.OpenLog(logName); err != nil {
@@ -98,6 +98,8 @@ func Main(ctx context.Context, argv []string) int {
 	}
 	if inv.Command.Handler == cli.InputsReadHandler {
 		e.LogInputsCLI(inv.Command.Path, inv.Args)
+	} else if inv.Command.Handler == cli.InputsSetHandler {
+		e.LogInputSetCLI(inv)
 	} else if inv.Command.Handler == cli.InputsUpdateHandler {
 		e.LogInputUpdateCLI(inv)
 	} else if !extensionCommand || supportedRuntimeCommand(command) {
@@ -108,12 +110,16 @@ func Main(ctx context.Context, argv []string) int {
 	}
 	fail := func(err error, code int) int {
 		fmt.Fprintf(os.Stderr, "\nLog file: %s\n", e.Log.Name())
+		diagnostic := err.Error()
+		if inv.Command.Handler == cli.InputsSetHandler {
+			diagnostic = inputSetDiagnostic(err)
+		}
 		var updateExit *inputs.ExitError
-		if inv.Command.Handler == cli.InputsUpdateHandler && errors.As(err, &updateExit) {
-			// Completed updater failures already carry tty-command's final newline.
-			fmt.Fprint(os.Stderr, "error: "+err.Error())
+		if (inv.Command.Handler == cli.InputsUpdateHandler || inv.Command.Handler == cli.InputsSetHandler) && errors.As(err, &updateExit) {
+			// Completed input mutation failures carry tty-command's final newline.
+			fmt.Fprint(os.Stderr, "error: "+diagnostic)
 		} else {
-			fmt.Fprintln(os.Stderr, "error: "+err.Error())
+			fmt.Fprintln(os.Stderr, "error: "+diagnostic)
 		}
 		return code
 	}
@@ -128,9 +134,11 @@ func Main(ctx context.Context, argv []string) int {
 		success = code == 0
 		return code
 	}
-	if inv.Command.Handler == cli.InputsReadHandler || inv.Command.Handler == cli.InputsUpdateHandler {
+	if inv.Command.Handler == cli.InputsReadHandler || inv.Command.Handler == cli.InputsUpdateHandler || inv.Command.Handler == cli.InputsSetHandler {
 		var text string
-		if inv.Command.Handler == cli.InputsUpdateHandler {
+		if inv.Command.Handler == cli.InputsSetHandler {
+			err = e.SetInputs(inv, func(s string) { fmt.Print(s) })
+		} else if inv.Command.Handler == cli.InputsUpdateHandler {
 			text, err = e.UpdateInputs(inv)
 		} else {
 			text, err = e.ListInputs(len(inv.Command.Path) == 3, inv.Args)
