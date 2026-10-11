@@ -137,3 +137,58 @@ func TestMachineUnavailableRoleAndEvaluationFailures(t *testing.T) {
 		}
 	}
 }
+
+func TestSharedInputUsesOtherRoleOutsideSelectionAndSortedMessage(t *testing.T) {
+	all := []Channel{
+		{Name: "z", Roles: []Role{{"os", "b"}, {"confctl", "b"}, {"extra", "a"}}},
+		{Name: "a", Roles: []Role{{"os", "a"}, {"confctl", "b"}}},
+		{Name: "outside", Roles: []Role{{"z", "b"}, {"a", "b"}, {"os", "a"}}},
+	}
+	selected := []Channel{all[0], all[1], all[0]}
+	targets := ChannelTargets(selected, stringPtr("os"))
+	if !reflect.DeepEqual(targets, []Target{{"z", "os", "b"}, {"a", "os", "a"}, {"z", "os", "b"}}) || !reflect.DeepEqual(SelectedInputs(targets), []any{"b", "a"}) {
+		t.Fatal(targets, SelectedInputs(targets))
+	}
+	uses := SharedInputUses(all, selected, "os", []any{"b", "a", "b"})
+	want := []SharedInputUse{
+		{Input: "b", Uses: []ChannelRoleUse{{"z", "confctl"}, {"a", "confctl"}, {"outside", "z"}, {"outside", "a"}}},
+		{Input: "a", Uses: []ChannelRoleUse{{"z", "extra"}, {"outside", "os"}}},
+	}
+	if !reflect.DeepEqual(uses, want) {
+		t.Fatal(uses)
+	}
+	// Literal diagnostic layout is owned by cli/inputs/channels.rb; no warning
+	// or refusal suffix belongs to this private helper.
+	message, err := SharedInputMessage(uses, setTestArgument)
+	expected := "selected input(s) are shared outside the requested channel/role: a (also used by outside/os, z/extra); b (also used by a/confctl, outside/a, outside/z, z/confctl)"
+	if err != nil || message != expected || !reflect.DeepEqual(uses, want) {
+		t.Fatal(message, err, uses)
+	}
+	if len(SharedInputUses(all, all, "confctl", []any{"absent"})) != 0 {
+		t.Fatal("absent sharing")
+	}
+}
+
+func TestSharedInputUsesRetainsRawValuesUntilSorting(t *testing.T) {
+	name := []any{"opaque", false}
+	all := []Channel{{Name: "selected", Roles: []Role{{"os", name}, {"other", []any{"opaque", false}}}}, {Name: "outside", Roles: []Role{{"os", "string"}}}}
+	uses := SharedInputUses(all, all[:1], "os", []any{name, "string"})
+	if len(uses) != 2 || !reflect.DeepEqual(uses[0].Input, name) || !reflect.DeepEqual(uses[0].Uses, []ChannelRoleUse{{"selected", "other"}}) {
+		t.Fatal(uses)
+	}
+	called := false
+	_, err := SharedInputMessage(uses, func(any) string { called = true; return "coerced" })
+	if err == nil || called {
+		t.Fatal("raw mixed keys were stringified before sorting", err, called)
+	}
+	uses = uses[:1]
+	message, err := SharedInputMessage(uses, func(v any) string {
+		if !reflect.DeepEqual(v, name) {
+			t.Fatal(v)
+		}
+		return "raw"
+	})
+	if err != nil || message != "selected input(s) are shared outside the requested channel/role: raw (also used by selected/other)" {
+		t.Fatal(message, err)
+	}
+}

@@ -3,11 +3,79 @@ package inputs
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
 	"strings"
 )
+
+type ChannelRoleUse struct{ Channel, Role string }
+type SharedInputUse struct {
+	Input any
+	Uses  []ChannelRoleUse
+}
+
+// SharedInputUses retains raw input equality and channel/role encounter order.
+// Repeated selection targets do not create additional outside uses.
+func SharedInputUses(all, selected []Channel, role string, names []any) []SharedInputUse {
+	requested := make(map[ChannelRoleUse]bool)
+	for _, ch := range selected {
+		requested[ChannelRoleUse{ch.Name, role}] = true
+	}
+	shared := []SharedInputUse{}
+	for _, ch := range all {
+		for _, r := range ch.Roles {
+			use := ChannelRoleUse{ch.Name, r.Name}
+			if requested[use] {
+				continue
+			}
+			for _, name := range names {
+				if !reflect.DeepEqual(name, r.Input) {
+					continue
+				}
+				index := -1
+				for i := range shared {
+					if reflect.DeepEqual(shared[i].Input, name) {
+						index = i
+						break
+					}
+				}
+				if index < 0 {
+					shared = append(shared, SharedInputUse{Input: name})
+					index = len(shared) - 1
+				}
+				shared[index].Uses = append(shared[index].Uses, use)
+				break
+			}
+		}
+	}
+	return shared
+}
+
+func SharedInputMessage(uses []SharedInputUse, argument func(any) string) (string, error) {
+	ordered := append([]SharedInputUse(nil), uses...)
+	// Ruby sorts the raw keys before interpolating them. Do not make mixed
+	// keys comparable by converting them with Argument.
+	if len(ordered) > 1 {
+		for _, use := range ordered {
+			if _, ok := use.Input.(string); !ok {
+				return "", errors.New("expected comparable input names")
+			}
+		}
+		sort.Slice(ordered, func(i, j int) bool { return ordered[i].Input.(string) < ordered[j].Input.(string) })
+	}
+	details := make([]string, len(ordered))
+	for i, use := range ordered {
+		roles := make([]string, len(use.Uses))
+		for j, pair := range use.Uses {
+			roles[j] = pair.Channel + "/" + pair.Role
+		}
+		sort.Strings(roles)
+		details[i] = argument(use.Input) + " (also used by " + strings.Join(roles, ", ") + ")"
+	}
+	return "selected input(s) are shared outside the requested channel/role: " + strings.Join(details, "; "), nil
+}
 
 type Role struct {
 	Name  string

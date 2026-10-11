@@ -81,3 +81,63 @@ func TestCommitMessageFirstSeenRevisionGroupsAndNilSources(t *testing.T) {
 		t.Fatal(text, err)
 	}
 }
+
+func TestSetCommitActionOnlyChangesTitleVerb(t *testing.T) {
+	changes := []Change{messageChange("b", "1111111111", "2222222222", "https://repo/"), messageChange("a", "1111111111", "2222222222", "https://repo")}
+	for _, changelog := range []bool{false, true} {
+		for _, downgrade := range []bool{false, true} {
+			var calls [][]string
+			lookup := func(_ context.Context, url, from, to string) (string, error) {
+				calls = append(calls, []string{url, from, to})
+				return "literal changelog\n", nil
+			}
+			update, err := BuildCommitMessage(context.Background(), changes, changelog, downgrade, lookup)
+			if err != nil {
+				t.Fatal(err)
+			}
+			updateCalls := append([][]string(nil), calls...)
+			calls = nil
+			set, err := buildCommitMessage(context.Background(), changes, changelog, downgrade, lookup, SetAction)
+			if err != nil || set != "inputs: set"+strings.TrimPrefix(update, "inputs: update") || !reflect.DeepEqual(calls, updateCalls) {
+				t.Fatal(set, update, err, calls, updateCalls)
+			}
+			if changelog {
+				from, to := "1111111111", "2222222222"
+				if downgrade {
+					from, to = to, from
+				}
+				if !reflect.DeepEqual(calls, [][]string{{"https://repo/", from, to}}) {
+					t.Fatal(calls)
+				}
+			}
+		}
+	}
+	plain, err := buildCommitMessage(context.Background(), changes, false, false, nil, SetAction)
+	if err != nil || plain != "inputs: set a, b to 22222222\n\nb: 11111111 -> 22222222\na: 11111111 -> 22222222" {
+		t.Fatal(plain, err)
+	}
+	_, err = buildCommitMessage(context.Background(), changes, false, false, nil, CommitAction(99))
+	if err == nil || err.Error() != "invalid commit action" {
+		t.Fatal(err)
+	}
+}
+
+func TestSetCommitActionChangelogFailureAndCancellation(t *testing.T) {
+	changes := []Change{messageChange("a", "1111111111", "2222222222", "https://repo")}
+	text, err := buildCommitMessage(context.Background(), changes, true, false, func(context.Context, string, string, string) (string, error) { return "", errors.New("mirror refused") }, SetAction)
+	if err != nil || text != "inputs: set a to 22222222\n\na: 11111111 -> 22222222\n(changelog unavailable: mirror refused)" {
+		t.Fatal(text, err)
+	}
+	for _, failure := range []error{context.Canceled, context.DeadlineExceeded} {
+		_, err = buildCommitMessage(context.Background(), changes, true, false, func(context.Context, string, string, string) (string, error) { return "", failure }, SetAction)
+		if !errors.Is(err, failure) {
+			t.Fatal(err)
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = buildCommitMessage(ctx, changes, false, false, nil, SetAction)
+	if err != context.Canceled {
+		t.Fatal(err)
+	}
+}

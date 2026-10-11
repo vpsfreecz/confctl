@@ -35,13 +35,33 @@ func changeSummary(c Change) string {
 	return c.Name + ": " + old + " -> " + revision(c.New.ShortRev, "-") + "\n"
 }
 
+type CommitAction uint8
+
+const (
+	UpdateAction CommitAction = iota
+	SetAction
+)
+
 func commitTitle(changes []Change) (string, error) {
+	return commitActionTitle(changes, UpdateAction)
+}
+
+func commitActionTitle(changes []Change, action CommitAction) (string, error) {
+	var verb string
+	switch action {
+	case UpdateAction:
+		verb = "update"
+	case SetAction:
+		verb = "set"
+	default:
+		return "", errors.New("invalid commit action")
+	}
 	names := make([]string, len(changes))
 	for i, c := range changes {
 		names[i] = c.Name
 	}
 	sort.Strings(names)
-	title := "inputs: update " + strings.Join(names, ", ")
+	title := "inputs: " + verb + " " + strings.Join(names, ", ")
 	reference := changes[0]
 	if reference.New.Rev == nil || reference.New.ShortRev == nil {
 		return title, nil
@@ -72,13 +92,17 @@ func commitTitle(changes []Change) (string, error) {
 // BuildCommitMessage groups in first-seen order. Only ordinary mirror failures
 // become changelog text; cancellation remains an invocation failure.
 func BuildCommitMessage(ctx context.Context, changes []Change, changelog, downgrade bool, lookup Changelog) (string, error) {
+	return buildCommitMessage(ctx, changes, changelog, downgrade, lookup, UpdateAction)
+}
+
+func buildCommitMessage(ctx context.Context, changes []Change, changelog, downgrade bool, lookup Changelog, action CommitAction) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
 	if len(changes) == 0 {
 		return "", errors.New("no changes")
 	}
-	title, err := commitTitle(changes)
+	title, err := commitActionTitle(changes, action)
 	if err != nil {
 		return "", err
 	}
