@@ -1,0 +1,85 @@
+{
+  "config_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i2-original-observations-v2/inputs-update-corrupt-new-lock-3371072168/config",
+  "run_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i2-original-observations-v2/inputs-update-corrupt-new-lock-3371072168",
+  "schema": 1,
+  "case": "inputs-update-corrupt-new-lock",
+  "executable": "/nix/store/x96jzlpaq69bkdardsn56px7czybkbs8-confctl/bin/confctl",
+  "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de",
+  "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "fixture_sha256": "32149f3a59de9f55d22f075b88c093d1376402cfaa569f78785ca9c6886578c0",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "stdout": "",
+  "stderr": "\nLog file: ${ROOT}/.confctl/logs/${LOG_TIME:1}-confctl-inputs-update.log\nerror: unexpected character: 'bad' at line 1 column 1\n",
+  "exit": 1,
+  "before": {
+    "flake.lock": {
+      "text": "{\"version\":7,\"root\":\"not-authoritative\",\"nodes\":{\"root\":{\"inputs\":{\"z\":\"node-z\",\"b\":\"node-b\",\"a\":[\"node-a\",\"ignored-follow\"]}},\"node-a\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"rev\":\"1111111111111111111111111111111111111111\"}},\"node-b\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"rev\":\"1111111111111111111111111111111111111111\"}},\"node-z\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"rev\":\"1111111111111111111111111111111111111111\"}}},\"fixtureUnknown\":{\"keep\":[null,false,\"untouched\"]}}\n",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "after": {
+    ".confctl": {
+      "mode": 2147484141
+    },
+    ".confctl/logs": {
+      "mode": 2147484141
+    },
+    ".confctl/logs/${LOG_TIME:1}-confctl-inputs-update.log": {
+      "text": "{command: [\"inputs\", \"update\"],\n global_options: {\"c\" =\u003e \"auto\", \"color\" =\u003e \"auto\", \"help\" =\u003e false},\n command_options:\n  {\"commit\" =\u003e false,\n   \"changelog\" =\u003e true,\n   \"editor\" =\u003e true,\n   \"d\" =\u003e false,\n   \"downgrade\" =\u003e false,\n   \"all\" =\u003e false,\n   #\u003cGLI::Command::ParentKey:${PARENT_ADDRESS:1}\u003e =\u003e {}},\n arguments: [\"a\"]}\n[${COMMAND_ID:1}] Running nix flake update a\n[${COMMAND_ID:1}] Finished in ${DURATION} seconds with exit status 0 (successful)\n",
+      "mode": 420
+    },
+    "flake.lock": {
+      "text": "bad json\n",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "events": [
+    {
+      "occurrence": 1,
+      "stdout": "",
+      "stderr": "",
+      "stdin_mode": "empty-open",
+      "tool": "nix",
+      "argv": [
+        "flake",
+        "update",
+        "a"
+      ],
+      "env": {
+        "COMPAT_CASE": "${RUN_ROOT}/case.json",
+        "CONFCTL_MAX_JOBS": "",
+        "CONFCTL_SSH_CONFIG": "",
+        "HOME": "${RUN_ROOT}/home",
+        "NIX_SSHOPTS": "",
+        "PWD": "${ROOT}",
+        "TMPDIR": "${RUN_ROOT}/tmp"
+      },
+      "stdin": "",
+      "cwd": "${ROOT}",
+      "pid": 0,
+      "start_ns": 0,
+      "end_ns": 0,
+      "exit": 0,
+      "rule": 0,
+      "writes": {
+        "flake.lock": {
+          "text": "bad json\n"
+        }
+      }
+    }
+  ],
+  "git_before": {},
+  "git_after": {},
+  "wall_ns": 0,
+  "user_ns": 0,
+  "system_ns": 0,
+  "max_rss_kb": 0
+}

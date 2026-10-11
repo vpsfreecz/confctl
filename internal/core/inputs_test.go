@@ -65,6 +65,7 @@ type inputsNixRule struct {
 	Argv           []string
 	Stdout, Stderr string
 	Exit           int
+	LockWrite      *string
 }
 
 // Every request crosses the actual external process boundary. The fixture
@@ -116,6 +117,11 @@ func TestInputsNixHelper(t *testing.T) {
 		os.Exit(97)
 	}
 	r := rules[index]
+	if r.LockWrite != nil {
+		if err = os.WriteFile("flake.lock", []byte(*r.LockWrite), 0600); err != nil {
+			panic(err)
+		}
+	}
 	fmt.Print(r.Stdout)
 	fmt.Fprint(os.Stderr, r.Stderr)
 	os.Exit(r.Exit)
@@ -146,6 +152,11 @@ func inputsTools(t *testing.T, rules []inputsNixRule) (string, string) {
 	launcher := "#!" + sh + "\nexec " + ShellJoin([]string{os.Args[0], "-test.run=^TestInputsNixHelper$", "--"}) + " \"$@\"\n"
 	if err = os.WriteFile(filepath.Join(tools, "nix"), []byte(launcher), 0700); err != nil {
 		t.Fatal(err)
+	}
+	if os.Getenv("CONFCTL_INPUTS_ALLOW_GIT") == "1" {
+		if err = os.WriteFile(filepath.Join(tools, "git"), []byte(launcher), 0700); err != nil {
+			t.Fatal(err)
+		}
 	}
 	calls := filepath.Join(tools, "calls.jsonl")
 	b, err := json.Marshal(rules)
@@ -393,7 +404,7 @@ func TestInputsHelpAndMutatorsRemainNoEffect(t *testing.T) {
 		}
 	}
 	for _, leaf := range cli.BuiltinRegistry().Leaves() {
-		if leaf.Path[0] == "inputs" && leaf.Handler != cli.InputsReadHandler {
+		if leaf.Path[0] == "inputs" && leaf.Handler != cli.InputsReadHandler && leaf.Handler != cli.InputsUpdateHandler {
 			code, stdout, stderr, _ := actualCLI(t, append(append([]string{}, leaf.Path...), "a", "os", "rev"), "")
 			if code != 2 || stdout != "" || !strings.Contains(stderr, "unavailable") {
 				t.Fatal(leaf.Path, code, stdout, stderr)

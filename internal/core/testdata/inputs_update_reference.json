@@ -1,0 +1,121 @@
+{
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "acceptance_sha256": "02ffedc52e85ddf0880593154f1d66c0b8f04218471f29cb920b1184fc2ed8d0",
+  "help_extracts": [
+    {
+      "case": "inputs-update-channel-help",
+      "asset": "inputs_update_channel_help.txt",
+      "sha256": "e6ab1f4a177bcb407e42e1ef11f5b71444ef988cf8bc2ffadbc0bdf3acf0cd04",
+      "raw_path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i2-original-observations-v2/inputs-update-channel-help-1372610028/raw.json",
+      "raw_sha256": "0f9b51f355438e4561b30db4e257de2fa030714630ea3644644e28ac3b98b95f",
+      "normalized_sha256": "cc13243713ee298f4ddbb7b7b3203c2e0e60a0fc52154abf15940bf1fddc9f69",
+      "fixture_sha256": "4a8dae18040fc5c5ca33e0dc21364ba36eacd15566c10460df91c730e09983ba",
+      "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de"
+    },
+    {
+      "case": "inputs-update-machine-help",
+      "asset": "inputs_update_machine_help.txt",
+      "sha256": "a684da05aa400e47952448df1f5767c9bf8f9b9996ddbabaf30370c6090a8e3b",
+      "raw_path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i2-original-observations-v2/inputs-update-machine-help-3853099671/raw.json",
+      "raw_sha256": "9c82f43c54ad2897ff80e8fbc0bb3b1fbe0b72bcf7eee2d2ddd58c63bb9936fa",
+      "normalized_sha256": "e0687b734d93ad13df962db578189a49a2a7c29e9fc9173012695e8d3090c302",
+      "fixture_sha256": "9596414763e24ba271ef8fa1ca48169ca4d096be88f0105f5b290386bb0d2ddf",
+      "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de"
+    },
+    {
+      "case": "inputs-update-root-help",
+      "asset": "inputs_update_root_help.txt",
+      "sha256": "87e24bfaf0060528279ae5be0ff2ce2bc4f8b9c296e9441435ffeefa7b45d0f3",
+      "raw_path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i2-original-observations-v2/inputs-update-root-help-3028476419/raw.json",
+      "raw_sha256": "da81a956c3f6204d9e704f3a1ec6541f3ddf32362df89ef513d0952ba1554b68",
+      "normalized_sha256": "9e829002ebe8f9140247fce1c1d9f6d604232949d0468867a3eeb3604c1dda46",
+      "fixture_sha256": "f0d09990950edb6b48423465cb7b821d382858d9d4e0cb61863e176cb93e4ef2",
+      "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de"
+    }
+  ],
+  "failure_logs": {
+    "inputs-update-channel-extra-argument": "{command: [\"inputs\", \"channel\", \"update\"],\n global_options: {\"c\" => \"auto\", \"color\" => \"auto\", \"help\" => false},\n command_options:\n  {\"commit\" => false,\n   \"changelog\" => true,\n   \"editor\" => true,\n   \"d\" => false,\n   \"downgrade\" => false,\n   #<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> =>\n    {#<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> => {}}},\n arguments: [\"zeta\", \"os\", \"extra\"]}\n",
+    "inputs-update-machine-extra-argument": "{command: [\"inputs\", \"machine\", \"update\"],\n global_options: {\"c\" => \"auto\", \"color\" => \"auto\", \"help\" => false},\n command_options:\n  {\"commit\" => false,\n   \"changelog\" => true,\n   \"editor\" => true,\n   \"d\" => false,\n   \"downgrade\" => false,\n   #<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> =>\n    {#<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> => {}}},\n arguments: [\"alpha/site\", \"os\", \"extra\"]}\n",
+    "inputs-update-root-missing-name": "{command: [\"inputs\", \"update\"],\n global_options: {\"c\" => \"auto\", \"color\" => \"auto\", \"help\" => false},\n command_options:\n  {\"commit\" => false,\n   \"changelog\" => true,\n   \"editor\" => true,\n   \"d\" => false,\n   \"downgrade\" => false,\n   \"all\" => false,\n   #<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> => {}},\n arguments: []}\n"
+  },
+  "failure_errors": {
+    "inputs-update-channel-extra-argument": "unknown argument: extra\n\n",
+    "inputs-update-machine-extra-argument": "unknown argument: extra\n\n",
+    "inputs-update-root-missing-name": "missing input name (or pass --all)\n\n"
+  },
+  "pp_extracts": [
+    {
+      "case": "inputs-update-all-empty-lock",
+      "argv": [
+        "inputs",
+        "update",
+        "--all"
+      ],
+      "text": "{command: [\"inputs\", \"update\"],\n global_options: {\"c\" => \"auto\", \"color\" => \"auto\", \"help\" => false},\n command_options:\n  {\"all\" => true,\n   \"commit\" => false,\n   \"changelog\" => true,\n   \"editor\" => true,\n   \"d\" => false,\n   \"downgrade\" => false,\n   #<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> => {}},\n arguments: []}\n",
+      "sha256": "fbf7041bca07509d7975f770a7f38fac1c3e284fb4df054717dc0a3deb7bae5e",
+      "raw_sha256": "9c07b2fb2f27237f559d5a25770fbbf07fe11304bcfa4df8012bba8c177366f4",
+      "normalized_sha256": "3a97592663394e3ea5cc8e0443659d7d2911812c9f036c290182b7bebfe37a94",
+      "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de"
+    },
+    {
+      "case": "inputs-update-channel-extra-argument",
+      "argv": [
+        "inputs",
+        "channel",
+        "update",
+        "zeta",
+        "os",
+        "extra"
+      ],
+      "text": "{command: [\"inputs\", \"channel\", \"update\"],\n global_options: {\"c\" => \"auto\", \"color\" => \"auto\", \"help\" => false},\n command_options:\n  {\"commit\" => false,\n   \"changelog\" => true,\n   \"editor\" => true,\n   \"d\" => false,\n   \"downgrade\" => false,\n   #<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> =>\n    {#<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> => {}}},\n arguments: [\"zeta\", \"os\", \"extra\"]}\n",
+      "sha256": "435e8a131c3bf710fc79df345fcd203bce0e31e1cfbedf912f9ff4ed19b93971",
+      "raw_sha256": "ba362c650f56d7f0d684c3f2924fad80587b9cd9e02f675dec1318e97fb1f922",
+      "normalized_sha256": "479ba533f8494c8516078e74d369d57640d6d10d8d98cbba8c87fe175eca36e1",
+      "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de"
+    },
+    {
+      "case": "inputs-update-commit-failure",
+      "argv": [
+        "inputs",
+        "update",
+        "--commit",
+        "--no-changelog",
+        "--no-editor",
+        "a"
+      ],
+      "text": "{command: [\"inputs\", \"update\"],\n global_options: {\"c\" => \"auto\", \"color\" => \"auto\", \"help\" => false},\n command_options:\n  {\"commit\" => true,\n   \"changelog\" => false,\n   \"editor\" => false,\n   \"d\" => false,\n   \"downgrade\" => false,\n   \"all\" => false,\n   #<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> => {}},\n arguments: [\"a\"]}\n",
+      "sha256": "aba8cbea854a2918df127d80b33408aeacc4ade871f722030ad8aeddb8201725",
+      "raw_sha256": "84bf679a097a4f66327545614ed8403a94350f9b085953b3a7b7043a2852fc0c",
+      "normalized_sha256": "e0859579e4685d2deda72d75184958bf06f269ff3b4ad1ec0c0cc7c1a8b3691c",
+      "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de"
+    },
+    {
+      "case": "inputs-update-machine-extra-argument",
+      "argv": [
+        "inputs",
+        "machine",
+        "update",
+        "alpha/site",
+        "os",
+        "extra"
+      ],
+      "text": "{command: [\"inputs\", \"machine\", \"update\"],\n global_options: {\"c\" => \"auto\", \"color\" => \"auto\", \"help\" => false},\n command_options:\n  {\"commit\" => false,\n   \"changelog\" => true,\n   \"editor\" => true,\n   \"d\" => false,\n   \"downgrade\" => false,\n   #<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> =>\n    {#<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> => {}}},\n arguments: [\"alpha/site\", \"os\", \"extra\"]}\n",
+      "sha256": "368e06b9d81a662092653cf60b716d0b94587adce745d3a82e371a6bb0b9bfb1",
+      "raw_sha256": "75224b103e69968251282834855528dc2833e68076f935d760e9837192a5227a",
+      "normalized_sha256": "363709f17ad8d8af0a220701f0e541f0500f1216785b0a190ac3be01220e8580",
+      "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de"
+    },
+    {
+      "case": "inputs-update-root-missing-name",
+      "argv": [
+        "inputs",
+        "update"
+      ],
+      "text": "{command: [\"inputs\", \"update\"],\n global_options: {\"c\" => \"auto\", \"color\" => \"auto\", \"help\" => false},\n command_options:\n  {\"commit\" => false,\n   \"changelog\" => true,\n   \"editor\" => true,\n   \"d\" => false,\n   \"downgrade\" => false,\n   \"all\" => false,\n   #<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> => {}},\n arguments: []}\n",
+      "sha256": "4d864eaf894a1c9f081aedaeeb2ed47d51519c4de5978c0293acd933fa948079",
+      "raw_sha256": "07efadd60d2e352630052311433e2f8103fef8870288e8c9362cbca4ddbcb32d",
+      "normalized_sha256": "fd3959a939be8f4d0527bb2dc74791195bdec30e1898aa67ff6ccf183ba9efb4",
+      "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de"
+    }
+  ]
+}

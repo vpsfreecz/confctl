@@ -1,0 +1,16 @@
+NAME
+    update - Update flake inputs in flake.lock
+
+SYNOPSIS
+
+    confctl [global options] inputs update [command options] [input-name ...]
+
+COMMAND OPTIONS
+    --[no-]all           - Update all root inputs (dangerous; normally specify
+                           names)
+    --[no-]changelog     - Include git log in the commit message (default:
+                           enabled)
+    --[no-]commit        - Commit changes to git
+    -d, --[no-]downgrade - Treat change as downgrade for changelog direction
+    --[no-]editor        - Open $EDITOR with commit message (default: enabled)
+

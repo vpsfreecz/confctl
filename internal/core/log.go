@@ -4,8 +4,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
+
+	"github.com/vpsfreecz/confctl/internal/cli"
 )
 
 func logID() string { var b [4]byte; _, _ = rand.Read(b[:]); return hex.EncodeToString(b[:]) }
@@ -153,4 +156,40 @@ func (e *Engine) LogInputsCLI(path []string, args []string) {
 		options = "\n  {" + parent + " =>\n    {" + parent + " => {}}}"
 	}
 	e.logText(fmt.Sprintf("{command: %s,\n global_options: {\"c\" => %s, \"color\" => %s, \"help\" => false},\n command_options:%s,\n arguments: %s}\n", rubyInspect(command), rubyInspect(e.Color), rubyInspect(e.Color), options, rubyInspect(arguments)))
+}
+
+// GLI callbacks insert explicit options in first encounter order, then append
+// defaults in declaration order. Each spelling stays together; the one parent
+// identity is reused at both depths, exactly as in the read-only adapter.
+func (e *Engine) LogInputUpdateCLI(inv cli.Invocation) {
+	command, arguments := make([]any, len(inv.Command.Path)), make([]any, len(inv.Args))
+	for i, p := range inv.Command.Path {
+		command[i] = p
+	}
+	for i, a := range inv.Args {
+		arguments[i] = a
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "{command: %s,\n global_options: {\"c\" => %s, \"color\" => %s, \"help\" => false},\n command_options:\n  {", rubyInspect(command), rubyInspect(e.Color), rubyInspect(e.Color))
+	separator := ""
+	specs := append([]cli.OptionSpec(nil), inv.Command.Options...)
+	sort.SliceStable(specs, func(i, j int) bool {
+		a, b := inv.Options[specs[i].Key].FirstEncounter, inv.Options[specs[j].Key].FirstEncounter
+		return a != 0 && (b == 0 || a < b)
+	})
+	for _, spec := range specs {
+		for _, name := range spec.Names {
+			fmt.Fprintf(&b, "%s%s => %s", separator, rubyInspect(name), rubyInspect(inv.Options[spec.Key].Value.Bool))
+			separator = ",\n   "
+		}
+	}
+	parent := "#<GLI::Command::ParentKey:0x0000000000000000>"
+	b.WriteString(separator + parent + " =>")
+	if len(inv.Command.Path) == 3 {
+		b.WriteString("\n    {" + parent + " => {}}}")
+	} else {
+		b.WriteString(" {}}")
+	}
+	b.WriteString(",\n arguments: " + rubyInspect(arguments) + "}\n")
+	e.logText(b.String())
 }

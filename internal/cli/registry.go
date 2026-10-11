@@ -74,6 +74,9 @@ type OptionSpec struct {
 type ParsedValue struct {
 	Value   Value
 	Present bool
+	// FirstEncounter is the first successful option callback in this scan.
+	// Zero denotes a default/unseen value; aliases and repeats retain insertion.
+	FirstEncounter int
 }
 
 type ArgumentSpec struct {
@@ -99,6 +102,7 @@ const (
 	KnownExtension
 	ConfigurationHandler
 	InputsReadHandler
+	InputsUpdateHandler
 )
 
 type AvailabilityMode uint8
@@ -231,7 +235,7 @@ func NewRegistry(globals []OptionSpec, commands []CommandSpec) (*Registry, error
 				return nil, fmt.Errorf("invalid command path %q", key)
 			}
 		}
-		if c.ArgumentPolicy > GroupArguments || c.Handler > InputsReadHandler || c.Availability.Mode > Conditional {
+		if c.ArgumentPolicy > GroupArguments || c.Handler > InputsUpdateHandler || c.Availability.Mode > Conditional {
 			return nil, fmt.Errorf("invalid command policy %q", key)
 		}
 		if c.ArgumentPolicy == GroupArguments {
@@ -247,7 +251,7 @@ func NewRegistry(globals []OptionSpec, commands []CommandSpec) (*Registry, error
 		if c.Handler != None && c.Availability.Mode == Unavailable {
 			return nil, fmt.Errorf("unavailable command has handler %q", key)
 		}
-		if c.Handler == StatusNone && c.Availability.Mode != Conditional || (c.Handler == ListHandler || c.Handler == KnownExtension || c.Handler == ConfigurationHandler || c.Handler == InputsReadHandler) && c.Availability.Mode != Available {
+		if c.Handler == StatusNone && c.Availability.Mode != Conditional || (c.Handler == ListHandler || c.Handler == KnownExtension || c.Handler == ConfigurationHandler || c.Handler == InputsReadHandler || c.Handler == InputsUpdateHandler) && c.Availability.Mode != Available {
 			return nil, fmt.Errorf("handler/availability conflict %q", key)
 		}
 		argumentNames := map[string]bool{}

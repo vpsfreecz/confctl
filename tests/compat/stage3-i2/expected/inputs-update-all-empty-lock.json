@@ -1,0 +1,51 @@
+{
+  "config_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i2-original-observations-v2/inputs-update-all-empty-lock-2413480075/config",
+  "run_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i2-original-observations-v2/inputs-update-all-empty-lock-2413480075",
+  "schema": 1,
+  "case": "inputs-update-all-empty-lock",
+  "executable": "/nix/store/x96jzlpaq69bkdardsn56px7czybkbs8-confctl/bin/confctl",
+  "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de",
+  "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "fixture_sha256": "7d8758e76c360bfec0c0763ce4cdcfe3c0e835b38915cd59594de3a51269b035",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "stdout": "",
+  "stderr": "\nLog file: ${ROOT}/.confctl/logs/${LOG_TIME:1}-confctl-inputs-update.log\nerror: no inputs selected\n",
+  "exit": 1,
+  "before": {
+    "flake.lock": {
+      "text": "{\"version\":7,\"root\":\"not-authoritative\",\"nodes\":{\"root\":{\"inputs\":{}}},\"fixtureUnknown\":{\"keep\":[null,false,\"untouched\"]}}\n",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "after": {
+    ".confctl": {
+      "mode": 2147484141
+    },
+    ".confctl/logs": {
+      "mode": 2147484141
+    },
+    ".confctl/logs/${LOG_TIME:1}-confctl-inputs-update.log": {
+      "text": "{command: [\"inputs\", \"update\"],\n global_options: {\"c\" =\u003e \"auto\", \"color\" =\u003e \"auto\", \"help\" =\u003e false},\n command_options:\n  {\"all\" =\u003e true,\n   \"commit\" =\u003e false,\n   \"changelog\" =\u003e true,\n   \"editor\" =\u003e true,\n   \"d\" =\u003e false,\n   \"downgrade\" =\u003e false,\n   #\u003cGLI::Command::ParentKey:${PARENT_ADDRESS:1}\u003e =\u003e {}},\n arguments: []}\n",
+      "mode": 420
+    },
+    "flake.lock": {
+      "text": "{\"version\":7,\"root\":\"not-authoritative\",\"nodes\":{\"root\":{\"inputs\":{}}},\"fixtureUnknown\":{\"keep\":[null,false,\"untouched\"]}}\n",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "events": null,
+  "git_before": {},
+  "git_after": {},
+  "wall_ns": 0,
+  "user_ns": 0,
+  "system_ns": 0,
+  "max_rss_kb": 0
+}

@@ -174,8 +174,12 @@ func TestInputsReadOnlyDeclarations(t *testing.T) {
 			if c.Availability.Mode != Available || len(c.Options) != 0 || r.CheckAvailability(inv) != nil {
 				t.Fatal("read-only metadata changed", c)
 			}
+		} else if c.Handler == InputsUpdateHandler {
+			if c.Availability.Mode != Available || r.CheckAvailability(inv) != nil {
+				t.Fatal("input update unavailable", c.Path)
+			}
 		} else if r.CheckAvailability(inv) == nil {
-			t.Fatal("input mutation advertised as available", c.Path)
+			t.Fatal("input set advertised as available", c.Path)
 		}
 	}
 	if available != 2 {
@@ -355,7 +359,7 @@ func TestHelpReferences(t *testing.T) {
 	}
 	for _, c := range r.Commands() {
 		text, err := r.Help(c.Path, 80)
-		if err != nil || !strings.Contains(text, c.Summary) {
+		if err != nil || !strings.Contains(strings.Join(strings.Fields(text), " "), strings.Join(strings.Fields(c.Summary), " ")) {
 			t.Fatal(c.Path, text, err)
 		}
 		if c.ArgumentPolicy != GroupArguments && c.Availability.Mode == Unavailable && !strings.Contains(text, "Unavailable in confctl-go-prototype.") {
@@ -428,5 +432,54 @@ func TestCapabilityTableMatchesREADME(t *testing.T) {
 	table, _, ok := strings.Cut(tail, end)
 	if !ok || table != BuiltinRegistry().CapabilityTable() {
 		t.Fatal("README capability table diverged from registry", table)
+	}
+}
+
+func TestInputsUpdateHelpReferencesAndMetadata(t *testing.T) {
+	var reference struct {
+		SourceRevision string                                 `json:"source_revision"`
+		HelpExtracts   []struct{ Case, Asset, SHA256 string } `json:"help_extracts"`
+	}
+	b, err := os.ReadFile("../core/testdata/inputs_update_reference.json")
+	if err != nil || json.Unmarshal(b, &reference) != nil || reference.SourceRevision != "cc40679d267165aecfa569128438bb55fe910268" || len(reference.HelpExtracts) != 3 {
+		t.Fatal(err)
+	}
+	for _, record := range reference.HelpExtracts {
+		path := []string{"inputs", "update"}
+		if strings.Contains(record.Case, "channel") {
+			path = []string{"inputs", "channel", "update"}
+		}
+		if strings.Contains(record.Case, "machine") {
+			path = []string{"inputs", "machine", "update"}
+		}
+		want, err := os.ReadFile("../core/testdata/" + record.Asset)
+		got, helpErr := BuiltinRegistry().Help(path, 80)
+		if err != nil || helpErr != nil || fmt.Sprintf("%x", sha256.Sum256(want)) != record.SHA256 || got != string(want) {
+			t.Fatal(record.Case, got, string(want), err, helpErr)
+		}
+	}
+	base := BuiltinRegistry()
+	commands := base.Commands()
+	for i := range commands {
+		if pathKey(commands[i].Path) == "inputs update" {
+			commands[i].Summary = "Changed update summary"
+			commands[i].Usage = "<changed>"
+			commands[i].Options[0].Description = "Changed commit switch"
+			commands[i].Options[0].Default = Bool(true)
+		}
+	}
+	derived, err := NewRegistry(base.Globals(), commands)
+	if err != nil {
+		t.Fatal(err)
+	}
+	help, _ := derived.Help([]string{"inputs", "update"}, 80)
+	if !strings.Contains(help, "update - Changed update summary") || !strings.Contains(help, "<changed>") || !strings.Contains(help, "Changed commit switch (default: enabled)") {
+		t.Fatal(help)
+	}
+	for _, path := range [][]string{{"inputs", "update"}, {"inputs", "channel", "update"}, {"inputs", "machine", "update"}} {
+		inv, err := derived.Parse(append(append([]string{}, path...), "--commit", "--no-commit", "-d", "--no-downgrade", "a"))
+		if err != nil || inv.Command.Handler != InputsUpdateHandler || derived.CheckAvailability(inv) != nil || inv.Options["commit"].Value.Bool || inv.Options["downgrade"].Value.Bool {
+			t.Fatal(inv, err)
+		}
 	}
 }

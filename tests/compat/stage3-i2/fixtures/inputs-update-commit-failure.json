@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "id": "inputs-update-commit-failure",
+  "tier": "fixture-process",
+  "sources": [
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/cli/inputs/root.rb",
+      "lines": "37-112"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/cli/app.rb",
+      "lines": "59-155,540-548"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/cli/command.rb",
+      "lines": "1-70"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/inputs/updater.rb",
+      "lines": "1-84"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/flake_lock.rb",
+      "lines": "1-88"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/flake_lock_diff.rb",
+      "lines": "1-42"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/inputs/commit_message.rb",
+      "lines": "1-140"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/inputs/git_commit.rb",
+      "lines": "1-18"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/git_repo_mirror.rb",
+      "lines": "1-95"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/inputs/nix_output_guard.rb",
+      "lines": "1-44"
+    }
+  ],
+  "argv": [
+    "inputs",
+    "update",
+    "--commit",
+    "--no-changelog",
+    "--no-editor",
+    "a"
+  ],
+  "env": {
+    "XDG_CACHE_HOME": "${ROOT}/.cache"
+  },
+  "stdin": "",
+  "tty": false,
+  "deadline_ms": 30000,
+  "expected_no_calls": false,
+  "files": {
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n"
+    },
+    "flake.lock": {
+      "text": "{\"version\":7,\"root\":\"not-authoritative\",\"nodes\":{\"root\":{\"inputs\":{\"z\":\"node-z\",\"b\":\"node-b\",\"a\":[\"node-a\",\"ignored-follow\"]}},\"node-a\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"rev\":\"1111111111111111111111111111111111111111\"}},\"node-b\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"rev\":\"1111111111111111111111111111111111111111\"}},\"node-z\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"rev\":\"1111111111111111111111111111111111111111\"}}},\"fixtureUnknown\":{\"keep\":[null,false,\"untouched\"]}}\n"
+    }
+  },
+  "rules": [
+    {
+      "tool": "nix",
+      "argv": [
+        "flake",
+        "update",
+        "a"
+      ],
+      "occurrence": 1,
+      "stdin": "",
+      "stdout": "",
+      "stderr": "",
+      "exit": 0,
+      "writes": {
+        "flake.lock": {
+          "text": "{\"version\":7,\"root\":\"not-authoritative\",\"nodes\":{\"root\":{\"inputs\":{\"z\":\"node-z\",\"b\":\"node-b\",\"a\":[\"node-a\",\"ignored-follow\"]}},\"node-a\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"rev\":\"2222222222222222222222222222222222222222\"}},\"node-b\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"rev\":\"1111111111111111111111111111111111111111\"}},\"node-z\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"rev\":\"1111111111111111111111111111111111111111\"}}},\"fixtureUnknown\":{\"keep\":[null,false,\"untouched\"]}}\n"
+        }
+      }
+    },
+    {
+      "tool": "git",
+      "argv": [
+        "commit",
+        "-m",
+        "inputs: update a to 22222222\n\na: 11111111 -> 22222222",
+        "flake.lock"
+      ],
+      "occurrence": 1,
+      "stdin": "",
+      "stdout": "fixture git stdout\n",
+      "stderr": "fixture git stderr\n",
+      "exit": 43
+    }
+  ],
+  "expected": "../expected/inputs-update-commit-failure.json",
+  "normalize": {
+    "root_fields": [
+      "stdout",
+      "stderr",
+      "events.cwd",
+      "events.argv",
+      "events.stdin",
+      "events.env.PWD",
+      "events.stdout",
+      "events.stderr"
+    ],
+    "volatile_fields": [
+      "events.pid",
+      "events.start_ns",
+      "events.end_ns",
+      "wall_ns",
+      "user_ns",
+      "system_ns",
+      "max_rss_kb"
+    ],
+    "concurrent_events": false,
+    "run_root_fields": [
+      "events.env.HOME",
+      "events.env.TMPDIR",
+      "events.env.COMPAT_CASE"
+    ],
+    "log_fields": [
+      "filename-time",
+      "command-uuid",
+      "gli-parent-address",
+      "process-duration",
+      "config-root"
+    ]
+  },
+  "causal": [
+    {
+      "before": {
+        "tool": "nix",
+        "contains": "update"
+      },
+      "after": {
+        "tool": "git",
+        "contains": ""
+      }
+    }
+  ]
+}

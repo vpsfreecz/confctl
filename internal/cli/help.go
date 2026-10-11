@@ -108,6 +108,25 @@ func renderOptions(specs []OptionSpec, global bool, width int) string {
 	return renderRows(rows, width)
 }
 
+// These newly implemented leaves use GLI's switch-default annotations. Other
+// handlers retain their existing help contract.
+func renderInputUpdateOptions(specs []OptionSpec, width int) string {
+	ordered := cloneOptions(specs)
+	sort.SliceStable(ordered, func(i, j int) bool { return ordered[i].Names[0] < ordered[j].Names[0] })
+	rows := make([]helpRow, len(ordered))
+	for i, o := range ordered {
+		d := optionDescription(o)
+		if o.Kind == Switch && o.Default.Kind == Boolean && o.Default.Bool {
+			if d != "" {
+				d += " "
+			}
+			d += "(default: enabled)"
+		}
+		rows[i] = helpRow{optionLabel(o, false), d}
+	}
+	return renderRows(rows, width)
+}
+
 func availabilityText(c CommandSpec) string {
 	switch c.Availability.Mode {
 	case Available:
@@ -136,12 +155,17 @@ func (r *Registry) Help(path []string, width int) (string, error) {
 		b.WriteString(renderOptions(r.globals, true, width))
 		b.WriteString("\n\nCOMMANDS\n")
 	} else {
+		inputUpdate := c.Handler == InputsUpdateHandler
 		inputsWithoutOptions := c.Handler == InputsReadHandler && len(c.Options) == 0 && (name == "inputs ls" || name == "inputs channel ls")
 		heading := name
 		if inputsWithoutOptions {
 			heading = c.Path[len(c.Path)-1]
 		}
-		b.WriteString("NAME\n    " + heading + " - " + c.Summary + "\n\nSYNOPSIS\n\n    confctl [global options] " + name)
+		if inputUpdate {
+			b.WriteString("NAME\n" + renderRows([]helpRow{{c.Path[len(c.Path)-1], c.Summary}}, width) + "\nSYNOPSIS\n\n    confctl [global options] " + name)
+		} else {
+			b.WriteString("NAME\n    " + heading + " - " + c.Summary + "\n\nSYNOPSIS\n\n    confctl [global options] " + name)
+		}
 		if c.ArgumentPolicy == GroupArguments {
 			b.WriteString(" command")
 		}
@@ -159,7 +183,11 @@ func (r *Registry) Help(path []string, width int) (string, error) {
 		if c.ArgumentPolicy == GroupArguments {
 			b.WriteString("COMMANDS\n")
 		} else if len(c.Options) > 0 {
-			b.WriteString("COMMAND OPTIONS\n" + renderOptions(c.Options, false, width) + "\n")
+			options := renderOptions(c.Options, false, width)
+			if inputUpdate {
+				options = renderInputUpdateOptions(c.Options, width)
+			}
+			b.WriteString("COMMAND OPTIONS\n" + options + "\n")
 		}
 	}
 	if c.ArgumentPolicy == GroupArguments {

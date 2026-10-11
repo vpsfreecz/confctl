@@ -3,6 +3,7 @@
 `confctl-go-prototype` is the separately packaged experimental Go CLI. The normal
 `confctl` package remains the operational tool. This package executes help,
 `init`, `add`, `rename`, `rediscover`, `ls`, `inputs ls`, `inputs channel ls`,
+`inputs update`, `inputs channel update`, `inputs machine update`,
 `status --generation none` and explicitly registered external extensions. Other
 commands and generation modes fail before opening logs, evaluating Nix, running
 SSH or changing configuration.
@@ -121,9 +122,31 @@ Both commands require `flake.nix` before reading the lock or validating handler
 arguments. Failures retain logs; successful reads leave the lock bytes unchanged.
 The lock reader translates the observed initial invalid-value JSON diagnostic;
 other malformed JSON classes keep Go diagnostics and are not claimed equivalent.
-Separate original references live in `tests/compat/stage3-i1`; the machine-role
-resolver is tested preparatory code, and all input mutation commands remain
-unavailable.
+Separate original references live in `tests/compat/stage3-i1`; the three `set` commands remain unavailable.
+
+Input updates preserve selection order and deduplicate channel input requests in
+first-seen order. Root `--all` uses sorted root inputs and ignores positional
+names; explicit names may create a missing lock. Update invokes literal
+`nix flake update` without evaluation flags, with one experimental-feature retry
+only for a matching failed command. The specific cached GitHub metadata warning
+is an error even after exit0. Failures retain written lock bytes. Diffs compare
+revisions only; metadata-only changes report no changes and skip commit.
+
+Optional commits use the existing message grouping and actual-URL mirror cache
+under the private XDG/HOME cache. Ordinary mirror failures become changelog text;
+cancellation propagates and prevents commit. Git commit inherits stdin/stdout/
+stderr directly and adds `-e` only when editor is enabled and stdout is a TTY.
+It performs no `git add` or rollback, and Git owns index, hooks and editor behavior.
+The Linux commit adapter observes the exact Git child's stop/continue events.
+A private packaged Bash helper relays terminal stops to the unchanged caller
+job and reports its actual inherited signal state. A matching eligible ACK
+permits owned Git continuation, with terminal handoff only when the caller owns
+foreground. Restoration preserves another live foreground group. Helper,
+observer and terminal failures retain their diagnostics; ordinary Git failures
+remain `git commit failed`. Stop/resume, initial background jobs and real editor
+parity still require the original/candidate PTY acceptance checks.
+Separate original-only references live in `tests/compat/stage3-i2`. Finite fake
+Git tests establish process/argv boundaries, not real Git or terminal acceptance.
 
 The following table is checked against the command registry:
 
@@ -147,12 +170,12 @@ The following table is checked against the command registry:
 | `init` | Available |
 | `inputs channel ls` | Available |
 | `inputs channel set` | Unavailable |
-| `inputs channel update` | Unavailable |
+| `inputs channel update` | Available |
 | `inputs ls` | Available |
 | `inputs machine set` | Unavailable |
-| `inputs machine update` | Unavailable |
+| `inputs machine update` | Available |
 | `inputs set` | Unavailable |
-| `inputs update` | Unavailable |
+| `inputs update` | Available |
 | `ls` | Available |
 | `rediscover` | Available |
 | `rename` | Available |

@@ -1,0 +1,13 @@
+NAME
+    update - Update the input used by a specific machine for a specific role
+
+SYNOPSIS
+
+    confctl [global options] inputs machine update [command options] <machine> <role>
+
+COMMAND OPTIONS
+    --[no-]changelog     - (default: enabled)
+    --[no-]commit        - 
+    -d, --[no-]downgrade - 
+    --[no-]editor        - (default: enabled)
+
