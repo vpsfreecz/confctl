@@ -1,0 +1,35 @@
+bits = %w[
+  3fefffffffffffff
+  3ff0000000000000
+  3ff0000000000001
+  42d6bcc41e8fffff
+  42d6bcc41e900000
+  42d6bcc41e900001
+  430c6bf52633ffff
+  430c6bf526340000
+  430c6bf526340001
+  3eb0c6f7a0b5ed8c
+  3eb0c6f7a0b5ed8d
+  3eb0c6f7a0b5ed8e
+  3e7ad7f29abcaf47
+  3e7ad7f29abcaf48
+  3e7ad7f29abcaf49
+  3ddb7cdfd9d7bdba
+  3ddb7cdfd9d7bdbb
+  3ddb7cdfd9d7bdbc
+  3ff3c0ca428c59fa
+  3ff3c0ca428c59fb
+  3ff3c0ca428c59fc
+  3fb9999999999999
+  3fb999999999999a
+  3fb999999999999b
+  0000000000000001
+  8000000000000001
+  000fffffffffffff
+  800fffffffffffff
+  0010000000000000
+  8010000000000000
+  7fefffffffffffff
+  ffefffffffffffff
+].freeze
+value = bits.map { |hex| [hex].pack('H*').unpack1('G') }
