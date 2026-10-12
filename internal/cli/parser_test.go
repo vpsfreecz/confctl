@@ -7,6 +7,33 @@ import (
 	"testing"
 )
 
+func TestTestConnectionParserPrecedenceAndEncounter(t *testing.T) {
+	r := BuiltinRegistry()
+	for _, argv := range [][]string{{"test-connection", "--help"}, {"test-connection", "-h"}, {"help", "test-connection"}} {
+		inv, err := r.Parse(argv)
+		if err != nil || !inv.Help || !reflect.DeepEqual(inv.HelpPath, []string{"test-connection"}) {
+			t.Fatal(inv, err)
+		}
+	}
+	for _, argv := range [][]string{{"test-connection", "--managed", "invalid", "--help"}, {"test-connection", "--unknown", "--help"}} {
+		_, err := r.Parse(argv)
+		var parsed *ParseError
+		if !errors.As(err, &parsed) || !reflect.DeepEqual(parsed.HelpPath, []string{"test-connection"}) {
+			t.Fatal(err)
+		}
+		if argv[1] == "--unknown" && parsed.Message != "invalid option: --unknown" {
+			t.Fatal("shared ParseError mutated", parsed)
+		}
+	}
+	inv, err := r.Parse([]string{"test-connection", "--tag", "node", "-a", "name!=beta", "--attr", "managed=true", "-t", "^absent", "-y", "--no-yes", "one", "ignored", "--help", "--managed", "invalid"})
+	if err != nil || inv.Help || inv.Options["yes"].Value.Bool || !reflect.DeepEqual(inv.Options["attr"].Value.Strings, []string{"name!=beta", "managed=true"}) || !reflect.DeepEqual(inv.Options["tag"].Value.Strings, []string{"node", "^absent"}) || !reflect.DeepEqual(inv.Args, []string{"one", "ignored", "--help", "--managed", "invalid"}) {
+		t.Fatal(inv, err)
+	}
+	if inv.Options["tag"].FirstEncounter != 1 || inv.Options["attr"].FirstEncounter != 2 || inv.Options["yes"].FirstEncounter != 5 || inv.Options["managed"].FirstEncounter != 0 {
+		t.Fatal("option callback order changed", inv.Options)
+	}
+}
+
 func TestCommandHelpImmediatePrecedence(t *testing.T) {
 	r := BuiltinRegistry()
 	for _, argv := range [][]string{

@@ -75,6 +75,65 @@ func TestInputLogArgumentsM02ObservedHeader(t *testing.T) {
 	}
 }
 
+func TestTestConnectionLogOriginalHeaderAndEncounter(t *testing.T) {
+	// Exact accepted original malformed-filter header, no parent-address field.
+	const original = `{command: ["test-connection"],
+ global_options: {"c" => "auto", "color" => "auto", "help" => false},
+ command_options:
+  {"a" => ["malformed"],
+   "attr" => ["malformed"],
+   "y" => true,
+   "yes" => true,
+   "managed" => nil,
+   "t" => [],
+   "tag" => []},
+ arguments: []}
+`
+	if got := fmt.Sprintf("%x", sha256.Sum256([]byte(original))); got != "0fe33511833aca3da22c9dc5edd6ee9ea394bf9b06afe64fdb330d2b9515e640" {
+		t.Fatal("accepted original leaf header changed", got)
+	}
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"-a", "malformed", "-y"}, original},
+		// Synthetic finite encounter/list/ignored-argument oracle; independent
+		// literal value and ordering, not copied Go output or new reference.
+		{[]string{"--tag", "node", "-a", "name!=beta", "--attr", "managed=true", "-t", "^absent", "-y", "--no-yes", "one", "ignored", "--help"}, `{command: ["test-connection"],
+ global_options: {"c" => "auto", "color" => "auto", "help" => false},
+ command_options:
+  {"t" => ["node", "^absent"],
+   "tag" => ["node", "^absent"],
+   "a" => ["name!=beta", "managed=true"],
+   "attr" => ["name!=beta", "managed=true"],
+   "y" => false,
+   "yes" => false,
+   "managed" => nil},
+ arguments: ["one", "ignored", "--help"]}
+`},
+	} {
+		inv := connectionInvocation(t, tc.args...)
+		before := connectionInvocation(t, tc.args...)
+		f, err := os.Create(filepath.Join(t.TempDir(), "header.log"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		e := &Engine{Log: f, Color: "auto"}
+		e.LogTestConnectionCLI(inv)
+		if !reflect.DeepEqual(inv, before) {
+			t.Fatal("logger changed invocation")
+		}
+		b, err := os.ReadFile(f.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Close()
+		if string(b) != tc.want {
+			t.Fatalf("header\ngot %s\nwant %s", b, tc.want)
+		}
+	}
+}
+
 // Literal source-predicted default prefixes: independent of the argument helper.
 const inputLogRootSetPrefix = `{command: ["inputs", "set"],
  global_options: {"c" => "auto", "color" => "auto", "help" => false},

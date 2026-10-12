@@ -216,3 +216,45 @@ func inputLogArgumentsField(arguments []any) string {
 
 // Set uses the same ordered boolean declarations and PP parent layout.
 func (e *Engine) LogInputSetCLI(inv cli.Invocation) { e.LogInputUpdateCLI(inv) }
+
+// This leaf has no GLI parent key. Aliases share one value and keep callback
+// encounter order before declaration defaults, including nil managed and lists.
+func (e *Engine) LogTestConnectionCLI(inv cli.Invocation) {
+	command, arguments := make([]any, len(inv.Command.Path)), make([]any, len(inv.Args))
+	for i, p := range inv.Command.Path {
+		command[i] = p
+	}
+	for i, a := range inv.Args {
+		arguments[i] = a
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "{command: %s,\n global_options: {\"c\" => %s, \"color\" => %s, \"help\" => false},\n command_options:\n  {", rubyInspect(command), rubyInspect(e.Color), rubyInspect(e.Color))
+	specs := append([]cli.OptionSpec(nil), inv.Command.Options...)
+	sort.SliceStable(specs, func(i, j int) bool {
+		a, b := inv.Options[specs[i].Key].FirstEncounter, inv.Options[specs[j].Key].FirstEncounter
+		return a != 0 && (b == 0 || a < b)
+	})
+	separator := ""
+	for _, spec := range specs {
+		v := inv.Options[spec.Key].Value
+		var value any
+		switch v.Kind {
+		case cli.Boolean:
+			value = v.Bool
+		case cli.Text:
+			value = v.String
+		case cli.TextList:
+			a := make([]any, len(v.Strings))
+			for i, s := range v.Strings {
+				a[i] = s
+			}
+			value = a
+		}
+		for _, name := range spec.Names {
+			fmt.Fprintf(&b, "%s%s => %s", separator, rubyInspect(name), rubyInspect(value))
+			separator = ",\n   "
+		}
+	}
+	b.WriteString("}" + inputLogArgumentsField(arguments))
+	e.logText(b.String())
+}

@@ -5,11 +5,17 @@
 `init`, `add`, `rename`, `rediscover`, `ls`, `inputs ls`, `inputs channel ls`,
 `inputs update`, `inputs channel update`, `inputs machine update`,
 `inputs set`, `inputs channel set`, `inputs machine set`,
-`status --generation none` and explicitly registered external extensions. Other
+`status --generation none`, `test-connection` and explicitly registered external
+extensions. Other
 commands and generation modes fail before opening logs, evaluating Nix, running
 SSH or changing configuration.
 Root help shows the reference builtin inventory. Detailed help describes the
 execution limits of unavailable commands and status modes.
+
+`test-connection` checks selected machines sequentially. It captures uptime
+command output and reports successful and failed hosts. Completed host failures
+keep the overall exit status 0; start, wait or cancellation errors stop the
+invocation and retain its log.
 
 The Go module `github.com/vpsfreecz/confctl` and its `cmd`, `internal` and
 `extension` packages live at the repository root. The normal Go package builds
@@ -195,7 +201,7 @@ The following table is checked against the command registry:
 | `rename` | Available |
 | `ssh` | Unavailable |
 | `status` | Only --generation none |
-| `test-connection` | Unavailable |
+| `test-connection` | Available |
 <!-- command-registry-capabilities:end -->
 
 The prototype preserves the existing Nix and OpenSSH executable paths, status

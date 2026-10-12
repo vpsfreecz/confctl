@@ -162,6 +162,9 @@ func BuiltinRegistry() *Registry {
 	)
 	for i := range commands {
 		switch pathKey(commands[i].Path) {
+		case "test-connection":
+			commands[i].Handler = TestConnectionHandler
+			commands[i].Availability = Availability{Mode: Available}
 		case "init", "add", "rename", "rediscover":
 			commands[i].Handler = ConfigurationHandler
 			commands[i].Availability = Availability{Mode: Available}
