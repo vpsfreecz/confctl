@@ -45,7 +45,7 @@ func Main(ctx context.Context, argv []string) int {
 			path = parseErr.HelpPath
 			// This accepted leaf presentation depends on the existing ParseError
 			// prefix; the shared parser has no unknown-option kind/token field.
-			if len(path) == 1 && path[0] == "test-connection" && len(inv.Command.Path) == 1 && inv.Command.Path[0] == "test-connection" && inv.Command.Handler == cli.TestConnectionHandler {
+			if len(path) == 1 && len(inv.Command.Path) == 1 && path[0] == inv.Command.Path[0] && (inv.Command.Handler == cli.TestConnectionHandler || inv.Command.Handler == cli.SSHHandler || inv.Command.Handler == cli.CSSHHandler) {
 				if option, ok := strings.CutPrefix(parseErr.Message, "invalid option: "); ok && option != "" {
 					diagnostic = "Unknown option " + option
 				}
@@ -112,6 +112,8 @@ func Main(ctx context.Context, argv []string) int {
 		e.LogInputUpdateCLI(inv)
 	} else if inv.Command.Handler == cli.TestConnectionHandler {
 		e.LogTestConnectionCLI(inv)
+	} else if inv.Command.Handler == cli.SSHHandler || inv.Command.Handler == cli.CSSHHandler {
+		e.LogSSHCLI(inv)
 	} else if !extensionCommand || supportedRuntimeCommand(command) {
 		e.LogCLI(cmd, opts, commandArgv)
 	} else {
@@ -201,6 +203,26 @@ func Main(ctx context.Context, argv []string) int {
 	if inv.Command.Handler == cli.TestConnectionHandler {
 		if err = e.TestConnection(inv, os.Stdin, os.Stdout); err != nil {
 			var argumentErr *testConnectionArgumentError
+			if errors.As(err, &argumentErr) {
+				code := fail(err, 64)
+				fmt.Fprintln(os.Stderr)
+				text, _ := registry.Help(inv.Command.Path, 80)
+				fmt.Print(text)
+				return code
+			}
+			return fail(err, 1)
+		}
+		success = true
+		return 0
+	}
+	if inv.Command.Handler == cli.SSHHandler || inv.Command.Handler == cli.CSSHHandler {
+		if inv.Command.Handler == cli.SSHHandler {
+			err = e.SSH(inv, os.Stdin, os.Stdout)
+		} else {
+			err = e.CSSH(inv, os.Stdin, os.Stdout)
+		}
+		if err != nil {
+			var argumentErr *sshArgumentError
 			if errors.As(err, &argumentErr) {
 				code := fail(err, 64)
 				fmt.Fprintln(os.Stderr)

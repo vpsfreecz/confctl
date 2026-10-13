@@ -23,12 +23,6 @@ func TestTestConnectionDeclarationsAndAvailability(t *testing.T) {
 	if err != nil || inv.Help || r.CheckAvailability(inv) != nil || !reflect.DeepEqual(inv.Args, []string{"one", "extra", "--help"}) {
 		t.Fatal(inv, err)
 	}
-	for _, path := range [][]string{{"ssh"}, {"cssh"}} {
-		inv, err := r.Parse(path)
-		if err != nil || r.CheckAvailability(inv) == nil {
-			t.Fatal("sibling availability changed", path, err)
-		}
-	}
 	for _, mode := range []AvailabilityMode{Unavailable, Conditional} {
 		commands := r.Commands()
 		for i := range commands {

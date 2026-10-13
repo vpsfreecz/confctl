@@ -5,8 +5,8 @@
 `init`, `add`, `rename`, `rediscover`, `ls`, `inputs ls`, `inputs channel ls`,
 `inputs update`, `inputs channel update`, `inputs machine update`,
 `inputs set`, `inputs channel set`, `inputs machine set`,
-`status --generation none`, `test-connection` and explicitly registered external
-extensions. Other
+`status --generation none`, `test-connection`, `ssh`, `cssh` and explicitly
+registered external extensions. Other
 commands and generation modes fail before opening logs, evaluating Nix, running
 SSH or changing configuration.
 Root help shows the reference builtin inventory. Detailed help describes the
@@ -16,6 +16,41 @@ execution limits of unavailable commands and status modes.
 command output and reports successful and failed hosts. Completed host failures
 keep the overall exit status 0; start, wait or cancellation errors stop the
 invocation and retain its log.
+
+`ssh` selects managed runnable machines and retains literal OpenSSH arguments,
+including `CONFCTL_SSH_CONFIG` and per-machine ports. Commands run serially or
+with one worker per selected machine. Parallel results follow completion order;
+aggregate groups retain first-seen order and sort names within each group.
+Command output merges stdout and stderr at the child descriptors. A handled
+nonzero host status still prints the original separate error result, which can
+be empty after merging, and keeps the overall exit status 0.
+
+Absent command input leaves its pipe open. Explicit empty `--input-string`
+supplies EOF; input options conflict even when empty. Each host reopens
+`--input-file`. The pinned command dependency treats a nonexistent pathname as
+literal input in a temporary file, and the Go adapter retains that behavior.
+Terminal parallel output displays recent command-log lines and advances progress
+as each host finishes. `CONFCTL_TTY=0` or a pipe on stdout/stderr selects the
+noninteractive header instead.
+
+Exactly one positional argument opens an interactive shell on one machine.
+Interactive SSH inherits stdin/stdout/stderr and the caller's process group,
+without forcing OpenSSH PTY allocation. Localhost resolves UID0's shell through
+`getent passwd 0` and executes it as the current user. The runtime environment
+must supply `getent`; there is no `$SHELL` or hardcoded-shell fallback.
+Interactive child nonzero status is ignored. Explicit cancellation targets only
+the owned child handle, with TERM, two seconds of grace, KILL and one Wait; it
+never signals the caller's process group. Terminal attributes are restored while
+the caller owns foreground. Cancellation does not prove descendant or remote
+termination.
+
+`cssh` retains the literal `nix-shell -p perlPackages.AppClusterSSH --command`
+launch and its `cssh -l root <targets>` command string, without per-host ports or
+SSH configuration options. The pinned command dependency converts `shellHook`
+with a nil value to a present empty export. The adapter keeps those bytes and
+ignores completed child nonzero status. Local fake-child and PTY tests exercise
+these adapters; original-family compatibility acceptance and packaged SSH/GUI
+integration remain separate verification steps.
 
 The Go module `github.com/vpsfreecz/confctl` and its `cmd`, `internal` and
 `extension` packages live at the repository root. The normal Go package builds
@@ -177,7 +212,7 @@ The following table is checked against the command registry:
 | `build` | Unavailable |
 | `changelog` | Unavailable |
 | `collect-garbage` | Unavailable |
-| `cssh` | Unavailable |
+| `cssh` | Available |
 | `deploy` | Unavailable |
 | `diff` | Unavailable |
 | `gen-data vpsadmin all` | Unavailable |
@@ -199,7 +234,7 @@ The following table is checked against the command registry:
 | `ls` | Available |
 | `rediscover` | Available |
 | `rename` | Available |
-| `ssh` | Unavailable |
+| `ssh` | Available |
 | `status` | Only --generation none |
 | `test-connection` | Available |
 <!-- command-registry-capabilities:end -->
@@ -217,7 +252,9 @@ all legacy exception classes.
 
 Explicit invocation/context cancellation has an accepted experimental policy:
 send TERM to the owned child group, allow two seconds, send KILL if it is still
-alive, and wait/reap. It is not a routine command deadline. The test driver has
+alive, and wait/reap. Inherited interactive SSH uses the child-handle exception
+described above because it shares the caller's group. It is not a routine
+command deadline. The test driver has
 its own declared deadline and descendant cleanup. Cancellation is an invocation
 failure and cannot be treated as a handled host failure followed by a state
 save. No automatic retry, worker cap, output cap, new state lock or command

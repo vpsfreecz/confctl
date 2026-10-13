@@ -29,6 +29,7 @@ pkgs.buildGoModule {
           pkgs.git
           pkgs.openssh
           pkgs.nix
+          pkgs.glibc.bin
         ]
       }
     done

@@ -82,7 +82,7 @@ fi
 	if err := os.WriteFile(filepath.Join(tools, "nix"), []byte("#!"+bash+"\n"+nix), 0700); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"ssh", "cat"} {
+	for _, name := range []string{"ssh", "cat", "nix-shell", "getent"} {
 		if name == "cat" && catMode == 0 {
 			continue
 		}
