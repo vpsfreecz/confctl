@@ -203,18 +203,18 @@ func linuxBasicKey(ctx context.Context, stdin *os.File, input *bufio.Reader, ops
 	if err = ctx.Err(); err != nil {
 		return "", err
 	}
-	wakeRead, wakeWrite, err := ops.Pipe()
+	wait, err := acquireInputWait(stdin, input, inputWaitOps{Pipe: ops.Pipe, Poll: ops.Poll, Byte: ops.Byte, Wake: ops.Wake, Close: ops.Close})
 	if err != nil {
+		wait.StopJoin()
+		closed := wait.CloseOwned()
+		if closed.Read != nil || closed.Write != nil {
+			err = errors.Join(err, closed.Read, closed.Write)
+		}
 		return "", err
 	}
-	stop, joined := make(chan struct{}), make(chan struct{})
-	running, rawAttempted := false, false
-	var wakeErr error
+	rawAttempted := false
 	defer func() {
-		if running {
-			close(stop)
-			<-joined
-		}
+		stopped := wait.StopJoin()
 		var restoreErr error
 		if rawAttempted {
 			current, identityErr := ops.Identity(stdin)
@@ -228,8 +228,15 @@ func linuxBasicKey(ctx context.Context, stdin *os.File, input *bufio.Reader, ops
 			}
 		}
 		err = errors.Join(ctx.Err(), err)
-		readClose, writeClose := ops.Close(wakeRead), ops.Close(wakeWrite)
-		err = errors.Join(restoreErr, err, wakeErr, readClose, writeClose)
+		closed := wait.CloseOwned()
+		writeClose := closed.Write
+		if stopped.WriteClose != nil {
+			writeClose = stopped.WriteClose
+		}
+		// Cancellation write-close happens before restore/read-close, but stays
+		// in the existing final write-close presentation slot. The two write
+		// close routes are mutually exclusive; no close is retried on error.
+		err = errors.Join(restoreErr, err, stopped.Wake, closed.Read, writeClose)
 		if err != nil {
 			key = ""
 		}
@@ -242,38 +249,12 @@ func linuxBasicKey(ctx context.Context, stdin *os.File, input *bufio.Reader, ops
 	if err = basicSetTermios(ctx, stdin, &raw, ops); err != nil {
 		return "", err
 	}
-	running = true
-	go func() {
-		defer close(joined)
-		select {
-		case <-stop:
-		case <-ctx.Done():
-			wakeErr = ops.Wake(wakeWrite)
-		}
-	}()
+	wait.Start(ctx)
 	var character [utf8.UTFMax]byte
 	needed := 1
 	for used := 0; used < needed; used++ {
-		for {
-			if err = ctx.Err(); err != nil {
-				return "", err
-			}
-			if input.Buffered() != 0 {
-				break
-			}
-			err = ops.Poll(stdin, wakeRead)
-			if errors.Is(err, syscall.EINTR) {
-				continue
-			}
-			if err != nil {
-				return "", err
-			}
-			if err = ctx.Err(); err != nil {
-				return "", err
-			}
-			break
-		}
-		character[used], err = ops.Byte(input)
+		read := wait.Byte(ctx)
+		character[used], err = read.Value, read.Err
 		if err != nil {
 			if used > 0 && errors.Is(err, io.EOF) {
 				return "", fmt.Errorf("%w: truncated key: %w", ui.ErrBasicEncoding, err)

@@ -519,8 +519,14 @@ func TestBasicLinuxCancellationWakeNotifierJoinedBeforeClose(t *testing.T) {
 	s, ops := basicScript(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	polling, woken, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
-	ops.Poll = func(*os.File, *os.File) error { s.event("poll-wait"); close(polling); <-woken; return nil }
+	polling, woken, release, hup := make(chan struct{}), make(chan struct{}), make(chan struct{}), make(chan struct{})
+	ops.Poll = func(*os.File, *os.File) error {
+		s.event("poll-wait")
+		close(polling)
+		<-hup
+		s.event("poll-HUP")
+		return nil
+	}
 	wakeFailure := errors.New("script wake failure")
 	ops.Wake = func(*os.File) error {
 		s.event("wake-begin")
@@ -528,6 +534,14 @@ func TestBasicLinuxCancellationWakeNotifierJoinedBeforeClose(t *testing.T) {
 		<-release
 		s.event("wake-end")
 		return wakeFailure
+	}
+	closeFile := ops.Close
+	ops.Close = func(file *os.File) error {
+		err := closeFile(file)
+		if strings.HasPrefix(filepath.Base(file.Name()), "wake-write") {
+			close(hup) // modeled pipe HUP, independent of the failed Wake callback
+		}
+		return err
 	}
 	result := make(chan error, 1)
 	go func() {
@@ -553,20 +567,146 @@ func TestBasicLinuxCancellationWakeNotifierJoinedBeforeClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	trace := s.trace()
-	wakeIndex, firstClose := -1, -1
+	wakeIndex, writeClose, restoreIndex, readClose := -1, -1, -1, -1
 	for i, event := range trace {
 		if event == "wake-end" {
 			wakeIndex = i
 		}
-		if strings.HasPrefix(event, "close:") && firstClose < 0 {
-			firstClose = i
+		if strings.HasPrefix(event, "close:wake-write") {
+			writeClose = i
+		}
+		if event == "identity:stdin" && i > 0 {
+			restoreIndex = i
+		}
+		if strings.HasPrefix(event, "close:wake-read") {
+			readClose = i
 		}
 		if event == "byte" {
 			t.Fatal("read after wake cancellation")
 		}
 	}
-	if wakeIndex < 0 || firstClose < wakeIndex || len(s.sets) != 2 || s.sets[1] != s.saved {
+	if wakeIndex < 0 || writeClose < wakeIndex || restoreIndex < writeClose || readClose < restoreIndex || len(s.sets) != 2 || s.sets[1] != s.saved {
 		t.Fatal(trace, s.sets)
+	}
+	basicOwnedClosed(t, s)
+	basicBorrowedOpen(t, s)
+}
+
+func TestBasicLinuxSharedWaitPartialPipeCleanupAndRequiredBindings(t *testing.T) {
+	failure := errors.New("partial pipe")
+	for _, name := range []string{"both", "read", "write", "neither", "missing poll", "missing byte", "missing wake", "missing close"} {
+		t.Run(name, func(t *testing.T) {
+			s, ops := basicScript(t)
+			pipe := ops.Pipe
+			if strings.HasPrefix(name, "missing ") {
+				switch name {
+				case "missing poll":
+					ops.Poll = nil
+				case "missing byte":
+					ops.Byte = nil
+				case "missing wake":
+					ops.Wake = nil
+				case "missing close":
+					ops.Close = nil
+				}
+			} else {
+				ops.Pipe = func() (*os.File, *os.File, error) {
+					if name == "neither" {
+						return nil, nil, failure
+					}
+					r, w, e := pipe()
+					if e != nil {
+						return r, w, e
+					}
+					// Only return the endpoints transferred by this partial source
+					// fixture; the discarded file model is closed by the fixture.
+					if name == "read" {
+						_ = w.Close()
+						s.owned = s.owned[:1]
+						w = nil
+					}
+					if name == "write" {
+						_ = r.Close()
+						s.owned = s.owned[1:]
+						r = nil
+					}
+					return r, w, failure
+				}
+			}
+			input := basicBuffered("qTAIL")
+			key, err := linuxBasicKey(context.Background(), s.in, input, ops)
+			if key != "" || err == nil || len(s.sets) != 0 || input.Buffered() != 5 {
+				t.Fatal("partial wait affected raw/input")
+			}
+			if strings.HasPrefix(name, "missing ") {
+				if s.pipeCount != 0 || err.Error() != "input wait "+strings.TrimPrefix(name, "missing ")+" binding is unavailable" {
+					t.Fatal("required wait checks", err, s.trace())
+				}
+			} else if err != failure {
+				t.Fatal("ordinary pipe error identity", err)
+			}
+			basicOwnedClosed(t, s)
+			basicBorrowedOpen(t, s)
+			trace := strings.Join(s.trace(), ",")
+			if strings.Contains(trace, "wake,") || strings.Contains(trace, "set:") || strings.Contains(trace, "byte") {
+				t.Fatal("partial acquisition started/read", trace)
+			}
+		})
+	}
+}
+
+func TestBasicLinuxSharedWaitCancellationCloseErrorPresentation(t *testing.T) {
+	s, ops := basicScript(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	polling, hup := make(chan struct{}), make(chan struct{})
+	wakeErr, writeErr, readErr, restoreErr := errors.New("wake failure"), errors.New("write close failure"), errors.New("read close failure"), errors.New("restore failure")
+	ops.Poll = func(*os.File, *os.File) error { close(polling); <-hup; return nil }
+	ops.Wake = func(*os.File) error { s.event("wake failed"); return wakeErr }
+	closeFile, termios := ops.Close, ops.Termios
+	closes := map[*os.File]int{}
+	ops.Close = func(file *os.File) error {
+		closes[file]++
+		_ = closeFile(file)
+		if strings.HasPrefix(filepath.Base(file.Name()), "wake-write") {
+			close(hup)
+			return writeErr
+		}
+		return readErr
+	}
+	ops.Termios = func(file *os.File, request uintptr, a *syscall.Termios) error {
+		e := termios(file, request, a)
+		if request == syscall.TCSETS && len(s.sets) == 2 {
+			return restoreErr
+		}
+		return e
+	}
+	result := make(chan error, 1)
+	go func() {
+		key, e := linuxBasicKey(ctx, s.in, bufio.NewReader(strings.NewReader("q")), ops)
+		if key != "" {
+			t.Error("accepted canceled key")
+		}
+		result <- e
+	}()
+	<-polling
+	cancel()
+	err := <-result
+	for _, cause := range []error{context.Canceled, wakeErr, writeErr, readErr, restoreErr} {
+		if !errors.Is(err, cause) {
+			t.Fatal("lost joined cause", err)
+		}
+	}
+	if err.Error() != "restore failure\ncontext canceled\ncontext canceled\nwake failure\nread close failure\nwrite close failure" {
+		t.Fatal("changed presentation order", err)
+	}
+	for _, file := range s.owned {
+		if closes[file] != 1 {
+			t.Fatal("close retried")
+		}
+	}
+	if len(s.sets) != 2 || s.sets[1] != s.saved {
+		t.Fatal("guarded restoration changed")
 	}
 	basicOwnedClosed(t, s)
 	basicBorrowedOpen(t, s)
