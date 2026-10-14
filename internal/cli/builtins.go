@@ -171,6 +171,9 @@ func BuiltinRegistry() *Registry {
 		case "cssh":
 			commands[i].Handler = CSSHHandler
 			commands[i].Availability = Availability{Mode: Available}
+		case "generation ls":
+			commands[i].Handler = GenerationListHandler
+			commands[i].Availability = Availability{Mode: Available}
 		case "init", "add", "rename", "rediscover":
 			commands[i].Handler = ConfigurationHandler
 			commands[i].Availability = Availability{Mode: Available}

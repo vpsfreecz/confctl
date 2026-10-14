@@ -97,7 +97,7 @@ func Main(ctx context.Context, argv []string) int {
 	logName := cmd
 	if extensionCommand {
 		logName = strings.Join(command.Path, "-")
-	} else if inv.Command.Handler == cli.InputsReadHandler || inv.Command.Handler == cli.InputsUpdateHandler || inv.Command.Handler == cli.InputsSetHandler {
+	} else if inv.Command.Handler == cli.InputsReadHandler || inv.Command.Handler == cli.InputsUpdateHandler || inv.Command.Handler == cli.InputsSetHandler || inv.Command.Handler == cli.GenerationListHandler {
 		logName = strings.Join(inv.Command.Path, "-")
 	}
 	if err = e.OpenLog(logName); err != nil {
@@ -114,6 +114,8 @@ func Main(ctx context.Context, argv []string) int {
 		e.LogTestConnectionCLI(inv)
 	} else if inv.Command.Handler == cli.SSHHandler || inv.Command.Handler == cli.CSSHHandler {
 		e.LogSSHCLI(inv)
+	} else if inv.Command.Handler == cli.GenerationListHandler {
+		e.LogGenerationCLI(inv)
 	} else if !extensionCommand || supportedRuntimeCommand(command) {
 		e.LogCLI(cmd, opts, commandArgv)
 	} else {
@@ -232,6 +234,23 @@ func Main(ctx context.Context, argv []string) int {
 			}
 			return fail(err, 1)
 		}
+		success = true
+		return 0
+	}
+	if inv.Command.Handler == cli.GenerationListHandler {
+		text, err := e.ListGenerations(inv)
+		if err != nil {
+			var argumentErr *generationArgumentError
+			if errors.As(err, &argumentErr) {
+				code := fail(err, 64)
+				fmt.Fprintln(os.Stderr)
+				help, _ := registry.Help(inv.Command.Path, 80)
+				fmt.Print(help)
+				return code
+			}
+			return fail(err, 1)
+		}
+		fmt.Print(text)
 		success = true
 		return 0
 	}

@@ -1,25 +1,25 @@
 package core
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"math"
-	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
+
+	"github.com/vpsfreecz/confctl/internal/generation"
 )
 
 type Status struct {
-	Machine     Machine
-	Uptime      *float64
-	Generations *int
-	Target      map[string]map[string]any
-	Deployed    map[string]map[string]any
-	Err         error
+	Machine         Machine
+	Uptime          *float64
+	Generations     *generation.HostList
+	CurrentToplevel *string
+	Target          map[string]map[string]any
+	Deployed        map[string]map[string]any
+	Err             error
 }
 
 func normalizeInputs(v any) map[string]map[string]any {
@@ -58,10 +58,11 @@ func short(s string) string {
 	}
 	return string(r)
 }
-func hostScript(profile string) string {
-	return fmt.Sprintf("realpath %s\n\nfor generation in `ls -d -1 %s-*-link` ; do\n  echo -n \"$generation;\"\n  echo -n \"$(readlink $generation);\"\n  echo -n \"$(stat --format=%%Y $generation);\"\n\n  for kernel_file in kernel bzImage ; do\n    [ -h \"$generation/$kernel_file\" ] && echo -n $(readlink \"$generation/$kernel_file\")\n  done\n\n  echo\ndone\n", profile, profile)
-}
-func (e *Engine) query(st *Status, all []Machine) {
+
+// queryOptions are explicit because listing must not request toplevel or inputs.
+type queryOptions struct{ Toplevel, Generations, Inputs bool }
+
+func (e *Engine) query(st *Status, all []Machine, options queryOptions) {
 	m := st.Machine
 	if m.CarrierName != nil {
 		found := false
@@ -98,46 +99,59 @@ func (e *Engine) query(st *Status, all []Machine) {
 		up, _ = strconv.ParseFloat(parts[0], 64)
 	}
 	st.Uptime = &up
-	r, err = run([]string{"bash", "--norc"}, []byte(hostScript(st.Machine.Profile)))
-	if err != nil {
-		st.Err = err
-		return
-	}
-	if r.ExitCode != 0 {
-		return
-	}
-	n := 0
-	lines := strings.Split(strings.TrimSpace(string(r.Stdout)), "\n")
-	for _, l := range lines[1:] {
-		p := strings.Split(l, ";")
-		if len(p) < 3 {
-			continue
+	if options.Toplevel {
+		path := "/run/current-system"
+		if st.Machine.CarrierName != nil {
+			path = st.Machine.Profile
 		}
-		prefix := st.Machine.Profile + "-"
-		if strings.HasPrefix(p[0], prefix) && strings.HasSuffix(p[0], "-link") {
-			id := strings.TrimSuffix(strings.TrimPrefix(p[0], prefix), "-link")
-			if _, err := strconv.Atoi(id); err == nil {
-				n++
+		r, err = run([]string{"realpath", path}, nil)
+		if err != nil {
+			st.Err = err
+			return
+		}
+		if r.ExitCode != 0 {
+			return
+		}
+		top := strings.Trim(string(r.Stdout), "\x00 \t\r\n\v\f")
+		st.CurrentToplevel = &top
+	}
+	if options.Generations {
+		list, err := generation.FetchHostList(e.Context, st.Machine.Name, st.Machine.Profile, e.generationOptions(), func(ctx context.Context, argv []string, stdin []byte) ([]byte, bool, error) {
+			// Fetch receives the same invocation context used by Engine.Process.
+			if err := ctx.Err(); err != nil {
+				return nil, false, err
 			}
+			r, err := run(argv, stdin)
+			return r.Stdout, r.ExitCode == 0, err
+		})
+		if err != nil {
+			st.Err = err
+			return
 		}
+		if list == nil {
+			return
+		}
+		st.Generations = list
 	}
-	st.Generations = &n
+	if !options.Inputs {
+		return
+	}
 	path := "/etc/confctl/inputs-info.json"
 	var value any
 	if st.Machine.CarrierName != nil {
-		r, err = run([]string{"cat", filepath.Join(st.Machine.Profile, "machine.json")}, nil)
+		r, err = run([]string{"cat", strings.TrimRight(st.Machine.Profile, "/") + "/machine.json"}, nil)
 		if err != nil {
 			st.Err = err
 			return
 		}
 		if r.ExitCode == 0 {
 			var h map[string]any
-			if json.Unmarshal(r.Stdout, &h) == nil {
+			if decodeJSONNumbers(r.Stdout, &h) == nil {
 				value = h["inputs-info"]
 			}
 		}
 		if !truth(value) {
-			path = filepath.Join(st.Machine.Profile, path)
+			path = strings.TrimRight(st.Machine.Profile, "/") + path
 		}
 	}
 	if !truth(value) {
@@ -152,12 +166,13 @@ func (e *Engine) query(st *Status, all []Machine) {
 		value = string(r.Stdout)
 	}
 	if s, ok := value.(string); ok {
-		if json.Unmarshal([]byte(s), &value) != nil {
+		if decodeJSONNumbers([]byte(s), &value) != nil {
 			return
 		}
 	}
 	st.Deployed = normalizeInputs(value)
 }
+
 func formatDuration(up float64) (string, error) {
 	for _, u := range []struct {
 		s string
@@ -177,75 +192,6 @@ func inputState(t, d map[string]any) string {
 		return "same"
 	}
 	return "changed"
-}
-func (e *Engine) localGenerationCount(host string) (int, error) {
-	dir := filepath.Join(e.Root, ".confctl", "generations", strings.ReplaceAll(host, "/", ":"))
-	entries, err := os.ReadDir(dir)
-	if os.IsNotExist(err) {
-		return 0, nil
-	}
-	if err != nil {
-		return 0, err
-	}
-	n := 0
-	for _, d := range entries {
-		if !d.IsDir() || d.Type()&os.ModeSymlink != 0 {
-			continue
-		}
-		p := filepath.Join(dir, d.Name(), "generation.json")
-		b, err := os.ReadFile(p)
-		var h map[string]any
-		if err == nil {
-			err = json.Unmarshal(b, &h)
-		}
-		reason := ""
-		if err != nil {
-			reason = p + ": " + err.Error()
-		} else if h["mode"] != "flakes" {
-			reason = fmt.Sprintf("%s: unsupported generation mode %s; only explicit flakes mode is supported", p, rubyInspect(h["mode"]))
-		} else {
-			_, dateErr := time.Parse(time.RFC3339Nano, str(h["date"]))
-			inputs, ok := h["inputs"].(map[string]any)
-			if h["inputs"] == nil {
-				inputs = map[string]any{}
-				ok = true
-			}
-			valid := ok
-			for _, v := range inputs {
-				if _, ok := v.(string); !ok {
-					valid = false
-				}
-			}
-			info := h["inputs_info"]
-			if info == nil {
-				info = h["inputsInfo"]
-			}
-			if info != nil {
-				if _, ok := info.(map[string]any); !ok {
-					valid = false
-				}
-			}
-			if h["auto_rollback"] != nil {
-				if _, ok := h["auto_rollback"].(string); !ok {
-					valid = false
-				}
-			}
-			if s, ok := h["toplevel"].(string); !ok || s == "" {
-				valid = false
-			}
-			if !valid {
-				reason = p + ": invalid flake generation payload"
-			} else if dateErr != nil {
-				reason = p + ": " + dateErr.Error()
-			}
-		}
-		if reason != "" {
-			fmt.Fprintf(os.Stderr, "Skipping generation %s: %s. Records and GC roots were left untouched; use confctl v3 for old software-pin generations.\n", filepath.Dir(p), reason)
-			continue
-		}
-		n++
-	}
-	return n, nil
 }
 func (e *Engine) Status(ms, all []Machine) (string, error) {
 	statuses := make([]Status, len(ms))
@@ -272,7 +218,10 @@ func (e *Engine) Status(ms, all []Machine) (string, error) {
 	var wg sync.WaitGroup
 	for i := range statuses {
 		wg.Add(1)
-		go func(i int) { defer wg.Done(); e.query(&statuses[i], all) }(i)
+		go func(i int) {
+			defer wg.Done()
+			e.query(&statuses[i], all, queryOptions{Generations: true, Inputs: true})
+		}(i)
 	}
 	wg.Wait()
 	roleSet := map[string]bool{}
@@ -295,10 +244,11 @@ func (e *Engine) Status(ms, all []Machine) (string, error) {
 	cols := append([]string{"host", "online", "uptime", "status", "generations"}, roles...)
 	rows := []map[string]any{}
 	for _, s := range statuses {
-		n, err := e.localGenerationCount(s.Machine.Name)
+		builds, err := generation.LoadBuildList(e.Root, s.Machine.Name, e.generationOptions())
 		if err != nil {
 			return "", err
 		}
+		n := len(builds.Builds)
 		row := map[string]any{"host": s.Machine.Name, "generations": fmt.Sprint(n) + ":"}
 		ok := s.Uptime != nil && len(s.Target) > 0
 		for k, t := range s.Target {
@@ -315,7 +265,7 @@ func (e *Engine) Status(ms, all []Machine) (string, error) {
 			row["uptime"] = up
 		}
 		if s.Generations != nil {
-			row["generations"] = fmt.Sprintf("%d:%d", n, *s.Generations)
+			row["generations"] = fmt.Sprintf("%d:%d", n, len(s.Generations.Generations))
 		}
 		if ok {
 			row["status"] = e.Colorize("ok", "green")

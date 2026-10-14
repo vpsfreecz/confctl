@@ -5,8 +5,8 @@
 `init`, `add`, `rename`, `rediscover`, `ls`, `inputs ls`, `inputs channel ls`,
 `inputs update`, `inputs channel update`, `inputs machine update`,
 `inputs set`, `inputs channel set`, `inputs machine set`,
-`status --generation none`, `test-connection`, `ssh`, `cssh` and explicitly
-registered external extensions. Other
+`status --generation none`, `generation ls`, `test-connection`, `ssh`, `cssh`
+and explicitly registered external extensions. Other
 commands and generation modes fail before opening logs, evaluating Nix, running
 SSH or changing configuration.
 Root help shows the reference builtin inventory. Detailed help describes the
@@ -218,7 +218,7 @@ The following table is checked against the command registry:
 | `gen-data vpsadmin all` | Unavailable |
 | `gen-data vpsadmin containers` | Unavailable |
 | `gen-data vpsadmin network` | Unavailable |
-| `generation ls` | Unavailable |
+| `generation ls` | Available |
 | `generation rm` | Unavailable |
 | `generation rotate` | Unavailable |
 | `health-check` | Unavailable |
@@ -266,9 +266,35 @@ separately; those broader exception categories are not claimed interchangeable.
 Corrupt JSON fails without replacing state. Its initial invalid-value-starter
 diagnostic follows the pinned JSON gem's token-fragment, line and byte-column
 format; the other syntax-error classes remain unverified and use Go diagnostics.
-The built-in generation reader is
-bounded to current flake-generation records; it is not an implementation of
-native build, deployment, rotation or legacy software-pin migration.
+
+`generation ls` lists local flake generations by default. `--remote` queries
+remote profiles, and `--local --remote` combines both sources. Machine filters
+include unmanaged and carried entries; a carried profile uses its carrier's
+connection and its own profile path. Listing queries uptime and generations
+without reading the running toplevel or deployed input metadata.
+
+Local readers retain ordered input metadata and exact JSON-number tokens. They
+warn about rejected records without changing those records or their roots.
+Numeric selection refuses excluded-record ambiguity; `current` and `old` refuse
+an unresolved local current link. Remote-only selection leaves local records
+unread. The local and remote counts in `status --generation none` use these same
+readers, with a successful empty remote query distinct from a failed query.
+
+Combined selection uses remote inventory and per-host ID order, followed by
+local inventory and per-host date order. Display rows sort by name and host;
+input columns follow their first occurrence before that sort. Numeric selectors
+refer to the combined insertion order, with zero selecting the last entry and
+minus one the penultimate. An out-of-range selector falls through to name
+matching. For integers beyond a machine long, this bounded behavior differs
+from the original Ruby array's `RangeError`. Age selection uses a strict cutoff
+and retains timestamp fractions. Reads never repair current links or create
+profiles or roots.
+
+Default and selected-generation status, native build, deployment, generation
+removal, rotation and legacy software-pin migration remain unavailable. Native
+tests use disposable records and fake child processes. The finite original
+adapters compare reader and table behavior; they do not establish packaged or
+fleet parity.
 
 The SDK remains experimental. No production configuration pin selects the Go
 CLI. Recovery is selecting the unchanged normal package while retaining
