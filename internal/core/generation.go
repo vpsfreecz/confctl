@@ -14,8 +14,7 @@ import (
 	"github.com/vpsfreecz/confctl/internal/generation"
 )
 
-// generationWarning preserves stderr-before-log; the P1 raw logger remains
-// void until the separately committed live-log binding.
+// generationWarning returns each reached stderr or synchronous log error.
 func (e *Engine) generationWarning(stderr io.Writer) func(string) error {
 	return func(message string) error {
 		body := []byte(message + "\n")
@@ -26,8 +25,7 @@ func (e *Engine) generationWarning(stderr io.Writer) func(string) error {
 		if n != len(body) {
 			return io.ErrShortWrite
 		}
-		e.logText(message + "\n")
-		return nil
+		return e.logText(message + "\n")
 	}
 }
 func (e *Engine) generationOptions() generation.Options {
@@ -328,7 +326,7 @@ func resolvedBuildValueCompare(a, b any) (int, bool) {
 	return 0, false
 }
 
-func (e *Engine) LogGenerationCLI(inv cli.Invocation) {
+func (e *Engine) LogGenerationCLI(inv cli.Invocation) error {
 	command, arguments := make([]any, len(inv.Command.Path)), make([]any, len(inv.Args))
 	for i, p := range inv.Command.Path {
 		command[i] = p
@@ -359,5 +357,5 @@ func (e *Engine) LogGenerationCLI(inv cli.Invocation) {
 		}
 	}
 	b.WriteString(separator + "#<GLI::Command::ParentKey:0x0000000000000000> => {}}" + inputLogArgumentsField(arguments))
-	e.logText(b.String())
+	return e.logMetadata(b.String())
 }

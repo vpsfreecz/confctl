@@ -44,7 +44,7 @@ func TestGenerationWarningStderrOrder(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		e := &Engine{Log: f}
+		e := &Engine{Log: f, logOwner: nativeEngineLog(f)}
 		w := &generationWarningWriter{count: row.count, err: row.err}
 		got := e.generationWarning(w)("warning")
 		if got != row.want || w.body.String() != "warning\n" {
@@ -217,7 +217,7 @@ esac
 		t.Fatal(err)
 	}
 	defer log.Close()
-	e.Log = log
+	e.Log, e.logOwner = log, nativeEngineLog(log)
 	_, err = e.ListGenerations(generationInvocation(t, "-lr", "*", "0"))
 	if err == nil || !strings.Contains(err.Error(), "ambiguous") {
 		t.Fatal(err)
@@ -286,7 +286,7 @@ esac
 		t.Fatal(err)
 	}
 	defer log.Close()
-	e.Log = log
+	e.Log, e.logOwner = log, nativeEngineLog(log)
 	e.Color = "never"
 	before := testConfigurationState(t, filepath.Join(root, ".confctl", "generations"))
 	text, err := e.Status([]Machine{m}, []Machine{m})

@@ -26,11 +26,15 @@ func inputLogHeader(t *testing.T, argv []string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := &Engine{Log: f, Color: inv.Globals["color"].Value.String}
+	e := &Engine{Log: f, logOwner: nativeEngineLog(f), Color: inv.Globals["color"].Value.String}
 	if inv.Command.Path[len(inv.Command.Path)-1] == "set" {
-		e.LogInputSetCLI(inv)
+		if err := e.LogInputSetCLI(inv); err != nil {
+			t.Fatal(err)
+		}
 	} else {
-		e.LogInputUpdateCLI(inv)
+		if err := e.LogInputUpdateCLI(inv); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if !reflect.DeepEqual(inv, before) {
 		t.Fatal("logger changed parsed invocation")
@@ -118,8 +122,10 @@ func TestTestConnectionLogOriginalHeaderAndEncounter(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		e := &Engine{Log: f, Color: "auto"}
-		e.LogTestConnectionCLI(inv)
+		e := &Engine{Log: f, logOwner: nativeEngineLog(f), Color: "auto"}
+		if err := e.LogTestConnectionCLI(inv); err != nil {
+			t.Fatal(err)
+		}
 		if !reflect.DeepEqual(inv, before) {
 			t.Fatal("logger changed invocation")
 		}

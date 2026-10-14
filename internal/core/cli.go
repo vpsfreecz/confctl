@@ -12,7 +12,7 @@ import (
 	"github.com/vpsfreecz/confctl/internal/inputs"
 )
 
-func Main(ctx context.Context, argv []string) int {
+func Main(ctx context.Context, argv []string) (result int) {
 	builtins := cli.BuiltinRegistry()
 	globals, commandArgv, globalErr := builtins.ParseGlobals(argv)
 	// Keep the accepted version failure before any extension registry read.
@@ -104,23 +104,31 @@ func Main(ctx context.Context, argv []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
+	success := false
+	originalStderr := os.Stderr
+	defer func() { result, _ = LogCleanupStatus(result, e.CloseLog(success), originalStderr) }()
+
 	if inv.Command.Handler == cli.InputsReadHandler {
-		e.LogInputsCLI(inv.Command.Path, inv.Args)
+		err = e.LogInputsCLI(inv.Command.Path, inv.Args)
 	} else if inv.Command.Handler == cli.InputsSetHandler {
-		e.LogInputSetCLI(inv)
+		err = e.LogInputSetCLI(inv)
 	} else if inv.Command.Handler == cli.InputsUpdateHandler {
-		e.LogInputUpdateCLI(inv)
+		err = e.LogInputUpdateCLI(inv)
 	} else if inv.Command.Handler == cli.TestConnectionHandler {
-		e.LogTestConnectionCLI(inv)
+		err = e.LogTestConnectionCLI(inv)
 	} else if inv.Command.Handler == cli.SSHHandler || inv.Command.Handler == cli.CSSHHandler {
-		e.LogSSHCLI(inv)
+		err = e.LogSSHCLI(inv)
 	} else if inv.Command.Handler == cli.GenerationListHandler {
-		e.LogGenerationCLI(inv)
+		err = e.LogGenerationCLI(inv)
 	} else if !extensionCommand || supportedRuntimeCommand(command) {
-		e.LogCLI(cmd, opts, commandArgv)
+		err = e.LogCLI(cmd, opts, commandArgv)
 	} else {
 		b, _ := json.Marshal(commandInvocation(e.Root, registered[strings.Join(inv.Command.Path, " ")], inv, commandArgv))
-		e.logText(string(b) + "\n")
+		err = e.logMetadata(string(b) + "\n")
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
 	}
 	fail := func(err error, code int) int {
 		fmt.Fprintf(os.Stderr, "\nLog file: %s\n", e.Log.Name())
@@ -137,8 +145,6 @@ func Main(ctx context.Context, argv []string) int {
 		}
 		return code
 	}
-	success := false
-	defer func() { e.CloseLog(success) }()
 	if extensionCommand {
 		in := commandInvocation(e.Root, registered[strings.Join(inv.Command.Path, " ")], inv, commandArgv)
 		code, err := e.Invoke(registration, command.Handler, in)

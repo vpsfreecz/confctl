@@ -266,7 +266,7 @@ func (e *Engine) Invoke(reg Registration, handler string, in ext.Invocation) (in
 	group.bind(cmd.Process.Pid)
 	_ = toChildRead.Close()
 	_ = fromChildWrite.Close()
-	scoped := &Engine{Root: e.Root, Context: ctx, SettingsCache: e.SettingsCache, Inventory: e.Inventory, ShowTrace: e.ShowTrace, Color: e.Color, Yes: e.Yes, Log: e.Log}
+	scoped := e.scopedEngine(ctx)
 	s := &supervisor{e: scoped, in: in, snapshots: map[string][]Machine{}}
 	p := ext.NewPeer(ctx, fromChildRead, toChildWrite, "c")
 	p.SetHandler(s.handle)
@@ -565,4 +565,10 @@ func nixNumber(value json.Number) (string, error) {
 		return token[:exponent] + ".0" + token[exponent:], nil
 	}
 	return token, nil
+}
+
+// Reverse services borrow the actual invocation's file/owner pair; root alone
+// finalizes after children/handlers/readers have joined. No raw state is cloned.
+func (e *Engine) scopedEngine(ctx context.Context) *Engine {
+	return &Engine{Root: e.Root, Context: ctx, SettingsCache: e.SettingsCache, Inventory: e.Inventory, ShowTrace: e.ShowTrace, Color: e.Color, Yes: e.Yes, Log: e.Log, logOwner: e.logOwner}
 }

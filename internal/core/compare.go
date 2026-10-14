@@ -72,7 +72,7 @@ func (e *Engine) Compare(inv cli.Invocation, stdin, stdout, stderr *os.File) err
 	return e.compare(inv, bufio.NewReader(stdin), stdout, deps)
 }
 
-func (e *Engine) LogComparisonCLI(inv cli.Invocation) { e.LogTestConnectionCLI(inv) }
+func (e *Engine) LogComparisonCLI(inv cli.Invocation) error { return e.LogTestConnectionCLI(inv) }
 
 func comparisonPagerEnabled(deps comparisonDeps) bool {
 	if value, _ := deps.Env("CONFCTL_TTY"); value == "0" || !deps.OutputTTY() || !deps.ErrorTTY() {

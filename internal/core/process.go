@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,6 +19,80 @@ type Result struct {
 	Stderr   []byte `json:"stderr_b64"`
 	signal   syscall.Signal
 	waitErr  error
+	capture  *captureCompletion // private joined provenance, never wire metadata
+}
+
+type captureOrigin uint8
+
+const (
+	captureCallback captureOrigin = iota + 1
+	captureRead
+)
+
+type captureCause struct {
+	owner  *commandCapture
+	origin captureOrigin
+	err    error
+}
+
+func (c *captureCause) Error() string { return "captured command copy failed" }
+
+type captureReceipt struct {
+	stream         string
+	count          int64
+	callback, read error
+}
+type captureCompletion struct {
+	primary error
+	streams []captureReceipt
+}
+
+// Nonzero-sized invocation identity: only this direct winning cause is owned.
+// Notification never calls childGroup.cancel (which can await pre-Start bind).
+type commandCapture struct {
+	parent, ctx context.Context
+	cancel      context.CancelCauseFunc
+}
+
+func newCommandCapture(parent context.Context) *commandCapture {
+	ctx, cancel := context.WithCancelCause(parent)
+	return &commandCapture{parent, ctx, cancel}
+}
+func (c *commandCapture) fail(origin captureOrigin, err error) {
+	if err != nil {
+		c.cancel(&captureCause{c, origin, err})
+	}
+}
+
+// Captures are written by their respective copy goroutines. joined is reached
+// only after Wait has joined those copies; the receipt keeps value snapshots.
+func (c *commandCapture) joined(waitErr error, streams ...*testConnectionCapture) (*captureCompletion, error) {
+	completion := &captureCompletion{}
+	for _, s := range streams {
+		completion.streams = append(completion.streams, captureReceipt{s.stream, s.count, s.callbackErr, s.readErr})
+	}
+	if winner, ok := context.Cause(c.ctx).(*captureCause); ok && winner.owner == c {
+		completion.primary = winner.err
+		return completion, winner.err
+	}
+	// A parent's arbitrary cause (including a foreign or wrapped marker) is
+	// presented at the existing ctx.Err boundary. Error shape grants no origin.
+	if c.ctx.Err() != nil {
+		return completion, c.parent.Err()
+	}
+	if waitErr != nil {
+		var exit *exec.ExitError
+		if !errors.As(waitErr, &exit) {
+			return completion, waitErr
+		}
+	}
+	return completion, nil
+}
+func (r Result) capturePrimary() error {
+	if r.capture != nil {
+		return r.capture.primary
+	}
+	return nil
 }
 
 func ShellJoin(argv []string) string {
@@ -66,12 +141,14 @@ func Process(ctx context.Context, root string, argv []string, input []byte) (Res
 	return processWithTestConnectionLog(ctx, root, argv, input, nil)
 }
 
-func processWithTestConnectionLog(ctx context.Context, root string, argv []string, input []byte, chunk func([]byte)) (Result, error) {
+func processWithTestConnectionLog(ctx context.Context, root string, argv []string, input []byte, chunk func([]byte) error) (Result, error) {
 	r := Result{ExitCode: -1, Command: ShellJoin(argv)}
 	if len(argv) == 0 {
 		return r, fmt.Errorf("empty argv")
 	}
-	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	owner := newCommandCapture(ctx)
+	defer owner.cancel(nil)
+	cmd := exec.CommandContext(owner.ctx, argv[0], argv[1:]...)
 	cmd.Dir = root
 	cmd.Env = os.Environ()
 	group := prepareChild(cmd)
@@ -87,12 +164,9 @@ func processWithTestConnectionLog(ctx context.Context, root string, argv []strin
 		cmd.Stdin = bytes.NewReader(input)
 	}
 	var out, errout bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &errout
-	if chunk != nil {
-		cmd.Stdout = &testConnectionCapture{buffer: &out, chunk: chunk}
-		cmd.Stderr = &testConnectionCapture{buffer: &errout, chunk: chunk}
-	}
+	stdout := &testConnectionCapture{buffer: &out, chunk: chunk, owner: owner, stream: "stdout"}
+	stderr := &testConnectionCapture{buffer: &errout, chunk: chunk, owner: owner, stream: "stderr"}
+	cmd.Stdout, cmd.Stderr = stdout, stderr
 	e := cmd.Start()
 	if e == nil {
 		group.bind(cmd.Process.Pid)
@@ -110,10 +184,8 @@ func processWithTestConnectionLog(ctx context.Context, root string, argv []strin
 		r.Signal = s.Signal().String()
 		r.signal = s.Signal()
 	}
-	if ctx.Err() != nil {
-		return r, ctx.Err()
-	}
-	return r, nil
+	r.capture, e = owner.joined(e, stdout, stderr)
+	return r, e
 }
 func RunMachine(ctx context.Context, root string, m Machine, argv []string, input []byte) (Result, error) {
 	a, e := SSHArgs(m, argv)

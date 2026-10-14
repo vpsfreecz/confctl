@@ -181,8 +181,10 @@ func TestGenerationListingLogOptionValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer log.Close()
-	e := &Engine{Context: context.Background(), Log: log, Color: "never"}
-	e.LogGenerationCLI(generationInvocation(t, "-r", "-a", "managed=false", "-a", "spin=nixos", "-t", "fixture", "-l", "--no-remote", "node", ""))
+	e := &Engine{Context: context.Background(), Log: log, logOwner: nativeEngineLog(log), Color: "never"}
+	if err := e.LogGenerationCLI(generationInvocation(t, "-r", "-a", "managed=false", "-a", "spin=nixos", "-t", "fixture", "-l", "--no-remote", "node", "")); err != nil {
+		t.Fatal(err)
+	}
 	text := fixtureFile(t, root, "log")
 	for _, part := range []string{`"r" => false`, `"remote" => false`, `"attr" => ["managed=false", "spin=nixos"]`, `"tag" => ["fixture"]`, `"local" => true`, `arguments: ["node", ""]`} {
 		if !strings.Contains(text, part) {

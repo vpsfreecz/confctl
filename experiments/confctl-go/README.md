@@ -52,6 +52,31 @@ ignores completed child nonzero status. Local fake-child and PTY tests exercise
 these adapters; original-family compatibility acceptance and packaged SSH/GUI
 integration remain separate verification steps.
 
+Command logs return raw write, flush and live-reader errors synchronously.
+The runner stores each captured child chunk before its log callback. A callback
+or non-EOF copy-read failure requests cancellation through that command's own
+context. A winning callback or read error retains its identity after the runner
+joins completion; caller cancellation wins when it reaches the context first.
+A start-log failure prevents input and child acquisition. Ordinary completed
+commands emit one summary, including nonzero and signal outcomes. Infrastructure
+failures skip the summary. Completion never replays captured output.
+
+CLI metadata keeps its existing bytes and bypasses live readers and explicit
+flush. Generation warnings write stderr first and stop on a reached stderr or
+log error. Higher callers keep their own policies: status tolerates failed
+target-metadata queries, ordinary changelog failures can become unavailable text,
+and input mutations retain their existing context precedence. Start, summary
+and input-acquisition errors remain subject to those outer context rules.
+
+The root invocation closes its log once after its users finish. Removal requires
+both a successful body and a successful close. A close or removal error makes an
+otherwise successful invocation fail; an earlier nonzero status remains primary.
+Cleanup attempts one diagnostic on the original stderr, which can itself fail.
+Logging does not retry, replay, restore prior state or undo partial output,
+captures and completed file effects. Nonreturning callbacks and the existing
+child and descendant ownership limits can still prevent completion. Native,
+original-Ruby, terminal and packaged error behavior need separate verification.
+
 The Go module `github.com/vpsfreecz/confctl` and its `cmd`, `internal` and
 `extension` packages live at the repository root. The normal Go package builds
 only `confctl-go-prototype` and `hook-driver`, with no site executable, registry

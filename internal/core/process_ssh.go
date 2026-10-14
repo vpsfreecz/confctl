@@ -33,14 +33,18 @@ func (e *Engine) sshProcess(ctx context.Context, root string, argv []string, inp
 		r.Command = "( export shellHook=\"\" ; " + r.Command + " )"
 	}
 	id := logID()
-	e.logText("[" + id + "] Running " + r.Command + "\n")
+	if err := e.logText("[" + id + "] Running " + r.Command + "\n"); err != nil {
+		return r, err
+	}
 	start := time.Now()
 	stdin, closeInput, err := sshStdin(root, input)
 	if err != nil {
 		return r, err
 	}
 	defer closeInput()
-	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	owner := newCommandCapture(ctx)
+	defer owner.cancel(nil)
+	cmd := exec.CommandContext(owner.ctx, argv[0], argv[1:]...)
 	cmd.Dir, cmd.Stdin = root, stdin
 	cmd.Env = os.Environ()
 	if env != nil {
@@ -48,11 +52,13 @@ func (e *Engine) sshProcess(ctx context.Context, root string, argv []string, inp
 	}
 	group := prepareChild(cmd)
 	var stdout, stderr bytes.Buffer
-	chunk := func(b []byte) { e.logText("[" + id + "] \t" + strings.TrimSuffix(string(b), "\n") + "\n") }
-	out := &testConnectionCapture{buffer: &stdout, chunk: chunk}
+	chunk := func(b []byte) error { return e.logText("[" + id + "] \t" + strings.TrimSuffix(string(b), "\n") + "\n") }
+	out := &testConnectionCapture{buffer: &stdout, chunk: chunk, owner: owner, stream: "stdout"}
+	errs := &testConnectionCapture{buffer: &stderr, chunk: chunk, owner: owner, stream: "stderr"}
 	cmd.Stdout = out
-	cmd.Stderr = &testConnectionCapture{buffer: &stderr, chunk: chunk}
+	cmd.Stderr = errs
 	if merge {
+		out.stream = "combined"
 		cmd.Stderr = out
 	}
 	if err = cmd.Start(); err != nil {
@@ -66,11 +72,18 @@ func (e *Engine) sshProcess(ctx context.Context, root string, argv []string, inp
 	if status, ok := cmd.ProcessState.Sys().(syscall.WaitStatus); ok && status.Signaled() {
 		r.signal, r.Signal = status.Signal(), status.Signal().String()
 	}
+	streams := []*testConnectionCapture{out}
+	if !merge {
+		streams = append(streams, errs)
+	}
+	r.capture, err = owner.joined(r.waitErr, streams...)
+	if err != nil {
+		return r, err
+	}
 	status, err := sshStatus(ctx, r, nil)
 	if err != nil {
 		return r, err
 	}
 	display := Result{ExitCode: status}
-	e.processLogFinish(id, start, display)
-	return r, nil
+	return r, e.processLogFinish(id, start, display)
 }
