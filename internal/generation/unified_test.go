@@ -85,8 +85,8 @@ func TestUnifiedReplacementAndFirstMatch(t *testing.T) {
 
 func TestUnifiedInventoryOffsets(t *testing.T) {
 	list := &UnifiedList{}
-	list.AddHosts(ParseHostList("a", "/p", []byte("/none\n/p-20-link;/a20;20\n/p-2-link;/a2;30"), Options{Location: time.UTC}))
-	list.AddHosts(ParseHostList("b", "/p", []byte("/none\n/p-1-link;/b1;0"), Options{Location: time.UTC}))
+	list.AddHosts(mustParseHostList(t, "a", "/p", []byte("/none\n/p-20-link;/a20;20\n/p-2-link;/a2;30"), Options{Location: time.UTC}))
+	list.AddHosts(mustParseHostList(t, "b", "/p", []byte("/none\n/p-1-link;/b1;0"), Options{Location: time.UTC}))
 	list.AddBuilds(&BuildList{Builds: []*Build{
 		testBuild(t, "a", "local-a", "/local-a", "1900-01-01T00:00:00Z", Object{}, nil, false),
 	}})

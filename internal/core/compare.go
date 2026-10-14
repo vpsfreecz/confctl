@@ -48,10 +48,7 @@ func (e *Engine) Compare(inv cli.Invocation, stdin, stdout, stderr *os.File) err
 		Machines: func() ([]Machine, error) { return e.Machines(false) },
 		List:     func(ms []Machine) (string, error) { return e.List(ms, nil, true) },
 		Builds: func(host string) (*generation.BuildList, error) {
-			return generation.LoadBuildList(e.Root, host, generation.Options{Warn: func(message string) {
-				fmt.Fprintln(stderr, message)
-				e.logText(message + "\n")
-			}})
+			return generation.LoadBuildList(e.Root, host, generation.Options{Warn: e.generationWarning(stderr)})
 		},
 		// This resolver uses Settings.maxJobs and show_trace, never comparison's
 		// parsed max-jobs/cores. Inventory's evaluator does not seed its keys.

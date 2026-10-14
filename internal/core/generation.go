@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"os"
 	"sort"
@@ -13,11 +14,24 @@ import (
 	"github.com/vpsfreecz/confctl/internal/generation"
 )
 
-func (e *Engine) generationOptions() generation.Options {
-	return generation.Options{Warn: func(message string) {
-		fmt.Fprintln(os.Stderr, message)
+// generationWarning preserves stderr-before-log; the P1 raw logger remains
+// void until the separately committed live-log binding.
+func (e *Engine) generationWarning(stderr io.Writer) func(string) error {
+	return func(message string) error {
+		body := []byte(message + "\n")
+		n, err := stderr.Write(body)
+		if err != nil {
+			return err
+		}
+		if n != len(body) {
+			return io.ErrShortWrite
+		}
 		e.logText(message + "\n")
-	}}
+		return nil
+	}
+}
+func (e *Engine) generationOptions() generation.Options {
+	return generation.Options{Warn: e.generationWarning(os.Stderr)}
 }
 
 // Queries run concurrently, but results retain inventory order. The existing

@@ -180,7 +180,7 @@ func TestSelectionPrivateRecordsAndNoWrites(t *testing.T) {
 		remoteCalls, localCalls := []string{}, []string{}
 		remote := func(host string) (*HostList, error) {
 			remoteCalls = append(remoteCalls, host)
-			return ParseHostList(host, "/private/profile", []byte(root+"/system-b\n/private/profile-1-link;"+root+"/system-b;0"), Options{}), nil
+			return mustParseHostList(t, host, "/private/profile", []byte(root+"/system-b\n/private/profile-1-link;"+root+"/system-b;0"), Options{}), nil
 		}
 		local := func(host string) (*BuildList, error) {
 			localCalls = append(localCalls, host)
@@ -339,7 +339,7 @@ func TestOriginalRubySelection(t *testing.T) {
 					return p == n
 				}
 			}}, func(host string) (*HostList, error) {
-				return ParseHostList(host, "/private/profile", []byte(outputs[host]), Options{}), nil
+				return mustParseHostList(t, host, "/private/profile", []byte(outputs[host]), Options{}), nil
 			}, func(host string) (*BuildList, error) { return LoadBuildList(root, host, Options{}) })
 			if r.RangeError != "" {
 				// Actual Ruby Array indexing rejects huge offsets before name

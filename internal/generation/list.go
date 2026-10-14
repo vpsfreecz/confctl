@@ -16,7 +16,7 @@ type Options struct {
 	// Enumerate returns names in filesystem enumeration order, not sorted order.
 	Enumerate func(string) ([]string, error)
 	// Warn receives newline-free messages. Core may copy them to stderr and log.
-	Warn func(string)
+	Warn func(string) error
 }
 type Rejected struct{ Name, Path, Reason string }
 type BuildList struct {
@@ -58,10 +58,11 @@ func LoadBuildList(root, host string, options Options) (*BuildList, error) {
 	if err != nil {
 		return nil, err
 	}
-	warn := func(s string) {
+	warn := func(s string) error {
 		if options.Warn != nil {
-			options.Warn(s)
+			return options.Warn(s)
 		}
+		return nil
 	}
 	for _, name := range names {
 		if name == "." || name == ".." {
@@ -78,7 +79,9 @@ func LoadBuildList(root, host string, options Options) (*BuildList, error) {
 			rejection := Rejected{Name: name, Path: path, Reason: err.Error()}
 			list.Rejected = append(list.Rejected, rejection)
 			list.rejected[name] = rejection
-			warn(fmt.Sprintf("Skipping generation %s: %s. Records and GC roots were left untouched; use confctl v3 for old software-pin generations.", path, err))
+			if warningErr := warn(fmt.Sprintf("Skipping generation %s: %s. Records and GC roots were left untouched; use confctl v3 for old software-pin generations.", path, err)); warningErr != nil {
+				return nil, warningErr
+			}
 			continue
 		}
 		list.Builds = append(list.Builds, build)
@@ -121,7 +124,9 @@ func LoadBuildList(root, host string, options Options) (*BuildList, error) {
 		if len(list.Builds) != 0 {
 			list.Current = list.Builds[len(list.Builds)-1]
 			if len(list.Rejected) != 0 {
-				warn(fmt.Sprintf("No current link for %s; selecting newest supported generation %s. Excluded records and GC roots were left untouched.", host, list.Current.Name))
+				if warningErr := warn(fmt.Sprintf("No current link for %s; selecting newest supported generation %s. Excluded records and GC roots were left untouched.", host, list.Current.Name)); warningErr != nil {
+					return nil, warningErr
+				}
 			}
 		}
 	}
