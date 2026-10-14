@@ -21,6 +21,12 @@ import (
 type Field[T any] struct {
 	Present bool
 	Value   *T
+	// read is private to the consumed provider. It runs at this field's source
+	// access point, preserving pure fixture construction and lazy error order.
+	read func() (*T, error)
+	// scalar preserves a provider getter's decoded primitive without claiming
+	// the already-decoded typed fixtures cover every source scalar domain.
+	scalar func() (any, error)
 }
 
 type ContainerRef struct {
@@ -119,12 +125,16 @@ func ProjectContainer(machine MachineInput, vps VPS) (string, map[string]any, er
 		{"host.location", machine.HostLocation},
 		{"host.domain", machine.HostDomain},
 	} {
-		value, err := fieldValue(host.field, host.path)
+		value, err := scalarValue(host.field, host.path)
 		if err != nil {
 			return "", nil, err
 		}
 		if value != nil {
-			parts = append(parts, *value)
+			text, err := scalarText(value)
+			if err != nil {
+				return "", nil, err
+			}
+			parts = append(parts, text)
 		}
 	}
 
@@ -217,6 +227,9 @@ func ProjectNetworks(networks []Network) (map[string]any, error) {
 }
 
 func fieldValue[T any](field Field[T], path string) (*T, error) {
+	if field.read != nil {
+		return field.read()
+	}
 	if !field.Present && field.Value != nil {
 		return nil, fmt.Errorf("%s: value supplied for absent field", path)
 	}
@@ -235,6 +248,9 @@ func association[T any](field Field[T], path string) (*T, error) {
 }
 
 func scalarValue[T any](field Field[T], path string) (any, error) {
+	if field.scalar != nil {
+		return field.scalar()
+	}
 	value, err := fieldValue(field, path)
 	if err != nil || value == nil {
 		return nil, err
@@ -243,6 +259,9 @@ func scalarValue[T any](field Field[T], path string) (any, error) {
 }
 
 func numberValue(field Field[json.Number], path string) (any, error) {
+	if field.scalar != nil {
+		return field.scalar()
+	}
 	value, err := fieldValue(field, path)
 	if err != nil || value == nil {
 		return nil, err
@@ -275,7 +294,8 @@ func interpolation(value any) string {
 	if value == nil {
 		return ""
 	}
-	return value.(string)
+	text, _ := scalarText(value)
+	return text
 }
 
 func networkVersion(field Field[any]) (int, error) {
