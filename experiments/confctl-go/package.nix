@@ -26,8 +26,6 @@ pkgs.buildGoModule {
       "$out/share/doc/confctl-go-prototype/process_log_source.NOTICE"
     install -Dm444 internal/ui/pager_source.NOTICE \
       "$out/share/doc/confctl-go-prototype/pager_source.NOTICE"
-    install -Dm444 internal/core/live_terminal_source.NOTICE \
-      "$out/share/doc/confctl-go-prototype/live_terminal_source.NOTICE"
     mkdir -p "$out/libexec"
     substitute libexec/confctl-commit-stop-relay.bash \
       "$out/libexec/confctl-commit-stop-relay.bash" \

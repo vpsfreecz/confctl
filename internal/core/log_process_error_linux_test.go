@@ -11,8 +11,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/vpsfreecz/confctl/internal/ui"
 )
 
 // These cells require a separately selected native route and finite containment.
@@ -141,10 +139,14 @@ func TestLogProcessNativeStatusMetadataSuppression(t *testing.T) {
 
 func TestLogProcessNativeViewDetach(t *testing.T) {
 	e := &Engine{Root: t.TempDir()}
-	if err := e.OpenLog("view-private"); err != nil {
+	if err := e.OpenLog("subscriber-private"); err != nil {
 		t.Fatal(err)
 	}
-	v, err := ui.OpenLiveView(ui.LiveViewOptions{}, ui.LiveViewOps{AttachLogger: e.attachLog})
+	var observed [][]byte
+	detach, err := e.attachLog(func(p []byte) error {
+		observed = append(observed, bytes.Clone(p))
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,19 +156,24 @@ func TestLogProcessNativeViewDetach(t *testing.T) {
 	if err := e.scopedEngine(context.Background()).logText("\xa9\nunterminated"); err != nil {
 		t.Fatal(err)
 	}
-	if err := v.Stop(); err != nil {
+	if len(observed) != 2 || string(observed[0]) != "split \xc3" || string(observed[1]) != "\xa9\nunterminated" {
+		t.Fatal("subscriber changed raw chunks", observed)
+	}
+	if err := detach(); err != nil {
 		t.Fatal(err)
 	}
 	if len(e.logOwner.live.readers) != 0 {
 		t.Fatal("reader still attached")
 	}
+	if err := e.logText("after\x00\xff\n"); err != nil || len(observed) != 2 {
+		t.Fatal("write after detach", err, observed)
+	}
 	if err := e.CloseLog(false); err != nil {
 		t.Fatal(err)
 	}
 	b, err := os.ReadFile(e.Log.Name())
-	if err != nil || string(b) != "split é\nunterminated" {
+	if err != nil || string(b) != "split é\nunterminatedafter\x00\xff\n" {
 		t.Fatal(err, b)
 	}
-	// This file/view cell does not certify a native descriptor/PTY renderer or
-	// arbitrary blocked-callback termination. Those routes remain separate.
+	// The subscriber borrows raw chunks only; the file remains owned by Engine.
 }

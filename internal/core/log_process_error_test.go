@@ -18,7 +18,6 @@ import (
 	"github.com/vpsfreecz/confctl/internal/cli"
 	"github.com/vpsfreecz/confctl/internal/generation"
 	"github.com/vpsfreecz/confctl/internal/inputs"
-	"github.com/vpsfreecz/confctl/internal/ui"
 )
 
 // Opaque identities only: these scripts never call methods on the file.
@@ -116,7 +115,23 @@ func TestLogProcessSharedScopedOwner(t *testing.T) {
 	if scoped.Log != e.Log || scoped.logOwner != e.logOwner || scoped.Context != ctx || scoped.Root != e.Root || scoped.Color != e.Color || !scoped.Yes || !scoped.ShowTrace || scoped.Inventory[0].Name != "host" || scoped.SettingsCache["key"] != "value" {
 		t.Fatal("scope copied another owner or lost fields")
 	}
-	v, err := ui.OpenLiveView(ui.LiveViewOptions{}, ui.LiveViewOps{AttachLogger: e.attachLog})
+	var observed [][]byte
+	var borrowed []byte
+	failure := errors.New("subscriber refused")
+	refuse := false
+	detach, err := e.attachLog(func(p []byte) error {
+		if flushes != len(observed)+1 || !bytes.HasSuffix(raw.Bytes(), p) {
+			t.Fatal("subscriber preceded raw write and flush")
+		}
+		if borrowed != nil && (len(p) != len(borrowed) || &p[0] != &borrowed[0]) {
+			t.Fatal("subscriber did not receive borrowed storage")
+		}
+		observed = append(observed, bytes.Clone(p))
+		if refuse {
+			return failure
+		}
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,29 +141,36 @@ func TestLogProcessSharedScopedOwner(t *testing.T) {
 	if err := e.logText("\xa9\n"); err != nil {
 		t.Fatal(err)
 	}
-	if err := scoped.logMetadata("\xff\n"); err != nil || flushes != 2 {
-		t.Fatal("metadata reached reader or flush", err, flushes)
+	if err := scoped.logMetadata("\xff\n"); err != nil || flushes != 2 || len(observed) != 2 {
+		t.Fatal("metadata reached reader or flush", err, flushes, observed)
 	}
-	if err := scoped.logText("\xff\n\xfe\ntail"); err == nil {
-		t.Fatal("actual view did not refuse invalid complete line")
+	borrowed = []byte{0, 0xff, 0xfe, '\n'}
+	if n, err := scoped.logOwner.live.Write(borrowed); n != len(borrowed) || err != nil {
+		t.Fatal("borrowed write or completed raw count lost", n, err)
 	}
-	if err := e.logText(""); err == nil {
-		t.Fatal("view lost next complete suffix")
+	clear(borrowed) // callback copies survive only after the borrow has ended
+	borrowed, refuse = nil, true
+	if err := scoped.logText("rejected\x00\xff\n"); err != failure {
+		t.Fatal("subscriber error was not propagated", err)
 	}
+	refuse = false
 	if err := e.logText(""); err != nil {
 		t.Fatal("error latched", err)
 	}
-	if err := v.Stop(); err != nil {
+	if len(observed) != 5 || string(observed[0]) != "split \xc3" || string(observed[1]) != "\xa9\n" || !bytes.Equal(observed[2], []byte{0, 0xff, 0xfe, '\n'}) || string(observed[3]) != "rejected\x00\xff\n" || len(observed[4]) != 0 {
+		t.Fatal("borrowed chunks changed or were buffered", observed)
+	}
+	if err := detach(); err != nil {
 		t.Fatal(err)
 	}
 	if len(e.logOwner.live.readers) != 0 {
-		t.Fatal("view did not detach")
+		t.Fatal("subscriber did not detach")
 	}
 	if err := e.logText("\n"); err != nil {
-		t.Fatal("tail survived detach", err)
+		t.Fatal(err)
 	}
-	if raw.String() != "split é\n\xff\n\xff\n\xfe\ntail\n" {
-		t.Fatal(raw.String())
+	if len(observed) != 5 || raw.String() != "split é\n\xff\n\x00\xff\xfe\nrejected\x00\xff\n\n" {
+		t.Fatal("detached subscriber or raw bytes changed", raw.String(), observed)
 	}
 	// Distinct scoped/root writers all reach the same raw lock, with no cloned
 	// subscription state. Cross-write notification order is not promised.
