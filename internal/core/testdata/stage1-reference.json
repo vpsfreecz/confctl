@@ -1,0 +1,35 @@
+{
+  "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "note": "Original Ruby observation byte extracts for module-subtree unit tests; help assets are existing identical byte copies. No candidate-derived expectations. Only the captured ParentKey address placeholder is substituted in the log assertion. Full immutable observations remain at the source_observation paths.",
+  "records": {
+    "parser-help": {
+      "source_observation": "tests/compat/expected/parser-help.json",
+      "source_observation_sha256": "6c175b91b02b68bd14fd0796fa36b67574f162f8555f5ef6112091c14c59fb48",
+      "exit": 0,
+      "stderr": "",
+      "stdout_asset": "help_root.txt",
+      "stdout_sha256": "4224ef48b2340ef58d2f0d1c524f51b9b8ad9e8c8263482fe3d6468267e33b5c"
+    },
+    "parser-version": {
+      "source_observation": "tests/compat/expected/parser-version.json",
+      "source_observation_sha256": "3d826089738e6f73fcee0b5704433a761a4b74080c6d33fb77c24e75c2f17c5f",
+      "exit": 1,
+      "stderr": "confctl: version unknown\nerror: confctl: version unknown\n",
+      "stdout": ""
+    },
+    "list-invalid-managed": {
+      "source_observation": "tests/compat/expected/list-invalid-managed.json",
+      "source_observation_sha256": "865d1eebb0a6b3c5e342d4e6da0e1d4dfc2fa8efe93c56889d25534b99286c1f",
+      "exit": 64,
+      "stderr": "error: invalid argument: --managed bad\n\n",
+      "stdout_asset": "help_ls.txt",
+      "stdout_sha256": "85bf370e9263466e5a57056e432f100fb94bcb12cd85d7d6b0090c8730f8f64c"
+    },
+    "site-kernels-corrupt-log": {
+      "source_observation": "tests/compat/expected/site-kernels-corrupt.json",
+      "source_observation_sha256": "6d9eeef857b32d7cb9ea7fefba173a8a0f96a8b097e55edf8ec3e22794623cb1",
+      "source_field": "after/.confctl/logs/${LOG_TIME:1}-confctl-runtime-kernels-update.log/text (prefix before first command event)",
+      "text": "{command: [\"runtime-kernels\", \"update\"],\n global_options: {\"c\" => \"auto\", \"color\" => \"auto\", \"help\" => false},\n command_options:\n  {\"y\" => true,\n   \"yes\" => true,\n   \"a\" => [],\n   \"attr\" => [],\n   \"t\" => [],\n   \"tag\" => [],\n   \"show-trace\" => false,\n   #<GLI::Command::ParentKey:${PARENT_ADDRESS:1}> => {}},\n arguments: []}\n"
+    }
+  }
+}

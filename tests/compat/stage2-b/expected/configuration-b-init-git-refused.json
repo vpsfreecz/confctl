@@ -1,0 +1,49 @@
+{
+  "config_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage2-b-original-v1/configuration-b-init-git-refused-830605482/config",
+  "run_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage2-b-original-v1/configuration-b-init-git-refused-830605482",
+  "schema": 1,
+  "case": "configuration-b-init-git-refused",
+  "executable": "/nix/store/x96jzlpaq69bkdardsn56px7czybkbs8-confctl/bin/confctl",
+  "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de",
+  "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "fixture_sha256": "a936b1810573cef98f80fb3d0fa4535069b348906ca5424722c2a5f95f381fa1",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "stdout": "",
+  "stderr": "\nLog file: ${ROOT}/.confctl/logs/${LOG_TIME:1}-confctl-init.log\nerror: init must be called in an empty directory\n",
+  "exit": 1,
+  "before": {
+    ".git": {
+      "mode": 2147484141
+    },
+    ".git/retained": {
+      "text": "retained",
+      "mode": 420
+    }
+  },
+  "after": {
+    ".confctl": {
+      "mode": 2147484141
+    },
+    ".confctl/logs": {
+      "mode": 2147484141
+    },
+    ".confctl/logs/${LOG_TIME:1}-confctl-init.log": {
+      "text": "{command: [\"init\"],\n global_options: {\"c\" =\u003e \"auto\", \"color\" =\u003e \"auto\", \"help\" =\u003e false},\n command_options: {},\n arguments: []}\n",
+      "mode": 420
+    },
+    ".git": {
+      "mode": 2147484141
+    },
+    ".git/retained": {
+      "text": "retained",
+      "mode": 420
+    }
+  },
+  "events": null,
+  "git_before": {},
+  "git_after": {},
+  "wall_ns": 0,
+  "user_ns": 0,
+  "system_ns": 0,
+  "max_rss_kb": 0
+}

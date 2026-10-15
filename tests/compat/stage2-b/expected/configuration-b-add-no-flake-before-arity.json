@@ -1,0 +1,34 @@
+{
+  "config_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage2-b-original-v1/configuration-b-add-no-flake-before-arity-1731678575/config",
+  "run_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage2-b-original-v1/configuration-b-add-no-flake-before-arity-1731678575",
+  "schema": 1,
+  "case": "configuration-b-add-no-flake-before-arity",
+  "executable": "/nix/store/x96jzlpaq69bkdardsn56px7czybkbs8-confctl/bin/confctl",
+  "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de",
+  "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "fixture_sha256": "6c02a39cac49cf7e33656ed423c6cac5654fdfa4cae627905d533b52f6fc3f36",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "stdout": "",
+  "stderr": "\nLog file: ${ROOT}/.confctl/logs/${LOG_TIME:1}-confctl-add.log\nerror: ${ROOT} has no flake.nix; migrate software-pin configurations with confctl v3 before using this version (see docs/swpins-to-flakes.md)\n",
+  "exit": 1,
+  "before": {},
+  "after": {
+    ".confctl": {
+      "mode": 2147484141
+    },
+    ".confctl/logs": {
+      "mode": 2147484141
+    },
+    ".confctl/logs/${LOG_TIME:1}-confctl-add.log": {
+      "text": "{command: [\"add\"],\n global_options: {\"c\" =\u003e \"auto\", \"color\" =\u003e \"auto\", \"help\" =\u003e false},\n command_options: {},\n arguments: []}\n",
+      "mode": 420
+    }
+  },
+  "events": null,
+  "git_before": {},
+  "git_after": {},
+  "wall_ns": 0,
+  "user_ns": 0,
+  "system_ns": 0,
+  "max_rss_kb": 0
+}

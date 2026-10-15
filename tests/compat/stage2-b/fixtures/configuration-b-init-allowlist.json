@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "id": "configuration-b-init-allowlist",
+  "tier": "fixture-process",
+  "sources": [
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/cli/configuration.rb",
+      "lines": "1-337"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/cli/command.rb",
+      "lines": "7-71"
+    }
+  ],
+  "argv": [
+    "init"
+  ],
+  "env": {},
+  "stdin": "",
+  "tty": false,
+  "files": {
+    "shell.nix": {
+      "text": "retained\n"
+    },
+    ".gitignore": {
+      "text": "retained\n"
+    },
+    ".gems/retained": {
+      "text": "retained\n"
+    },
+    ".confctl/retained": {
+      "text": "retained\n"
+    }
+  },
+  "rules": [],
+  "expected": "../expected/configuration-b-init-allowlist.json",
+  "normalize": {
+    "root_fields": [
+      "stdout",
+      "stderr",
+      "events.cwd",
+      "events.argv",
+      "events.stdin",
+      "events.env.PWD",
+      "events.stdout",
+      "events.stderr"
+    ],
+    "volatile_fields": [
+      "events.pid",
+      "events.start_ns",
+      "events.end_ns",
+      "wall_ns",
+      "user_ns",
+      "system_ns",
+      "max_rss_kb"
+    ],
+    "concurrent_events": false,
+    "run_root_fields": [
+      "events.env.HOME",
+      "events.env.TMPDIR",
+      "events.env.COMPAT_CASE"
+    ],
+    "log_fields": [
+      "filename-time",
+      "command-uuid",
+      "gli-parent-address",
+      "process-duration",
+      "config-root"
+    ]
+  },
+  "deadline_ms": 30000,
+  "expected_no_calls": true
+}

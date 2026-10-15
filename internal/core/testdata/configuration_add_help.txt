@@ -1,0 +1,6 @@
+NAME
+    add - Add a new machine
+
+SYNOPSIS
+
+    confctl [global options] add <name>
