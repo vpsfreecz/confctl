@@ -10,27 +10,12 @@ let
 
   cfg = config.confctl.programs.kexec-netboot;
 
-  kexecNetboot = pkgs.replaceVarsWith {
-    name = "kexec-netboot";
-    src = ./kexec-netboot.rb;
-    isExecutable = true;
-    replacements = {
-      ruby = pkgs.ruby;
-      kexecTools = pkgs.kexec-tools;
-      machineFqdn = confMachine.host.fqdn;
-    };
+  manPage = import ../../../kexec-netboot-man.nix { inherit pkgs; };
+
+  kexecNetbootBin = import ../../../helpers/kexec-netboot.nix {
+    inherit pkgs manPage;
+    machineFqdn = confMachine.host.fqdn;
   };
-
-  kexecNetbootBin = pkgs.runCommand "kexec-netboot-bin" { } ''
-    mkdir -p $out/bin
-    ln -s ${kexecNetboot} $out/bin/kexec-netboot
-
-    mkdir -p $out/share/man/man8
-    ${pkgs.asciidoctor}/bin/asciidoctor \
-      -b manpage \
-      -D $out/share/man/man8 \
-      ${./kexec-netboot.8.adoc}
-  '';
 in
 {
   options = {

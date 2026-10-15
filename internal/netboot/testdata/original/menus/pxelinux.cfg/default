@@ -1,0 +1,37 @@
+DEFAULT menu.c32
+PROMPT 0
+TIMEOUT 0
+MENU TITLE carrier.test
+
+LABEL nixos
+  MENU LABEL NixOS >
+  KERNEL menu.c32
+  APPEND pxeserver/nixos.cfg
+
+LABEL vpsadminos
+  MENU LABEL vpsAdminOS >
+  KERNEL menu.c32
+  APPEND pxeserver/vpsadminos.cfg
+
+LABEL isoimages
+  MENU LABEL ISO images >
+  KERNEL menu.c32
+  APPEND pxeserver/iso-images.cfg
+
+LABEL memtest
+  MENU LABEL Memtest86
+  LINUX boot/memtest86/memtest.bin
+  APPEND console=ttyS0 fixture-param
+
+LABEL local_boot
+  MENU LABEL Local Boot
+  LOCALBOOT 0
+
+LABEL warm_reboot
+  MENU LABEL Warm Reboot
+  KERNEL reboot.c32
+  APPEND --warm
+
+LABEL cold_reboot
+  MENU LABEL Cold Reboot
+  KERNEL reboot.c32

@@ -1,0 +1,1262 @@
+{
+  "source_path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage6-helper-contract-inventory-v1/input-matrix.json",
+  "source_sha256": "6e37075b98ad306f75b7061b05956203a1c3bac8f0abc836329a6aeb435414aa",
+  "source_nominations_not_observed_outcomes": true,
+  "cases": [
+    {
+      "id": "KN01-default",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN02-exec",
+      "argv": [
+        "--exec"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN03-unload",
+      "argv": [
+        "--unload"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN04-both",
+      "argv": [
+        "--exec",
+        "--unload"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN05-no-sync",
+      "argv": [
+        "--no-sync",
+        "--exec"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN06-ignored-tail",
+      "argv": [
+        "extra"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN07-implicit-help",
+      "argv": [
+        "--help"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN08-parser-invalid",
+      "argv": [
+        "--unknown"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN09-server-override-needs-proc",
+      "argv": [
+        "--server-url",
+        "http://alternate.test/prefix"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN10-server-override",
+      "argv": [
+        "-s",
+        "http://alternate.test/prefix"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN11-derived-prefix",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "httproot=http://netboot.test/prefix/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN12-derived-short-path",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "httproot=http://netboot.test/a/b\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN13-derived-https",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "httproot=https://netboot.test:8443/prefix/node.test/7/initrd?fixture=yes\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN14-machine-missing",
+      "argv": [
+        "-m",
+        "missing.test"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN15-generation-exact",
+      "argv": [
+        "-g",
+        "6"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN16-negative-offset",
+      "argv": [
+        "-g",
+        "-1"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN17-zero",
+      "argv": [
+        "-g",
+        "0"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN18-out-of-range",
+      "argv": [
+        "-g",
+        "-3"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN19-invalid-generation",
+      "argv": [
+        "-g",
+        "oops"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN20-integer-form",
+      "argv": [
+        "-g",
+        "0x6"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN21-no-current",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-ce3aac909e2e.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "ce3aac909e2e12019885dba91b7311de4dccbcd9d61d392ebc65603150ce4e81"
+    },
+    {
+      "id": "KN22-current-not-newest",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-995528d4fbcb.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "995528d4fbcbdecdeab7be0b2e8989030c15713c8e692b98efe9919f5d965493"
+    },
+    {
+      "id": "KN23-empty-index",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-4115c93b07b4.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "4115c93b07b494b0188c0899c545c6313d8dfda70cf8d2613984eae1976fb745"
+    },
+    {
+      "id": "KN24-missing-machines",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-44136fa355b3.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+    },
+    {
+      "id": "KN25-http-redirect",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 302,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN26-invalid-json",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-be302461cda2.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "be302461cda285db3ed2d45fb767b23e08ca8808b35a638009937df22b332d73"
+    },
+    {
+      "id": "KN27-default-variant",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-e6870cb0b0bd.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "e6870cb0b0bd7c498d02d6be77a701981238cb283c0c6143b4c1e4900abc486c"
+    },
+    {
+      "id": "KN28-known-variant",
+      "argv": [
+        "-v",
+        "rescue"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-e6870cb0b0bd.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "e6870cb0b0bd7c498d02d6be77a701981238cb283c0c6143b4c1e4900abc486c"
+    },
+    {
+      "id": "KN29-unknown-variant",
+      "argv": [
+        "-v",
+        "missing"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-e6870cb0b0bd.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "e6870cb0b0bd7c498d02d6be77a701981238cb283c0c6143b4c1e4900abc486c"
+    },
+    {
+      "id": "KN30-no-variants-explicit",
+      "argv": [
+        "-v",
+        "rescue"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN31-interactive-defaults",
+      "argv": [
+        "-i"
+      ],
+      "environment": {},
+      "stdin_bytes": "\n\n\ny\n",
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-e6870cb0b0bd.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "e6870cb0b0bd7c498d02d6be77a701981238cb283c0c6143b4c1e4900abc486c"
+    },
+    {
+      "id": "KN32-interactive-repeat-abort",
+      "argv": [
+        "-i"
+      ],
+      "environment": {},
+      "stdin_bytes": "99\n1\n\n\n\nn\n",
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-e6870cb0b0bd.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "e6870cb0b0bd7c498d02d6be77a701981238cb283c0c6143b4c1e4900abc486c"
+    },
+    {
+      "id": "KN33-interactive-machine-eof",
+      "argv": [
+        "-i"
+      ],
+      "environment": {},
+      "stdin_bytes": "",
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-e6870cb0b0bd.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "e6870cb0b0bd7c498d02d6be77a701981238cb283c0c6143b4c1e4900abc486c"
+    },
+    {
+      "id": "KN34-confirmation-eof",
+      "argv": [
+        "-i",
+        "-m",
+        "node.test",
+        "-g",
+        "7",
+        "-v",
+        "default"
+      ],
+      "environment": {},
+      "stdin_bytes": "",
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-e6870cb0b0bd.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "e6870cb0b0bd7c498d02d6be77a701981238cb283c0c6143b4c1e4900abc486c"
+    },
+    {
+      "id": "KN35-interactive-default-missing",
+      "argv": [
+        "-i"
+      ],
+      "environment": {},
+      "stdin_bytes": "1\n",
+      "literal_inputs": {
+        "compiled_machine_fqdn": "missing.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-e6870cb0b0bd.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "e6870cb0b0bd7c498d02d6be77a701981238cb283c0c6143b4c1e4900abc486c"
+    },
+    {
+      "id": "KN36-append-literal",
+      "argv": [
+        "-a",
+        "console=ttyS1 fixture=yes"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN37-append-quotes-inert",
+      "argv": [
+        "-a",
+        "fixture=\"quoted\" $FIXTURE_LITERAL"
+      ],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN38-initrd-download-fails",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "kernel"
+          },
+          {
+            "http_status": 404,
+            "body_bytes": "missing"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN39-load-fails",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 23
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN40-load-signal",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0,
+        "kexec_status": {
+          "signaled": true,
+          "signal": "TERM",
+          "exitstatus": null
+        }
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN41-temp-unlink-fails",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0,
+        "temp_unlink_error": "EACCES"
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN42-transport-error",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0,
+        "index_transport_error": "fixture connection error"
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    },
+    {
+      "id": "KN43-missing-boot-url",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d08ff924370d.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "d08ff924370d3258b697c6fc56496c2824a9df8cba8d0ab28a35e314161908e7"
+    },
+    {
+      "id": "KN44-https-boot-file",
+      "argv": [],
+      "environment": {},
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-cb43dc9a5e56.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0
+      },
+      "index_source_sha256": "cb43dc9a5e56972d428dfb51d3d1063ae9400aef6b7e8b1e8d1b0a17a6349adf"
+    },
+    {
+      "id": "KN45-temp-dir-env",
+      "argv": [],
+      "environment": {
+        "TMPDIR": "/fixture/tmp",
+        "TZ": "UTC"
+      },
+      "stdin_bytes": null,
+      "literal_inputs": {
+        "compiled_machine_fqdn": "node.test",
+        "cmdline_bytes": "console=ttyS0 httproot=http://netboot.test/node.test/7/initrd\n",
+        "index_response": {
+          "http_status": 200,
+          "fixture": "index-d27e5f768d03.json"
+        },
+        "download_responses": [
+          {
+            "http_status": 200,
+            "body_bytes": "literal-kernel-bytes"
+          },
+          {
+            "http_status": 200,
+            "body_bytes": "literal-initrd-bytes"
+          }
+        ],
+        "kexec_exit": 0,
+        "tempfile_namespace_description": "future disposable local tempfiles only"
+      },
+      "index_source_sha256": "d27e5f768d0397835ec2eb8fbd871245e6ec08facc94957398a9a2e300957caf"
+    }
+  ]
+}

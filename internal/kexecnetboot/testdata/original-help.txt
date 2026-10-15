@@ -1,0 +1,10 @@
+Usage: /literal/kexec-netboot [options]
+    -s, --server-url URL             Specify URL of the netboot server
+    -m, --machine FQDN               Select machine by FQDN
+    -g, --generation N               Select generation by number or negative offset
+    -v, --variant NAME               Select a specific variant by name
+    -i, --interactive                Enable interactive mode
+    -a, --append PARAMS              Append parameters to kernel command line
+    -e, --exec                       Run the currently loaded kernel
+    -u, --unload                     Unload the current kexec target kernel and exit
+    -y, --no-sync                    Skip syncing filesystems
