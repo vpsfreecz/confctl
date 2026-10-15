@@ -8,11 +8,9 @@
 
 # DESCRIPTION
 
-`confctl` manages configurations for NixOS and vpsAdminOS machines. Its command
-declarations cover configuration, input management, build and deployment work.
-The reference below includes commands unavailable in the experimental Go tool.
-Each command and group states its availability in the help below. The command
-list alone does not show that every handler works.
+`confctl` manages configurations for NixOS and vpsAdminOS machines. Its commands
+cover configuration, input management, build, deployment and machine operations.
+The command reference and help use the same CLI declarations.
 
 # FLAKE INPUTS
 

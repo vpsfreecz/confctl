@@ -1,0 +1,55 @@
+name: Go tooling
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tooling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7.0.1
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31.11.2
+      - name: Check Go sources and policy template
+        run: |
+          nix develop --no-write-lock-file .#experimental --command bash -euc '
+            go test ./...
+            go vet ./...
+            git ls-files -z "*.go" | xargs -0 gofmt -l > /tmp/gofmt-files
+            test ! -s /tmp/gofmt-files || { cat /tmp/gofmt-files; exit 1; }
+            nixfmt --check flake.nix shell.nix nix/package.nix \
+              nix/legacy-package.nix nix/docgen.nix nix/docgen-tool.nix nix/docs.nix \
+              nix/hook-checker.nix nix/dev-tools.nix nix/lefthook-config.nix nix/hook-go-tools.nix \
+              nix/flake/mk-confctl-devshell.nix nix/flake/mk-config-devshell.nix \
+              nix/flake/mk-legacy-devshell.nix tests/hooks/check.nix tests/hooks/dependencies.nix
+          '
+      - name: Build normal packages and focused rendering check
+        run: |
+          nix build --no-write-lock-file .#confctl --out-link result-cli
+          nix build --no-write-lock-file .#confctl-docs --out-link result-docs
+          nix build --no-write-lock-file .#confctl-dev-tools --out-link result-tools
+          nix build --no-write-lock-file .#checks.x86_64-linux.docgen \
+            .#checks.x86_64-linux.hook-policy .#checks.x86_64-linux.hook-dependencies --no-link
+      - name: Check installed hooks in a disposable repository
+        run: |
+          export CONFCTL_HOOK_TOOLS="$(readlink -f result-tools)/bin/confctl-hooks"
+          nix develop --no-write-lock-file .#experimental --command \
+            go test ./tests/hooks -run '^TestInstalledHook' -count=1 -v
+      - name: Check runtime closures
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix path-info --recursive ./result-cli ./result-docs ./result-tools > closure.txt
+          if grep -E -- '-(ruby[^/]*|bundler[^/]*|bundix[^/]*|overcommit[^/]*)$' closure.txt; then
+            echo 'Unexpected Ruby dependency in normal tooling' >&2
+            exit 1
+          fi
+          test -f result-docs/share/doc/confctl/html/index.html
+          test -f result-docs/share/man/man8/confctl.8
+          result-cli/bin/confctl --help
