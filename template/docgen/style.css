@@ -1,0 +1,41 @@
+body {
+  max-width: 76rem;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  font-family: sans-serif;
+  line-height: 1.5;
+}
+
+code, pre {
+  font-family: monospace;
+}
+
+pre {
+  padding: 1rem;
+  overflow-x: auto;
+  white-space: pre;
+  background: #f3f3f3;
+}
+
+dt {
+  margin-top: 1.5rem;
+  font-weight: bold;
+}
+
+dd {
+  margin-left: 1.5rem;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+th, td {
+  border: 1px solid #aaa;
+  padding: 0.4rem 0.7rem;
+  text-align: left;
+}
+
+a {
+  overflow-wrap: anywhere;
+}
