@@ -101,7 +101,24 @@ Optional commit calls argv `git commit [-e] -m MESSAGE flake.lock`; no explicit 
 
 ## Gen-data and authentication
 
-Client memoized per GenData command. Uses VpsFree::Client.new, HighLine username and hidden password, authenticate token with lifetime fixed and interval60; challenge fields prompt label or name, hiding protected values. **U:** client library endpoint/config discovery, HTTP protocol/schema, pagination, retries, error classes and authentication challenges are dependency contracts requiring pinned-gem/local adapter characterization. Do not call production API or store credentials as fixtures. Source [gen_data:70–100](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/gen_data.rb#L70).
+The Go provider supports the generated vpsAdmin v7.0 schema. It prompts for a
+username and protected password, then requests a fixed token with interval 60
+and leaves scope unset. It supports repeated TOTP/recovery-code and password-reset
+steps; reset asks for two protected passwords. An unknown authentication action
+fails before another request. Credentials and tokens stay in invocation memory.
+A strictly expired token triggers one credential reauthentication before the
+pending request; equality is unexpired. Authentication failures do not reprompt
+or replay requests, and the provider does not renew or revoke tokens in the
+background.
+
+Generated actions own routes and input serialization. Raw responses preserve
+missing/null values, exact numbers and lazy association metadata without decoding
+unrelated output fields. The provider sends no OPTIONS discovery requests and
+does not interpret runtime auth descriptors, arbitrary validators or protocol
+version warnings. Each request has a 60-second budget through body reading,
+verified TLS, a same-origin guard and redirect refusal; no retry is added. The
+original Ruby client behavior is documented at
+[gen_data.rb](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/gen_data.rb#L70).
 
 Containers calls vps.show(container.id, meta includes node__location__environment) for each inventory entry whose container is not nil; keys output by joining host.name/location/domain after dropping nil. Node record: id/name, location.domain, environment.domain, fqdn=node.domain_name + environment.domain. Network calls network.list and emits ipv4/ipv6 ordered address/prefix arrays by numeric ip_version4/6. Each writes a fixed `.new` sibling then rename, no mkdir or fsync; all writes containers first then network. Collision/permission/partial-file failures remain observable. Sources [gen_data:7–65,103–112](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/gen_data.rb#L7). Fixtures `gen-data.*`.
 

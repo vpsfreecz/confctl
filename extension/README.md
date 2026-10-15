@@ -57,6 +57,27 @@ machines.length concurrency and preserves result order. Each local `Item` also
 records `Completion`, a monotonically increasing worker completion index for
 handlers that need completion order. It is not a protocol field.
 
+`Client.Nix` calls `format.nix` to render literal data. Maps sort keys lexically,
+the public service quotes every key, and arrays retain their order. The service
+does not accept raw Nix expressions.
+
+The string encoder uses Nix escapes for quotes, backslashes, `${`, LF, CR and
+TAB. Other representable control characters keep their literal bytes; valid
+Unicode stays UTF-8. NUL returns a formatter error without usable text. Invalid
+UTF-8 supplied directly to the Go formatter also returns an error; JSON decoding
+retains its standard handling of encoded strings.
+
+The formatter validates `json.Number` tokens without converting them to
+`float64`. An exponent token without a decimal point gains `.0` before its
+exponent, and negative numeric list items are parenthesized. Finite `float64`
+values keep floating-point syntax; NaN and infinities are errors. Rendering
+preserves numeric digits but does not guarantee the Nix evaluator's range or
+arithmetic precision.
+
+These corrections intentionally change scalar and list output that previously
+used Go escape spellings, invalid number syntax or ungrouped negative list
+items. The default quoted-key layout and protocol remain unchanged.
+
 Wire `stdin_b64` absent/null means an empty pipe kept open until the command
 exits. A present empty string means explicit empty input followed by EOF. The
 minimal `Client.Exec` uses the former; callers can use the wire method for

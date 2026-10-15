@@ -9,12 +9,14 @@ import (
 	ext "github.com/vpsfreecz/confctl/extension"
 	"github.com/vpsfreecz/confctl/internal/cli"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"unicode/utf8"
 )
 
 var Services = []string{"settings.get", "machines.select", "exec.run", "ui.write", "ui.machines", "ui.table", "ui.confirm", "format.nix"}
@@ -396,8 +398,27 @@ func (e *Engine) hooks(r Registry, event string, names []string, origin *cli.Inv
 	}
 	return 0, nil
 }
-func NixLiteral(v any) (string, error) { return nixFormat(v, 0) }
-func nixFormat(v any, level int) (string, error) {
+
+type nixKeyLayout uint8
+
+const (
+	nixQuotedKeys nixKeyLayout = iota
+	nixOrdinaryKeys
+)
+
+func NixLiteral(v any) (string, error) { return nixFormat(v, 0, nixQuotedKeys) }
+
+// genDataNixLiteral uses ordinary per-map layout with reserved-word quoting.
+// All entries share the Nix-semantic encoder; SDK/RPC consumers use NixLiteral.
+func genDataNixLiteral(v any) (string, error) { return nixFormat(v, 0, nixOrdinaryKeys) }
+
+// DocumentationNixLiteral renders literal documentation values with sorted maps
+// and ordinary Ruby per-map key layout, sharing G1's existing safe encoder.
+// Docgen owns any source-declared raw-expression bypass; this entry does not add
+// one. The default formatter and SDK/RPC policy remain always-quoted.
+func DocumentationNixLiteral(v any) (string, error) { return nixFormat(v, 0, nixOrdinaryKeys) }
+
+func nixFormat(v any, level int, layout nixKeyLayout) (string, error) {
 	pad := strings.Repeat(" ", level)
 	switch x := v.(type) {
 	case nil:
@@ -405,20 +426,32 @@ func nixFormat(v any, level int) (string, error) {
 	case bool:
 		return strconv.FormatBool(x), nil
 	case json.Number:
-		return string(x), nil
+		return nixNumber(x)
 	case float64:
-		return strconv.FormatFloat(x, 'f', -1, 64), nil
-	case string:
-		s := strconv.Quote(x)
-		s = strings.ReplaceAll(s, "${", "\\${")
+		if math.IsNaN(x) || math.IsInf(x, 0) {
+			return "", fmt.Errorf("unsupported non-finite Nix float")
+		}
+		s := strconv.FormatFloat(x, 'f', -1, 64)
+		if !strings.Contains(s, ".") {
+			s += ".0"
+		}
 		return s, nil
+	case string:
+		return nixString(x)
 	case []any:
 		var b strings.Builder
 		b.WriteString("[\n")
 		for _, v := range x {
-			s, e := nixFormat(v, level+2)
+			s, e := nixFormat(v, level+2, layout)
 			if e != nil {
 				return "", e
+			}
+			// Unary minus is expr_op, not expr_select in Nix list grammar.
+			switch v.(type) {
+			case json.Number, float64:
+				if strings.HasPrefix(s, "-") {
+					s = "(" + s + ")"
+				}
 			}
 			b.WriteString(pad + "  " + s + "\n")
 		}
@@ -429,25 +462,107 @@ func nixFormat(v any, level int) (string, error) {
 		for i, v := range x {
 			a[i] = v
 		}
-		return nixFormat(a, level)
+		return nixFormat(a, level, layout)
 	case map[string]any:
 		keys := []string{}
+		quoteKeys := layout != nixOrdinaryKeys
 		for k := range x {
 			keys = append(keys, k)
+			if !genDataBareKey(k) {
+				quoteKeys = true
+			}
 		}
 		sort.Strings(keys)
 		var b strings.Builder
 		b.WriteString("{\n")
 		for _, k := range keys {
-			s, e := nixFormat(x[k], level+2)
+			s, e := nixFormat(x[k], level+2, layout)
 			if e != nil {
 				return "", e
 			}
-			q, _ := nixFormat(k, 0)
+			q := k
+			if quoteKeys {
+				q, e = nixString(k)
+				if e != nil {
+					return "", e
+				}
+			}
 			b.WriteString(pad + "  " + q + " = " + s + ";\n")
 		}
 		b.WriteString(pad + "}")
 		return b.String(), nil
 	}
 	return "", fmt.Errorf("unsupported Nix literal %T", v)
+}
+
+// The original ordinary gen-data rule excludes digits even after the first
+// character. Reserved Nix words also require quoting. Each nested map decides
+// independently whether to quote all keys; attribute grammar admits "or".
+func genDataBareKey(key string) bool {
+	if key == "" {
+		return false
+	}
+	switch key {
+	case "if", "then", "else", "let", "in", "rec", "with", "assert", "inherit":
+		return false
+	}
+	for i := 0; i < len(key); i++ {
+		c := key[i]
+		if c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' {
+			continue
+		}
+		if i > 0 && (c == '-' || c == '\'') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// Nix recognizes only its own escapes. Keep other representable controls and
+// valid Unicode literal instead of emitting Go/JSON hexadecimal escapes.
+func nixString(value string) (string, error) {
+	if !utf8.ValidString(value) {
+		return "", fmt.Errorf("invalid UTF-8 in Nix string")
+	}
+	var b strings.Builder
+	b.WriteByte('"')
+	for i := 0; i < len(value); i++ {
+		switch value[i] {
+		case 0:
+			return "", fmt.Errorf("unsupported NUL in Nix string")
+		case '"', '\\':
+			b.WriteByte('\\')
+			b.WriteByte(value[i])
+		case '\n':
+			b.WriteString("\\n")
+		case '\r':
+			b.WriteString("\\r")
+		case '\t':
+			b.WriteString("\\t")
+		case '$':
+			if i+1 < len(value) && value[i+1] == '{' {
+				b.WriteByte('\\')
+			}
+			b.WriteByte('$')
+		default:
+			b.WriteByte(value[i])
+		}
+	}
+	b.WriteByte('"')
+	return b.String(), nil
+}
+
+func nixNumber(value json.Number) (string, error) {
+	token := string(value)
+	if token == "" {
+		return "", fmt.Errorf("empty Nix number")
+	}
+	if _, err := json.Marshal(value); err != nil {
+		return "", fmt.Errorf("invalid Nix number: %w", err)
+	}
+	if exponent := strings.IndexAny(token, "eE"); exponent >= 0 && !strings.Contains(token[:exponent], ".") {
+		return token[:exponent] + ".0" + token[exponent:], nil
+	}
+	return token, nil
 }

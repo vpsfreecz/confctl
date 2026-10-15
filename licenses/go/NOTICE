@@ -18,6 +18,8 @@ github.com/lucasb-eyer/go-colorful v1.4.1 (MIT)
   github.com-lucasb-eyer-go-colorful-v1.4.1.LICENSE
 github.com/mattn/go-runewidth v0.0.27 (MIT)
   github.com-mattn-go-runewidth-v0.0.27.LICENSE
+github.com/vpsfreecz/vpsadmin-go-client v0.0.0-20261016074816-30686062fc4a (MIT)
+  github.com-vpsfreecz-vpsadmin-go-client-v0.0.0-20261016074816-30686062fc4a.LICENSE
 golang.org/x/sys v0.49.0 (BSD-3-Clause)
   golang.org-x-sys-v0.49.0.LICENSE
 golang.org/x/term v0.47.0 (BSD-3-Clause)

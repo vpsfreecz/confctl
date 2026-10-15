@@ -28,6 +28,10 @@ pkgs.buildGoModule {
       "$out/share/doc/confctl-go-prototype/ordered_lock.NOTICE"
     install -Dm444 internal/ui/pager_source.NOTICE \
       "$out/share/doc/confctl-go-prototype/pager_source.NOTICE"
+    install -Dm444 internal/core/gendata_prompt_linux.NOTICE \
+      "$out/share/doc/confctl-go-prototype/gendata_prompt_linux.NOTICE"
+    install -Dm444 internal/ui/gendata_prompt.NOTICE \
+      "$out/share/doc/confctl-go-prototype/gendata_prompt.NOTICE"
     mkdir -p "$out/libexec"
     substitute libexec/confctl-commit-stop-relay.bash \
       "$out/libexec/confctl-commit-stop-relay.bash" \

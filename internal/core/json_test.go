@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	ext "github.com/vpsfreecz/confctl/extension"
 	"io"
 	"os"
@@ -14,6 +15,53 @@ import (
 	"testing"
 	"time"
 )
+
+func TestNixLiteralSDKHelper(t *testing.T) {
+	if os.Getenv("CONFCTL_NIX_LITERAL_SDK_HELPER") != "1" {
+		return
+	}
+	ext.Serve(map[string]ext.Handler{"literal": func(ctx context.Context, client *ext.Client, in ext.Invocation) error {
+		value := in.Options["value"]
+		if in.Options["bad-number"] == true {
+			// Invalid tokens cannot be put in a valid JSON request. This exercises
+			// the real Client.Nix/Peer marshaling refusal, before the service.
+			value = json.Number("not-a-number")
+		}
+		text, err := client.Nix(ctx, value)
+		if reason, wantsError := in.Options["error"].(string); wantsError {
+			if err == nil || text != "" || !strings.Contains(err.Error(), reason) {
+				return fmt.Errorf("expected %s error/empty result: text=%q err=%v", reason, text, err)
+			}
+			return nil
+		}
+		if err != nil || text != in.Options["want"] {
+			return fmt.Errorf("SDK literal: text=%q err=%v want=%q", text, err, in.Options["want"])
+		}
+		return nil
+	}}, []string{"format.nix"})
+}
+
+func TestNixLiteralSDKServiceCorrections(t *testing.T) {
+	t.Setenv("CONFCTL_NIX_LITERAL_SDK_HELPER", "1")
+	for _, options := range []map[string]any{
+		{"value": map[string]any{"if": []any{"\b\f\x1b\u2028😀", json.Number("9007199254740993"), json.Number("-1"), json.Number("2"), json.Number("1e3")}},
+			"want": "{\n  \"if\" = [\n    \"\b\f\x1b\u2028😀\"\n    9007199254740993\n    (-1)\n    2\n    1.0e3\n  ];\n}"},
+		{"value": map[string]any{"x${key}": []any{`${value}`, json.Number("-125E-3")}},
+			"want": "{\n  \"x\\${key}\" = [\n    \"\\${value}\"\n    (-125.0E-3)\n  ];\n}"},
+		{"value": map[string]any{"nested": "\x00"}, "error": "NUL"},
+		{"value": map[string]any{"nested": map[string]any{"\x00": true}}, "error": "NUL"},
+		{"bad-number": true, "error": "invalid number literal"},
+	} {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		engine := &Engine{Root: t.TempDir(), Context: ctx}
+		reg := Registration{ID: "test.literal", Protocol: ext.Version{Major: 1}, Argv: []string{os.Args[0], "-test.run=^TestNixLiteralSDKHelper$"}}
+		code, err := engine.Invoke(reg, "literal", ext.Invocation{Root: engine.Root, Options: options})
+		cancel()
+		if err != nil || code != 0 {
+			t.Fatalf("options=%#v code=%d err=%v", options, code, err)
+		}
+	}
+}
 
 func TestSettingsNixHelper(t *testing.T) {
 	if os.Getenv("CORE_SETTINGS_NIX_HELPER") != "1" {

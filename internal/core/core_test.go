@@ -2,6 +2,8 @@ package core
 
 import (
 	"context"
+	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -93,6 +95,78 @@ func TestNixEscapesInterpolation(t *testing.T) {
 	s, e := NixLiteral([]any{"${danger}", "quote\"\\"})
 	if e != nil || !strings.Contains(s, "\\${danger}") {
 		t.Fatal(s, e)
+	}
+}
+
+func TestNixLiteralScalarCorrections(t *testing.T) {
+	// F1/F2 intentionally correct prior Go-only escapes and float type loss.
+	// These are source-backed Nix spellings, not original runtime captures.
+	for name, render := range map[string]func(any) (string, error){
+		"default": NixLiteral, "gendata": genDataNixLiteral, "documentation": DocumentationNixLiteral,
+	} {
+		t.Run(name, func(t *testing.T) {
+			for _, test := range []struct {
+				value any
+				want  string
+			}{
+				{"", `""`},
+				{"quote\"\\", `"quote\"\\"`},
+				{"\n\r\t", `"\n\r\t"`},
+				{`\n`, `"\\n"`},
+				{`${builtins.abort "inert"}`, `"\${builtins.abort \"inert\"}"`},
+				{`\${x}`, `"\\\${x}"`},
+				{"$${x}\\", `"$\${x}\\"`},
+				{"\b\f\x1b\x7f\u0085\u2028😀", "\"\b\f\x1b\x7f\u0085\u2028😀\""},
+				{json.Number("9007199254740993"), "9007199254740993"},
+				{json.Number("184467440737095516160000000000000000000"), "184467440737095516160000000000000000000"},
+				{json.Number("1.0"), "1.0"},
+				{json.Number("1e3"), "1.0e3"},
+				{json.Number("-2E-4"), "-2.0E-4"},
+				{json.Number("1.25e+2"), "1.25e+2"},
+				{json.Number("-0E+003"), "-0.0E+003"},
+				{json.Number("1e400"), "1.0e400"},
+				{float64(1), "1.0"},
+				{math.Copysign(0, -1), "-0.0"},
+				{float64(1.25), "1.25"},
+			} {
+				got, err := render(test.value)
+				if err != nil || got != test.want {
+					t.Fatalf("%T(%q): got=%q err=%v, want=%q", test.value, test.value, got, err, test.want)
+				}
+			}
+			for _, value := range []any{
+				"prefix\x00suffix", string([]byte{0xff}), math.NaN(), math.Inf(1), math.Inf(-1),
+				json.Number(""), json.Number("+1"), json.Number("01"), json.Number("1."), json.Number(".5"),
+				json.Number("1e"), json.Number(" 1 "), json.Number("NaN"), json.Number("1; builtins.abort \"injection\""),
+				map[string]any{"valid": []any{json.Number("2"), "\x00"}},
+				map[string]any{"\x00": true}, map[string]any{string([]byte{0xff}): true},
+				map[string]any{"nested": map[string]any{"\x00": true}},
+				map[string]any{"nested": map[string]any{string([]byte{0xff}): true}},
+				int64(1), struct{}{}, []int{1},
+			} {
+				got, err := render(value)
+				if err == nil || got != "" {
+					t.Fatalf("%T invalid value: got=%q err=%v", value, got, err)
+				}
+			}
+		})
+	}
+}
+
+func TestNixLiteralNumericListGrammar(t *testing.T) {
+	value := []any{json.Number("-1"), json.Number("2"), json.Number("-0"), json.Number("-125E-3"), math.Copysign(0, -1), "-1", []any{json.Number("-2"), float64(-1), map[string]any{"negative": json.Number("-3")}}}
+	for name, render := range map[string]func(any) (string, error){
+		"default": NixLiteral, "gendata": genDataNixLiteral, "documentation": DocumentationNixLiteral,
+	} {
+		key := "negative"
+		if name == "default" {
+			key = `"negative"`
+		}
+		want := "[\n  (-1)\n  2\n  (-0)\n  (-125.0E-3)\n  (-0.0)\n  \"-1\"\n  [\n    (-2)\n    (-1.0)\n    {\n      " + key + " = -3;\n    }\n  ]\n]"
+		got, err := render(value)
+		if err != nil || got != want {
+			t.Fatalf("%s: got=%q err=%v, want=%q", name, got, err, want)
+		}
 	}
 }
 func TestMachineOrder(t *testing.T) {
