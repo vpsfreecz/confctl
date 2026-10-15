@@ -27,6 +27,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	originalStderr := os.Stderr
 	names := []string{}
 	if len(os.Args) > 2 && os.Args[2] != "" {
 		names = strings.Split(os.Args[2], ",")
@@ -36,6 +37,6 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		code = 1
 	}
-	e.CloseLog(code == 0)
+	code, _ = core.LogCleanupStatus(code, e.CloseLog(code == 0), originalStderr)
 	os.Exit(code)
 }

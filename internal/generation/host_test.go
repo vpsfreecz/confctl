@@ -14,6 +14,31 @@ import (
 	"time"
 )
 
+func TestGenerationWarningHostRefusal(t *testing.T) {
+	failure := errors.New("profile warning refusal")
+	calls := 0
+	list, err := ParseHostList("h", "/p", []byte("/current\nbad\n/p-1-link;/top;1\nlater-bad"), Options{Warn: func(string) error { calls++; return failure }})
+	if list != nil || err != failure || calls != 1 {
+		t.Fatal("profile warning continued or published partial list")
+	}
+	list, err = ParseHostList("h", "/p", []byte("/current\nbad\n/p-1-link;/top;1"), Options{})
+	if err != nil || len(list.Generations) != 1 {
+		t.Fatal("nil warning changed profile admission")
+	}
+}
+
+func TestGenerationWarningFetchRefusal(t *testing.T) {
+	failure := errors.New("profile warning refusal")
+	runs := 0
+	list, err := FetchHostList(context.Background(), "h", "/p", Options{Warn: func(string) error { return failure }}, func(context.Context, []string, []byte) ([]byte, bool, error) {
+		runs++
+		return []byte("/top\nbad\nlater-bad"), true, nil
+	})
+	if list != nil || err != failure || runs != 1 {
+		t.Fatal("fetch lost parser refusal")
+	}
+}
+
 func stringPointer(s string) *string { return &s }
 func integer(s string) *big.Int      { n, _ := new(big.Int).SetString(s, 10); return n }
 func stamp(t *testing.T, s string) Timestamp {
@@ -88,7 +113,7 @@ func TestProfileLiteralParsing(t *testing.T) {
 	warnings := []string{}
 	root := t.TempDir()
 	readOnly(t, root, func() {
-		list := ParseHostList("logical", profile, []byte(out), Options{Location: time.UTC, Warn: func(s string) { warnings = append(warnings, s) }})
+		list := mustParseHostList(t, "logical", profile, []byte(out), Options{Location: time.UTC, Warn: func(s string) error { warnings = append(warnings, s); return nil }})
 		if list.CurrentPath == nil || *list.CurrentPath != "/target/../system" {
 			t.Fatal(list.CurrentPath)
 		}
@@ -117,13 +142,13 @@ func TestProfileLiteralParsing(t *testing.T) {
 		}
 	})
 	for _, output := range []string{"", " \x00\t\r\n\v\f"} {
-		list := ParseHostList("host", profile, []byte(output), Options{})
+		list := mustParseHostList(t, "host", profile, []byte(output), Options{})
 		if len(list.Generations) != 0 || list.CurrentPath != nil || list.Current() != nil {
 			t.Fatal(list)
 		}
 	}
 	// Unicode whitespace is not Ruby String#strip whitespace.
-	list := ParseHostList("host", profile, []byte("\u00a0current\u00a0\n"+profile+"-1-link;\u00a0current\u00a0;0"), Options{})
+	list := mustParseHostList(t, "host", profile, []byte("\u00a0current\u00a0\n"+profile+"-1-link;\u00a0current\u00a0;0"), Options{})
 	if *list.CurrentPath != "\u00a0current\u00a0" || list.Current() == nil {
 		t.Fatal(list)
 	}
@@ -252,7 +277,7 @@ func TestOriginalRubyHostParser(t *testing.T) {
 				warnings := []string{}
 				for i, r := range results {
 					f := fixtures[i]
-					list := ParseHostList("logical", f["profile"], []byte(f["output"]), Options{Location: location, Warn: func(s string) { warnings = append(warnings, s) }})
+					list := mustParseHostList(t, "logical", f["profile"], []byte(f["output"]), Options{Location: location, Warn: func(s string) error { warnings = append(warnings, s); return nil }})
 					if r.Script != string(ProfileScript(f["profile"])) || len(r.Rows) != len(list.Generations) {
 						t.Fatal("script/rows differ", r)
 					}
@@ -273,4 +298,13 @@ func TestOriginalRubyHostParser(t *testing.T) {
 			})
 		})
 	}
+}
+
+func mustParseHostList(t *testing.T, host, profile string, output []byte, options Options) *HostList {
+	t.Helper()
+	list, err := ParseHostList(host, profile, output, options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return list
 }

@@ -288,8 +288,10 @@ func TestInputsUpdateLogParsedAliasDefaultsOriginal(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		e := &Engine{Log: f, Color: inv.Globals["color"].Value.String}
-		e.LogInputUpdateCLI(inv)
+		e := &Engine{Log: f, logOwner: nativeEngineLog(f), Color: inv.Globals["color"].Value.String}
+		if err := e.LogInputUpdateCLI(inv); err != nil {
+			t.Fatal(err)
+		}
 		if err = f.Close(); err != nil {
 			t.Fatal(err)
 		}
@@ -373,8 +375,10 @@ func TestInputsUpdateLogExplicitEncounterOrderAndAliasGrouping(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		e := &Engine{Log: f, Color: inv.Globals["color"].Value.String}
-		e.LogInputUpdateCLI(inv)
+		e := &Engine{Log: f, logOwner: nativeEngineLog(f), Color: inv.Globals["color"].Value.String}
+		if err := e.LogInputUpdateCLI(inv); err != nil {
+			t.Fatal(err)
+		}
 		if err = f.Close(); err != nil {
 			t.Fatal(err)
 		}

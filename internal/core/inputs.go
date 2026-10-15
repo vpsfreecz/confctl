@@ -105,11 +105,15 @@ func inputLockError(err error, path string) error {
 // explicit `cd ... && nix ...`. Keep this log start scoped to these operations.
 func (e *Engine) inputCommand(ctx context.Context, root string, argv []string) (inputs.Output, error) {
 	id, start := logID(), time.Now()
-	e.logText("[" + id + "] Running " + ShellJoin(argv) + "\n")
-	r, err := Process(ctx, root, argv, nil)
-	e.processLogFinish(id, start, r)
+	if err := e.logText("[" + id + "] Running " + ShellJoin(argv) + "\n"); err != nil {
+		return inputs.Output{}, err
+	}
+	r, err := processWithTestConnectionLog(ctx, root, argv, nil, func(b []byte) error { return e.logText("[" + id + "] \t" + strings.TrimSuffix(string(b), "\n") + "\n") })
 	out := inputs.Output{Stdout: string(r.Stdout), Stderr: string(r.Stderr)}
 	if err != nil {
+		return out, err
+	}
+	if err = e.processLogFinish(id, start, r); err != nil {
 		return out, err
 	}
 	if r.ExitCode != 0 {

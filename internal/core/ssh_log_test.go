@@ -42,7 +42,9 @@ func TestSSHLogTypedOptionsPresenceAndEncounterOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	before := sshInvocation(t, inv.RawArgv...)
-	e.LogSSHCLI(inv)
+	if err := e.LogSSHCLI(inv); err != nil {
+		t.Fatal(err)
+	}
 	if !reflect.DeepEqual(inv, before) {
 		t.Fatal("command log changed invocation")
 	}
@@ -81,8 +83,10 @@ func TestSSHLogTypedOptionsPresenceAndEncounterOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e.Log = f
-	e.LogSSHCLI(inv)
+	e.Log, e.logOwner = f, nativeEngineLog(f)
+	if err := e.LogSSHCLI(inv); err != nil {
+		t.Fatal(err)
+	}
 	_ = f.Close()
 	b, _ = os.ReadFile(f.Name())
 	for _, text := range []string{`"input-string" => nil`, `"input-file" => nil`} {

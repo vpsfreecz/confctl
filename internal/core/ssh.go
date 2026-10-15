@@ -34,7 +34,7 @@ type sshArgumentError struct{ error }
 // These leaf options share the same typed/alias PP layout as test-connection:
 // encounter order first, then declarations, and nil distinct from empty text.
 // Reuse that owning projector instead of introducing a second option catalogue.
-func (e *Engine) LogSSHCLI(inv cli.Invocation) { e.LogTestConnectionCLI(inv) }
+func (e *Engine) LogSSHCLI(inv cli.Invocation) error { return e.LogTestConnectionCLI(inv) }
 
 // Command mode uses pipes; interactive mode retains the caller's descriptors.
 func (e *Engine) SSH(inv cli.Invocation, in io.Reader, out io.Writer) error {
@@ -257,6 +257,9 @@ func sshInteractiveArgs(m Machine, rootShell func() (string, error)) ([]string, 
 }
 
 func sshStatus(ctx context.Context, r Result, runErr error) (int, error) {
+	if primary := r.capturePrimary(); primary != nil {
+		return 0, primary
+	}
 	if ctx.Err() != nil {
 		return 0, ctx.Err()
 	}

@@ -199,8 +199,15 @@ func (p *VPSAdmin) descriptionVersion(obj map[string]json.RawMessage) error {
 	if err != nil || strings.Split(version, ".")[0] != "2" {
 		return errors.New("incompatible HaveAPI protocol")
 	}
-	if version != "2.0" && p.warn != nil {
-		p.warn("The client uses protocol v2.0 while the API server uses a different same-major version")
+	if version != "2.0" {
+		const message = "The client uses protocol v2.0 while the API server uses a different same-major version"
+		if p.warnError != nil {
+			if err := p.warnError(message); err != nil {
+				return &WarningError{cause: err}
+			}
+		} else if p.warn != nil {
+			p.warn(message)
+		}
 	}
 	return nil
 }

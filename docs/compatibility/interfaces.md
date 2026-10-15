@@ -26,6 +26,51 @@ Sources: [ConfDir:9–67](https://github.com/vpsfreecz/confctl/blob/cc40679d2671
 
 **Logging is an observable filesystem effect.** Each action wrapper creates `.confctl/logs/<YYYY-MM-DD--HH-MM-SS>-confctl-<command-name-joined-with-hyphens>.log`, records command/options/arguments, runs handler, then closes/unlinks on normal completion unless Logger.keep was set. Failed health-check attempts can set keep even if a retry eventually succeeds. Exceptions skip wrapper cleanup; App warns `Log file: <path>` when open. Helpers log subprocess traffic through TTY::Command; LogView may relay it to console. No per-command UUID avoids same-second log-name collision. Help/parser failures may precede wrapper creation; capture their exact boundary. Sources [command:6–25](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/command.rb#L6), [logger:32–144](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/logger.rb#L32), [health logging:925–963](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/cluster.rb#L925). Fixtures `logging.lifecycle`, `logging.failure`, `logging.collision`.
 
+**Experimental Go logging and capture errors (P, source-tested only).** One
+invocation log owner is shared with scoped reverse services. Ordinary writes
+check the raw write and user-space flush before notifying live readers. Native
+file flush is a no-op; the adapter adds no buffering or fsync. CLI metadata uses
+the same raw lock and existing projectors, bypassing flush and reader notification.
+
+The runner retains positive captured bytes before invoking the synchronous log
+callback. Callback errors, including `io.EOF`, `EINTR`, `EAGAIN`, `EPIPE` and
+`EIO`, and non-EOF copy-read errors request invocation-local cancellation.
+Exact source EOF completes normally. If one positive read produces both a
+callback and a non-EOF read error, the callback error remains primary and the
+read error remains secondary. Both streams retain their counts and causes after
+joins. Only this invocation's direct winning capture marker preserves the
+original error at later test-connection/SSH status boundaries. Caller-first
+cancellation returns `ctx.Err`. Start, summary and input-acquisition errors keep
+the existing later parent-context override.
+
+Engine and input-command logs stream each captured chunk once. Infrastructure
+failure skips the finish summary; ordinary completed zero, nonzero and signal
+outcomes reach one summary. A summary error precedes input `ExitError`
+construction. Read-fill boundaries and cross-stream ordering remain unconstrained.
+These presentation and error policies differ from earlier Go aggregate replay
+and tty-command's broad callback errno rescue. They do not establish native or
+original-Ruby parity.
+
+Higher callers retain their policies. Status suppresses failed target-metadata
+queries and continues with remote queries. A host query error retains earlier
+fields and stops that host's remaining steps. Input mutations can replace a
+returned error with parent `ctx.Err`; ordinary changelog and comparison failures
+can be rescued. RPC encoding and extension handling have their own boundaries.
+A log failure does not latch a persistent failure for later operations.
+
+Main acquires cleanup immediately after opening its log. The root closes once,
+caches the result and freezes the first success choice. Removal requires a
+successful close and body. Main and hook-driver preserve an earlier nonzero
+status, otherwise fail on cleanup error, and attempt one diagnostic on the
+original stderr. A short write without an error still fails. Reporting errors
+remain separate from the cached cleanup cause; failed stderr can hide the
+diagnostic. Rollback cannot undo earlier output, captures, body mutations or
+actual close/remove effects. Views must detach and join before root close;
+scoped users borrow the owner. Arbitrary blocked callbacks, inherited writers
+and descendants can still prevent completion. This work adds no timer-worker
+join guarantee. Source tests and tagged compilation leave native entrypoint,
+syscall, original-provider, terminal and packaged behavior unverified.
+
 **Tables:** column labels uppercase unless explicit; nil, false and empty string become `-`; zero remains zero. Column width is max(header length, rendered data length)+1, including hidden-header calculation; columns joined by two spaces, final column unpadded. Ordering is caller order unless sort specified. OutputFormatter stringifies Ruby objects, so arrays/hashes/booleans and missing custom attributes need goldens, not Go formatting. Status handles ANSI width when color=true; ordinary list does not request that mode. Sources [output_formatter:15–21,108–164,204–258](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/output_formatter.rb#L108). Prompt details are in [commands](commands.md#shared-parser-and-option-contract). Fixtures `ui.format`, `ui.confirm`, `list.columns`.
 
 ## Inventory, selection and order

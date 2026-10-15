@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"os"
 	"os/exec"
@@ -17,6 +19,53 @@ import (
 	"github.com/vpsfreecz/confctl/internal/cli"
 	"github.com/vpsfreecz/confctl/internal/generation"
 )
+
+type generationWarningWriter struct {
+	body  bytes.Buffer
+	count int
+	err   error
+}
+
+func (w *generationWarningWriter) Write(p []byte) (int, error) {
+	w.body.Write(p)
+	if w.count < 0 {
+		return len(p), w.err
+	}
+	return w.count, w.err
+}
+func TestGenerationWarningStderrOrder(t *testing.T) {
+	failure := errors.New("warning stderr refusal")
+	for _, row := range []struct {
+		count     int
+		err, want error
+	}{{0, failure, failure}, {1, nil, io.ErrShortWrite}, {-1, nil, nil}} {
+		root := t.TempDir()
+		f, err := os.Create(filepath.Join(root, "log"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		e := &Engine{Log: f, logOwner: nativeEngineLog(f)}
+		w := &generationWarningWriter{count: row.count, err: row.err}
+		got := e.generationWarning(w)("warning")
+		if got != row.want || w.body.String() != "warning\n" {
+			t.Fatal("warning stderr count/error changed")
+		}
+		if err = f.Close(); err != nil {
+			t.Fatal(err)
+		}
+		b, err := os.ReadFile(f.Name())
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := ""
+		if row.want == nil {
+			want = "warning\n"
+		}
+		if string(b) != want {
+			t.Fatal("log reached before failed stderr or warning bytes changed")
+		}
+	}
+}
 
 func seedCoreGeneration(t *testing.T, root, host, name, payload string) string {
 	t.Helper()
@@ -168,7 +217,7 @@ esac
 		t.Fatal(err)
 	}
 	defer log.Close()
-	e.Log = log
+	e.Log, e.logOwner = log, nativeEngineLog(log)
 	_, err = e.ListGenerations(generationInvocation(t, "-lr", "*", "0"))
 	if err == nil || !strings.Contains(err.Error(), "ambiguous") {
 		t.Fatal(err)
@@ -237,7 +286,7 @@ esac
 		t.Fatal(err)
 	}
 	defer log.Close()
-	e.Log = log
+	e.Log, e.logOwner = log, nativeEngineLog(log)
 	e.Color = "never"
 	before := testConfigurationState(t, filepath.Join(root, ".confctl", "generations"))
 	text, err := e.Status([]Machine{m}, []Machine{m})

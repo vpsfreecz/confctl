@@ -76,14 +76,14 @@ func FetchHostList(ctx context.Context, host, profile string, options Options, r
 	if !success {
 		return nil, nil
 	}
-	return ParseHostList(host, profile, out, options), nil
+	return ParseHostList(host, profile, out, options)
 }
 
-func ParseHostList(host, profile string, output []byte, options Options) *HostList {
+func ParseHostList(host, profile string, output []byte, options Options) (*HostList, error) {
 	list := &HostList{Host: host, Generations: []*Host{}}
 	lines := rubySplit(strings.Trim(string(output), "\x00 \t\r\n\v\f"), "\n")
 	if len(lines) == 0 {
-		return list
+		return list, nil
 	}
 	list.CurrentPath = &lines[0]
 	idPattern := regexp.MustCompile("^" + regexp.QuoteMeta(profile) + "-([0-9]+)-link$")
@@ -93,7 +93,9 @@ func ParseHostList(host, profile string, output []byte, options Options) *HostLi
 		match := idPattern.FindStringSubmatch(link)
 		if match == nil {
 			if options.Warn != nil {
-				options.Warn(fmt.Sprintf("Invalid profile generation link '%s'", link))
+				if err := options.Warn(fmt.Sprintf("Invalid profile generation link '%s'", link)); err != nil {
+					return nil, err
+				}
 			}
 			continue
 		}
@@ -108,7 +110,7 @@ func ParseHostList(host, profile string, output []byte, options Options) *HostLi
 	}
 	// No extra tie breaker: retain enumeration order for equal numeric IDs.
 	sort.SliceStable(list.Generations, func(i, j int) bool { return list.Generations[i].ID.Cmp(list.Generations[j].ID) < 0 })
-	return list
+	return list, nil
 }
 
 func rubySplit(s, separator string) []string {

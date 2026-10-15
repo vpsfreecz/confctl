@@ -14,6 +14,27 @@ import (
 	"github.com/vpsfreecz/confctl/internal/generation"
 )
 
+// Source-only query seam: no evaluator/child injection is invented for Status's
+// best-effort target metadata. That admission remains a separate native gate.
+func logProcessQueryRefusal(t *testing.T) {
+	t.Helper()
+	failure := errors.New("query log refused")
+	e := logProcessEngine(engineLogOps{Write: func([]byte) (int, error) { return 0, failure }})
+	m := connectionMachine("logical", "key", "fake.invalid", true)
+	st := Status{Machine: m}
+	calls := 0
+	e.queryWithInputs(&st, []Machine{m}, queryOptions{Toplevel: true, Generations: true, Inputs: true}, func([]string, []byte) (Result, error) {
+		calls++
+		if calls == 1 {
+			return Result{ExitCode: 0, Stdout: []byte("1000 0\n")}, nil
+		}
+		return Result{}, e.logText("query record\n")
+	}, false)
+	if st.Err != failure || st.Uptime == nil || st.CurrentToplevel != nil || st.Generations != nil || st.Deployed != nil || calls != 2 {
+		t.Fatal(st, calls)
+	}
+}
+
 // The fake executable inspects literal SSH argv and never evaluates the remote
 // command or script. All capture files and records are confined to this root.
 func queryFixture(t *testing.T, body string) (*Engine, Machine, string) {

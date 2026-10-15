@@ -36,6 +36,7 @@ type VPSAdmin struct {
 	now                                func() time.Time
 	prompt                             Prompt
 	warn                               func(string)
+	warnError                          func(string) error
 	budget                             time.Duration
 	authDescription                    json.RawMessage
 	resources                          json.RawMessage

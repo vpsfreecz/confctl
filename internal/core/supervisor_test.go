@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	ext "github.com/vpsfreecz/confctl/extension"
 	"os"
@@ -14,6 +15,19 @@ import (
 	"testing"
 	"time"
 )
+
+// The actual reverse-service owner must return a reached start-log failure
+// before spawning/replaying output. This does not execute the RPC transport.
+func logProcessServiceRefusal(t *testing.T) {
+	t.Helper()
+	failure := errors.New("reverse service log refused")
+	e := logProcessEngine(engineLogOps{Write: func([]byte) (int, error) { return 0, failure }})
+	s := &supervisor{e: e.scopedEngine(e.Context), snapshots: map[string][]Machine{"s:1": {{Name: "m", Target: Target{Localhost: true}}}}}
+	value, err := s.handle(e.Context, "exec.run", json.RawMessage(`{"snapshot":"s:1","machine":"m","argv":["never-started"],"stdin_b64":"","output":"stream"}`))
+	if err != failure || value != nil {
+		t.Fatal(value, err)
+	}
+}
 
 func TestSupervisorHelper(t *testing.T) {
 	if os.Getenv("CORE_SUPERVISOR_HELPER") == "" {

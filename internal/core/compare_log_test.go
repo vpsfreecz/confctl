@@ -235,8 +235,10 @@ func TestComparisonLogInvocationLiteralOptionsAndNoMutation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	e := &Engine{Color: "auto", Log: f}
-	e.LogComparisonCLI(inv)
+	e := &Engine{Color: "auto", Log: f, logOwner: nativeEngineLog(f)}
+	if err := e.LogComparisonCLI(inv); err != nil {
+		t.Fatal(err)
+	}
 	data, err := os.ReadFile(f.Name())
 	if err != nil {
 		t.Fatal(err)
@@ -269,8 +271,10 @@ func TestComparisonLogInvocationLiteralOptionsAndNoMutation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		e.Log = f
-		e.LogComparisonCLI(comparisonInvocation(t, command))
+		e.Log, e.logOwner = f, nativeEngineLog(f)
+		if err := e.LogComparisonCLI(comparisonInvocation(t, command)); err != nil {
+			t.Fatal(err)
+		}
 		f.Close()
 		b, err := os.ReadFile(f.Name())
 		if err != nil {

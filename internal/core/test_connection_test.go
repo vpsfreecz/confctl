@@ -58,7 +58,7 @@ func TestTestConnectionCaptureReads(t *testing.T) {
 	r := &connectionReader{t: t, steps: steps}
 	var aggregate bytes.Buffer
 	logged := []string{}
-	c := &testConnectionCapture{buffer: &aggregate, chunk: func(b []byte) { logged = append(logged, string(b)) }}
+	c := &testConnectionCapture{buffer: &aggregate, chunk: func(b []byte) error { logged = append(logged, string(b)); return nil }}
 	n, err := c.ReadFrom(r)
 	if err != nil || n != 65537 || !reflect.DeepEqual(logged, parts) || aggregate.String() != strings.Repeat("P", 32768)+"M"+strings.Repeat("S", 32768) || r.reads != 6 {
 		t.Fatal(n, err, r.reads, len(logged))
@@ -74,7 +74,7 @@ func TestTestConnectionCaptureReads(t *testing.T) {
 			reader := &connectionReader{t: t, steps: steps}
 			var buf bytes.Buffer
 			var saved [][]byte
-			sink := &testConnectionCapture{buffer: &buf, chunk: func(b []byte) { saved = append(saved, bytes.Clone(b)) }}
+			sink := &testConnectionCapture{buffer: &buf, chunk: func(b []byte) error { saved = append(saved, bytes.Clone(b)); return nil }}
 			n, err := sink.ReadFrom(reader)
 			wantErr := terminal
 			if terminal == io.EOF {
@@ -91,7 +91,7 @@ func TestTestConnectionCaptureReads(t *testing.T) {
 		})
 	}
 	var empty bytes.Buffer
-	c = &testConnectionCapture{buffer: &empty, chunk: func([]byte) { t.Fatal("empty EOF callback") }}
+	c = &testConnectionCapture{buffer: &empty, chunk: func([]byte) error { t.Fatal("empty EOF callback"); return nil }}
 	if n, err := c.ReadFrom(strings.NewReader("")); n != 0 || err != nil {
 		t.Fatal(n, err)
 	}
@@ -100,11 +100,12 @@ func TestTestConnectionCaptureReads(t *testing.T) {
 func TestTestConnectionCaptureFileCopyDispatch(t *testing.T) {
 	var b bytes.Buffer
 	parts := [][]byte{}
-	sink := &testConnectionCapture{buffer: &b, chunk: func(p []byte) {
+	sink := &testConnectionCapture{buffer: &b, chunk: func(p []byte) error {
 		if len(p) == 0 || len(p) > 16384 {
 			t.Errorf("ReaderFrom dispatch lost: positive read length%d", len(p))
 		}
 		parts = append(parts, bytes.Clone(p))
+		return nil
 	}}
 	if _, ok := any(sink).(io.ReaderFrom); !ok {
 		t.Fatal("missing ReaderFrom")

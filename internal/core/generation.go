@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"os"
 	"sort"
@@ -13,11 +14,22 @@ import (
 	"github.com/vpsfreecz/confctl/internal/generation"
 )
 
+// generationWarning returns each reached stderr or synchronous log error.
+func (e *Engine) generationWarning(stderr io.Writer) func(string) error {
+	return func(message string) error {
+		body := []byte(message + "\n")
+		n, err := stderr.Write(body)
+		if err != nil {
+			return err
+		}
+		if n != len(body) {
+			return io.ErrShortWrite
+		}
+		return e.logText(message + "\n")
+	}
+}
 func (e *Engine) generationOptions() generation.Options {
-	return generation.Options{Warn: func(message string) {
-		fmt.Fprintln(os.Stderr, message)
-		e.logText(message + "\n")
-	}}
+	return generation.Options{Warn: e.generationWarning(os.Stderr)}
 }
 
 // Queries run concurrently, but results retain inventory order. The existing
@@ -314,7 +326,7 @@ func resolvedBuildValueCompare(a, b any) (int, bool) {
 	return 0, false
 }
 
-func (e *Engine) LogGenerationCLI(inv cli.Invocation) {
+func (e *Engine) LogGenerationCLI(inv cli.Invocation) error {
 	command, arguments := make([]any, len(inv.Command.Path)), make([]any, len(inv.Args))
 	for i, p := range inv.Command.Path {
 		command[i] = p
@@ -345,5 +357,5 @@ func (e *Engine) LogGenerationCLI(inv cli.Invocation) {
 		}
 	}
 	b.WriteString(separator + "#<GLI::Command::ParentKey:0x0000000000000000> => {}}" + inputLogArgumentsField(arguments))
-	e.logText(b.String())
+	return e.logMetadata(b.String())
 }

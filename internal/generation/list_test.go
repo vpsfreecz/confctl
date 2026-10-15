@@ -1,6 +1,7 @@
 package generation
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,38 @@ import (
 	"testing"
 	"time"
 )
+
+func TestGenerationWarningBuildRefusal(t *testing.T) {
+	root := t.TempDir()
+	seed(t, root, "h", "bad", `{`)
+	seed(t, root, "h", "good", record(root+"/system", "2026-10-09T00:00:00Z"))
+	seed(t, root, "h", "later-bad", `{`)
+	failure := errors.New("warning refusal")
+	for _, late := range []bool{false, true} {
+		calls := 0
+		readOnly(t, root, func() {
+			list, err := LoadBuildList(root, "h", Options{Enumerate: func(string) ([]string, error) {
+				if late {
+					return []string{"bad", "good"}, nil
+				}
+				return []string{"bad", "later-bad", "good"}, nil
+			}, Warn: func(message string) error {
+				calls++
+				if calls == 1 && late {
+					return nil
+				}
+				return failure
+			}})
+			if list != nil || err != failure || calls != map[bool]int{false: 1, true: 2}[late] {
+				t.Fatal("warning did not refuse immediately or returned partial list")
+			}
+		})
+	}
+	list, err := LoadBuildList(root, "h", Options{})
+	if err != nil || len(list.Builds) != 1 || list.Current == nil {
+		t.Fatal("nil warning changed successful selection")
+	}
+}
 
 func names(l *BuildList) []string {
 	n := []string{}
@@ -43,7 +76,7 @@ func TestEnumerationRejectionsTieOrderAndWarnings(t *testing.T) {
 	order := []string{".", "..", "middle", "z", "legacy", "alias", "a", "corrupt", "file", "missing-json"}
 	var warnings []string
 	readOnly(t, root, func() {
-		l, err := LoadBuildList(root, host, Options{Location: time.UTC, Enumerate: func(string) ([]string, error) { return order, nil }, Warn: func(s string) { warnings = append(warnings, s) }})
+		l, err := LoadBuildList(root, host, Options{Location: time.UTC, Enumerate: func(string) ([]string, error) { return order, nil }, Warn: func(s string) error { warnings = append(warnings, s); return nil }})
 		if err != nil {
 			t.Fatal(err)
 		}
