@@ -97,7 +97,7 @@ func Main(ctx context.Context, argv []string) (result int) {
 	logName := cmd
 	if extensionCommand {
 		logName = strings.Join(command.Path, "-")
-	} else if inv.Command.Handler == cli.InputsReadHandler || inv.Command.Handler == cli.InputsUpdateHandler || inv.Command.Handler == cli.InputsSetHandler || inv.Command.Handler == cli.GenerationListHandler || inv.Command.Handler == cli.GenDataHandler {
+	} else if inv.Command.Handler == cli.InputsReadHandler || inv.Command.Handler == cli.InputsUpdateHandler || inv.Command.Handler == cli.InputsSetHandler || inv.Command.Handler == cli.GenerationListHandler || inv.Command.Handler == cli.GenerationRemoveHandler || inv.Command.Handler == cli.GenerationRotateHandler || inv.Command.Handler == cli.CollectGarbageHandler || inv.Command.Handler == cli.GenDataHandler {
 		logName = strings.Join(inv.Command.Path, "-")
 	}
 	if err = e.OpenLog(logName); err != nil {
@@ -118,7 +118,7 @@ func Main(ctx context.Context, argv []string) (result int) {
 		err = e.LogTestConnectionCLI(inv)
 	} else if inv.Command.Handler == cli.SSHHandler || inv.Command.Handler == cli.CSSHHandler {
 		err = e.LogSSHCLI(inv)
-	} else if inv.Command.Handler == cli.GenerationListHandler {
+	} else if inv.Command.Handler == cli.GenerationListHandler || inv.Command.Handler == cli.GenerationRemoveHandler || inv.Command.Handler == cli.GenerationRotateHandler || inv.Command.Handler == cli.CollectGarbageHandler {
 		err = e.LogGenerationCLI(inv)
 	} else if inv.Command.Handler == cli.ComparisonHandler {
 		err = e.LogComparisonCLI(inv)
@@ -267,6 +267,29 @@ func Main(ctx context.Context, argv []string) (result int) {
 			return fail(err, 1)
 		}
 		fmt.Print(text)
+		success = true
+		return 0
+	}
+	if inv.Command.Handler == cli.GenerationRemoveHandler || inv.Command.Handler == cli.GenerationRotateHandler || inv.Command.Handler == cli.CollectGarbageHandler {
+		switch inv.Command.Handler {
+		case cli.GenerationRemoveHandler:
+			err = e.RemoveGenerations(inv, os.Stdin, os.Stdout, os.Stderr)
+		case cli.GenerationRotateHandler:
+			err = e.RotateGenerations(inv, os.Stdin, os.Stdout, os.Stderr)
+		case cli.CollectGarbageHandler:
+			err = e.CollectGarbage(inv, os.Stdin, os.Stdout, os.Stderr)
+		}
+		if err != nil {
+			var argumentErr *generationArgumentError
+			if errors.As(err, &argumentErr) {
+				code := fail(err, 64)
+				fmt.Fprintln(os.Stderr)
+				help, _ := registry.Help(inv.Command.Path, 80)
+				fmt.Print(help)
+				return code
+			}
+			return fail(err, 1)
+		}
 		success = true
 		return 0
 	}
