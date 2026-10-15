@@ -541,10 +541,10 @@ func TestSSHParallelCompletionAndAggregateGroups(t *testing.T) {
 	for _, aggregate := range []bool{false, true} {
 		t.Run(strconv.FormatBool(aggregate), func(t *testing.T) {
 			trace := sshExecutables(t, map[string]sshChildStimulus{
-				"zeta.invalid":  {Out: "same\n", Exit: 7, DelayMS: 400, Barrier: 4},
-				"beta.invalid":  {Out: "same\n", DelayMS: 0, Barrier: 4},
-				"alpha.invalid": {Out: "same\n", Exit: 7, DelayMS: 200, Barrier: 4},
-				"gamma.invalid": {Out: "different\n", Exit: 7, DelayMS: 100, Barrier: 4},
+				"zeta.invalid":  {Out: "same\n", Exit: 7, Barrier: 4},
+				"beta.invalid":  {Out: "same\n", Barrier: 4},
+				"alpha.invalid": {Out: "same\n", Exit: 7, Barrier: 4},
+				"gamma.invalid": {Out: "different\n", Exit: 7, Barrier: 4},
 			})
 			e := connectionEngine(t, connectionMachine("zeta", "z", "zeta.invalid", true), connectionMachine("beta", "b", "beta.invalid", true), connectionMachine("alpha", "a", "alpha.invalid", true), connectionMachine("gamma", "g", "gamma.invalid", true))
 			args := []string{"ssh", "-y", "-p"}
@@ -556,12 +556,34 @@ func TestSSHParallelCompletionAndAggregateGroups(t *testing.T) {
 			if err := e.SSH(sshInvocation(t, args...), strings.NewReader(""), &out); err != nil {
 				t.Fatal(err)
 			}
-			want := "Executing cat token on 4 machines\nbeta:\nsame\n\ngamma:\n\n\nalpha:\n\n\nzeta:\n\n\n"
+			blocks := []string{"beta:\nsame\n\n", "gamma:\n\n\n", "alpha:\n\n\n", "zeta:\n\n\n"}
 			if aggregate {
-				want = "Executing cat token on 4 machines\nbeta:\nExit status: 0\nsame\n\ngamma:\nExit status: 7\ndifferent\n\nalpha, zeta:\nExit status: 7\nsame\n\n"
+				blocks = []string{"beta:\nExit status: 0\nsame\n\n", "gamma:\nExit status: 7\ndifferent\n\n", "alpha, zeta:\nExit status: 7\nsame\n\n"}
 			}
-			if out.String() != want {
-				t.Fatal(out.String())
+			remaining, ok := strings.CutPrefix(out.String(), "Executing cat token on 4 machines\n")
+			if !ok {
+				t.Fatalf("missing execution header: %q", out.String())
+			}
+			// Barrier 4 proves concurrent starts, not completion order. Child
+			// exit status and race-runtime cleanup can reorder parent Waits.
+			// Consume each exact block once, retaining sorted group members,
+			// distinct statuses and all payload/whitespace expectations.
+			for len(blocks) > 0 {
+				matched := false
+				for i, block := range blocks {
+					if rest, ok := strings.CutPrefix(remaining, block); ok {
+						remaining = rest
+						blocks = append(blocks[:i], blocks[i+1:]...)
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					t.Fatalf("missing blocks %q or unexpected output %q", blocks, remaining)
+				}
+			}
+			if remaining != "" {
+				t.Fatalf("unexpected extra output: %q", remaining)
 			}
 			for _, host := range []string{"zeta.invalid", "beta.invalid", "alpha.invalid", "gamma.invalid"} {
 				_ = sshRecord(t, trace, host, 1)
