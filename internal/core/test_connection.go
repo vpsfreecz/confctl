@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -124,7 +123,8 @@ func (e *Engine) runTestConnection(inv cli.Invocation, in io.Reader, out io.Writ
 			return err
 		}
 		fmt.Fprint(out, "Test SSH connection to the following machines:\n"+text)
-		if err := testConnectionConfirm(in, out); err != nil {
+		_, line := commandInput(in)
+		if err := testConnectionConfirm(e.Context, line, out); err != nil {
 			return err
 		}
 	}
@@ -152,20 +152,25 @@ func (e *Engine) runTestConnection(inv cli.Invocation, in io.Reader, out io.Writ
 	return nil
 }
 
-func testConnectionConfirm(in io.Reader, out io.Writer) error {
-	r := bufio.NewReader(in)
+func testConnectionConfirm(ctx context.Context, line commandLine, out io.Writer) error {
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if _, err := fmt.Fprint(out, "\nContinue? [y/N]: "); err != nil {
 			return err
 		}
-		line, err := r.ReadString('\n')
+		answer, err := line(ctx)
 		if err != nil && err != io.EOF {
 			return err
 		}
-		if err == io.EOF && line == "" {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err == io.EOF && answer == "" {
 			return fmt.Errorf("end of file reached")
 		}
-		switch strings.ToLower(testConnectionStrip(line)) {
+		switch strings.ToLower(testConnectionStrip(answer)) {
 		case "y":
 			_, err := fmt.Fprintln(out)
 			return err

@@ -58,7 +58,8 @@ func (e *Engine) healthCheck(inv cli.Invocation, in io.Reader, out io.Writer, de
 		if err := healthWrite(out, "Health checks will be run on the following machines:\n"+table+fmt.Sprintf("\n%d checks in total\n", len(plan.Checks))); err != nil {
 			return HealthResult{}, err
 		}
-		if err := testConnectionConfirm(in, out); err != nil {
+		_, line := commandInput(in)
+		if err := testConnectionConfirm(e.Context, line, out); err != nil {
 			return HealthResult{}, err
 		}
 	}

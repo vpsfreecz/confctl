@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -57,12 +56,12 @@ func deployCheckFile() (string, error) {
 	return "/run/confctl-confirm-" + hex.EncodeToString(random[:]), nil
 }
 
-func (e *Engine) deployOperations(ctx context.Context, all, selected []Machine, input *bufio.Reader, out io.Writer, inv cli.Invocation) deploy.Deps {
+func (e *Engine) deployOperations(ctx context.Context, all, selected []Machine, line commandLine, out io.Writer, inv cli.Invocation) deploy.Deps {
 	ops := deployProcessOps{Run: e.deployProcess, Now: time.Now, Sleep: deploySleep, CheckFile: deployCheckFile}
-	return e.deployOperationsWithOps(ctx, all, selected, input, out, inv, ops)
+	return e.deployOperationsWithOps(ctx, all, selected, line, out, inv, ops)
 }
 
-func (e *Engine) deployOperationsWithOps(ctx context.Context, all, selected []Machine, input *bufio.Reader, out io.Writer, inv cli.Invocation, ops deployProcessOps) deploy.Deps {
+func (e *Engine) deployOperationsWithOps(ctx context.Context, all, selected []Machine, line commandLine, out io.Writer, inv cli.Invocation, ops deployProcessOps) deploy.Deps {
 	byName := map[string]Machine{}
 	for _, m := range selected {
 		byName[m.Name] = m
@@ -160,40 +159,46 @@ func (e *Engine) deployOperationsWithOps(ctx context.Context, all, selected []Ma
 			})
 			return result.Report, err
 		},
-		Confirm: func(_ context.Context, _ deploy.Confirmation) (bool, error) { return deployConfirm(input, out) },
-		ChooseActivation: func(_ context.Context, _ deploy.Target, retry bool) (deploy.ActivationChoice, error) {
+		Confirm: func(ctx context.Context, _ deploy.Confirmation) (bool, error) { return deployConfirm(ctx, line, out) },
+		ChooseActivation: func(ctx context.Context, _ deploy.Target, retry bool) (deploy.ActivationChoice, error) {
 			choices := "ysa"
 			if retry {
 				choices += "r"
 			}
-			choice, err := deployChoice(input, out, choices)
+			choice, err := deployChoice(ctx, line, out, choices)
 			return map[string]deploy.ActivationChoice{"y": deploy.ActivationContinue, "r": deploy.ActivationRetry, "s": deploy.ActivationSkip, "a": deploy.ActivationAbort}[choice], err
 		},
-		ChooseHealth: func(context.Context, []deploy.Machine, health.Report) (deploy.HealthChoice, error) {
-			choice, err := deployChoice(input, out, "crfa")
+		ChooseHealth: func(ctx context.Context, _ []deploy.Machine, _ health.Report) (deploy.HealthChoice, error) {
+			choice, err := deployChoice(ctx, line, out, "crfa")
 			return map[string]deploy.HealthChoice{"c": deploy.HealthContinue, "r": deploy.HealthRetryAll, "f": deploy.HealthRetryFailed, "a": deploy.HealthAbort}[choice], err
 		},
 	}
 }
 
-func deployConfirm(input *bufio.Reader, out io.Writer) (bool, error) {
-	choice, err := deployChoice(input, out, "yn")
+func deployConfirm(ctx context.Context, line commandLine, out io.Writer) (bool, error) {
+	choice, err := deployChoice(ctx, line, out, "yn")
 	return choice == "y", err
 }
 
-func deployChoice(input *bufio.Reader, out io.Writer, choices string) (string, error) {
+func deployChoice(ctx context.Context, line commandLine, out io.Writer, choices string) (string, error) {
 	for {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
 		if err := buildWrite(out, fmt.Sprintf("Choose [%s]: ", choices)); err != nil {
 			return "", err
 		}
-		line, err := input.ReadString('\n')
+		answer, err := line(ctx)
 		if err != nil && !errors.Is(err, io.EOF) {
 			return "", err
 		}
-		if errors.Is(err, io.EOF) && line == "" {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+		if errors.Is(err, io.EOF) && answer == "" {
 			return "", errors.New("end of file reached")
 		}
-		value := strings.ToLower(strings.Trim(line, " \t\n\v\f\r\x00"))
+		value := strings.ToLower(strings.Trim(answer, " \t\n\v\f\r\x00"))
 		if len(value) == 1 && strings.Contains(choices, value) {
 			err := buildWrite(out, "\n")
 			return value, err

@@ -63,7 +63,8 @@ func (e *Engine) buildCLI(inv cli.Invocation, stdin io.Reader, stdout, stderr io
 		if err := buildWrite(stdout, "The following machines will be built:\n"+table); err != nil {
 			return err
 		}
-		if err := testConnectionConfirm(stdin, stdout); err != nil {
+		_, line := commandInput(stdin)
+		if err := testConnectionConfirm(e.Context, line, stdout); err != nil {
 			return err
 		}
 	}

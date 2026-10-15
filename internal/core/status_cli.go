@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -14,13 +13,14 @@ import (
 type statusArgumentError struct{ error }
 
 func (e *Engine) StatusCLI(inv cli.Invocation, stdin, stdout, stderr *os.File) error {
-	return e.statusCLI(inv, bufio.NewReader(stdin), stdout, stderr, buildDeps{})
+	return e.statusCLI(inv, stdin, stdout, stderr, buildDeps{})
 }
 
 func (e *Engine) LogStatusCLI(inv cli.Invocation) error { return e.LogTestConnectionCLI(inv) }
 func (e *Engine) LogBuildCLI(inv cli.Invocation) error  { return e.LogTestConnectionCLI(inv) }
 
 func (e *Engine) statusCLI(inv cli.Invocation, in io.Reader, out, stderr io.Writer, deps buildDeps) error {
+	_, line := commandInput(in)
 	all, err := e.Machines(false)
 	if err != nil {
 		return err
@@ -56,7 +56,7 @@ func (e *Engine) statusCLI(inv cli.Invocation, in io.Reader, out, stderr io.Writ
 		if err := buildWrite(out, heading+"\n"+table+"\nGeneration: "+label+"\n"); err != nil {
 			return err
 		}
-		if err := testConnectionConfirm(in, out); err != nil {
+		if err := testConnectionConfirm(e.Context, line, out); err != nil {
 			return err
 		}
 	}
@@ -103,7 +103,7 @@ func (e *Engine) statusCLI(inv cli.Invocation, in io.Reader, out, stderr io.Writ
 			if err := buildWrite(out, text); err != nil {
 				return err
 			}
-			if err := testConnectionConfirm(in, out); err != nil {
+			if err := testConnectionConfirm(e.Context, line, out); err != nil {
 				return err
 			}
 		}

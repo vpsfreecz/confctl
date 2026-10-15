@@ -22,11 +22,19 @@ import (
 var Services = []string{"settings.get", "machines.select", "exec.run", "ui.write", "ui.machines", "ui.table", "ui.confirm", "format.nix"}
 
 type supervisor struct {
-	e         *Engine
-	in        ext.Invocation
-	mu        sync.Mutex
-	snapshots map[string][]Machine
-	seq       int
+	e          *Engine
+	in         ext.Invocation
+	mu         sync.Mutex
+	snapshots  map[string][]Machine
+	seq        int
+	prompt     commandLine
+	promptOut  io.Writer
+	promptGate chan struct{}
+}
+
+func newSupervisor(e *Engine, in ext.Invocation, stdin *os.File, stdout io.Writer) *supervisor {
+	_, line := commandInput(stdin)
+	return &supervisor{e: e, in: in, snapshots: map[string][]Machine{}, prompt: line, promptOut: stdout, promptGate: make(chan struct{}, 1)}
 }
 
 func (s *supervisor) handle(ctx context.Context, method string, b json.RawMessage) (any, error) {
@@ -175,7 +183,18 @@ func (s *supervisor) handle(ctx context.Context, method string, b json.RawMessag
 		if e := json.Unmarshal(b, &p); e != nil {
 			return nil, e
 		}
-		ok, e := s.e.Confirm(os.Stdin, p.Message, p.Always)
+		if s.prompt == nil || s.promptOut == nil || s.promptGate == nil {
+			return nil, fmt.Errorf("confirmation input is unavailable")
+		}
+		// Reverse services may run concurrently. Keep one reader and hold a
+		// context-aware gate through the whole prompt, apart from cache locks.
+		select {
+		case s.promptGate <- struct{}{}:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		defer func() { <-s.promptGate }()
+		ok, e := s.e.confirm(ctx, s.prompt, s.promptOut, p.Message, p.Always)
 		return map[string]any{"accepted": ok}, e
 	case "ui.table":
 		var p struct {
@@ -267,7 +286,7 @@ func (e *Engine) Invoke(reg Registration, handler string, in ext.Invocation) (in
 	_ = toChildRead.Close()
 	_ = fromChildWrite.Close()
 	scoped := e.scopedEngine(ctx)
-	s := &supervisor{e: scoped, in: in, snapshots: map[string][]Machine{}}
+	s := newSupervisor(scoped, in, os.Stdin, os.Stdout)
 	p := ext.NewPeer(ctx, fromChildRead, toChildWrite, "c")
 	p.SetHandler(s.handle)
 	var initialized ext.InitResult

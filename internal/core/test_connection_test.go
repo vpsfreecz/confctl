@@ -270,7 +270,8 @@ func TestTestConnectionConfirmation(t *testing.T) {
 	}
 	readErr := errors.New("synthetic reader failure")
 	var out bytes.Buffer
-	err := testConnectionConfirm(&connectionReader{t: t, steps: []connectionRead{{data: "y", err: readErr}}}, &out)
+	_, line := commandInput(&connectionReader{t: t, steps: []connectionRead{{data: "y", err: readErr}}})
+	err := testConnectionConfirm(context.Background(), line, &out)
 	if err != readErr || out.String() != prompt {
 		t.Fatal("read failure was accepted", err)
 	}
