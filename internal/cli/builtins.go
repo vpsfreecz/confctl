@@ -174,6 +174,15 @@ func BuiltinRegistry() *Registry {
 		case "generation ls":
 			commands[i].Handler = GenerationListHandler
 			commands[i].Availability = Availability{Mode: Available}
+		case "diff", "changelog":
+			commands[i].Handler = ComparisonHandler
+			commands[i].Availability = Availability{Mode: Available}
+		case "health-check":
+			commands[i].Handler = HealthCheckHandler
+			commands[i].Availability = Availability{Mode: Available}
+		case "gen-data vpsadmin all", "gen-data vpsadmin containers", "gen-data vpsadmin network":
+			commands[i].Handler = GenDataHandler
+			commands[i].Availability = Availability{Mode: Available}
 		case "init", "add", "rename", "rediscover":
 			commands[i].Handler = ConfigurationHandler
 			commands[i].Availability = Availability{Mode: Available}

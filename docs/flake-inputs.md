@@ -160,6 +160,14 @@ Because `follows` is per-input-name, you typically need separate inputs per envi
 
 ## Source inputs and evaluation
 
+The experimental Go CLI supports `diff` and `changelog` with the existing machine
+and role filters. By default they compare current configuration metadata with
+deployed inputs; `--generation` selects an existing local generation instead.
+`diff` does not fetch mirrors, while `changelog` uses the existing Git mirror
+cache. Configured pager commands run through the package's declared shell.
+See the [experimental CLI guide](../experiments/confctl-go/README.md) for paging,
+redirected output and verification limits.
+
 Inputs used only as source directories may use `flake = false`:
 
 ```nix

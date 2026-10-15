@@ -97,7 +97,7 @@ func Main(ctx context.Context, argv []string) (result int) {
 	logName := cmd
 	if extensionCommand {
 		logName = strings.Join(command.Path, "-")
-	} else if inv.Command.Handler == cli.InputsReadHandler || inv.Command.Handler == cli.InputsUpdateHandler || inv.Command.Handler == cli.InputsSetHandler || inv.Command.Handler == cli.GenerationListHandler {
+	} else if inv.Command.Handler == cli.InputsReadHandler || inv.Command.Handler == cli.InputsUpdateHandler || inv.Command.Handler == cli.InputsSetHandler || inv.Command.Handler == cli.GenerationListHandler || inv.Command.Handler == cli.GenDataHandler {
 		logName = strings.Join(inv.Command.Path, "-")
 	}
 	if err = e.OpenLog(logName); err != nil {
@@ -120,6 +120,12 @@ func Main(ctx context.Context, argv []string) (result int) {
 		err = e.LogSSHCLI(inv)
 	} else if inv.Command.Handler == cli.GenerationListHandler {
 		err = e.LogGenerationCLI(inv)
+	} else if inv.Command.Handler == cli.ComparisonHandler {
+		err = e.LogComparisonCLI(inv)
+	} else if inv.Command.Handler == cli.HealthCheckHandler {
+		err = e.LogHealthCLI(inv)
+	} else if inv.Command.Handler == cli.GenDataHandler {
+		err = e.LogGenDataCLI(inv)
 	} else if !extensionCommand || supportedRuntimeCommand(command) {
 		err = e.LogCLI(cmd, opts, commandArgv)
 	} else {
@@ -257,6 +263,45 @@ func Main(ctx context.Context, argv []string) (result int) {
 			return fail(err, 1)
 		}
 		fmt.Print(text)
+		success = true
+		return 0
+	}
+	if inv.Command.Handler == cli.ComparisonHandler {
+		if err = e.Compare(inv, os.Stdin, os.Stdout, os.Stderr); err != nil {
+			var argumentErr *comparisonArgumentError
+			if errors.As(err, &argumentErr) {
+				code := fail(err, 64)
+				fmt.Fprintln(os.Stderr)
+				help, _ := registry.Help(inv.Command.Path, 80)
+				fmt.Print(help)
+				return code
+			}
+			return fail(err, 1)
+		}
+		success = true
+		return 0
+	}
+	if inv.Command.Handler == cli.HealthCheckHandler {
+		checked, err := e.HealthCheck(inv, os.Stdin, os.Stdout)
+		if err != nil {
+			var argumentErr *healthArgumentError
+			if errors.As(err, &argumentErr) {
+				code := fail(err, 64)
+				fmt.Fprintln(os.Stderr)
+				help, _ := registry.Help(inv.Command.Path, 80)
+				fmt.Print(help)
+				return code
+			}
+			return fail(err, 1)
+		}
+		// A later successful attempt must preserve the earlier failure's log.
+		success = !checked.RetainLog
+		return 0
+	}
+	if inv.Command.Handler == cli.GenDataHandler {
+		if err = e.GenData(inv, os.Stdin, os.Stdout, os.Stderr); err != nil {
+			return fail(err, 1)
+		}
 		success = true
 		return 0
 	}
