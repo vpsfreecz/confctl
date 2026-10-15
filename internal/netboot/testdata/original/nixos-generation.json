@@ -1,0 +1,39 @@
+{
+  "url": "http://netboot.test/node.test/6",
+  "store_path": "/fixture/store/netboot-6",
+  "generation": 6,
+  "time": 1727740806,
+  "time_s": "2024-10-01 00:00:06",
+  "current": true,
+  "toplevel": "/fixture/store/system-6",
+  "version": "24.11.20241001",
+  "revision": "0123456789abcdef",
+  "shortrev": "012345678",
+  "macs": [
+    "AA:BB:CC:DD:EE:FF"
+  ],
+  "kernel_version": "6.6.52",
+  "kernel_params": [
+    "httproot=http://netboot.test/node.test/6/initrd",
+    "init=/fixture/store/system-6/init",
+    "console=ttyS0"
+  ],
+  "boot_files": {
+    "bzImage": "http://netboot.test/node.test/6/bzImage",
+    "initrd": "http://netboot.test/node.test/6/initrd"
+  },
+  "variants": [],
+  "inputs_info": {
+    "z": "ž <>&  ",
+    "a": [
+      9007199254740993123456789,
+      1.2,
+      1.0e-07,
+      1.0e+15
+    ],
+    "nested": {
+      "b": false,
+      "a": null
+    }
+  }
+}

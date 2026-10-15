@@ -52,7 +52,6 @@ let
   httpRoot = "${baseDir}/http";
 
   builderConfig = builtins.toJSON {
-    ruby = pkgs.ruby;
     coreutils = pkgs.coreutils;
     syslinux = pkgs.syslinux;
     inherit tftpRoot httpRoot;
@@ -69,15 +68,9 @@ let
     isoImages = cfg.isoImages;
   };
 
-  builder = pkgs.replaceVarsWith {
-    src = ./build-netboot-server.rb;
-    name = "build-netboot-server";
-    dir = "bin";
-    isExecutable = true;
-    replacements = {
-      ruby = pkgs.ruby;
-      jsonConfig = pkgs.writeText "netboot-server.json" builderConfig;
-    };
+  builder = import ../../../../helpers/build-netboot-server.nix {
+    inherit pkgs;
+    configFile = pkgs.writeText "netboot-server.json" builderConfig;
   };
 in
 {

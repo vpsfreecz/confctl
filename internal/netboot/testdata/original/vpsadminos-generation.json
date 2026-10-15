@@ -1,0 +1,77 @@
+{
+  "url": "http://netboot.test/other.test/1",
+  "store_path": "/fixture/store/netboot-1",
+  "generation": 1,
+  "time": 1727740801,
+  "time_s": "2024-10-01 00:00:01",
+  "current": true,
+  "toplevel": "/fixture/store/system-1",
+  "version": "24.11.20241001",
+  "revision": "0123456789abcdef",
+  "shortrev": "012345678",
+  "macs": [
+    "AA:BB:CC:DD:EE:FF"
+  ],
+  "kernel_version": "6.6.52",
+  "kernel_params": [
+    "httproot=http://netboot.test/other.test/1/root.squashfs",
+    "console=ttyS0"
+  ],
+  "boot_files": {
+    "bzImage": "http://netboot.test/other.test/1/bzImage",
+    "initrd": "http://netboot.test/other.test/1/initrd",
+    "root.squashfs": "http://netboot.test/other.test/1/root.squashfs"
+  },
+  "variants": [
+    {
+      "name": "default",
+      "label": "Default runlevel",
+      "kernel_params": [
+        "runlevel=default"
+      ]
+    },
+    {
+      "name": "nopools",
+      "label": "Default runlevel without container imports",
+      "kernel_params": [
+        "runlevel=default",
+        "osctl.pools=0"
+      ]
+    },
+    {
+      "name": "nostart",
+      "label": "Default runlevel without container autostart",
+      "kernel_params": [
+        "runlevel=default",
+        "osctl.autostart=0"
+      ]
+    },
+    {
+      "name": "rescue",
+      "label": "Rescue runlevel (network and sshd)",
+      "kernel_params": [
+        "runlevel=rescue"
+      ]
+    },
+    {
+      "name": "single",
+      "label": "Single-user runlevel (console only)",
+      "kernel_params": [
+        "runlevel=single"
+      ]
+    }
+  ],
+  "inputs_info": {
+    "z": "ž <>&  ",
+    "a": [
+      9007199254740993123456789,
+      1.2,
+      1.0e-07,
+      1.0e+15
+    ],
+    "nested": {
+      "b": false,
+      "a": null
+    }
+  }
+}

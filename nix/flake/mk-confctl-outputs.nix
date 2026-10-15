@@ -415,25 +415,7 @@ let
     ++ userModules
     ++ m.extraModules;
 
-  autoRollbackFor =
-    pkgs:
-    let
-      args = {
-        src = confctlSrc + "/libexec/auto-rollback.rb";
-        isExecutable = true;
-      };
-
-      replacements = {
-        ruby = pkgs.ruby;
-      };
-    in
-    if pkgs ? replaceVarsWith then
-      pkgs.replaceVarsWith {
-        inherit (args) src isExecutable;
-        inherit replacements;
-      }
-    else
-      pkgs.substituteAll ({ inherit (args) src isExecutable; } // replacements);
+  autoRollbackFor = pkgs: import (confctlSrc + "/nix/helpers/auto-rollback.nix") { inherit pkgs; };
 
   evalConfigFor =
     m:
