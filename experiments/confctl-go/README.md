@@ -5,7 +5,8 @@
 `init`, `add`, `rename`, `rediscover`, `ls`, `inputs ls`, `inputs channel ls`,
 `inputs update`, `inputs channel update`, `inputs machine update`,
 `inputs set`, `inputs channel set`, `inputs machine set`,
-`status --generation none`, `generation ls`, `test-connection`, `ssh`, `cssh`
+`status --generation none`, `generation ls`, `test-connection`, `ssh`, `cssh`,
+`diff`, `changelog`
 and explicitly registered external extensions. Other
 commands and generation modes fail before opening logs, evaluating Nix, running
 SSH or changing configuration.
@@ -235,11 +236,11 @@ The following table is checked against the command registry:
 | --- | --- |
 | `add` | Available |
 | `build` | Unavailable |
-| `changelog` | Unavailable |
+| `changelog` | Available |
 | `collect-garbage` | Unavailable |
 | `cssh` | Available |
 | `deploy` | Unavailable |
-| `diff` | Unavailable |
+| `diff` | Available |
 | `gen-data vpsadmin all` | Unavailable |
 | `gen-data vpsadmin containers` | Unavailable |
 | `gen-data vpsadmin network` | Unavailable |
@@ -314,6 +315,33 @@ matching. For integers beyond a machine long, this bounded behavior differs
 from the original Ruby array's `RangeError`. Age selection uses a strict cutoff
 and retains timestamp fractions. Reads never repair current links or create
 profiles or roots.
+
+`diff` and `changelog` compare managed machines sequentially with deployed input
+metadata. Without `--generation`, the target is the current configuration;
+an explicit selector reads existing local generation records. Both confirm the
+selection unless `--yes` is used. A partial generation match prompts again before
+ignoring missing hosts. `--yes` still prints the resolved-generation table.
+
+`diff` reports role revisions without fetching comparison mirrors. `changelog`
+clones or fetches a mirror in the existing XDG/HOME cache and forwards Git's log
+body. `--downgrade` reverses the range; `--verbose` and `--patch` retain their
+existing meanings. An ordinary per-role Git error is displayed and comparison
+continues. Queries and mirror writes already completed remain on later failure.
+
+Paging requires terminal stdout and stderr, a nonblank `PAGER`, and
+`CONFCTL_TTY` other than `0`. Discovery honors the existing pager configuration
+and uses the package's declared shell for configured command strings. If no
+candidate is found, Basic paging shares the confirmation reader and restores
+terminal state after each key. A source binary without the shell linker binding
+fails only when it reaches a System pager operation. Ordinary completed pager
+nonzero status is ignored; start, input, cleanup and cancellation errors propagate.
+Cancellation joins the owned child without promising descendant termination.
+
+The existing Null pager suppresses comparison body output when stdout is
+redirected. It still performs queries and eligible changelog mirror operations;
+confirmation and resolved-generation tables are outside that pager. Local
+fixtures and PTY tests cover these paths; installed package and real-provider
+checks remain separate from the source tests.
 
 Default and selected-generation status, native build, deployment, generation
 removal, rotation and legacy software-pin migration remain unavailable. Native

@@ -83,6 +83,11 @@ Sources: [cluster:46–92](https://github.com/vpsfreecz/confctl/blob/cc40679d267
 
 ## Comparisons (2)
 
+The experimental Go CLI implements both comparison commands. Its
+[comparison and pager guide](../../experiments/confctl-go/README.md) describes
+current output routing, package shell binding and verification limits. The
+original command contract below remains the compatibility reference.
+
 `changelog [machine-pattern [role-pattern]]` and `diff [machine-pattern [role-pattern]]` accept F Y N, `-g/--generation`, `-d/--downgrade`; changelog additionally `-v/--verbose`, `-p/--patch` ([app:301–352](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/app.rb#L301)). Both select managed machines, confirm, resolve optional local generation (including missing-host confirmation) or evaluate current configured metadata; neither normally builds despite accepting N. Compare each host sequentially against deployed inputs, with optional TTY/PAGER. Empty selection has no explicit no-machines error.
 
 Offline prints `<host> is offline`; no roles prints `<host>: no inputs info`; unknown revisions print `<host> @ <role> in unknown state`; unchanged prints `<host>: no changes`. Role names are sorted; pattern uses Ruby matching. Diff prints `<host> @ <role> (<url>): <old-short> -> <new-short>` with URL segment conditional. Downgrade swaps direction. Changelog fetches/reuses a Git mirror and prints log; default `--oneline --max-count=50`, verbose removes both, patch adds `-p` and removes count limit. Mirror errors print an error per entry instead of failing the whole comparison. Exact blank-line/pager/caught-error transcripts require fixtures `compare.*` ([cluster:207–295,1385–1544](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/cluster.rb#L207)).

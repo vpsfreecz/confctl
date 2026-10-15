@@ -113,6 +113,60 @@ func TestBuiltinDeclarations(t *testing.T) {
 	}
 }
 
+func TestComparisonDeclarationsAndAvailability(t *testing.T) {
+	r := BuiltinRegistry()
+	// Keep the complete unrelated leaf map explicit: public comparison must not
+	// accidentally enable the next build, status, deployment or mutation units.
+	unavailable := map[string]bool{
+		"build": true, "deploy": true, "collect-garbage": true,
+		"generation rm": true, "generation rotate": true, "health-check": true,
+		"gen-data vpsadmin all": true, "gen-data vpsadmin containers": true, "gen-data vpsadmin network": true,
+	}
+	available := 0
+	for _, c := range r.Leaves() {
+		mode := Available
+		if unavailable[pathKey(c.Path)] {
+			mode = Unavailable
+		} else if pathKey(c.Path) == "status" {
+			mode = Conditional
+		}
+		if c.Availability.Mode != mode {
+			t.Fatal(c.Path, c.Availability, mode)
+		}
+		if mode == Available {
+			available++
+		}
+	}
+	if available != 19 || len(r.Leaves()) != 29 {
+		t.Fatal(available, len(r.Leaves()))
+	}
+	for _, command := range []string{"diff", "changelog"} {
+		c, _ := r.Lookup([]string{command})
+		if c.Handler != ComparisonHandler || c.ArgumentPolicy != FreeForm || c.Usage != "[machine-pattern [role-pattern]]" || len(c.Arguments) != 2 {
+			t.Fatal(c)
+		}
+		inv, err := r.Parse([]string{command})
+		if err != nil || r.CheckAvailability(inv) != nil || inv.Options["generation"].Present || inv.Options["generation"].Value.Kind != Null || inv.Options["yes"].Value.Bool || inv.Options["downgrade"].Value.Bool {
+			t.Fatal(inv, err)
+		}
+		inv, err = r.Parse([]string{command, "--generation", "", "--downgrade", "-j", "auto", "--cores", "12", "node*", "role*", "extra", "--help"})
+		if err != nil || !inv.Options["generation"].Present || inv.Options["generation"].Value.String != "" || !inv.Options["downgrade"].Value.Bool || inv.Options["max-jobs"].Value.String != "auto" || !reflect.DeepEqual(inv.Args, []string{"node*", "role*", "extra", "--help"}) || inv.Help {
+			t.Fatal(inv, err)
+		}
+		for _, mode := range []AvailabilityMode{Unavailable, Conditional} {
+			commands := r.Commands()
+			for i := range commands {
+				if pathKey(commands[i].Path) == command {
+					commands[i].Availability.Mode = mode
+				}
+			}
+			if _, err := NewRegistry(r.Globals(), commands); err == nil {
+				t.Fatal("accepted comparison handler conflict", mode)
+			}
+		}
+	}
+}
+
 func TestRegistryValidation(t *testing.T) {
 	for _, tc := range []struct {
 		name string
