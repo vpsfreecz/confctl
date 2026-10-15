@@ -97,7 +97,7 @@ func Main(ctx context.Context, argv []string) (result int) {
 	logName := cmd
 	if extensionCommand {
 		logName = strings.Join(command.Path, "-")
-	} else if inv.Command.Handler == cli.InputsReadHandler || inv.Command.Handler == cli.InputsUpdateHandler || inv.Command.Handler == cli.InputsSetHandler || inv.Command.Handler == cli.GenerationListHandler {
+	} else if inv.Command.Handler == cli.InputsReadHandler || inv.Command.Handler == cli.InputsUpdateHandler || inv.Command.Handler == cli.InputsSetHandler || inv.Command.Handler == cli.GenerationListHandler || inv.Command.Handler == cli.GenDataHandler {
 		logName = strings.Join(inv.Command.Path, "-")
 	}
 	if err = e.OpenLog(logName); err != nil {
@@ -124,6 +124,8 @@ func Main(ctx context.Context, argv []string) (result int) {
 		err = e.LogComparisonCLI(inv)
 	} else if inv.Command.Handler == cli.HealthCheckHandler {
 		err = e.LogHealthCLI(inv)
+	} else if inv.Command.Handler == cli.GenDataHandler {
+		err = e.LogGenDataCLI(inv)
 	} else if !extensionCommand || supportedRuntimeCommand(command) {
 		err = e.LogCLI(cmd, opts, commandArgv)
 	} else {
@@ -294,6 +296,13 @@ func Main(ctx context.Context, argv []string) (result int) {
 		}
 		// A later successful attempt must preserve the earlier failure's log.
 		success = !checked.RetainLog
+		return 0
+	}
+	if inv.Command.Handler == cli.GenDataHandler {
+		if err = e.GenData(inv, os.Stdin, os.Stdout, os.Stderr); err != nil {
+			return fail(err, 1)
+		}
+		success = true
 		return 0
 	}
 	if cmd == "ls" && opts.List {

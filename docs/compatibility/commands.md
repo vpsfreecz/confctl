@@ -116,3 +116,11 @@ Declarations [app:419–513](https://github.com/vpsfreecz/confctl/blob/cc40679d2
 ## Data generation (3)
 
 `gen-data vpsadmin all`, `gen-data vpsadmin containers`, `gen-data vpsadmin network` declare no arguments or local flags ([app:515–534](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/app.rb#L515)). No Y bypass or ordinary confirmation. They prompt for API authentication, including dynamic protected fields. Containers evaluates all machines with non-nil container metadata (no managed filter), fetches each referenced VPS, writes `data/vpsadmin/containers.nix`. Network fetches network.list, partitions IPv4/IPv6, writes `data/vpsadmin/networks/containers.nix`. All executes containers then network with one memoized client; first file can remain updated if second fails. No directory creation in update_file. API/schema/serialization details and external-library uncertainties are [documented separately](interfaces.md#gen-data-and-authentication). Fixtures: `gen-data.containers`, `gen-data.network`, `gen-data.all`, `gen-data.auth`.
+
+The Go CLI exposes all three `gen-data vpsadmin` commands through the same
+provider and generation owners. It sends prompts to the original stdout and
+protocol warnings directly to the original stderr. Invocation logs contain
+command metadata, while credentials, tokens, prompt answers, API responses and
+warning text stay out of the logs. Operational errors retain the log and return
+status 1; success removes it and returns 0. Usage errors return 64 before
+acquiring a log or authenticating.

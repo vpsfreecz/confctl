@@ -6,7 +6,7 @@
 `inputs update`, `inputs channel update`, `inputs machine update`,
 `inputs set`, `inputs channel set`, `inputs machine set`,
 `status --generation none`, `generation ls`, `test-connection`, `ssh`, `cssh`,
-`diff`, `changelog`, `health-check`
+`diff`, `changelog`, `health-check`, the three `gen-data vpsadmin` commands
 and explicitly registered external extensions. Other
 commands and generation modes fail before opening logs, evaluating Nix, running
 SSH or changing configuration.
@@ -24,6 +24,20 @@ failures using the configured worker count, retry timeout and cooldown. A failed
 check or process error returns status 1. Logs remain available after any failed
 attempt, even when a later attempt succeeds and the command returns status 0.
 See [Health checks](../../docs/health-checks.md) for predicates and retry behavior.
+
+`gen-data vpsadmin containers`, `network` and `all` prompt for API credentials
+without an ordinary yes/no confirmation. Authentication completes before
+containers load machine metadata; network generation skips inventory entirely.
+The commands keep prompt, credential, token, response and protocol-warning data
+out of their invocation logs. Warnings go directly to stderr. Success removes
+the log; operational failures return status 1 and retain it.
+
+Generated files use the existing `data/vpsadmin` paths and fixed `.new` files.
+The parent directories must already exist. `all` saves containers before
+fetching and saving networks, so an error in the second step can leave the first
+file updated. Inspect retained files before retrying; the command performs no
+rollback. See [Gen-data and authentication](../../docs/compatibility/interfaces.md#gen-data-and-authentication)
+for the data and authentication contracts.
 
 `ssh` selects managed runnable machines and retains literal OpenSSH arguments,
 including `CONFCTL_SSH_CONFIG` and per-machine ports. Commands run serially or
@@ -248,9 +262,9 @@ The following table is checked against the command registry:
 | `cssh` | Available |
 | `deploy` | Unavailable |
 | `diff` | Available |
-| `gen-data vpsadmin all` | Unavailable |
-| `gen-data vpsadmin containers` | Unavailable |
-| `gen-data vpsadmin network` | Unavailable |
+| `gen-data vpsadmin all` | Available |
+| `gen-data vpsadmin containers` | Available |
+| `gen-data vpsadmin network` | Available |
 | `generation ls` | Available |
 | `generation rm` | Unavailable |
 | `generation rotate` | Unavailable |

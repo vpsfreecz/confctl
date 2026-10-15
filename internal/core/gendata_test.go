@@ -837,11 +837,11 @@ func TestGenDataCorePublicBoundary(t *testing.T) {
 	for _, leaf := range []string{"containers", "network", "all"} {
 		path := []string{"gen-data", "vpsadmin", leaf}
 		inv, err := r.Parse(path)
-		if err != nil || r.CheckAvailability(inv) == nil {
-			t.Fatal("public gen-data became available")
+		if err != nil || r.CheckAvailability(inv) != nil || inv.Command.Handler != cli.GenDataHandler {
+			t.Fatal("public gen-data dispatch is unavailable")
 		}
 		command, ok := r.Lookup(path)
-		if !ok || command.Availability.Mode != cli.Unavailable {
+		if !ok || command.Availability.Mode != cli.Available {
 			t.Fatal("public declaration changed")
 		}
 	}

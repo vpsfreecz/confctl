@@ -120,7 +120,6 @@ func TestComparisonDeclarationsAndAvailability(t *testing.T) {
 	unavailable := map[string]bool{
 		"build": true, "deploy": true, "collect-garbage": true,
 		"generation rm": true, "generation rotate": true,
-		"gen-data vpsadmin all": true, "gen-data vpsadmin containers": true, "gen-data vpsadmin network": true,
 	}
 	available := 0
 	for _, c := range r.Leaves() {
@@ -137,7 +136,7 @@ func TestComparisonDeclarationsAndAvailability(t *testing.T) {
 			available++
 		}
 	}
-	if available != 20 || len(r.Leaves()) != 29 {
+	if available != 23 || len(r.Leaves()) != 29 {
 		t.Fatal(available, len(r.Leaves()))
 	}
 	for _, command := range []string{"diff", "changelog"} {
