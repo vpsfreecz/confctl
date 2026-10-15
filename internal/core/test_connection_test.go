@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -467,5 +468,41 @@ func TestTestConnectionAdapterLogAndFullCapture(t *testing.T) {
 	b, _ = os.ReadFile(e.Log.Name())
 	if strings.Count(string(b), "] Finished") != 1 || !strings.HasSuffix(string(b), "Running cat /proc/uptime\n") {
 		t.Fatal("spawn emitted Finished", string(b))
+	}
+}
+
+func TestTestConnectionConfirmationWriteFailures(t *testing.T) {
+	for _, boundary := range []string{"prompt", "yes-ack", "no-ack"} {
+		t.Run(boundary, func(t *testing.T) {
+			failure := errors.New("confirmation writer failed")
+			out := &confirmationFailWriter{err: failure}
+			answer := "y\n"
+			if boundary == "prompt" {
+				out.failPrompt = 1
+			} else {
+				out.failAck = 1
+			}
+			if boundary == "no-ack" {
+				answer = "n\n"
+			}
+			in := bufio.NewReader(strings.NewReader(answer + "TAIL"))
+			e := connectionEngine(t, connectionMachine("one", "one", "unused.invalid", true))
+			calls := 0
+			err := e.runTestConnection(connectionInvocation(t, "one"), in, out, testConnectionDeps{Run: func(context.Context, string, []string, []byte) (Result, error) {
+				calls++
+				return Result{}, nil
+			}})
+			if !errors.Is(err, failure) || calls != 0 {
+				t.Errorf("err=%v calls=%d", err, calls)
+			}
+			remaining, readErr := io.ReadAll(in)
+			want := "TAIL"
+			if boundary == "prompt" {
+				want = answer + want
+			}
+			if readErr != nil || string(remaining) != want {
+				t.Fatal("consumed logical input", string(remaining), want, readErr)
+			}
+		})
 	}
 }

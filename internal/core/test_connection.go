@@ -129,7 +129,9 @@ func (e *Engine) runTestConnection(inv cli.Invocation, in io.Reader, out io.Writ
 func testConnectionConfirm(in io.Reader, out io.Writer) error {
 	r := bufio.NewReader(in)
 	for {
-		fmt.Fprint(out, "\nContinue? [y/N]: ")
+		if _, err := fmt.Fprint(out, "\nContinue? [y/N]: "); err != nil {
+			return err
+		}
 		line, err := r.ReadString('\n')
 		if err != nil && err != io.EOF {
 			return err
@@ -139,10 +141,12 @@ func testConnectionConfirm(in io.Reader, out io.Writer) error {
 		}
 		switch strings.ToLower(testConnectionStrip(line)) {
 		case "y":
-			fmt.Fprintln(out)
-			return nil
+			_, err := fmt.Fprintln(out)
+			return err
 		case "n":
-			fmt.Fprintln(out)
+			if _, err := fmt.Fprintln(out); err != nil {
+				return err
+			}
 			return fmt.Errorf("Aborted")
 		}
 	}

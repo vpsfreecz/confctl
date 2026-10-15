@@ -232,28 +232,7 @@ type MachineResolver struct {
 }
 
 func (r *MachineResolver) Resolve(machine, role string) (any, error) {
-	if r.keys == nil {
-		b, err := r.Eval(".#confctl.machineKeys")
-		if err != nil {
-			return nil, err
-		}
-		if err = decode(b, &r.keys); err != nil {
-			return nil, err
-		}
-	}
-	key, known := r.keys[machine]
-	if !known {
-		for _, k := range r.keys {
-			if k == machine {
-				key, known = machine, true
-				break
-			}
-		}
-	}
-	if !known {
-		return nil, fmt.Errorf("Unknown machine %q", machine)
-	}
-	b, err := r.Eval(fmt.Sprintf(".#confctl.inputsInfo.%v", key))
+	b, err := r.InputInfo(machine)
 	if err != nil {
 		return nil, err
 	}
@@ -271,4 +250,34 @@ func (r *MachineResolver) Resolve(machine, role string) (any, error) {
 		return nil, fmt.Errorf("machine '%s' has no role '%s'", machine, role)
 	}
 	return input, nil
+}
+
+// InputInfo returns the evaluator's raw metadata for this machine without
+// decoding or caching it. Publish keys only after complete successful decoding,
+// so a rejected mapping cannot supply a cached prefix to a later demand.
+func (r *MachineResolver) InputInfo(machine string) ([]byte, error) {
+	if r.keys == nil {
+		b, err := r.Eval(".#confctl.machineKeys")
+		if err != nil {
+			return nil, err
+		}
+		var keys map[string]any
+		if err = decode(b, &keys); err != nil {
+			return nil, err
+		}
+		r.keys = keys
+	}
+	key, known := r.keys[machine]
+	if !known {
+		for _, k := range r.keys {
+			if k == machine {
+				key, known = machine, true
+				break
+			}
+		}
+	}
+	if !known {
+		return nil, fmt.Errorf("Unknown machine %q", machine)
+	}
+	return r.Eval(fmt.Sprintf(".#confctl.inputsInfo.%v", key))
 }

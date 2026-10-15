@@ -294,3 +294,58 @@ func TestSSHRootShellNSSLiteralRequestAndFailures(t *testing.T) {
 		t.Fatal("interactive streams were copied through pipes")
 	}
 }
+
+// Pure source prerequisites: these early paths return before /dev/tty or Start.
+// They do not establish actual successful child/Wait/termios behavior.
+func TestPagerProcessInheritedStartupEarlyAcknowledgment(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	for _, tc := range []struct {
+		ctx     context.Context
+		argv    []string
+		want    error
+		message string
+	}{
+		{ctx: context.Background(), message: "empty argv"},
+		{ctx: ctx, argv: []string{"never-start%25"}, want: context.Canceled},
+	} {
+		called := 0
+		var ackErr error
+		r, err := runInheritedChild(tc.ctx, "", tc.argv, nil, &bytes.Buffer{}, &bytes.Buffer{}, func(err error) { called++; ackErr = err })
+		if called != 1 || ackErr != err || r.ExitCode != -1 || tc.want != nil && !errors.Is(err, tc.want) || tc.message != "" && (err == nil || err.Error() != tc.message) {
+			t.Fatal(r, err, called, ackErr)
+		}
+	}
+	r, err := runInheritedSSH(ctx, "", []string{"never-start%25"}, nil, nil, nil)
+	if !errors.Is(err, context.Canceled) || r.Command != `never-start\%25` || r.ExitCode != -1 {
+		t.Fatal(r, err)
+	}
+}
+
+func TestPagerProcessInheritedRawResultAndSSHStatusBoundary(t *testing.T) {
+	failure := errors.New("restore infrastructure")
+	for _, tc := range []struct {
+		r                 Result
+		runErr, errorWant error
+		ssh               int
+	}{
+		{r: Result{ExitCode: 9, waitErr: &exec.ExitError{}}, ssh: 9},
+		{r: Result{ExitCode: -1, signal: syscall.SIGTERM, waitErr: &exec.ExitError{}}, ssh: int(syscall.SIGTERM)},
+		{r: Result{ExitCode: 0, waitErr: syscall.ECHILD}, errorWant: syscall.ECHILD},
+		{r: Result{ExitCode: 0}, runErr: failure, errorWant: failure},
+	} {
+		ctx := context.Background()
+		if err := inheritedChildError(ctx, tc.r, tc.runErr); !errors.Is(err, tc.errorWant) {
+			t.Fatal(err)
+		}
+		status, err := sshStatus(ctx, tc.r, tc.runErr)
+		if !errors.Is(err, tc.errorWant) || err == nil && status != tc.ssh {
+			t.Fatal(status, err)
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := inheritedChildError(ctx, Result{ExitCode: 9}, failure); !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+}

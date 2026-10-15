@@ -1,7 +1,9 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
+	"math/big"
 	"os"
 	"sort"
 	"strings"
@@ -163,6 +165,153 @@ func generationTable(list *generation.UnifiedList) string {
 		return cell(rows[i]["host"]) < cell(rows[j]["host"])
 	})
 	return Table(rows, cols, true)
+}
+
+type resolvedBuild struct {
+	Host  string
+	Build *generation.Build
+}
+
+// Cluster comparison's table uses local host/build pairs, not unified records.
+// Source column order is first role occurrence; input names can overwrite base
+// row keys and create duplicate columns. Placeholder preparation precedes
+// typed sorting; display conversion follows.
+func resolvedBuildTable(builds []resolvedBuild, missing []string) (string, error) {
+	roles, seen := []string{}, map[string]bool{}
+	infos := make([]map[string]map[string]any, len(builds))
+	for i, resolved := range builds {
+		var err error
+		infos[i], err = comparisonInputs(resolved.Build.InputsInfo)
+		if err != nil {
+			return "", err
+		}
+		for _, member := range resolved.Build.InputsInfo {
+			if !seen[member.Name] {
+				roles = append(roles, member.Name)
+				seen[member.Name] = true
+			}
+		}
+	}
+	rows := make([]map[string]any, 0, len(builds)+len(missing))
+	for i, resolved := range builds {
+		var kernel any
+		if resolved.Build.KernelVersion != nil {
+			kernel = *resolved.Build.KernelVersion
+		}
+		row := map[string]any{"name": resolved.Host, "generation": resolved.Build.Name, "kernel": kernel}
+		for _, role := range roles {
+			rev, err := comparisonShort(infos[i][role])
+			if err != nil {
+				return "", err
+			}
+			row[role] = rev
+		}
+		rows = append(rows, row)
+	}
+	for _, host := range missing {
+		rows = append(rows, map[string]any{"name": host, "generation": "not found"})
+	}
+	// OutputFormatter.prepare replaces nil/false/empty String, retaining all
+	// other values for its [name,generation] comparison before to_s display.
+	cols := append([]string{"name", "generation", "kernel"}, roles...)
+	for _, row := range rows {
+		for _, col := range cols {
+			v := row[col]
+			if !truth(v) || v == "" {
+				row[col] = "-"
+			}
+		}
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		a := []any{rows[i]["name"], rows[i]["generation"]}
+		b := []any{rows[j]["name"], rows[j]["generation"]}
+		if cmp, comparable := resolvedBuildValueCompare(a, b); comparable {
+			return cmp < 0
+		}
+		// Source fallback is used only when <=> is nil. A literal "-" also
+		// matches @empty; a mixed pair without a placeholder stays stable.
+		for _, v := range a {
+			if v == nil || v == "-" {
+				return true
+			}
+		}
+		for _, v := range b {
+			if v == nil || v == "-" {
+				return false
+			}
+		}
+		return false
+	})
+	for _, row := range rows {
+		for key, value := range row {
+			row[key] = rubyValue(comparisonText(value))
+		}
+	}
+	return Table(rows, cols, true), nil
+}
+
+// Only the private resolved table reaches typed JSON sort keys. Array ordering
+// is lexicographic; unequal Hash/boolean or mixed types yield source <=> nil.
+// Numeric meaning uses the comparison owner's exact Integer/binary64 boundary.
+func resolvedBuildValueCompare(a, b any) (int, bool) {
+	if comparisonRevisionEqual(a, b) {
+		return 0, true
+	}
+	switch x := a.(type) {
+	case string:
+		y, ok := b.(string)
+		if ok {
+			return strings.Compare(x, y), true
+		}
+	case json.Number:
+		y, ok := b.(json.Number)
+		if !ok {
+			break
+		}
+		number := func(n json.Number) (*big.Rat, bool) {
+			if !strings.ContainsAny(string(n), ".eE") {
+				i, _ := new(big.Int).SetString(string(n), 10)
+				return new(big.Rat).SetInt(i), false
+			}
+			f, _ := n.Float64()
+			return new(big.Rat).SetFloat64(f), f > 0
+		}
+		xr, xp := number(x)
+		yr, yp := number(y)
+		if xr != nil && yr != nil {
+			return xr.Cmp(yr), true
+		}
+		// JSON exponents may overflow the existing binary64 interpretation.
+		if xr == nil {
+			if xp {
+				return 1, true
+			}
+			return -1, true
+		}
+		if yp {
+			return -1, true
+		}
+		return 1, true
+	case []any:
+		y, ok := b.([]any)
+		if !ok {
+			break
+		}
+		for i := 0; i < len(x) && i < len(y); i++ {
+			cmp, comparable := resolvedBuildValueCompare(x[i], y[i])
+			if !comparable || cmp != 0 {
+				return cmp, comparable
+			}
+		}
+		if len(x) < len(y) {
+			return -1, true
+		}
+		if len(x) == len(y) {
+			return 0, true
+		}
+		return 1, true
+	}
+	return 0, false
 }
 
 func (e *Engine) LogGenerationCLI(inv cli.Invocation) {

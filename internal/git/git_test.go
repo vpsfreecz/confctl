@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestCommitLiteralInheritedRunnerAndFailure(t *testing.T) {
@@ -148,5 +149,118 @@ func TestMirrorStatFailureDoesNotRunOrRepair(t *testing.T) {
 	b, err := os.ReadFile(blocked)
 	if err != nil || string(b) != "retain" {
 		t.Fatal("failed mirror repaired cache", string(b), err)
+	}
+}
+
+func TestMirrorLogOptionsLiteralArgumentsStripAndBorrowedSlice(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		legacy  bool
+		options []string
+		output  string
+		body    string
+	}{
+		{"legacy", true, nil, "\x00\t\n\v\f\r > old\n= kept \t\x00", "> old\n= kept"},
+		{"nil", false, nil, "", ""},
+		{"empty", false, []string{}, " \t\r\n\v\f\x00", ""},
+		{"oneline_max", false, []string{"--oneline", "--max-count=50"}, " > one \n", "> one"},
+		{"patch", false, []string{"-p"}, "\tpatch\n\nbody\r\n", "patch\n\nbody"},
+		{"ordered", false, []string{"--oneline", "-p", "--max-count=50", "-p"}, " \u00a0kept\u00a0 \n", "\u00a0kept\u00a0"},
+		{"literal", false, []string{"", "--format=quoted 'value'\n;$(literal)*", "--", "--max-count=0"}, "\x00 body \x00", "body"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.WithValue(context.Background(), struct{}{}, "same-context")
+			from, to := "old ref;$(literal)\n--all", "new' ref*..end"
+			span := from + ".." + to
+			m := Mirror{Root: "literal root/../cwd", Cache: "relative//cache/", URL: "literal URL/"}
+			wantOptions := tc.options
+			if tc.legacy {
+				wantOptions = []string{"--oneline"}
+			}
+			want := []string{"git", "-C", m.Path(), "log", "--no-decorate", "--left-right", "--cherry-mark"}
+			want = append(want, wantOptions...)
+			want = append(want, span)
+			// Spare capacity catches implementations that append the range into
+			// the caller's backing array. The fake also mutates its argv copy.
+			var options, backing, before []string
+			if tc.options != nil {
+				backing = append(append([]string{}, tc.options...), "spare-one", "spare-two")
+				options = backing[:len(tc.options)]
+				before = append([]string{}, backing...)
+			}
+			calls := 0
+			m.Run = func(actual context.Context, cwd string, argv []string) (string, error) {
+				calls++
+				if actual != ctx || cwd != m.Root || !reflect.DeepEqual(argv, want) {
+					t.Fatalf("context/CWD/argv changed: %q %q; want %q", cwd, argv, want)
+				}
+				if len(wantOptions) > 0 {
+					argv[7] = "runner-owned-change"
+				}
+				return tc.output, nil
+			}
+			var text string
+			var err error
+			if tc.legacy {
+				text, err = m.Log(ctx, from, to)
+			} else {
+				text, err = m.LogWithOptions(ctx, from, to, options)
+			}
+			if err != nil || text != "git log for "+span+"\n"+tc.body || calls != 1 {
+				t.Fatalf("text%q err%v calls%d", text, err, calls)
+			}
+			if !reflect.DeepEqual(backing, before) {
+				t.Fatalf("modified borrowed options: %q; before %q", backing, before)
+			}
+		})
+	}
+}
+
+func TestMirrorLogOptionsErrorsAndCancellationPriority(t *testing.T) {
+	for _, legacy := range []bool{true, false} {
+		call := func(m Mirror, ctx context.Context) (string, error) {
+			if legacy {
+				return m.Log(ctx, "from", "to")
+			}
+			return m.LogWithOptions(ctx, "from", "to", []string{"-p", "--max-count=50"})
+		}
+		for _, failure := range []error{errors.New("ordinary log error"), context.Canceled, context.DeadlineExceeded} {
+			m := Mirror{Run: func(context.Context, string, []string) (string, error) { return "partial stdout", failure }}
+			text, err := call(m, context.Background())
+			if text != "" || err != failure {
+				t.Fatalf("legacy%v lost runner error/output boundary: text%q err%v", legacy, text, err)
+			}
+		}
+		canceled, cancel := context.WithCancel(context.Background())
+		cancel()
+		expired, stop := context.WithDeadline(context.Background(), time.Unix(1, 0))
+		for _, ctx := range []context.Context{canceled, expired} {
+			m := Mirror{Run: func(context.Context, string, []string) (string, error) {
+				t.Fatal("ran after preexisting cancellation")
+				return "", nil
+			}}
+			text, err := call(m, ctx)
+			if text != "" || err != ctx.Err() {
+				t.Fatalf("legacy%v pre-cancel text%q err%v", legacy, text, err)
+			}
+		}
+		stop()
+		for _, failure := range []error{nil, errors.New("ordinary callback failure")} {
+			ctx, cancel := context.WithCancel(context.Background())
+			calls := 0
+			m := Mirror{Run: func(actual context.Context, _ string, _ []string) (string, error) {
+				if actual != ctx {
+					t.Fatal("context replaced")
+				}
+				calls++
+				cancel()
+				return "successful or partial stdout", failure
+			}}
+			text, err := call(m, ctx)
+			if text != "" || err != context.Canceled || calls != 1 {
+				t.Fatalf("legacy%v callback cancellation priority text%q err%v calls%d", legacy, text, err, calls)
+			}
+			cancel()
+		}
 	}
 }
