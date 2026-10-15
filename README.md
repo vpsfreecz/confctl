@@ -13,20 +13,22 @@ machines.
   configurations)
 * Query machine state, view changelogs and diffs
 * Run health checks
-* Automatically roll back faulty configurations
+* [Automatically roll back faulty configurations](docs/auto-rollback.md)
 * Support for creating netboot servers with option to kexec, see [docs/carrier.md](docs/carrier.md)
 
-## Experimental language evaluation
+## Packages and extensions
 
-The separately packaged [Go measurement prototype](experiments/confctl-go/README.md)
-and [compatibility harness](tests/compat/README.md) characterize a bounded CLI
-subset against the pinned Ruby implementation. They do not change the normal
-package or deployment workflow.
-The Go module lives at the repository root; its experimental public
-[extension SDK](extension/README.md) uses `github.com/vpsfreecz/confctl/extension`.
-The Go package provides the CLI and hook driver. Site executables and registries
-are configuration-owned and supplied explicitly for fixture composition and
-[executable conformance](experiments/confctl-go/README.md).
+The normal `confctl` package builds the Go CLI, hook driver and command manuals.
+It uses the same command implementation as the Go prototype. The
+[compatibility harness](tests/compat/README.md) and `confctl-ruby` package retain
+the original Ruby implementation for comparison and recovery; they are separate
+from normal Go development.
+
+Commands supplied by a configuration use the [executable extension API](extension/README.md).
+The configuration owns its registry, executable packages and command composition.
+See the configuration's [extension guide](https://github.com/vpsfreecz/vpsfree-cz-configuration/blob/0c557149fd4e6e653cd876b16382559efbb548e4/extensions/README.md)
+for its netboot and runtime-kernel workflows. Builtin commands, options and help
+come from the CLI registry, which also supplies the command manuals.
 
 ## Requirements
 
@@ -83,9 +85,9 @@ confctl init
       confctl = confctlOutputs;
 
       # Shell modes:
-      # - minimal: no Gemfile, best default
-      # - tools: Gemfile for repo tools such as overcommit or rubocop
-      # - bundled-confctl: Gemfile includes confctl and scripts/ can use bundle gems
+      # - minimal: packaged Go CLI and runtime tools
+      # - tools: also include development hooks and Go formatters
+      # - bundled-confctl: compatibility alias for tools
       devShells.x86_64-linux.default = confctl.lib.mkConfigDevShell {
         system = "x86_64-linux";
         mode = "minimal";
@@ -106,9 +108,10 @@ nix develop
 This makes `confctl` available from the pinned flake input package and exposes
 its man pages on `MANPATH`.
 
-For the Bundler modes, commit `Gemfile.lock` whenever possible. `confctl` can
-bootstrap those shells without it, but the lockfile makes CI and local shells
-reproducible.
+All three shell modes use the packaged Go CLI. They do not run Bundler or create
+`.gems`. Entering a shell does not install hooks or approve a hook policy. See
+[development and hooks](docs/development-hooks.md) for explicit setup and the
+separate Ruby service/oracle lane.
 
 Before the first build or deploy, make sure the per-user gcroot directory
 exists:
@@ -151,12 +154,15 @@ updating the tool. The [upgrade guide](docs/swpins-to-flakes.md) describes migra
 retained generations, GC roots and rollback preparation. This version has no
 software-pin or migration commands.
 
-The [command manual](man/man8/confctl.8.md) and
-[option reference](man/man8/confctl-options.nix.8.md) are also installed as man pages.
+The package installs `confctl(8)`, `confctl-options.nix(8)` and
+`kexec-netboot(8)`. The `confctl-docs` flake output also contains an HTML index at
+`share/doc/confctl/html/index.html` and the generated Markdown sources. See the
+[documentation generator](internal/docgen/README.md) for build interfaces.
 
-For development of confctl itself, the repository's `shell.nix` remains an
-optional Bundler shell using host `<nixpkgs>`. It does not evaluate a cluster;
-use `nix develop` for the configuration workflow above.
+For development of confctl itself, use `nix develop` from this repository.
+`shell.nix` selects the same locked default shell. Both use Go tooling; the
+[development guide](docs/development-hooks.md) covers source checks and the
+explicit original Ruby shell.
 
 ## Example configuration
 Example configuration, which can be used as a starting point, can be found in
@@ -183,8 +189,8 @@ See also existing configurations:
     ├── environments/           # Environment presets for various types of machines, optional
     ├── flake.nix               # Flake entrypoint
     ├── flake.lock              # Locked input sources
-    ├── Gemfile                 # Optional Bundler config for tools/bundled-confctl modes
-    ├── Gemfile.lock            # Recommended for Bundler modes
+    ├── Gemfile                 # Optional Bundler config for the original Ruby tool or services
+    ├── Gemfile.lock            # Lockfile for that explicit Ruby environment
     ├── modules/                # User-defined modules
     │   └── cluster/default.nix # User-defined extensions of `cluster.` options used in `<machine>/module.nix` files
     └── scripts/                # User-defined scripts
@@ -493,34 +499,14 @@ Note that these modules are self-contained. They are not evaluated with the full
 set of NixOS modules. You have to import modules that you need.
 
 ## User-defined confctl commands
-User-defined Ruby scripts can be placed in directory `scripts`. Each script
-should create a subclass of `ConfCtl::UserScript` and call class-method `register`.
-Scripts can define their own `confctl` subcommands.
 
-### Example user script
-
-```ruby
-class MyScript < ConfCtl::UserScript
-  register
-
-  def setup_cli(app)
-    app.desc 'My CLI command'
-    app.command 'my-command' do |c|
-      c.action &ConfCtl::Cli::Command.run(c, MyCommand, :run)
-    end
-  end
-end
-
-class MyCommand < ConfCtl::Cli::Command
-  def run
-    puts 'Hello world'
-  end
-end
-```
+Use the [executable extension API and Go SDK](extension/README.md) to add commands
+and event subscribers. A configuration supplies the registry explicitly and owns
+its installed executable paths. Ruby `ConfCtl::UserScript` classes are supported
+only by the retained original Ruby tool; the Go CLI does not load them.
 
 ## More information
-See the [man pages](./man/man8) for more information:
-
-* [confctl(8)](./man/man8/confctl.8.md)
-* [confctl-options.nix(8)](./man/man8/confctl-options.nix.8.md)
+* Installed `confctl(8)` and `confctl-options.nix(8)` manuals
+* [Development and hook setup](docs/development-hooks.md)
+* [Executable extensions](extension/README.md)
 * [Migrating from swpins to flakes](docs/swpins-to-flakes.md)

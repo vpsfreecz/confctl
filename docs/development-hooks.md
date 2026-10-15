@@ -157,6 +157,10 @@ The Ruby RSpec and RuboCop workflows are separate manual lanes. Existing VM
 integration tests remain available through `tests`, `testsMeta` and the test
 runner; their test framework can use Ruby independently of the normal CLI.
 `legacyChecks.SYSTEM.rspec` exposes the original RSpec package check.
-Normal CI builds the Go CLI, documentation and development tools and runs Go
-checks. Installed package, closure, platform and real disposable-hook checks
-remain distinct from unit-test success.
+The Go tooling workflow runs on native x86_64 and ARM64 Linux runners. Each
+job requires cgo, tests the Go sources and builds the normal CLI, documentation
+and development tools. It checks installed hooks in a disposable repository
+and builds four helper packages using the confined delivery fixtures. Those
+helper builds cover package construction and derivation checks; VM scenarios,
+state interoperability and operational helper actions have separate checks.
+Each architecture needs its own passing job.

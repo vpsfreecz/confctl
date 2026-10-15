@@ -560,7 +560,13 @@ func TestLogProcessCloseOnceAndReporting(t *testing.T) {
 	if err != nil || detach == nil || detach() != nil {
 		t.Fatal(err)
 	}
-	for _, status := range []int{0, 7} {
+	// A child's signal-shaped status is still a forwarded status. Only the
+	// entrypoint's own received-signal branch selects cancellation exit 1.
+	for _, status := range []int{0, 1, 7, 23, 64, 130, 143} {
+		w := &generationWarningWriter{count: -1}
+		if code, err := LogCleanupStatus(status, nil, w); code != status || err != nil || w.body.Len() != 0 {
+			t.Fatal(status, code, err, w.body.String())
+		}
 		for _, row := range []struct {
 			n         int
 			err, want error
@@ -575,10 +581,6 @@ func TestLogProcessCloseOnceAndReporting(t *testing.T) {
 				t.Fatal(code, err, w.body.String())
 			}
 		}
-	}
-	w := &generationWarningWriter{count: -1}
-	if code, err := LogCleanupStatus(0, nil, w); code != 0 || err != nil || w.body.Len() != 0 {
-		t.Fatal(code, err)
 	}
 }
 
