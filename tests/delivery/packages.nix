@@ -36,10 +36,17 @@ let
     end
     File.open(root + '/kexec.jsonl', 'a') { |f| f.puts(JSON.generate(record)) }
   '';
+  # Known copy-test bytes, not executable PXE payloads or bootability evidence.
+  fixtureBootData = pkgs.runCommand "delivery-fixture-boot-data" { } ''
+    mkdir -p "$out/share/syslinux"
+    for name in pxelinux.0 ldlinux.c32 libcom32.c32 libutil.c32 memdisk menu.c32 reboot.c32; do
+      printf 'asset:%s' "$name" > "$out/share/syslinux/$name"
+    done
+  '';
   netbootConfig = pkgs.writeText "delivery-netboot.json" (
     builtins.toJSON {
       coreutils = toString pkgs.coreutils;
-      syslinux = toString pkgs.syslinux;
+      syslinux = toString fixtureBootData;
       tftpRoot = root + "/tftp";
       httpRoot = root + "/http";
       hostName = "delivery-fixture";

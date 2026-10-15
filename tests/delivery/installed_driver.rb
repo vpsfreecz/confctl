@@ -155,6 +155,17 @@ describe 'installed helpers with explicit fixture bindings', order: :defined do
       out, err, status = Open3.capture3(B.fetch('builder'))
       abort "builder failed: #{out} #{err}" unless status.success?
       http, tftp = File.join(ROOT, 'http'), File.join(ROOT, 'tftp')
+      expected_assets = { 'pxelinux.0' => 'asset:pxelinux.0', 'ldlinux.c32' => 'asset:ldlinux.c32', 'libcom32.c32' => 'asset:libcom32.c32', 'libutil.c32' => 'asset:libutil.c32', 'memdisk' => 'asset:memdisk', 'menu.c32' => 'asset:menu.c32', 'reboot.c32' => 'asset:reboot.c32' }
+      copied_assets = lambda do |current_tftp|
+        bytes = expected_assets.keys.to_h do |name|
+          path = File.join(current_tftp, name)
+          abort "nonregular/symlink boot asset: #{name}" unless File.lstat(path).file? && !File.symlink?(path)
+          [name, File.binread(path)]
+        end
+        abort 'boot asset bytes differ' unless bytes == expected_assets
+        bytes
+      end
+      first_assets = copied_assets.call(tftp)
       old_roots = [File.realpath(http), File.realpath(tftp)]
       index = JSON.parse(File.read(File.join(http, 'machines.json')))
       machine = index.fetch('machines').fetch(0)
@@ -164,12 +175,15 @@ describe 'installed helpers with explicit fixture bindings', order: :defined do
       File.symlink(File.join(stores, '2'), current)
       out, err, status = Open3.capture3(B.fetch('builder'))
       abort "second builder failed: #{out} #{err}" unless status.success?
+      final_assets = copied_assets.call(tftp)
       final = JSON.parse(File.read(File.join(http, 'machines.json'))).fetch('machines').fetch(0)
       params = final.fetch('generations').find { |g| g.fetch('current') }.fetch('kernel_params')
       menu = File.read(File.join(tftp, 'pxeserver/machines/node.test/auto.cfg'))
-      puts JSON.generate('first_current' => first_current, 'final_current' => final.fetch('generations').find { |g| g.fetch('current') }.fetch('generation'), 'params' => params, 'menu_has_payload' => menu.include?('boot/node.test/2/bzImage') && menu.include?('boot/node.test/2/initrd') && menu.include?('console=ttyS0'), 'current_links' => [File.readlink(File.join(http, 'node.test/current')), File.readlink(File.join(tftp, 'boot/node.test/current'))], 'payload' => File.read(File.join(http, 'node.test/2/bzImage')), 'inputs_info' => final.fetch('generations').find { |g| g.fetch('current') }.fetch('inputs_info'), 'old_roots_removed' => old_roots.none? { |path| File.exist?(path) }, 'outside_untouched' => File.read(File.join(marker, 'sentinel')))
+      puts JSON.generate('first_assets' => first_assets, 'final_assets' => final_assets, 'first_current' => first_current, 'final_current' => final.fetch('generations').find { |g| g.fetch('current') }.fetch('generation'), 'params' => params, 'menu_has_payload' => menu.include?('boot/node.test/2/bzImage') && menu.include?('boot/node.test/2/initrd') && menu.include?('console=ttyS0'), 'current_links' => [File.readlink(File.join(http, 'node.test/current')), File.readlink(File.join(tftp, 'boot/node.test/current'))], 'payload' => File.read(File.join(http, 'node.test/2/bzImage')), 'inputs_info' => final.fetch('generations').find { |g| g.fetch('current') }.fetch('inputs_info'), 'old_roots_removed' => old_roots.none? { |path| File.exist?(path) }, 'outside_untouched' => File.read(File.join(marker, 'sentinel')))
     RUBY_GUEST
     expect(actual.values_at('first_current', 'final_current', 'menu_has_payload', 'old_roots_removed', 'outside_untouched')).to eq([1, 2, true, true, 'keep'])
+    expected_assets = { 'pxelinux.0' => 'asset:pxelinux.0', 'ldlinux.c32' => 'asset:ldlinux.c32', 'libcom32.c32' => 'asset:libcom32.c32', 'libutil.c32' => 'asset:libutil.c32', 'memdisk' => 'asset:memdisk', 'menu.c32' => 'asset:menu.c32', 'reboot.c32' => 'asset:reboot.c32' }
+    expect(actual.values_at('first_assets', 'final_assets')).to eq([expected_assets, expected_assets])
     expect(actual.fetch('payload')).to eq('payload:2:bzImage')
     expected_params = [
       'httproot=http://127.0.0.1:18080/node.test/2/initrd',
