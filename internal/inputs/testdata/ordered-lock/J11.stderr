@@ -1,0 +1,1 @@
+/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/observer.rb:127: warning: detected duplicate key "b" in JSON object. This will raise an error in json 3.0 unless enabled via `allow_duplicate_key: true` at line 1 column 1

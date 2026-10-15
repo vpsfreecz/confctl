@@ -1,0 +1,43 @@
+{
+  "config_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-missing-lock-1631973290/config",
+  "run_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-missing-lock-1631973290",
+  "schema": 1,
+  "case": "inputs-root-missing-lock",
+  "executable": "/nix/store/x96jzlpaq69bkdardsn56px7czybkbs8-confctl/bin/confctl",
+  "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de",
+  "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "fixture_sha256": "abed4c0d6e68b0482f1634f2b2e2d5ca0c8c2675cdad722126b8af0a4ddcd9e3",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "stdout": "",
+  "stderr": "\nLog file: ${ROOT}/.confctl/logs/${LOG_TIME:1}-confctl-inputs-ls.log\nerror: No such file or directory @ rb_sysopen - ${ROOT}/flake.lock\n",
+  "exit": 1,
+  "before": {
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "after": {
+    ".confctl": {
+      "mode": 2147484141
+    },
+    ".confctl/logs": {
+      "mode": 2147484141
+    },
+    ".confctl/logs/${LOG_TIME:1}-confctl-inputs-ls.log": {
+      "text": "{command: [\"inputs\", \"ls\"],\n global_options: {\"c\" =\u003e \"auto\", \"color\" =\u003e \"auto\", \"help\" =\u003e false},\n command_options: {#\u003cGLI::Command::ParentKey:${PARENT_ADDRESS:1}\u003e =\u003e {}},\n arguments: []}\n",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "events": null,
+  "git_before": {},
+  "git_after": {},
+  "wall_ns": 0,
+  "user_ns": 0,
+  "system_ns": 0,
+  "max_rss_kb": 0
+}

@@ -1,0 +1,12 @@
+Go module dependency licenses
+=============================
+
+These module versions are selected by go.mod/go.sum. The files named below
+retain their upstream LICENSE bytes, including copyright and permission terms.
+A selected module is not necessarily linked into every delivered command.
+Vendored source retains its own upstream notices as well.
+
+golang.org/x/sys v0.49.0 (BSD-3-Clause)
+  golang.org-x-sys-v0.49.0.LICENSE
+golang.org/x/term v0.47.0 (BSD-3-Clause)
+  golang.org-x-term-v0.47.0.LICENSE

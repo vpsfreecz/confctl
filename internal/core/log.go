@@ -4,8 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
+
+	"github.com/vpsfreecz/confctl/internal/cli"
 )
 
 func logID() string { var b [4]byte; _, _ = rand.Read(b[:]); return hex.EncodeToString(b[:]) }
@@ -136,3 +140,79 @@ func (e *Engine) LogCLI(cmd string, o Options, raw []string) {
 	b.WriteString("},\n arguments: " + rubyInspect(args) + "}\n")
 	e.logText(b.String())
 }
+
+// The two option-free inputs leaves retain the original PP parent-key layout.
+// GLI uses one PARENT constant at both depths; its address is log-scoped only.
+func (e *Engine) LogInputsCLI(path []string, args []string) {
+	command, arguments := make([]any, len(path)), make([]any, len(args))
+	for i, p := range path {
+		command[i] = p
+	}
+	for i, a := range args {
+		arguments[i] = a
+	}
+	parent := "#<GLI::Command::ParentKey:0x0000000000000000>"
+	options := " {" + parent + " => {}}"
+	if len(path) == 3 {
+		options = "\n  {" + parent + " =>\n    {" + parent + " => {}}}"
+	}
+	e.logText(fmt.Sprintf("{command: %s,\n global_options: {\"c\" => %s, \"color\" => %s, \"help\" => false},\n command_options:%s,\n arguments: %s}\n", rubyInspect(command), rubyInspect(e.Color), rubyInspect(e.Color), options, rubyInspect(arguments)))
+}
+
+// GLI callbacks insert explicit options in first encounter order, then append
+// defaults in declaration order. Each spelling stays together; the one parent
+// identity is reused at both depths, exactly as in the read-only adapter.
+func (e *Engine) LogInputUpdateCLI(inv cli.Invocation) {
+	command, arguments := make([]any, len(inv.Command.Path)), make([]any, len(inv.Args))
+	for i, p := range inv.Command.Path {
+		command[i] = p
+	}
+	for i, a := range inv.Args {
+		arguments[i] = a
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "{command: %s,\n global_options: {\"c\" => %s, \"color\" => %s, \"help\" => false},\n command_options:\n  {", rubyInspect(command), rubyInspect(e.Color), rubyInspect(e.Color))
+	separator := ""
+	specs := append([]cli.OptionSpec(nil), inv.Command.Options...)
+	sort.SliceStable(specs, func(i, j int) bool {
+		a, b := inv.Options[specs[i].Key].FirstEncounter, inv.Options[specs[j].Key].FirstEncounter
+		return a != 0 && (b == 0 || a < b)
+	})
+	for _, spec := range specs {
+		for _, name := range spec.Names {
+			fmt.Fprintf(&b, "%s%s => %s", separator, rubyInspect(name), rubyInspect(inv.Options[spec.Key].Value.Bool))
+			separator = ",\n   "
+		}
+	}
+	parent := "#<GLI::Command::ParentKey:0x0000000000000000>"
+	b.WriteString(separator + parent + " =>")
+	if len(inv.Command.Path) == 3 {
+		b.WriteString("\n    {" + parent + " => {}}}")
+	} else {
+		b.WriteString(" {}}")
+	}
+	b.WriteString(inputLogArgumentsField(arguments))
+	e.logText(b.String())
+}
+
+// Logger's final arguments hash field has a 79-character PP context. The closing
+// hash brace participates in fit; the array's comma group breaks together.
+// Count the existing inspected tokens as characters, without splitting them.
+func inputLogArgumentsField(arguments []any) string {
+	tokens := make([]string, len(arguments))
+	for i, argument := range arguments {
+		tokens[i] = rubyInspect(argument)
+	}
+	array := "[" + strings.Join(tokens, ", ") + "]"
+	width := utf8.RuneCountInString(array)
+	if width <= 66 {
+		return ",\n arguments: " + array + "}\n"
+	}
+	if width >= 77 {
+		array = "[" + strings.Join(tokens, ",\n   ") + "]"
+	}
+	return ",\n arguments:\n  " + array + "}\n"
+}
+
+// Set uses the same ordered boolean declarations and PP parent layout.
+func (e *Engine) LogInputSetCLI(inv cli.Invocation) { e.LogInputUpdateCLI(inv) }

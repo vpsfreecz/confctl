@@ -1,0 +1,6 @@
+NAME
+    ls - List root-level flake inputs and their locked revisions
+
+SYNOPSIS
+
+    confctl [global options] inputs ls [input-pattern]
