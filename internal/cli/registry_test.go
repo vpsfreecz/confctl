@@ -10,6 +10,32 @@ import (
 	"testing"
 )
 
+func TestTestConnectionDeclarationsAndAvailability(t *testing.T) {
+	r := BuiltinRegistry()
+	c, ok := r.Lookup([]string{"test-connection"})
+	if !ok || c.Handler != TestConnectionHandler || c.Availability.Mode != Available || c.ArgumentPolicy != FreeForm || len(c.Options) != 4 {
+		t.Fatal(c)
+	}
+	if !reflect.DeepEqual(c.Options[0].Choices, []string{"y", "yes", "n", "no", "a", "all"}) || c.Options[0].Default.Kind != Null {
+		t.Fatal("managed declaration changed", c.Options[0])
+	}
+	inv, err := r.Parse([]string{"test-connection", "-y", "one", "extra", "--help"})
+	if err != nil || inv.Help || r.CheckAvailability(inv) != nil || !reflect.DeepEqual(inv.Args, []string{"one", "extra", "--help"}) {
+		t.Fatal(inv, err)
+	}
+	for _, mode := range []AvailabilityMode{Unavailable, Conditional} {
+		commands := r.Commands()
+		for i := range commands {
+			if pathKey(commands[i].Path) == "test-connection" {
+				commands[i].Availability.Mode = mode
+			}
+		}
+		if _, err := NewRegistry(r.Globals(), commands); err == nil {
+			t.Fatal("accepted handler/availability conflict", mode)
+		}
+	}
+}
+
 func TestInputsHelpReferences(t *testing.T) {
 	var reference struct {
 		SourceRevision string `json:"source_revision"`

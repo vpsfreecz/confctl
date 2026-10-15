@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -24,6 +25,301 @@ func TestCLIStage1Subprocess(t *testing.T) {
 		panic(err)
 	}
 	os.Exit(Main(context.Background(), argv))
+}
+
+type connectionCLIResult struct {
+	code                                int
+	out, stderr, trace, args, log, root string
+}
+
+func connectionCLI(t *testing.T, argv []string, input string, ms []Machine, toolBody string, catMode os.FileMode, flake bool, config string) connectionCLIResult {
+	t.Helper()
+	root := t.TempDir()
+	tools := filepath.Join(root, "tools")
+	if err := os.Mkdir(tools, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if flake {
+		if err := os.WriteFile(filepath.Join(root, "flake.nix"), []byte("{ outputs = _: {}; }\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var inventory strings.Builder
+	inventory.WriteByte('{')
+	for i, m := range ms {
+		if i > 0 {
+			inventory.WriteByte(',')
+		}
+		key, _ := json.Marshal(m.Name)
+		record, _ := json.Marshal(map[string]any{"name": m.Name, "key": m.Key, "carrier": m.CarrierName, "metaConfig": m.Attributes})
+		fmt.Fprintf(&inventory, "%s:%s", key, record)
+	}
+	inventory.WriteByte('}')
+	if err := os.WriteFile(filepath.Join(root, "machines.json"), []byte(inventory.String()), 0600); err != nil {
+		t.Fatal(err)
+	}
+	bash, bashErr := exec.LookPath("bash")
+	if bashErr != nil {
+		t.Fatal("declared Bash required for confined connection tests", bashErr)
+	}
+	bash, bashErr = filepath.Abs(bash)
+	if bashErr != nil {
+		t.Fatal(bashErr)
+	}
+	nix := `case "$*" in
+  'eval --json --no-write-lock-file --no-update-lock-file --option max-jobs auto .#confctl.settings') label=settings-auto ;;
+  'eval --json --no-write-lock-file --no-update-lock-file --option max-jobs 7 .#confctl.settings') label=settings-seven ;;
+  'build --json --no-link --impure --no-write-lock-file --no-update-lock-file --option max-jobs 7 .#confctl.machinesJson') label=machines ;;
+  *) printf 'unexpected Nix argv: %s\n' "$*" >&2; exit 98 ;;
+esac
+printf '%s\n' "$label" >> "$TRACE"
+if [[ "$label" == machines ]]; then
+  printf '[{"outputs":{"out":"%s/machines.json"}}]\n' "$PWD"
+else
+  printf '%s\n' '{"list":{"columns":["name","spin","managed","host.target"]},"nix":{"maxJobs":"7","impureEval":true,"legacyNixPath":false}}'
+fi
+`
+	if err := os.WriteFile(filepath.Join(tools, "nix"), []byte("#!"+bash+"\n"+nix), 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"ssh", "cat", "nix-shell", "getent"} {
+		if name == "cat" && catMode == 0 {
+			continue
+		}
+		body := "printf '%s\\n' " + name + " >> \"$TRACE\"\nprintf '%s\\0' \"$@\" >> \"$ARGS\"\n" + toolBody
+		mode := os.FileMode(0700)
+		if name == "cat" {
+			mode = catMode
+		}
+		if err := os.WriteFile(filepath.Join(tools, name), []byte("#!"+bash+"\n"+body), mode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	b, _ := json.Marshal(argv)
+	cmd := exec.Command(os.Args[0], "-test.run=^TestCLIStage1Subprocess$")
+	cmd.Dir = root
+	cmd.Env = []string{"PATH=" + tools, "HOME=" + root, "TMPDIR=" + root, "LANG=C.UTF-8", "NO_COLOR=1", "PAGER=", "CONFCTL_STAGE1_SUBPROCESS=1", "CONFCTL_STAGE1_ARGV=" + string(b), "TRACE=" + filepath.Join(root, "trace"), "ARGS=" + filepath.Join(root, "args"), "CONFCTL_SSH_CONFIG=" + config}
+	cmd.Stdin = strings.NewReader(input)
+	var out, stderr strings.Builder
+	cmd.Stdout, cmd.Stderr = &out, &stderr
+	err := cmd.Run()
+	code := 0
+	if err != nil {
+		var exit *exec.ExitError
+		if !errors.As(err, &exit) {
+			t.Fatal(err)
+		}
+		code = exit.ExitCode()
+	}
+	trace, _ := os.ReadFile(filepath.Join(root, "trace"))
+	args, _ := os.ReadFile(filepath.Join(root, "args"))
+	logs, err := filepath.Glob(filepath.Join(root, ".confctl/logs/*.log"))
+	if err != nil || len(logs) > 1 {
+		t.Fatal(logs, err)
+	}
+	log := ""
+	if len(logs) == 1 {
+		b, err := os.ReadFile(logs[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		log = string(b)
+	}
+	return connectionCLIResult{code, out.String(), stderr.String(), string(trace), string(args), log, root}
+}
+
+func TestTestConnectionMainHelpAndExecution(t *testing.T) {
+	// Complete help bytes from accepted help-long/short/command original records.
+	const help = "NAME\n    test-connection - Test SSH connection\n\nSYNOPSIS\n\n    confctl [global options] test-connection [command options] [machine-pattern]\n\nCOMMAND OPTIONS\n    -a, --attr=arg - Filter by attribute (may be used more than once, default:\n                     none)\n    --managed=arg  - Filter (un)managed machines (default: none)\n    -t, --tag=arg  - Filter by tag (may be used more than once, default: none)\n    -y, --[no-]yes - Assume the answer to confirmations is yes\n\n"
+	for _, argv := range [][]string{{"test-connection", "--help"}, {"test-connection", "-h"}, {"help", "test-connection"}} {
+		r := connectionCLI(t, argv, "", nil, "exit 99\n", 0, false, "")
+		if r.code != 0 || r.out != help || r.stderr != "" || r.trace != "" || r.log != "" {
+			t.Fatal(r)
+		}
+	}
+	r := connectionCLI(t, []string{"test-connection", "--managed", "invalid", "--help"}, "", nil, "exit 99\n", 0, false, "")
+	if r.code != 64 || r.out != help || r.stderr != "error: invalid argument: --managed invalid\n\n" || r.trace != "" || r.log != "" {
+		t.Fatal(r)
+	}
+	r = connectionCLI(t, []string{"test-connection", "--unknown", "--help"}, "", nil, "exit 99\n", 0, false, "")
+	if r.code != 64 || r.out != help || r.stderr != "error: Unknown option --unknown\n\n" || r.trace != "" || r.log != "" {
+		t.Fatal(r)
+	}
+	r = connectionCLI(t, []string{"test-connection", "--help", "--unknown"}, "", nil, "exit 99\n", 0, false, "")
+	if r.code != 0 || r.out != help || r.stderr != "" || r.trace != "" || r.log != "" {
+		t.Fatal(r)
+	}
+	for _, argv := range [][]string{{"ls", "--unknown"}, {"--unknown", "test-connection"}} {
+		r = connectionCLI(t, argv, "", nil, "exit 99\n", 0, false, "")
+		if r.code != 64 || r.stderr != "error: invalid option: --unknown\n\n" || r.trace != "" || r.log != "" {
+			t.Fatal("other/default parse presentation changed", r)
+		}
+	}
+	r = connectionCLI(t, []string{"test-connection", "--managed"}, "", nil, "exit 99\n", 0, false, "")
+	if r.code != 64 || strings.Contains(r.stderr, "Unknown option") || r.trace != "" || r.log != "" {
+		t.Fatal("missing argument transformed", r)
+	}
+	one := connectionMachine("one", "one", "one.example", true)
+	for _, tc := range []struct {
+		argv          []string
+		input, suffix string
+		code          int
+		calls         bool
+	}{
+		{[]string{"test-connection", "-y", "one", "ignored", "--help"}, "", "", 0, true},
+		{[]string{"test-connection", "--no-yes", "one"}, "\x00 Y \n", "", 0, true},
+		{[]string{"test-connection", "one"}, "\nother\ny\n", "", 0, true},
+		{[]string{"test-connection", "one"}, "n", "error: Aborted\n", 1, false},
+		{[]string{"test-connection", "one"}, "", "error: end of file reached\n", 1, false},
+		{[]string{"test-connection", "one"}, "y", "", 0, true},
+	} {
+		r := connectionCLI(t, tc.argv, tc.input, []Machine{one}, "printf 'not-numeric'; printf stderr >&2; exit 0\n", 0700, true, "")
+		wantTrace := "settings-auto\nsettings-seven\nmachines\n"
+		if tc.calls {
+			wantTrace += "ssh\n"
+		}
+		if r.code != tc.code || r.trace != wantTrace || tc.code == 0 && (r.log != "" || r.stderr != "") || tc.code != 0 && (r.log == "" || !strings.HasSuffix(r.stderr, tc.suffix)) {
+			t.Fatal(r)
+		}
+		if tc.calls && !strings.HasSuffix(r.out, "\nResult: 1 successful, 0 failed\n\nFailed machines:\n") || !tc.calls && strings.Contains(r.out, "Result:") {
+			t.Fatal(r.out)
+		}
+		if !strings.Contains(strings.Join(tc.argv, " "), "-y") && !strings.HasPrefix(r.out, "Test SSH connection to the following machines:\nNAME   SPIN    MANAGED   HOST.TARGET\none    nixos   true      one.example\n\nContinue? [y/N]: ") {
+			t.Fatal(r.out)
+		}
+	}
+	for _, flake := range []bool{false, true} {
+		r := connectionCLI(t, []string{"test-connection", "-a", "malformed", "-y"}, "", []Machine{one}, "exit 99\n", 0, flake, "")
+		wantCode := 1
+		wantTrace := ""
+		if flake {
+			wantCode = 64
+			wantTrace = "settings-auto\nsettings-seven\nmachines\n"
+		}
+		if r.code != wantCode || r.trace != wantTrace || r.log == "" {
+			t.Fatal(r)
+		}
+		if flake && (r.out != help || !strings.HasSuffix(r.stderr, "error: Invalid filter ''\n\n")) || !flake && (r.out != "" || !strings.Contains(r.stderr, "has no flake.nix")) {
+			t.Fatal(r)
+		}
+		if !strings.HasPrefix(r.log, `{command: ["test-connection"],`+"\n") || strings.Contains(r.log, "ParentKey") {
+			t.Fatal(r.log)
+		}
+	}
+}
+
+func TestTestConnectionMainCompletedAndSpawn(t *testing.T) {
+	// Exact accepted original255 and signal15/2/9 presentation; executable
+	// scripts are synthetic finite test stimuli, not original observations.
+	for _, local := range []bool{false, true} {
+		for _, sig := range []string{"TERM", "INT", "KILL"} {
+			host := "signal.example"
+			command := `ssh -l root -o ConnectTimeout\=3 -o ServerAliveInterval\=3 -o ServerAliveCountMax\=1 signal.example cat\ /proc/uptime`
+			if local {
+				host, command = "localhost", "cat /proc/uptime"
+			}
+			ms := []Machine{connectionMachine("signalled", "first", host, true), connectionMachine("later", "later", "later.example", true)}
+			body := "if [[ \"$0\" == */cat || \"${@: -2:1}\" == signal.example ]]; then printf 'signal stdout\\n'; printf 'signal stderr\\n' >&2; kill -" + sig + " $$; fi\nexit 0\n"
+			r := connectionCLI(t, []string{"test-connection", "-y"}, "", ms, body, 0700, true, "")
+			status := map[string]int{"TERM": 15, "INT": 2, "KILL": 9}[sig]
+			want := fmt.Sprintf("Unable to connect to signalled: Running `%s` failed with\n  exit status: %d\n  stdout: signal stdout\n  stderr: signal stderr\n\n\nResult: 1 successful, 1 failed\n\nFailed machines:\n  signalled\n", command, status)
+			first := "ssh\n"
+			if local {
+				first = "cat\n"
+			}
+			if r.code != 0 || r.out != want || r.stderr != "" || r.log != "" || r.trace != "settings-auto\nsettings-seven\nmachines\n"+first+"ssh\n" {
+				t.Fatal(sig, local, r)
+			}
+		}
+	}
+	ms := []Machine{connectionMachine("b-first", "b", "b.example", true), connectionMachine("a-second", "a", "a.example", true)}
+	r := connectionCLI(t, []string{"test-connection", "-y"}, "", ms, "exit 255\n", 0700, true, "")
+	if r.code != 0 || r.stderr != "" || r.log != "" || strings.Count(r.out, "exit status: 255\n") != 2 || !strings.HasSuffix(r.out, "\nResult: 0 successful, 2 failed\n\nFailed machines:\n  b-first\n  a-second\n") {
+		t.Fatal(r)
+	}
+	for _, mode := range []os.FileMode{0, 0600} {
+		ms := []Machine{connectionMachine("local", "local", "localhost", true), connectionMachine("later", "later", "later.example", true)}
+		r := connectionCLI(t, []string{"test-connection", "-y"}, "", ms, "exit 99\n", mode, true, "")
+		if r.code != 1 || r.out != "" || !strings.HasSuffix(r.stderr, "error: No such file or directory - cat\n") || r.trace != "settings-auto\nsettings-seven\nmachines\n" || !strings.HasSuffix(r.log, "Running cat /proc/uptime\n") {
+			t.Fatal(r)
+		}
+	}
+}
+
+func TestTestConnectionMainSelectionFailureAndRepeatedHost(t *testing.T) {
+	one := connectionMachine("one", "one", "one.example", true)
+	for _, tc := range []struct {
+		ms   []Machine
+		argv []string
+	}{
+		{[]Machine{}, []string{"test-connection"}},
+		{[]Machine{one}, []string{"test-connection", "-y", "missing*"}},
+		{[]Machine{connectionMachine("collision", "different", "excluded", true), connectionMachine("survivor", "collision", "survivor", true)}, []string{"test-connection", "-y", "-a", "name!=collision", "collision"}},
+	} {
+		r := connectionCLI(t, tc.argv, "y\n", tc.ms, "exit 99\n", 0, true, "")
+		if r.code != 1 || r.out != "" || !strings.HasSuffix(r.stderr, "error: No machines to test\n") || r.trace != "settings-auto\nsettings-seven\nmachines\n" || r.log == "" {
+			t.Fatal(r)
+		}
+	}
+	// Invalid decoded evaluator output wins over the later malformed attr.
+	bad := one
+	bad.Attributes = nil
+	r := connectionCLI(t, []string{"test-connection", "-a", "malformed", "-y"}, "", []Machine{bad}, "exit 99\n", 0, true, "")
+	if r.code != 1 || r.out != "" || !strings.HasSuffix(r.stderr, "error: one: missing metaConfig\n") || strings.Contains(r.stderr, "Invalid filter") || r.trace != "settings-auto\nsettings-seven\nmachines\n" {
+		t.Fatal(r)
+	}
+	ms := []Machine{connectionMachine("first", "first", "shared.example", true), connectionMachine("second", "second", "shared.example", true)}
+	r = connectionCLI(t, []string{"test-connection", "-y"}, "", ms, "exit 0\n", 0700, true, "")
+	request := []string{"-l", "root", "-o", "ConnectTimeout=3", "-o", "ServerAliveInterval=3", "-o", "ServerAliveCountMax=1", "shared.example", "cat /proc/uptime"}
+	if r.code != 0 || r.out != "\nResult: 2 successful, 0 failed\n\nFailed machines:\n" || r.trace != "settings-auto\nsettings-seven\nmachines\nssh\nssh\n" || r.args != strings.Repeat(strings.Join(request, "\x00")+"\x00", 2) {
+		t.Fatal(r)
+	}
+}
+
+func TestTestConnectionMainRetainedLargeLogAndQuotedArgs(t *testing.T) {
+	for _, size := range []int{32768, 65536, 65537} {
+		ms := []Machine{connectionMachine("first", "first", "large.example", true), connectionMachine("local", "local", "localhost", true)}
+		// Bash builtin printf only, no host cat/profile/process tools.
+		payload := strings.Repeat("P", 32768)
+		if size == 65536 {
+			payload += strings.Repeat("S", 32768)
+		}
+		if size == 65537 {
+			payload += "M" + strings.Repeat("S", 32768)
+		}
+		body := "printf 'retained stdout\\n'; printf '%s' '" + payload + "' >&2; exit 7\n"
+		r := connectionCLI(t, []string{"test-connection", "-y"}, "", ms, body, 0, true, "")
+		if r.code != 1 || !strings.HasSuffix(r.stderr, "error: No such file or directory - cat\n") || strings.Contains(r.out, "Result:") || strings.Count(r.log, "] Finished") != 4 || !strings.HasSuffix(r.log, "Running cat /proc/uptime\n") {
+			t.Fatal("large stop/log", size, r.code, r.stderr)
+		}
+		var captured strings.Builder
+		chunks := 0
+		for _, line := range strings.Split(r.log, "\n") {
+			_, data, ok := strings.Cut(line, "] \t")
+			if !ok || data == "" || strings.Trim(data, "PMS") != "" {
+				continue
+			}
+			if len(data) > 16384 {
+				t.Fatal("actual read bound lost", len(data))
+			}
+			captured.WriteString(data)
+			chunks++
+		}
+		if captured.String() != payload || chunks < 2 || strings.Contains(r.log, "... omitting") {
+			t.Fatal("full target chunk log truncated", size, captured.Len(), chunks)
+		}
+		if size == 65537 && !strings.Contains(r.out, strings.Repeat("P", 32768)+"\n... omitting 1 bytes ...\n"+strings.Repeat("S", 32768)) || size <= 65536 && !strings.Contains(r.out, payload) {
+			t.Fatal("diagnostic bound", size)
+		}
+	}
+	m := connectionMachine("quoted", "quoted", "target%with'quote", true)
+	m.Target.Port = 2222
+	m.Attributes["host"].(map[string]any)["port"] = 2222
+	r := connectionCLI(t, []string{"test-connection", "-y"}, "", []Machine{m}, "printf 'data-not-uptime\\n'; printf 'separate error\\n' >&2; exit 7\n", 0700, true, "private ssh%quote'/config")
+	wantArgs := []string{"-F", "private ssh%quote'/config", "-l", "root", "-p", "2222", "-o", "ConnectTimeout=3", "-o", "ServerAliveInterval=3", "-o", "ServerAliveCountMax=1", "target%with'quote", "cat /proc/uptime"}
+	if r.code != 0 || r.stderr != "" || r.log != "" || r.args != strings.Join(wantArgs, "\x00")+"\x00" || !strings.Contains(r.out, `private\ ssh\%quote\'/config`) {
+		t.Fatal(r)
+	}
 }
 
 func actualCLI(t *testing.T, argv []string, registry string) (int, string, string, string) {

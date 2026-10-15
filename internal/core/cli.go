@@ -38,12 +38,20 @@ func Main(ctx context.Context, argv []string) int {
 	}
 	inv, err := registry.Parse(argv)
 	if err != nil {
-		fmt.Fprint(os.Stderr, "error: "+err.Error()+"\n\n")
+		diagnostic := err.Error()
 		var parseErr *cli.ParseError
 		var path []string
 		if errors.As(err, &parseErr) {
 			path = parseErr.HelpPath
+			// This accepted leaf presentation depends on the existing ParseError
+			// prefix; the shared parser has no unknown-option kind/token field.
+			if len(path) == 1 && len(inv.Command.Path) == 1 && path[0] == inv.Command.Path[0] && (inv.Command.Handler == cli.TestConnectionHandler || inv.Command.Handler == cli.SSHHandler || inv.Command.Handler == cli.CSSHHandler) {
+				if option, ok := strings.CutPrefix(parseErr.Message, "invalid option: "); ok && option != "" {
+					diagnostic = "Unknown option " + option
+				}
+			}
 		}
+		fmt.Fprint(os.Stderr, "error: "+diagnostic+"\n\n")
 		text, _ := registry.Help(path, 80)
 		fmt.Print(text)
 		return 64
@@ -89,7 +97,7 @@ func Main(ctx context.Context, argv []string) int {
 	logName := cmd
 	if extensionCommand {
 		logName = strings.Join(command.Path, "-")
-	} else if inv.Command.Handler == cli.InputsReadHandler || inv.Command.Handler == cli.InputsUpdateHandler || inv.Command.Handler == cli.InputsSetHandler {
+	} else if inv.Command.Handler == cli.InputsReadHandler || inv.Command.Handler == cli.InputsUpdateHandler || inv.Command.Handler == cli.InputsSetHandler || inv.Command.Handler == cli.GenerationListHandler {
 		logName = strings.Join(inv.Command.Path, "-")
 	}
 	if err = e.OpenLog(logName); err != nil {
@@ -102,6 +110,12 @@ func Main(ctx context.Context, argv []string) int {
 		e.LogInputSetCLI(inv)
 	} else if inv.Command.Handler == cli.InputsUpdateHandler {
 		e.LogInputUpdateCLI(inv)
+	} else if inv.Command.Handler == cli.TestConnectionHandler {
+		e.LogTestConnectionCLI(inv)
+	} else if inv.Command.Handler == cli.SSHHandler || inv.Command.Handler == cli.CSSHHandler {
+		e.LogSSHCLI(inv)
+	} else if inv.Command.Handler == cli.GenerationListHandler {
+		e.LogGenerationCLI(inv)
 	} else if !extensionCommand || supportedRuntimeCommand(command) {
 		e.LogCLI(cmd, opts, commandArgv)
 	} else {
@@ -187,6 +201,58 @@ func Main(ctx context.Context, argv []string) int {
 		}
 		success = code == 0
 		return code
+	}
+	if inv.Command.Handler == cli.TestConnectionHandler {
+		if err = e.TestConnection(inv, os.Stdin, os.Stdout); err != nil {
+			var argumentErr *testConnectionArgumentError
+			if errors.As(err, &argumentErr) {
+				code := fail(err, 64)
+				fmt.Fprintln(os.Stderr)
+				text, _ := registry.Help(inv.Command.Path, 80)
+				fmt.Print(text)
+				return code
+			}
+			return fail(err, 1)
+		}
+		success = true
+		return 0
+	}
+	if inv.Command.Handler == cli.SSHHandler || inv.Command.Handler == cli.CSSHHandler {
+		if inv.Command.Handler == cli.SSHHandler {
+			err = e.SSH(inv, os.Stdin, os.Stdout)
+		} else {
+			err = e.CSSH(inv, os.Stdin, os.Stdout)
+		}
+		if err != nil {
+			var argumentErr *sshArgumentError
+			if errors.As(err, &argumentErr) {
+				code := fail(err, 64)
+				fmt.Fprintln(os.Stderr)
+				text, _ := registry.Help(inv.Command.Path, 80)
+				fmt.Print(text)
+				return code
+			}
+			return fail(err, 1)
+		}
+		success = true
+		return 0
+	}
+	if inv.Command.Handler == cli.GenerationListHandler {
+		text, err := e.ListGenerations(inv)
+		if err != nil {
+			var argumentErr *generationArgumentError
+			if errors.As(err, &argumentErr) {
+				code := fail(err, 64)
+				fmt.Fprintln(os.Stderr)
+				help, _ := registry.Help(inv.Command.Path, 80)
+				fmt.Print(help)
+				return code
+			}
+			return fail(err, 1)
+		}
+		fmt.Print(text)
+		success = true
+		return 0
 	}
 	if cmd == "ls" && opts.List {
 		e.ShowTrace = false

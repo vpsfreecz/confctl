@@ -16,6 +16,8 @@ type Result struct {
 	Command  string `json:"command"`
 	Stdout   []byte `json:"stdout_b64"`
 	Stderr   []byte `json:"stderr_b64"`
+	signal   syscall.Signal
+	waitErr  error
 }
 
 func ShellJoin(argv []string) string {
@@ -61,6 +63,10 @@ func SSHArgs(m Machine, argv []string) ([]string, error) {
 	return append(a, *m.Target.Host, ShellJoin(argv)), nil
 }
 func Process(ctx context.Context, root string, argv []string, input []byte) (Result, error) {
+	return processWithTestConnectionLog(ctx, root, argv, input, nil)
+}
+
+func processWithTestConnectionLog(ctx context.Context, root string, argv []string, input []byte, chunk func([]byte)) (Result, error) {
 	r := Result{ExitCode: -1, Command: ShellJoin(argv)}
 	if len(argv) == 0 {
 		return r, fmt.Errorf("empty argv")
@@ -83,10 +89,15 @@ func Process(ctx context.Context, root string, argv []string, input []byte) (Res
 	var out, errout bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &errout
+	if chunk != nil {
+		cmd.Stdout = &testConnectionCapture{buffer: &out, chunk: chunk}
+		cmd.Stderr = &testConnectionCapture{buffer: &errout, chunk: chunk}
+	}
 	e := cmd.Start()
 	if e == nil {
 		group.bind(cmd.Process.Pid)
 		e = cmd.Wait()
+		r.waitErr = e
 		group.finish()
 	}
 	r.Stdout = out.Bytes()
@@ -97,6 +108,7 @@ func Process(ctx context.Context, root string, argv []string, input []byte) (Res
 	r.ExitCode = cmd.ProcessState.ExitCode()
 	if s, ok := cmd.ProcessState.Sys().(syscall.WaitStatus); ok && s.Signaled() {
 		r.Signal = s.Signal().String()
+		r.signal = s.Signal()
 	}
 	if ctx.Err() != nil {
 		return r, ctx.Err()

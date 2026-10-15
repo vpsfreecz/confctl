@@ -10,6 +10,9 @@ let
       git = fixtureTools;
       openssh = fixtureTools;
       nix = fixtureTools;
+      glibc = pkgs.glibc // {
+        bin = fixtureTools;
+      };
     };
   };
 in
