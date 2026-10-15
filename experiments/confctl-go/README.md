@@ -5,7 +5,8 @@
 `init`, `add`, `rename`, `rediscover`, `ls`, `inputs ls`, `inputs channel ls`,
 `inputs update`, `inputs channel update`, `inputs machine update`,
 `inputs set`, `inputs channel set`, `inputs machine set`,
-`build`, all `status` generation modes, `generation ls`, `test-connection`,
+`build`, all `status` generation modes, `generation ls`, `generation rm`,
+`generation rotate`, `collect-garbage`, `test-connection`,
 `ssh`, `cssh`,
 `diff`, `changelog`, `health-check`, the three `gen-data vpsadmin` commands
 and explicitly registered external extensions. Other
@@ -29,6 +30,20 @@ require a second confirmation unless `--yes` is set. Offline or outdated hosts
 remain ordinary results with exit status 0; build or infrastructure failures
 return status 1 and retain the log. See [Build and status](../../docs/compatibility/commands.md)
 for selection and generation behavior.
+
+`generation rm` and `generation rotate` confirm the selected removal plan unless
+`--yes` is set. Local removal deletes GC roots before generation files; a unified
+record is removed locally before its remote generation. Rotation skips current
+generations and applies the configured count and age limits. Completed removals
+remain in place after a later failure, and removing a current generation does
+not repair its current link.
+
+Remote removal can collect garbage afterward. `rm` collects on changed hosts;
+`rotate` also applies the configured GC policy. Carried hosts share one GC task
+on their carrier. Standalone `collect-garbage` selects runnable non-carried
+machines, including unmanaged machines. Ordinary failed GC tasks do not stop
+the remaining tasks; the command waits for them and returns status 1 with the
+failed host names. Success removes the invocation log; failures retain it.
 
 `test-connection` checks selected machines sequentially. It captures uptime
 command output and reports successful and failed hosts. Completed host failures
@@ -275,7 +290,7 @@ The following table is checked against the command registry:
 | `add` | Available |
 | `build` | Available |
 | `changelog` | Available |
-| `collect-garbage` | Unavailable |
+| `collect-garbage` | Available |
 | `cssh` | Available |
 | `deploy` | Unavailable |
 | `diff` | Available |
@@ -283,8 +298,8 @@ The following table is checked against the command registry:
 | `gen-data vpsadmin containers` | Available |
 | `gen-data vpsadmin network` | Available |
 | `generation ls` | Available |
-| `generation rm` | Unavailable |
-| `generation rotate` | Unavailable |
+| `generation rm` | Available |
+| `generation rotate` | Available |
 | `health-check` | Available |
 | `init` | Available |
 | `inputs channel ls` | Available |
@@ -381,8 +396,7 @@ confirmation and resolved-generation tables are outside that pager. Local
 fixtures and PTY tests cover these paths; installed package and real-provider
 checks remain separate from the source tests.
 
-Default and selected-generation status, native build, deployment, generation
-removal, rotation and legacy software-pin migration remain unavailable. Native
+Deployment and legacy software-pin migration remain unavailable. Operation
 tests use disposable records and fake child processes. The finite original
 adapters compare reader and table behavior; they do not establish packaged or
 fleet parity.

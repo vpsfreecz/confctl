@@ -116,10 +116,9 @@ func TestBuiltinDeclarations(t *testing.T) {
 func TestComparisonDeclarationsAndAvailability(t *testing.T) {
 	r := BuiltinRegistry()
 	// Keep the complete unrelated leaf map explicit: public comparison must not
-	// accidentally enable the next build, status, deployment or mutation units.
+	// accidentally enable the remaining deployment unit.
 	unavailable := map[string]bool{
-		"deploy": true, "collect-garbage": true,
-		"generation rm": true, "generation rotate": true,
+		"deploy": true,
 	}
 	available := 0
 	for _, c := range r.Leaves() {
@@ -134,7 +133,7 @@ func TestComparisonDeclarationsAndAvailability(t *testing.T) {
 			available++
 		}
 	}
-	if available != 25 || len(r.Leaves()) != 29 {
+	if available != 28 || len(r.Leaves()) != 29 {
 		t.Fatal(available, len(r.Leaves()))
 	}
 	for _, command := range []string{"diff", "changelog"} {

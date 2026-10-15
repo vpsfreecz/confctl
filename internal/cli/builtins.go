@@ -174,6 +174,15 @@ func BuiltinRegistry() *Registry {
 		case "generation ls":
 			commands[i].Handler = GenerationListHandler
 			commands[i].Availability = Availability{Mode: Available}
+		case "generation rm":
+			commands[i].Handler = GenerationRemoveHandler
+			commands[i].Availability = Availability{Mode: Available}
+		case "generation rotate":
+			commands[i].Handler = GenerationRotateHandler
+			commands[i].Availability = Availability{Mode: Available}
+		case "collect-garbage":
+			commands[i].Handler = CollectGarbageHandler
+			commands[i].Availability = Availability{Mode: Available}
 		case "diff", "changelog":
 			commands[i].Handler = ComparisonHandler
 			commands[i].Availability = Availability{Mode: Available}
