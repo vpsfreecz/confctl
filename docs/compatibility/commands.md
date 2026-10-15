@@ -29,6 +29,11 @@ All action handlers use the shared log wrapper, including commands that otherwis
 
 `ask_confirmation!` runs the description block and writes `\nContinue? [y/N]: `, flushing stdout. It accepts only stripped case-insensitive `y` or `n`; empty input repeats, EOF raises. A refusal raises `Aborted`. Y skips both prompt **and description block**, unless caller uses `always: true`. `ask_action` lists keys and loops until an explicit valid key; its capitalized “default” is only presentation, not an Enter default ([command.rb:73–127](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/command.rb#L73)). Fixtures: `ui.confirm`, `ui.action`, `parser.*`.
 
+Confirmation and deployment retry prompts in the Go CLI on Linux can be
+interrupted without entering a newline or closing standard input. Cancellation
+prevents a pending answer from authorizing the next operation or retry. Earlier
+completed operations remain in effect.
+
 ## Configuration commands (4)
 
 Declarations: [app.rb:37–57](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/app.rb#L37). No command-specific flags or confirmation.

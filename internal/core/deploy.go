@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -32,7 +31,7 @@ type deployCommandDeps struct {
 	Prepare    func([]string) (int, error)
 	Build      func([]string) ([]deploy.Target, error)
 	Load       func(string) (*generation.BuildList, error)
-	Operations func(context.Context, []Machine, []Machine, *bufio.Reader, io.Writer, cli.Invocation) deploy.Deps
+	Operations func(context.Context, []Machine, []Machine, commandLine, io.Writer, cli.Invocation) deploy.Deps
 }
 
 // Deploy prepares exactly once, rebinds selected names after hooks, then reuses
@@ -46,8 +45,8 @@ func (e *Engine) Deploy(inv cli.Invocation, registry Registry, stdin, stdout, st
 			return generation.LoadBuildList(e.Root, host, generation.Options{Warn: e.generationWarning(stderr)})
 		},
 		Build: func(hosts []string) ([]deploy.Target, error) { return e.deployBuild(hosts, inv, stdout) },
-		Operations: func(ctx context.Context, all, selected []Machine, input *bufio.Reader, out io.Writer, inv cli.Invocation) deploy.Deps {
-			return e.deployOperations(ctx, all, selected, input, out, inv)
+		Operations: func(ctx context.Context, all, selected []Machine, line commandLine, out io.Writer, inv cli.Invocation) deploy.Deps {
+			return e.deployOperations(ctx, all, selected, line, out, inv)
 		},
 	})
 }
@@ -125,7 +124,7 @@ func (e *Engine) deployCommand(inv cli.Invocation, in io.Reader, out io.Writer, 
 	if len(selected) == 0 {
 		return deploy.Report{}, errors.New("No machines to deploy")
 	}
-	input := bufio.NewReader(in)
+	_, line := commandInput(in)
 	names := make([]string, len(selected))
 	for i, m := range selected {
 		names[i] = m.Name
@@ -134,7 +133,7 @@ func (e *Engine) deployCommand(inv cli.Invocation, in io.Reader, out io.Writer, 
 		return deploy.Report{}, err
 	}
 	if !inv.Options["yes"].Value.Bool {
-		if err := testConnectionConfirm(input, out); err != nil {
+		if err := testConnectionConfirm(e.Context, line, out); err != nil {
 			return deploy.Report{}, err
 		}
 	}
@@ -191,7 +190,7 @@ func (e *Engine) deployCommand(inv cli.Invocation, in io.Reader, out io.Writer, 
 			}
 		}
 		if o.Interactive && !inv.Options["yes"].Value.Bool {
-			if err := testConnectionConfirm(input, out); err != nil {
+			if err := testConnectionConfirm(e.Context, line, out); err != nil {
 				return deploy.Report{}, err
 			}
 		}
@@ -200,7 +199,7 @@ func (e *Engine) deployCommand(inv cli.Invocation, in io.Reader, out io.Writer, 
 				return deploy.Report{}, err
 			}
 			if o.Interactive || !inv.Options["yes"].Value.Bool {
-				if err := testConnectionConfirm(input, out); err != nil {
+				if err := testConnectionConfirm(e.Context, line, out); err != nil {
 					return deploy.Report{}, err
 				}
 			}
@@ -221,7 +220,7 @@ func (e *Engine) deployCommand(inv cli.Invocation, in io.Reader, out io.Writer, 
 	}
 	ctx, cancel := context.WithCancel(e.Context)
 	defer cancel()
-	operations := d.Operations(ctx, all, selected, input, out, inv)
+	operations := d.Operations(ctx, all, selected, line, out, inv)
 	var mu sync.Mutex
 	var outputErr error
 	previous := operations.Event

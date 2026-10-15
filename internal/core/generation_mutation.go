@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -91,14 +92,15 @@ func generationWrite(out io.Writer, text string) error {
 	return err
 }
 
-func generationConfirm(inv cli.Invocation, in io.Reader, out io.Writer, text string) error {
+func generationConfirm(ctx context.Context, inv cli.Invocation, in io.Reader, out io.Writer, text string) error {
 	if inv.Options["yes"].Value.Bool {
 		return nil
 	}
 	if err := generationWrite(out, text); err != nil {
 		return err
 	}
-	return testConnectionConfirm(in, out)
+	_, line := commandInput(in)
+	return testConnectionConfirm(ctx, line, out)
 }
 
 type generationRemoval struct {
@@ -146,7 +148,7 @@ func (e *Engine) removeGenerations(inv cli.Invocation, in io.Reader, out io.Writ
 	if enableGC {
 		gcText = "yes"
 	}
-	if err := generationConfirm(inv, in, out, "The following generations will be removed:\n"+generationTable(list)+"\nGarbage collection: "+gcText+"\n"); err != nil {
+	if err := generationConfirm(e.Context, inv, in, out, "The following generations will be removed:\n"+generationTable(list)+"\nGarbage collection: "+gcText+"\n"); err != nil {
 		return err
 	}
 	rows := make([]generationRemoval, len(list.Generations))
@@ -335,7 +337,7 @@ func (e *Engine) rotateGenerations(inv cli.Invocation, in io.Reader, out io.Writ
 		}
 		table[i] = map[string]any{"host": row.host, "name": row.name, "type": row.kind, "id": id}
 	}
-	if err := generationConfirm(inv, in, out, "The following generations will be removed:\n"+Table(table, []string{"host", "name", "type", "id"}, true)+"\nGarbage collection: "+gcText+"\n"); err != nil {
+	if err := generationConfirm(e.Context, inv, in, out, "The following generations will be removed:\n"+Table(table, []string{"host", "name", "type", "id"}, true)+"\nGarbage collection: "+gcText+"\n"); err != nil {
 		return err
 	}
 	changed, err := e.removeGenerationRows(rows, ms, out, d)

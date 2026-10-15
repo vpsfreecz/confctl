@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -101,7 +100,7 @@ func TestDeployDeliveryQueryPartialStatusAndCarrier(t *testing.T) {
 				return Result{Stdout: []byte([]string{"100 0", top, top + "\n" + m.Profile + "-9-link;" + top + ";1;\n"}[calls-1])}, nil
 			}}
 			e := &Engine{Context: context.Background()}
-			d := e.deployOperationsWithOps(e.Context, []Machine{carrier, m}, []Machine{m}, bufio.NewReader(strings.NewReader("")), io.Discard, cli.Invocation{}, ops)
+			d := e.deployOperationsWithOps(e.Context, []Machine{carrier, m}, []Machine{m}, nil, io.Discard, cli.Invocation{}, ops)
 			status, err := d.QueryTarget(e.Context, deployMachine(m))
 			wantCalls := failedCommand
 			if wantCalls == 0 {
@@ -188,7 +187,7 @@ func TestDeployDeliveryActivationAndCarriedProfile(t *testing.T) {
 		return Result{ExitCode: 0}, nil
 	}}
 	e := &Engine{Context: context.Background()}
-	d := e.deployOperationsWithOps(e.Context, []Machine{m, carrier, carried}, []Machine{m, carried}, bufio.NewReader(strings.NewReader("")), io.Discard, cli.Invocation{}, ops)
+	d := e.deployOperationsWithOps(e.Context, []Machine{m, carrier, carried}, []Machine{m, carried}, nil, io.Discard, cli.Invocation{}, ops)
 	if ok, err := d.Activate(e.Context, deployMachine(m), deployTestGeneration("with space"), deploy.Test); !ok || err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +232,7 @@ func TestDeployDeliveryActivationLiteralToplevel(t *testing.T) {
 					return Result{}, nil // Only argv inspection; no child or filesystem access.
 				}}
 				e := &Engine{Context: context.Background()}
-				d := e.deployOperationsWithOps(e.Context, []Machine{m}, []Machine{m}, bufio.NewReader(strings.NewReader("")), io.Discard, cli.Invocation{}, ops)
+				d := e.deployOperationsWithOps(e.Context, []Machine{m}, []Machine{m}, nil, io.Discard, cli.Invocation{}, ops)
 				ok, err := d.Activate(e.Context, deployMachine(m), g, deploy.Test)
 				want := []string{row.executable, "test"}
 				if !local {
