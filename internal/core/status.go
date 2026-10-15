@@ -17,6 +17,7 @@ type Status struct {
 	Uptime          *float64
 	Generations     *generation.HostList
 	CurrentToplevel *string
+	TargetToplevel  *string
 	Target          map[string]map[string]any
 	Deployed        map[string]map[string]any
 	Err             error
@@ -231,16 +232,31 @@ func inputState(t, d map[string]any) string {
 	}
 	return "changed"
 }
+
+// Status retains the public none-mode compatibility entrypoint.
 func (e *Engine) Status(ms, all []Machine) (string, error) {
 	statuses := make([]Status, len(ms))
+	for i, machine := range ms {
+		statuses[i].Machine = machine
+	}
+	if err := e.statusTargetInputs(statuses); err != nil {
+		return "", err
+	}
+	e.statusQuery(statuses, all, queryOptions{Generations: true, Inputs: true}, len(ms))
+	return e.statusTable(statuses)
+}
+
+// Target metadata remains best-effort at the existing status boundary. This
+// fresh evaluator runs after build and does not reuse stored generation data.
+func (e *Engine) statusTargetInputs(statuses []Status) error {
 	n, err := e.evaluator()
 	if err != nil {
-		return "", err
+		return err
 	}
 	mapping, err := n.eval(".#confctl.machineKeys")
 	keys, _ := mapping.(map[string]any)
-	for i, m := range ms {
-		statuses[i].Machine = m
+	for i := range statuses {
+		m := statuses[i].Machine
 		if err == nil {
 			k := str(keys[m.Name])
 			if k == "" {
@@ -252,16 +268,31 @@ func (e *Engine) Status(ms, all []Machine) (string, error) {
 			}
 		}
 	}
-	// Baseline creates machines.length workers; one goroutine per selected machine.
-	var wg sync.WaitGroup
+	return nil
+}
+
+func (e *Engine) statusQuery(statuses []Status, all []Machine, options queryOptions, workers int) {
+	// Keep the selected-machine worker count even after missing generations
+	// remove statuses. Each job still uses the existing per-host query owner.
+	jobs := make(chan int, len(statuses))
 	for i := range statuses {
+		jobs <- i
+	}
+	close(jobs)
+	var wg sync.WaitGroup
+	for worker := 0; worker < workers; worker++ {
 		wg.Add(1)
-		go func(i int) {
+		go func() {
 			defer wg.Done()
-			e.query(&statuses[i], all, queryOptions{Generations: true, Inputs: true})
-		}(i)
+			for i := range jobs {
+				e.query(&statuses[i], all, options)
+			}
+		}()
 	}
 	wg.Wait()
+}
+
+func (e *Engine) statusTable(statuses []Status) (string, error) {
 	roleSet := map[string]bool{}
 	for _, s := range statuses {
 		if s.Err != nil {
@@ -293,6 +324,9 @@ func (e *Engine) Status(ms, all []Machine) (string, error) {
 			if inputState(t, s.Deployed[k]) != "same" {
 				ok = false
 			}
+		}
+		if s.TargetToplevel != nil {
+			ok = ok && s.CurrentToplevel != nil && *s.TargetToplevel == *s.CurrentToplevel
 		}
 		if s.Uptime != nil {
 			row["online"] = e.Colorize("yes", "green")

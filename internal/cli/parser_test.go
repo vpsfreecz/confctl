@@ -227,7 +227,7 @@ func TestNestedHelpAndAvailability(t *testing.T) {
 	}
 	for _, argv := range [][]string{{"status"}, {"status", "-gcurrent"}, {"status", "-g0"}} {
 		inv, err := r.Parse(argv)
-		if err != nil || r.CheckAvailability(inv) == nil {
+		if err != nil || r.CheckAvailability(inv) != nil {
 			t.Fatal(argv, inv, err)
 		}
 	}

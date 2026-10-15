@@ -4,6 +4,7 @@ pkgs.buildGoModule {
   version = "0.1.0";
   src = ../..;
   vendorHash = null;
+  env.CGO_ENABLED = "1";
   subPackages = [
     "cmd/confctl-go-prototype"
     "cmd/hook-driver"

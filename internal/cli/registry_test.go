@@ -118,7 +118,7 @@ func TestComparisonDeclarationsAndAvailability(t *testing.T) {
 	// Keep the complete unrelated leaf map explicit: public comparison must not
 	// accidentally enable the next build, status, deployment or mutation units.
 	unavailable := map[string]bool{
-		"build": true, "deploy": true, "collect-garbage": true,
+		"deploy": true, "collect-garbage": true,
 		"generation rm": true, "generation rotate": true,
 	}
 	available := 0
@@ -126,8 +126,6 @@ func TestComparisonDeclarationsAndAvailability(t *testing.T) {
 		mode := Available
 		if unavailable[pathKey(c.Path)] {
 			mode = Unavailable
-		} else if pathKey(c.Path) == "status" {
-			mode = Conditional
 		}
 		if c.Availability.Mode != mode {
 			t.Fatal(c.Path, c.Availability, mode)
@@ -136,7 +134,7 @@ func TestComparisonDeclarationsAndAvailability(t *testing.T) {
 			available++
 		}
 	}
-	if available != 23 || len(r.Leaves()) != 29 {
+	if available != 25 || len(r.Leaves()) != 29 {
 		t.Fatal(available, len(r.Leaves()))
 	}
 	for _, command := range []string{"diff", "changelog"} {
@@ -211,7 +209,15 @@ func TestRegistryValidation(t *testing.T) {
 			return s
 		}},
 		{"handler-condition", func(s []CommandSpec) []CommandSpec {
-			s[2].Handler, s[2].Availability.Mode = StatusNone, Available
+			s[2].Handler, s[2].Availability.Mode = BuildHandler, Conditional
+			return s
+		}},
+		{"status-generation-condition", func(s []CommandSpec) []CommandSpec {
+			for i := range s {
+				if pathKey(s[i].Path) == "status" {
+					s[i].Availability = Availability{Mode: Conditional, Option: "generation", Equals: Str("none"), Reason: "requires --generation none"}
+				}
+			}
 			return s
 		}},
 		{"variadic-position", func(s []CommandSpec) []CommandSpec {
@@ -219,8 +225,7 @@ func TestRegistryValidation(t *testing.T) {
 			return s
 		}},
 		{"condition-missing-option", func(s []CommandSpec) []CommandSpec {
-			s[2].Handler = StatusNone
-			s[2].Availability = Availability{Mode: Conditional, Option: "missing", Equals: Str("none"), Reason: "reason"}
+			s[1].Availability = Availability{Mode: Conditional, Option: "missing", Equals: Str("none"), Reason: "reason"}
 			return s
 		}},
 		{"framework-option", func(s []CommandSpec) []CommandSpec {
@@ -355,7 +360,9 @@ func TestNumericDeclarationOwnershipAndAvailability(t *testing.T) {
 	}
 	globals := append(base.Globals(), OptionSpec{Key: "limit", Names: []string{"limit"}, Kind: Integer, Default: number(), Metavar: "count"})
 	root, _ := base.Lookup(nil)
-	command, _ := base.Lookup([]string{"status"})
+	// Exercise generic conditions on framework help, since executable handlers
+	// require unconditional availability.
+	command, _ := base.Lookup([]string{"help"})
 	command.Options = []OptionSpec{{Key: "count", Names: []string{"count"}, Kind: Integer, Default: number(), Metavar: "count"}}
 	command.Availability = Availability{Mode: Conditional, Option: "count", Equals: number(), Reason: "different count"}
 	specs := []CommandSpec{root, command}
@@ -376,13 +383,13 @@ func TestNumericDeclarationOwnershipAndAvailability(t *testing.T) {
 	lookup, _ := r.Lookup(command.Path)
 	for _, declarations := range [][]CommandSpec{r.Commands(), r.Children(nil), r.Leaves(), {lookup}} {
 		for i := range declarations {
-			if pathKey(declarations[i].Path) == "status" {
+			if pathKey(declarations[i].Path) == "help" {
 				declarations[i].Options[0].Default.Integer.SetInt64(5)
 				declarations[i].Availability.Equals.Integer.SetInt64(6)
 			}
 		}
 	}
-	first, err := r.Parse([]string{"status"})
+	first, err := r.Parse([]string{"help"})
 	if err != nil || r.CheckAvailability(first) != nil {
 		t.Fatal(first, err)
 	}
@@ -394,7 +401,7 @@ func TestNumericDeclarationOwnershipAndAvailability(t *testing.T) {
 	first.Globals["limit"] = v
 	first.Command.Options[0].Default.Integer.SetInt64(9)
 	first.Command.Availability.Equals.Integer.SetInt64(10)
-	second, err := r.Parse([]string{"status"})
+	second, err := r.Parse([]string{"help"})
 	for _, v := range []ParsedValue{second.Globals["limit"], second.Options["count"]} {
 		if v.Value.Kind != Number || v.Value.Integer.String() != huge || v.Present {
 			t.Fatal("numeric declaration storage leaked", v)
@@ -406,7 +413,7 @@ func TestNumericDeclarationOwnershipAndAvailability(t *testing.T) {
 		t.Fatal("mutation changed registry/help/condition", second, stored, helpAfter, err, helpErr)
 	}
 	for _, text := range []string{huge, "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE"} {
-		inv, err := r.Parse([]string{"status", "--count=" + text})
+		inv, err := r.Parse([]string{"help", "--count=" + text})
 		if err != nil || (r.CheckAvailability(inv) == nil) != (text != "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE") {
 			t.Fatal("numeric comparison changed", text, inv, err)
 		}
@@ -446,7 +453,7 @@ func TestHelpReferences(t *testing.T) {
 		}
 	}
 	status, _ := r.Help([]string{"status"}, 80)
-	if !strings.Contains(status, "Execution requires --generation none.") {
+	if strings.Contains(status, "Execution requires") || !strings.Contains(status, "--generation") {
 		t.Fatal(status)
 	}
 	if _, err := r.Help([]string{"unknown"}, 80); err == nil {

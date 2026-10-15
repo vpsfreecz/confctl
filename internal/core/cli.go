@@ -126,6 +126,10 @@ func Main(ctx context.Context, argv []string) (result int) {
 		err = e.LogHealthCLI(inv)
 	} else if inv.Command.Handler == cli.GenDataHandler {
 		err = e.LogGenDataCLI(inv)
+	} else if inv.Command.Handler == cli.BuildHandler {
+		err = e.LogBuildCLI(inv)
+	} else if inv.Command.Handler == cli.StatusHandler {
+		err = e.LogStatusCLI(inv)
 	} else if !extensionCommand || supportedRuntimeCommand(command) {
 		err = e.LogCLI(cmd, opts, commandArgv)
 	} else {
@@ -305,6 +309,27 @@ func Main(ctx context.Context, argv []string) (result int) {
 		success = true
 		return 0
 	}
+	if inv.Command.Handler == cli.BuildHandler || inv.Command.Handler == cli.StatusHandler {
+		if inv.Command.Handler == cli.BuildHandler {
+			err = e.Build(inv, os.Stdin, os.Stdout, os.Stderr)
+		} else {
+			err = e.StatusCLI(inv, os.Stdin, os.Stdout, os.Stderr)
+		}
+		if err != nil {
+			var buildArgs *buildArgumentError
+			var statusArgs *statusArgumentError
+			if errors.As(err, &buildArgs) || errors.As(err, &statusArgs) {
+				code := fail(err, 64)
+				fmt.Fprintln(os.Stderr)
+				help, _ := registry.Help(inv.Command.Path, 80)
+				fmt.Print(help)
+				return code
+			}
+			return fail(err, 1)
+		}
+		success = true
+		return 0
+	}
 	if cmd == "ls" && opts.List {
 		e.ShowTrace = false
 		n, er := e.evaluator()
@@ -338,7 +363,7 @@ func Main(ctx context.Context, argv []string) (result int) {
 		pattern = &opts.Args[0]
 	}
 	managed := opts.Managed
-	if cmd == "status" || managed == "" {
+	if managed == "" {
 		managed = "yes"
 	}
 	ms, err := Select(all, pattern, opts.Attrs, opts.Tags, managed)
@@ -361,34 +386,5 @@ func Main(ctx context.Context, argv []string) (result int) {
 		success = true
 		return 0
 	}
-	selected := []Machine{}
-	for _, m := range ms {
-		if m.Target.Host != nil || m.CarrierName != nil {
-			selected = append(selected, m)
-		}
-	}
-	if len(selected) == 0 {
-		return fail(fmt.Errorf("No machines to check"), 1)
-	}
-	if !opts.Yes {
-		text, err := e.List(selected, nil, true)
-		if err != nil {
-			return fail(err, 1)
-		}
-		fmt.Print("The following machines will be checked:\n" + text + "\nGeneration: none\n")
-		ok, err := e.Confirm(os.Stdin, "", false)
-		if err != nil || !ok {
-			if err != nil {
-				return fail(err, 1)
-			}
-			return fail(fmt.Errorf("Aborted"), 1)
-		}
-	}
-	text, err := e.Status(selected, all)
-	if err != nil {
-		return fail(err, 1)
-	}
-	fmt.Print(text)
-	success = true
-	return 0
+	return fail(fmt.Errorf("unsupported command %s", cmd), 1)
 }

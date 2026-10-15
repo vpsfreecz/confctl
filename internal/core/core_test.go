@@ -64,7 +64,7 @@ func TestUnsupportedNoMutation(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer os.Chdir(cwd)
-	for _, a := range [][]string{{"build"}, {"deploy"}, {"status"}, {"status", "-g", "current"}} {
+	for _, a := range [][]string{{"deploy"}, {"collect-garbage"}, {"generation", "rm"}, {"generation", "rotate"}} {
 		if code := Main(context.Background(), a); code != 2 {
 			t.Fatalf("%v: %d", a, code)
 		}

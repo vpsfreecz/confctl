@@ -141,8 +141,8 @@ func BuiltinRegistry() *Registry {
 		leaf([]string{"health-check"}, "Run machine health-checks", "[machine-pattern]", args("machine-pattern"), options(filters(), ConfirmationOptions(), []OptionSpec{integerOption([]string{"j", "max-jobs"}, "Maximum number of health-check jobs", "number", 5)})),
 	)
 	status := leaf([]string{"status"}, "Check machine status", "[machine-pattern]", args("machine-pattern"), options(filters(), ConfirmationOptions(), []OptionSpec{generationOption("Check status against selected generation")}))
-	status.Handler = StatusNone
-	status.Availability = Availability{Mode: Conditional, Option: "generation", Equals: Str("none"), Reason: "status requires --generation none; other modes are unavailable"}
+	status.Handler = StatusHandler
+	status.Availability = Availability{Mode: Available}
 	commands = append(commands, status,
 		leaf([]string{"changelog"}, "Changelog between deployed and configured input roles", "[machine-pattern [role-pattern]]", args("machine-pattern", "role-pattern"), options(filters(), ConfirmationOptions(), []OptionSpec{generationOption("Show changelog against input roles from selected generation"), switchOption([]string{"d", "downgrade"}, "Show a changelog for downgrade", false, true), switchOption([]string{"v", "verbose"}, "Show full-length changelog descriptions", false, true), switchOption([]string{"p", "patch"}, "Show patches", false, true)}, nixOptions())),
 		leaf([]string{"diff"}, "Diff between deployed and configured input roles", "[machine-pattern [role-pattern]]", args("machine-pattern", "role-pattern"), options(filters(), ConfirmationOptions(), []OptionSpec{generationOption("Show diff against input roles from selected generation"), switchOption([]string{"d", "downgrade"}, "Show a changelog for downgrade", false, true)}, nixOptions())),
@@ -176,6 +176,9 @@ func BuiltinRegistry() *Registry {
 			commands[i].Availability = Availability{Mode: Available}
 		case "diff", "changelog":
 			commands[i].Handler = ComparisonHandler
+			commands[i].Availability = Availability{Mode: Available}
+		case "build":
+			commands[i].Handler = BuildHandler
 			commands[i].Availability = Availability{Mode: Available}
 		case "health-check":
 			commands[i].Handler = HealthCheckHandler
