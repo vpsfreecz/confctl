@@ -1,0 +1,216 @@
+{
+  "machines": [
+    {
+      "url": "http://netboot.test/node.test",
+      "name": "rack:node",
+      "spin": "nixos",
+      "fqdn": "node.test",
+      "label": "Node label\nLABEL extra",
+      "generations": [
+        {
+          "url": "http://netboot.test/node.test/7",
+          "store_path": "/fixture/store/netboot-7",
+          "generation": 7,
+          "time": 1727740807,
+          "time_s": "2024-10-01 00:00:07",
+          "current": false,
+          "toplevel": "/fixture/store/system-7",
+          "version": "24.11.20241001",
+          "revision": "0123456789abcdef",
+          "shortrev": "012345678",
+          "macs": [
+            "AA:BB:CC:DD:EE:FF"
+          ],
+          "kernel_version": "6.6.52",
+          "kernel_params": [
+            "httproot=http://netboot.test/node.test/7/initrd",
+            "init=/fixture/store/system-7/init",
+            "console=ttyS0"
+          ],
+          "boot_files": {
+            "bzImage": "http://netboot.test/node.test/7/bzImage",
+            "initrd": "http://netboot.test/node.test/7/initrd"
+          },
+          "variants": [],
+          "inputs_info": {
+            "z": "ž <>&  ",
+            "a": [
+              9007199254740993123456789,
+              1.2,
+              1.0e-07,
+              1.0e+15
+            ],
+            "nested": {
+              "b": false,
+              "a": null
+            }
+          }
+        },
+        {
+          "url": "http://netboot.test/node.test/6",
+          "store_path": "/fixture/store/netboot-6",
+          "generation": 6,
+          "time": 1727740806,
+          "time_s": "2024-10-01 00:00:06",
+          "current": true,
+          "toplevel": "/fixture/store/system-6",
+          "version": "24.11.20241001",
+          "revision": "0123456789abcdef",
+          "shortrev": "012345678",
+          "macs": [
+            "AA:BB:CC:DD:EE:FF"
+          ],
+          "kernel_version": "6.6.52",
+          "kernel_params": [
+            "httproot=http://netboot.test/node.test/6/initrd",
+            "init=/fixture/store/system-6/init",
+            "console=ttyS0"
+          ],
+          "boot_files": {
+            "bzImage": "http://netboot.test/node.test/6/bzImage",
+            "initrd": "http://netboot.test/node.test/6/initrd"
+          },
+          "variants": [],
+          "inputs_info": {
+            "z": "ž <>&  ",
+            "a": [
+              9007199254740993123456789,
+              1.2,
+              1.0e-07,
+              1.0e+15
+            ],
+            "nested": {
+              "b": false,
+              "a": null
+            }
+          }
+        },
+        {
+          "url": "http://netboot.test/node.test/5",
+          "store_path": "/fixture/store/netboot-5",
+          "generation": 5,
+          "time": 1727740805,
+          "time_s": "2024-10-01 00:00:05",
+          "current": false,
+          "toplevel": "/fixture/store/system-5",
+          "version": "24.11.20241001",
+          "revision": "0123456789abcdef",
+          "shortrev": "012345678",
+          "macs": [
+            "AA:BB:CC:DD:EE:FF"
+          ],
+          "kernel_version": "6.6.52",
+          "kernel_params": [
+            "httproot=http://netboot.test/node.test/5/initrd",
+            "init=/fixture/store/system-5/init",
+            "console=ttyS0"
+          ],
+          "boot_files": {
+            "bzImage": "http://netboot.test/node.test/5/bzImage",
+            "initrd": "http://netboot.test/node.test/5/initrd"
+          },
+          "variants": [],
+          "inputs_info": {
+            "z": "ž <>&  ",
+            "a": [
+              9007199254740993123456789,
+              1.2,
+              1.0e-07,
+              1.0e+15
+            ],
+            "nested": {
+              "b": false,
+              "a": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "url": "http://netboot.test/other.test",
+      "name": "aaa-other",
+      "spin": "vpsadminos",
+      "fqdn": "other.test",
+      "label": "other.test.example",
+      "generations": [
+        {
+          "url": "http://netboot.test/other.test/1",
+          "store_path": "/fixture/store/netboot-1",
+          "generation": 1,
+          "time": 1727740801,
+          "time_s": "2024-10-01 00:00:01",
+          "current": true,
+          "toplevel": "/fixture/store/system-1",
+          "version": "24.11.20241001",
+          "revision": "0123456789abcdef",
+          "shortrev": "012345678",
+          "macs": [
+            "AA:BB:CC:DD:EE:FF"
+          ],
+          "kernel_version": "6.6.52",
+          "kernel_params": [
+            "httproot=http://netboot.test/other.test/1/root.squashfs",
+            "console=ttyS0"
+          ],
+          "boot_files": {
+            "bzImage": "http://netboot.test/other.test/1/bzImage",
+            "initrd": "http://netboot.test/other.test/1/initrd",
+            "root.squashfs": "http://netboot.test/other.test/1/root.squashfs"
+          },
+          "variants": [
+            {
+              "name": "default",
+              "label": "Default runlevel",
+              "kernel_params": [
+                "runlevel=default"
+              ]
+            },
+            {
+              "name": "nopools",
+              "label": "Default runlevel without container imports",
+              "kernel_params": [
+                "runlevel=default",
+                "osctl.pools=0"
+              ]
+            },
+            {
+              "name": "nostart",
+              "label": "Default runlevel without container autostart",
+              "kernel_params": [
+                "runlevel=default",
+                "osctl.autostart=0"
+              ]
+            },
+            {
+              "name": "rescue",
+              "label": "Rescue runlevel (network and sshd)",
+              "kernel_params": [
+                "runlevel=rescue"
+              ]
+            },
+            {
+              "name": "single",
+              "label": "Single-user runlevel (console only)",
+              "kernel_params": [
+                "runlevel=single"
+              ]
+            }
+          ],
+          "inputs_info": {
+            "z": "ž <>&  ",
+            "a": [
+              9007199254740993123456789,
+              1.2,
+              1.0e-07,
+              1.0e+15
+            ],
+            "nested": {
+              "b": false,
+              "a": null
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

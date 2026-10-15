@@ -122,6 +122,51 @@ support is integrated within confctl and it only has to be enabled.
 The netboot server is rebuilt whenever a machine is deployed to it.
 The rebuild can be also run manually using command `build-netboot-server`.
 
+## Netboot files and current generations
+
+`build-netboot-server` reads its packaged configuration before taking the
+blocking lock at `/run/confctl/build-netboot-server.lock`. It ignores command
+arguments. It reads carried profiles from `/nix/var/nix/profiles`; each matching
+`confctl-NAME-ID-link` must contain `machine.json` with a `toplevel` path.
+For each machine, the first generation encountered whose resolved path matches
+the current `confctl-NAME` profile is marked current. Generations are then listed
+in descending numeric order, so current need not be the newest generation.
+
+The HTTP root contains `machines.json`, `FQDN/machine.json`, and
+`FQDN/ID/generation.json` with ordered machines, generations, boot-file URL
+strings, kernel parameters and vpsAdminOS variants. Boot files are absolute
+symlinks; `FQDN/current` is a relative symlink to the current ID. The TFTP root
+contains Syslinux assets, menus and boot links. MAC routing preserves address
+case. The NixOS menu shows current first, followed by the generation list
+without its first entry; when current is not newest, this can repeat the current
+generation and omit the newest. A generation's `kernel-params` file takes
+precedence over `machine.json` parameters.
+
+## Recovering a failed netboot rebuild
+
+The builder creates both candidate trees before installing the TFTP link,
+then the HTTP link. It removes the old TFTP tree, then the old HTTP tree, only
+after both installs succeed. A failure retains earlier effects: a failed
+second install can leave TFTP serving new content, and a cleanup failure can
+leave both new trees serving while old trees remain or have been partly removed.
+
+Cleanup accepts only a real directory owned by the helper's effective user,
+with a generated suffix of six lowercase hexadecimal characters in the
+configured root's parent. It rechecks the recorded directory and parent
+identities, excludes new and live roots, and unlinks symlinks without following
+their targets. Handwritten names such as `tftp.old`, missing or replaced roots,
+and old targets outside the configured parent cause a cleanup refusal after
+installation. A TFTP cleanup refusal also leaves the old HTTP tree untouched.
+This assumes a stable trusted parent; it does not protect against a privileged
+actor changing mounts or paths.
+
+Before recovery, inspect the actual TFTP and HTTP links and the retained
+candidate and old trees. A failed rebuild may already be serving the new
+content. Resolve a refused old root only after checking its location, type,
+owner and contents. Restore a matching module and helper revision separately
+if needed. A rerun creates another suffix and does not recover deleted content.
+Reverting software does not undo installed links or deletions.
+
 ## Other uses
 You can define your own commands to be run on the carrier machine when
 images are deployed to it:
@@ -137,15 +182,28 @@ images are deployed to it:
 }
 ```
 
+`carrier-env` exits with status 1 when extra operands remain. It prints
+corrective usage to stdout and `Too many arguments` to stderr. Parser and
+failed-command diagnostics omit Ruby exception frames. Help shows the invoked
+program name, and failure messages show the attempted command's arguments.
+Version queries, including `--version=PKG`, fail with `PROGRAM: version unknown`
+without loading Ruby packages.
+
+The profile command runs before the callback. If the callback fails, earlier
+profile changes or generation deletions remain. Reverting the helper or confctl
+software does not restore deleted generations.
+
 ## kexec from the netboot server
 Set `confctl.programs.kexec-netboot.enable = true;` within your netbooted machine
 configurations. This will add program `kexec-netboot` to your system path.
 
-This program can be used to load kernel and initrd from the netboot server for kexec.
-It automatically discovers the netboot server it was booted from, by default it uses
-the latest generation found on the netboot server at the moment of execution. Use
-`kexec-netboot --interactive` to select which machine/generation/variant should be
-loaded. See `kexec-netboot --help` for all available options.
+This program loads a kernel and initrd from the netboot server for kexec.
+It discovers the server from the boot parameters. By default, it selects the
+generation marked current, or the first listed generation if none is marked.
+Use `kexec-netboot --interactive` to select a machine, generation and variant.
+See `kexec-netboot --help` or the
+[kexec-netboot manual](../nix/modules/confctl/kexec-netboot/kexec-netboot.8.md)
+for the available options.
 
 The loaded kernel can be run either by `kexec-netboot -e` or `kexec -e` directly.
 

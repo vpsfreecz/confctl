@@ -10,18 +10,12 @@ let
 
   cfg = config.confctl.carrier;
 
-  carrier-env = pkgs.replaceVarsWith {
-    src = ./carrier-env.rb;
-    name = "carrier-env";
-    isExecutable = true;
-    dir = "bin";
-    replacements = {
-      ruby = pkgs.ruby;
-      onChangeCommands = pkgs.writeScript "carrier-on-change-commands.sh" ''
-        #!${pkgs.bash}/bin/bash
-        ${cfg.onChangeCommands}
-      '';
-    };
+  carrier-env = import ./package.nix {
+    inherit pkgs;
+    onChangeCommands = pkgs.writeScript "carrier-on-change-commands.sh" ''
+      #!${pkgs.bash}/bin/bash
+      ${cfg.onChangeCommands}
+    '';
   };
 in
 {
