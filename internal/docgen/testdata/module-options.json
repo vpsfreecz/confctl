@@ -1,0 +1,49 @@
+[
+  {
+    "name": "confctl.z",
+    "description": "Last setting.",
+    "type": "boolean",
+    "default": false,
+    "example": true,
+    "declarations": ["/fixture/confctl/nix/modules/confctl/z.nix"]
+  },
+  {"name": "unrelated.private", "default": {"_type": "not-rendered"}},
+  {"name": "confctl.hidden", "internal": true, "default": {"_type": "not-rendered"}},
+  {
+    "name": "confctl.carrier.enable",
+    "description": "Enable <literal>carrier-env</literal> &amp; keep <option>cluster</option>.\n\nSecond paragraph.\n",
+    "type": "boolean",
+    "default": true,
+    "example": false,
+    "declarations": ["/nix/store/abc-source/nix/modules/confctl/carrier/base.nix", "/other/module.nix"]
+  },
+  {
+    "name": "cluster.<name>.value",
+    "description": null,
+    "type": "boolean or integer",
+    "default": false,
+    "example": 9007199254740993,
+    "declarations": ["/fixture/confctl/nix/modules/cluster/default.nix"]
+  },
+  {
+    "name": "confctl.a",
+    "description": "Use &#65; &lt;source&gt;.",
+    "type": "attribute set",
+    "default": {"_type": "literalExpression", "text": "{\n  a = 1;\n  z = builtins.readFile \"notes`log\";\n}"},
+    "example": {"_type": "literalExpression", "text": "`edge`"},
+    "declarations": ["/fixture/confctl/nix/modules/confctl/a.nix"]
+  },
+  {
+    "name": "confctl.inputsInfo",
+    "description": "",
+    "type": "string",
+    "default": "",
+    "declarations": []
+  },
+  {
+    "name": "confctl.configurationInfo",
+    "description": false,
+    "type": "null or attribute set",
+    "declarations": ["/fixture/confctl/modules/external.nix"]
+  }
+]
