@@ -101,7 +101,8 @@ func (e *Engine) sshConfirmation(inv cli.Invocation, machines []Machine, in io.R
 	if command != "" {
 		fmt.Fprint(out, "\nCommand: "+command+"\n")
 	}
-	return testConnectionConfirm(in, out)
+	_, line := commandInput(in)
+	return testConnectionConfirm(e.Context, line, out)
 }
 
 func (e *Engine) runSSH(inv cli.Invocation, in io.Reader, out io.Writer, deps sshDeps) error {

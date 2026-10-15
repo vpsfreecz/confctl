@@ -851,7 +851,8 @@ func TestGenDataLinuxPromptComposition(t *testing.T) {
 	ctx := context.Background()
 	s := gpLinuxNew(t, "y\nxsynthetic-user\nsynthetic-password\n", "synthetic-answer\nyes\nTAIL")
 	var page bytes.Buffer
-	if err := testConnectionConfirm(s.input, &page); err != nil || s.input.Buffered() == 0 || s.reader.reads != 1 {
+	_, line := commandInput(s.input)
+	if err := testConnectionConfirm(ctx, line, &page); err != nil || s.input.Buffered() == 0 || s.reader.reads != 1 {
 		t.Fatal("actual confirmation stranded read-ahead")
 	}
 	keys := 0

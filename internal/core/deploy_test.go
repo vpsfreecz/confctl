@@ -1,7 +1,6 @@
 package core
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -61,7 +60,7 @@ func TestDeployDeliveryPrepareRebindAndOrders(t *testing.T) {
 					trace = append(trace, "build:"+strings.Join(names, ","))
 					return []deploy.Target{{Host: "b", Generation: deployTestGeneration("gb")}, {Host: "a", Generation: deployTestGeneration("ga")}}, nil
 				},
-				Operations: func(_ context.Context, all, selected []Machine, _ *bufio.Reader, _ io.Writer, _ cli.Invocation) deploy.Deps {
+				Operations: func(_ context.Context, all, selected []Machine, _ commandLine, _ io.Writer, _ cli.Invocation) deploy.Deps {
 					if selected[0].Name != "a" || selected[1].Name != "b" || selected[0].Profile != "/fresh/profile" || all[0].Name != "b" {
 						t.Fatal("hook rebind lost selected identity/order/fresh metadata")
 					}
@@ -179,7 +178,7 @@ func TestDeployDeliveryStoredMissingAndCopyOnly(t *testing.T) {
 			copied, prepare := 0, 0
 			d := deployCommandDeps{Machines: func() ([]Machine, error) { return []Machine{deployTestMachine("a"), deployTestMachine("b")}, nil }, Prepare: func([]string) (int, error) { prepare++; return 0, nil }, Load: func(host string) (*generation.BuildList, error) {
 				return generation.LoadBuildList(root, host, generation.Options{})
-			}, Build: func([]string) ([]deploy.Target, error) { t.Fatal("stored generation built"); return nil, nil }, Operations: func(context.Context, []Machine, []Machine, *bufio.Reader, io.Writer, cli.Invocation) deploy.Deps {
+			}, Build: func([]string) ([]deploy.Target, error) { t.Fatal("stored generation built"); return nil, nil }, Operations: func(context.Context, []Machine, []Machine, commandLine, io.Writer, cli.Invocation) deploy.Deps {
 				return deploy.Deps{AutoRollbackDefault: func(deploy.Machine) (bool, error) { return false, nil }, Confirm: func(context.Context, deploy.Confirmation) (bool, error) { return true, nil }, Copy: func(context.Context, deploy.Machine, []string, func(deploy.CopyProgress)) (bool, error) {
 					copied++
 					return true, nil
@@ -209,7 +208,7 @@ func TestDeployDeliveryOutputErrorJoins(t *testing.T) {
 	finished := make(chan struct{})
 	d := deployCommandDeps{Machines: func() ([]Machine, error) { return []Machine{deployTestMachine("a")}, nil }, Prepare: func([]string) (int, error) { return 0, nil }, Build: func([]string) ([]deploy.Target, error) {
 		return []deploy.Target{{Host: "a", Generation: deployTestGeneration("g")}}, nil
-	}, Operations: func(context.Context, []Machine, []Machine, *bufio.Reader, io.Writer, cli.Invocation) deploy.Deps {
+	}, Operations: func(context.Context, []Machine, []Machine, commandLine, io.Writer, cli.Invocation) deploy.Deps {
 		return deploy.Deps{QueryTarget: func(ctx context.Context, _ deploy.Machine) (deploy.Status, error) {
 			defer close(finished)
 			<-ctx.Done()
@@ -243,21 +242,21 @@ func (w *deployErrorWriter) Write(b []byte) (int, error) {
 }
 
 func TestDeployDeliveryPromptsAndWait(t *testing.T) {
-	input := bufio.NewReader(strings.NewReader("\ninvalid\ny\nn\nr\nf\n"))
+	_, input := commandInput(strings.NewReader("\ninvalid\ny\nn\nr\nf\n"))
 	var out bytes.Buffer
-	if ok, err := deployConfirm(input, &out); err != nil || !ok {
+	if ok, err := deployConfirm(context.Background(), input, &out); err != nil || !ok {
 		t.Fatal("blank/invalid must repeat confirmation")
 	}
-	if ok, err := deployConfirm(input, &out); err != nil || ok {
+	if ok, err := deployConfirm(context.Background(), input, &out); err != nil || ok {
 		t.Fatal("explicit decline changed")
 	}
-	if answer, err := deployChoice(input, &out, "yrsa"); err != nil || answer != "r" {
+	if answer, err := deployChoice(context.Background(), input, &out, "yrsa"); err != nil || answer != "r" {
 		t.Fatal("activation retry changed")
 	}
-	if answer, err := deployChoice(input, &out, "crfa"); err != nil || answer != "f" {
+	if answer, err := deployChoice(context.Background(), input, &out, "crfa"); err != nil || answer != "f" {
 		t.Fatal("health retry subset changed")
 	}
-	if _, err := deployChoice(input, &out, "yn"); err == nil {
+	if _, err := deployChoice(context.Background(), input, &out, "yn"); err == nil {
 		t.Fatal("EOF selected default")
 	}
 	for text, want := range map[string]string{"600": "600", "999999999999999999999999": "999999999999999999999999", "x\n12\nz": "0", "\n12\n": "12", "-1_2\n0\n": "-12"} {
@@ -285,7 +284,7 @@ func TestDeployDeliveryHealthRetainsFailures(t *testing.T) {
 	machine := deployTestMachine("a")
 	g := deployTestGeneration("g")
 	rounds := 0
-	d := deployCommandDeps{Machines: func() ([]Machine, error) { return []Machine{machine}, nil }, Prepare: func([]string) (int, error) { return 0, nil }, Build: func([]string) ([]deploy.Target, error) { return []deploy.Target{{Host: "a", Generation: g}}, nil }, Operations: func(context.Context, []Machine, []Machine, *bufio.Reader, io.Writer, cli.Invocation) deploy.Deps {
+	d := deployCommandDeps{Machines: func() ([]Machine, error) { return []Machine{machine}, nil }, Prepare: func([]string) (int, error) { return 0, nil }, Build: func([]string) ([]deploy.Target, error) { return []deploy.Target{{Host: "a", Generation: g}}, nil }, Operations: func(context.Context, []Machine, []Machine, commandLine, io.Writer, cli.Invocation) deploy.Deps {
 		return deploy.Deps{QueryTarget: func(context.Context, deploy.Machine) (deploy.Status, error) { return deploy.Status{}, nil }, AutoRollbackDefault: func(deploy.Machine) (bool, error) { return false, nil }, Copy: func(context.Context, deploy.Machine, []string, func(deploy.CopyProgress)) (bool, error) {
 			return true, nil
 		}, Activate: func(context.Context, deploy.Machine, *generation.Build, deploy.Action) (bool, error) {
@@ -353,7 +352,7 @@ func TestDeployDeliveryConcretePartialEffects(t *testing.T) {
 				Build: func([]string) ([]deploy.Target, error) {
 					return []deploy.Target{{Host: "a", Generation: deployTestGeneration("a")}, {Host: "b", Generation: deployTestGeneration("b")}}, nil
 				},
-				Operations: func(ctx context.Context, all, selected []Machine, input *bufio.Reader, out io.Writer, inv cli.Invocation) deploy.Deps {
+				Operations: func(ctx context.Context, all, selected []Machine, input commandLine, out io.Writer, inv cli.Invocation) deploy.Deps {
 					return e.deployOperationsWithOps(ctx, all, selected, input, out, inv, ops)
 				},
 			}
@@ -440,7 +439,7 @@ func TestDeployDeliveryHealthWorkerAdmissionAndRetries(t *testing.T) {
 				Build: func([]string) ([]deploy.Target, error) {
 					return []deploy.Target{{Host: "m", Generation: deployTestGeneration("g")}}, nil
 				},
-				Operations: func(ctx context.Context, all, selected []Machine, input *bufio.Reader, out io.Writer, inv cli.Invocation) deploy.Deps {
+				Operations: func(ctx context.Context, all, selected []Machine, input commandLine, out io.Writer, inv cli.Invocation) deploy.Deps {
 					return e.deployOperationsWithOps(ctx, all, selected, input, out, inv, ops)
 				},
 			}

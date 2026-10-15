@@ -261,7 +261,8 @@ func TestBasicLinuxBufferedOneCharacterAndConfirmationTail(t *testing.T) {
 			s, ops := basicScript(t)
 			input := basicBuffered("y\n" + key + "TAIL")
 			var confirm bytes.Buffer
-			if err := testConnectionConfirm(input, &confirm); err != nil {
+			_, line := commandInput(input)
+			if err := testConnectionConfirm(context.Background(), line, &confirm); err != nil {
 				t.Fatal(err)
 			}
 			got, err := linuxBasicKey(context.Background(), s.in, input, ops)
@@ -748,7 +749,8 @@ func TestBasicLinuxActualCursorWrapAndSharedInputComposition(t *testing.T) {
 	}
 	input := basicBuffered("y\nqTAIL")
 	var confirmation bytes.Buffer
-	if err := testConnectionConfirm(input, &confirmation); err != nil {
+	_, line := commandInput(input)
+	if err := testConnectionConfirm(context.Background(), line, &confirmation); err != nil {
 		t.Fatal(err)
 	}
 	pager, err := newLinuxBasicPagerWithOps(context.Background(), s.in, s.out, s.stderr, input, ops)

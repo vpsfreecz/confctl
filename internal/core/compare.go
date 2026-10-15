@@ -34,6 +34,7 @@ type comparisonDeps struct {
 	Env       func(string) (string, bool)
 	OutputTTY func() bool
 	ErrorTTY  func() bool
+	Line      commandLine
 	Pager     ui.PagerOps
 }
 
@@ -48,6 +49,7 @@ var comparisonRuntimeShell string
 func (e *Engine) Compare(inv cli.Invocation, stdin, stdout, stderr *os.File) error {
 	input := bufio.NewReader(stdin)
 	deps := comparisonDeps{
+		Line:     linuxCommandLine(stdin, input),
 		Machines: func() ([]Machine, error) { return e.Machines(false) },
 		List:     func(ms []Machine) (string, error) { return e.List(ms, nil, true) },
 		Builds: func(host string) (*generation.BuildList, error) {
@@ -96,6 +98,10 @@ func comparisonPagerEnabled(deps comparisonDeps) bool {
 
 func (e *Engine) compare(inv cli.Invocation, in *bufio.Reader, out io.Writer, deps comparisonDeps) error {
 	ctx := e.Context
+	line := deps.Line
+	if line == nil {
+		_, line = commandInput(in)
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -144,7 +150,7 @@ func (e *Engine) compare(inv cli.Invocation, in *bufio.Reader, out io.Writer, de
 		if _, err = fmt.Fprint(out, table+"\nGeneration: "+label+"\n"); err != nil {
 			return err
 		}
-		if err = testConnectionConfirm(in, out); err != nil {
+		if err = testConnectionConfirm(ctx, line, out); err != nil {
 			return err
 		}
 	}
@@ -202,7 +208,7 @@ func (e *Engine) compare(inv cli.Invocation, in *bufio.Reader, out io.Writer, de
 			if _, err = io.WriteString(out, text.String()); err != nil {
 				return err
 			}
-			if err = testConnectionConfirm(in, out); err != nil {
+			if err = testConnectionConfirm(ctx, line, out); err != nil {
 				return err
 			}
 		}

@@ -1,10 +1,10 @@
 package core
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -237,24 +237,48 @@ func (e *Engine) List(ms []Machine, cols []string, header bool) (string, error) 
 	return Table(rows, cols, header), nil
 }
 func (e *Engine) Confirm(stdin *os.File, message string, always bool) (bool, error) {
+	ctx := e.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	_, line := commandInput(stdin)
+	return e.confirm(ctx, line, os.Stdout, message, always)
+}
+
+func (e *Engine) confirm(ctx context.Context, line commandLine, out io.Writer, message string, always bool) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
 	if e.Yes && !always {
 		return true, nil
 	}
-	fmt.Print(message)
-	reader := bufio.NewReader(stdin)
+	if _, err := fmt.Fprint(out, message); err != nil {
+		return false, err
+	}
 	for {
-		fmt.Print("\nContinue? [y/N]: ")
-		line, err := reader.ReadString('\n')
-		if err != nil && line == "" {
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+		if _, err := fmt.Fprint(out, "\nContinue? [y/N]: "); err != nil {
+			return false, err
+		}
+		answer, err := line(ctx)
+		if err != nil && err != io.EOF {
+			return false, err
+		}
+		if stopped := ctx.Err(); stopped != nil {
+			return false, stopped
+		}
+		if err == io.EOF && answer == "" {
 			return false, fmt.Errorf("end of file reached")
 		}
-		switch strings.ToLower(strings.TrimSpace(line)) {
+		switch strings.ToLower(strings.TrimSpace(answer)) {
 		case "y":
-			fmt.Println()
-			return true, nil
+			_, err := fmt.Fprintln(out)
+			return err == nil, err
 		case "n":
-			fmt.Println()
-			return false, nil
+			_, err := fmt.Fprintln(out)
+			return false, err
 		}
 	}
 }

@@ -22,7 +22,8 @@ and owns only its wake pipe and notifier. Cancellation wakes polling without
 closing borrowed stdin. The caller joins the notifier before restoring the
 terminal and closing acquired ends; no delayed read or notifier survives return.
 `Ppoll` handles input, wake readiness, HUP and errors, with POLLNVAL reported as
-EBADF. Prompt permission remains with its existing owner.
+EBADF. Prompt permission and serialized extension confirmations remain with their
+existing owners.
 
 Inherited SSH, Git job control and SystemPager keep their distinct process and
 child-wait owners. Live command logs retain their operation and machine context;

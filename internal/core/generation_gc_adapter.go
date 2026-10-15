@@ -99,7 +99,7 @@ func (e *Engine) collectGarbage(inv cli.Invocation, in io.Reader, out io.Writer,
 		if err != nil {
 			return err
 		}
-		if err := generationConfirm(inv, in, out, "Collect garbage on the following machines:\n"+table); err != nil {
+		if err := generationConfirm(e.Context, inv, in, out, "Collect garbage on the following machines:\n"+table); err != nil {
 			return err
 		}
 	}
