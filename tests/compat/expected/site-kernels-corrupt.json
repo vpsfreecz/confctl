@@ -1,0 +1,237 @@
+{
+  "config_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-observations-final39/site-kernels-corrupt-1386419780/config",
+  "run_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-observations-final39/site-kernels-corrupt-1386419780",
+  "schema": 1,
+  "case": "site-kernels-corrupt",
+  "executable": "/nix/store/hwvcw1wyknlvk7xsclkasrl7lkcf41yx-confctl/bin/confctl",
+  "executable_sha256": "5bbb91ece29ffc9e7e3fd9be837e48f6eb8c6df2667055e6242e9ef128859e09",
+  "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "fixture_sha256": "617ebfc0a6d4097da586139b71d189a8b0559dbfdd0598aeef158fe39c65c95d",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "stdout": "",
+  "stderr": "\nLog file: ${ROOT}/.confctl/logs/${LOG_TIME:1}-confctl-runtime-kernels-update.log\nerror: unexpected character: 'bad' at line 1 column 1\n",
+  "exit": 1,
+  "before": {
+    "cluster": {
+      "mode": 2147484141
+    },
+    "cluster/cluster.nix": {
+      "text": "[]\n",
+      "mode": 420
+    },
+    "configs": {
+      "mode": 2147484141
+    },
+    "configs/node": {
+      "mode": 2147484141
+    },
+    "configs/node/.keep": {
+      "mode": 420
+    },
+    "configs/node/kernels.json": {
+      "text": "bad json",
+      "mode": 420
+    },
+    "fixtures": {
+      "mode": 2147484141
+    },
+    "fixtures/machines.json": {
+      "text": "{\"alpha/site\": {\"name\": \"alpha/site\", \"key\": \"ka\", \"clusterName\": \"alpha/site\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": true, \"spin\": \"vpsadminos\", \"tags\": [\"node\", \"east\"], \"host\": {\"target\": \"alpha.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \"beta\": {\"name\": \"beta\", \"key\": \"kb\", \"clusterName\": \"beta\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": true, \"spin\": \"nixos\", \"tags\": [\"web\"], \"host\": {\"target\": \"beta.example\", \"port\": 2222}, \"netboot\": {\"enable\": false}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \".hidden\": {\"name\": \".hidden\", \"key\": \"kh\", \"clusterName\": \".hidden\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": false, \"spin\": \"vpsadminos\", \"tags\": [\"node\"], \"host\": {\"target\": \"hidden.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \"alpha/carried\": {\"name\": \"alpha/carried\", \"key\": \"kc\", \"clusterName\": \"alpha/carried\", \"carrier\": \"alpha/site\", \"alias\": \"guest/one\", \"metaConfig\": {\"managed\": true, \"spin\": \"vpsadminos\", \"tags\": [\"node\"], \"host\": {\"target\": \"own.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}}",
+      "mode": 420
+    },
+    "fixtures/module-options.json": {
+      "text": "[{\"name\": \"cluster.\u003cname\u003e.spin\"}, {\"name\": \"cluster.\u003cname\u003e.host.target\"}, {\"name\": \"unrelated\"}]",
+      "mode": 420
+    },
+    "fixtures/settings.json": {
+      "text": "{\"list\": {\"columns\": [\"name\", \"spin\", \"managed\", \"host.target\"]}, \"nix\": {\"maxJobs\": \"auto\", \"impureEval\": true, \"legacyNixPath\": false}}",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    },
+    "scripts": {
+      "mode": 2147484141
+    },
+    "scripts/discover_netbootable.rb": {
+      "text": "module DiscoverNetbootable\n  # Generate `cluster/netbootable.nix` with a list of all netbootable nodes\n  class Script \u003c ConfCtl::UserScript\n    register\n\n    def setup_hooks(hooks)\n      hooks.subscribe(:configuration_rediscover) do\n        machines =\n          ConfCtl::MachineList.new.select do |_host, machine|\n            machine['netboot.enable'] \u0026\u0026 !machine.carried?\n          end.map do |host, _machine|\n            host\n          end\n\n        dst = 'cluster/netbootable.nix'\n        puts \"replace #{dst}\"\n\n        File.open(dst, 'w') do |f|\n          f.puts('# This file is auto-generated on confctl rediscover, changes will be lost')\n          f.write(ConfCtl::NixFormat.to_nix(machines))\n          f.puts\n        end\n      end\n    end\n  end\nend\n",
+      "mode": 420
+    },
+    "scripts/runtime_kernels.rb": {
+      "text": "require 'json'\n\nmodule RuntimeKernels\n  class Script \u003c ConfCtl::UserScript\n    register\n\n    def setup_hooks(hooks)\n      hooks.subscribe(:cluster_deploy) do |machines:, **_kwargs|\n        os_machines = machines.select do |_, machine|\n          machine.spin == 'vpsadminos' \u0026\u0026 !machine.carried?\n        end\n\n        next if os_machines.empty?\n\n        puts Rainbow('Updating runtime kernel information...').bright\n\n        state = State.new\n        state.update(os_machines)\n\n        puts\n      end\n    end\n\n    def setup_cli(app)\n      app.desc 'Manage node runtime kernel versions'\n      app.command 'runtime-kernels' do |rk|\n        rk.desc 'Update runtime kernels'\n        rk.arg_name '[machine-pattern]'\n        rk.command :update do |c|\n          c.desc 'Enable traces in Nix'\n          c.switch 'show-trace'\n\n          c.desc 'Filter by attribute'\n          c.flag %i[a attr], multiple: true\n\n          c.desc 'Filter by tag'\n          c.flag %i[t tag], multiple: true\n\n          c.desc 'Assume the answer to confirmations is yes'\n          c.switch %w[y yes]\n\n          c.action(\u0026ConfCtl::Cli::Command.run(c, Command, :update))\n        end\n      end\n    end\n  end\n\n  class Command \u003c ConfCtl::Cli::Cluster\n    def update\n      require_args!(optional: %w[machine-pattern])\n\n      machines = select_machines(args[0]).select { |_, m| m.spin == 'vpsadminos' }\n\n      ask_confirmation! do\n        puts 'The following machines will be queried:'\n        list_machines(machines)\n      end\n\n      state = State.new\n      state.update(machines)\n    end\n  end\n\n  class State\n    def update(machines)\n      saved_kernels = load_json\n      results = {}\n      errors = {}\n\n      tw = ConfCtl::ParallelExecutor.new(machines.length)\n\n      machines.each do |host, machine|\n        tw.add do\n          mc = ConfCtl::MachineControl.new(machine)\n\n          begin\n            result = mc.execute('uname', '-r')\n            results[host] = result\n          rescue TTY::Command::ExitError =\u003e e\n            errors[host] = e\n          end\n        end\n      end\n\n      tw.run\n\n      puts format('%-50s %s', 'HOST', 'KERNEL')\n\n      machines.each_key do |host|\n        kernel =\n          if results[host]\n            results[host].out.strip.split('.')[0..2].join('.')\n          else\n            'error'\n          end\n\n        saved_kernels[host] = kernel if kernel != 'error'\n        puts format('%-50s %s', host, kernel)\n      end\n\n      if errors.any?\n        puts\n\n        errors.each do |host, e|\n          puts \"Error on #{host}: #{e.message}\\n\"\n          saved_kernels.delete(host)\n        end\n      end\n\n      save_json(saved_kernels)\n    end\n\n    protected\n\n    def load_json\n      JSON.parse(File.read(json_path))\n    rescue Errno::ENOENT\n      {}\n    end\n\n    def save_json(kernels)\n      File.write(json_path, JSON.pretty_generate(kernels))\n    end\n\n    def json_path\n      File.join(ConfCtl::ConfDir.path, 'configs/node/kernels.json')\n    end\n  end\nend\n",
+      "mode": 420
+    }
+  },
+  "after": {
+    ".confctl": {
+      "mode": 2147484141
+    },
+    ".confctl/logs": {
+      "mode": 2147484141
+    },
+    ".confctl/logs/${LOG_TIME:1}-confctl-runtime-kernels-update.log": {
+      "text": "{command: [\"runtime-kernels\", \"update\"],\n global_options: {\"c\" =\u003e \"auto\", \"color\" =\u003e \"auto\", \"help\" =\u003e false},\n command_options:\n  {\"y\" =\u003e true,\n   \"yes\" =\u003e true,\n   \"a\" =\u003e [],\n   \"attr\" =\u003e [],\n   \"t\" =\u003e [],\n   \"tag\" =\u003e [],\n   \"show-trace\" =\u003e false,\n   #\u003cGLI::Command::ParentKey:${PARENT_ADDRESS:1}\u003e =\u003e {}},\n arguments: []}\n[${COMMAND_ID:1}] Running cd ${ROOT} \u0026\u0026 nix eval --json --no-write-lock-file --no-update-lock-file --option max-jobs auto .\\#confctl.settings\n[${COMMAND_ID:1}] \t{\"list\": {\"columns\": [\"name\", \"spin\", \"managed\", \"host.target\"]}, \"nix\": {\"maxJobs\": \"auto\", \"impureEval\": true, \"legacyNixPath\": false}}\n[${COMMAND_ID:1}] Finished in ${DURATION} seconds with exit status 0 (successful)\n[${COMMAND_ID:2}] Running cd ${ROOT} \u0026\u0026 nix eval --json --no-write-lock-file --no-update-lock-file --option max-jobs auto .\\#confctl.settings\n[${COMMAND_ID:2}] \t{\"list\": {\"columns\": [\"name\", \"spin\", \"managed\", \"host.target\"]}, \"nix\": {\"maxJobs\": \"auto\", \"impureEval\": true, \"legacyNixPath\": false}}\n[${COMMAND_ID:2}] Finished in ${DURATION} seconds with exit status 0 (successful)\n[${COMMAND_ID:3}] Running cd ${ROOT} \u0026\u0026 nix build --json --no-link --impure --no-write-lock-file --no-update-lock-file --option max-jobs auto .\\#confctl.machinesJson\n[${COMMAND_ID:3}] \t[{\"outputs\":{\"out\":\"${ROOT}/fixtures/machines.json\"}}]\n[${COMMAND_ID:3}] Finished in ${DURATION} seconds with exit status 0 (successful)\n",
+      "mode": 420
+    },
+    "cluster": {
+      "mode": 2147484141
+    },
+    "cluster/cluster.nix": {
+      "text": "[]\n",
+      "mode": 420
+    },
+    "configs": {
+      "mode": 2147484141
+    },
+    "configs/node": {
+      "mode": 2147484141
+    },
+    "configs/node/.keep": {
+      "mode": 420
+    },
+    "configs/node/kernels.json": {
+      "text": "bad json",
+      "mode": 420
+    },
+    "fixtures": {
+      "mode": 2147484141
+    },
+    "fixtures/machines.json": {
+      "text": "{\"alpha/site\": {\"name\": \"alpha/site\", \"key\": \"ka\", \"clusterName\": \"alpha/site\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": true, \"spin\": \"vpsadminos\", \"tags\": [\"node\", \"east\"], \"host\": {\"target\": \"alpha.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \"beta\": {\"name\": \"beta\", \"key\": \"kb\", \"clusterName\": \"beta\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": true, \"spin\": \"nixos\", \"tags\": [\"web\"], \"host\": {\"target\": \"beta.example\", \"port\": 2222}, \"netboot\": {\"enable\": false}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \".hidden\": {\"name\": \".hidden\", \"key\": \"kh\", \"clusterName\": \".hidden\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": false, \"spin\": \"vpsadminos\", \"tags\": [\"node\"], \"host\": {\"target\": \"hidden.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \"alpha/carried\": {\"name\": \"alpha/carried\", \"key\": \"kc\", \"clusterName\": \"alpha/carried\", \"carrier\": \"alpha/site\", \"alias\": \"guest/one\", \"metaConfig\": {\"managed\": true, \"spin\": \"vpsadminos\", \"tags\": [\"node\"], \"host\": {\"target\": \"own.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}}",
+      "mode": 420
+    },
+    "fixtures/module-options.json": {
+      "text": "[{\"name\": \"cluster.\u003cname\u003e.spin\"}, {\"name\": \"cluster.\u003cname\u003e.host.target\"}, {\"name\": \"unrelated\"}]",
+      "mode": 420
+    },
+    "fixtures/settings.json": {
+      "text": "{\"list\": {\"columns\": [\"name\", \"spin\", \"managed\", \"host.target\"]}, \"nix\": {\"maxJobs\": \"auto\", \"impureEval\": true, \"legacyNixPath\": false}}",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    },
+    "scripts": {
+      "mode": 2147484141
+    },
+    "scripts/discover_netbootable.rb": {
+      "text": "module DiscoverNetbootable\n  # Generate `cluster/netbootable.nix` with a list of all netbootable nodes\n  class Script \u003c ConfCtl::UserScript\n    register\n\n    def setup_hooks(hooks)\n      hooks.subscribe(:configuration_rediscover) do\n        machines =\n          ConfCtl::MachineList.new.select do |_host, machine|\n            machine['netboot.enable'] \u0026\u0026 !machine.carried?\n          end.map do |host, _machine|\n            host\n          end\n\n        dst = 'cluster/netbootable.nix'\n        puts \"replace #{dst}\"\n\n        File.open(dst, 'w') do |f|\n          f.puts('# This file is auto-generated on confctl rediscover, changes will be lost')\n          f.write(ConfCtl::NixFormat.to_nix(machines))\n          f.puts\n        end\n      end\n    end\n  end\nend\n",
+      "mode": 420
+    },
+    "scripts/runtime_kernels.rb": {
+      "text": "require 'json'\n\nmodule RuntimeKernels\n  class Script \u003c ConfCtl::UserScript\n    register\n\n    def setup_hooks(hooks)\n      hooks.subscribe(:cluster_deploy) do |machines:, **_kwargs|\n        os_machines = machines.select do |_, machine|\n          machine.spin == 'vpsadminos' \u0026\u0026 !machine.carried?\n        end\n\n        next if os_machines.empty?\n\n        puts Rainbow('Updating runtime kernel information...').bright\n\n        state = State.new\n        state.update(os_machines)\n\n        puts\n      end\n    end\n\n    def setup_cli(app)\n      app.desc 'Manage node runtime kernel versions'\n      app.command 'runtime-kernels' do |rk|\n        rk.desc 'Update runtime kernels'\n        rk.arg_name '[machine-pattern]'\n        rk.command :update do |c|\n          c.desc 'Enable traces in Nix'\n          c.switch 'show-trace'\n\n          c.desc 'Filter by attribute'\n          c.flag %i[a attr], multiple: true\n\n          c.desc 'Filter by tag'\n          c.flag %i[t tag], multiple: true\n\n          c.desc 'Assume the answer to confirmations is yes'\n          c.switch %w[y yes]\n\n          c.action(\u0026ConfCtl::Cli::Command.run(c, Command, :update))\n        end\n      end\n    end\n  end\n\n  class Command \u003c ConfCtl::Cli::Cluster\n    def update\n      require_args!(optional: %w[machine-pattern])\n\n      machines = select_machines(args[0]).select { |_, m| m.spin == 'vpsadminos' }\n\n      ask_confirmation! do\n        puts 'The following machines will be queried:'\n        list_machines(machines)\n      end\n\n      state = State.new\n      state.update(machines)\n    end\n  end\n\n  class State\n    def update(machines)\n      saved_kernels = load_json\n      results = {}\n      errors = {}\n\n      tw = ConfCtl::ParallelExecutor.new(machines.length)\n\n      machines.each do |host, machine|\n        tw.add do\n          mc = ConfCtl::MachineControl.new(machine)\n\n          begin\n            result = mc.execute('uname', '-r')\n            results[host] = result\n          rescue TTY::Command::ExitError =\u003e e\n            errors[host] = e\n          end\n        end\n      end\n\n      tw.run\n\n      puts format('%-50s %s', 'HOST', 'KERNEL')\n\n      machines.each_key do |host|\n        kernel =\n          if results[host]\n            results[host].out.strip.split('.')[0..2].join('.')\n          else\n            'error'\n          end\n\n        saved_kernels[host] = kernel if kernel != 'error'\n        puts format('%-50s %s', host, kernel)\n      end\n\n      if errors.any?\n        puts\n\n        errors.each do |host, e|\n          puts \"Error on #{host}: #{e.message}\\n\"\n          saved_kernels.delete(host)\n        end\n      end\n\n      save_json(saved_kernels)\n    end\n\n    protected\n\n    def load_json\n      JSON.parse(File.read(json_path))\n    rescue Errno::ENOENT\n      {}\n    end\n\n    def save_json(kernels)\n      File.write(json_path, JSON.pretty_generate(kernels))\n    end\n\n    def json_path\n      File.join(ConfCtl::ConfDir.path, 'configs/node/kernels.json')\n    end\n  end\nend\n",
+      "mode": 420
+    }
+  },
+  "events": [
+    {
+      "occurrence": 1,
+      "stdout": "{\"list\": {\"columns\": [\"name\", \"spin\", \"managed\", \"host.target\"]}, \"nix\": {\"maxJobs\": \"auto\", \"impureEval\": true, \"legacyNixPath\": false}}\n",
+      "stderr": "",
+      "stdin_mode": "empty-open",
+      "tool": "nix",
+      "argv": [
+        "eval",
+        "--json",
+        "--no-write-lock-file",
+        "--no-update-lock-file",
+        "--option",
+        "max-jobs",
+        "auto",
+        ".#confctl.settings"
+      ],
+      "env": {
+        "COMPAT_CASE": "${RUN_ROOT}/case.json",
+        "CONFCTL_MAX_JOBS": "",
+        "CONFCTL_SSH_CONFIG": "",
+        "HOME": "${RUN_ROOT}/home",
+        "NIX_SSHOPTS": "",
+        "PWD": "${ROOT}",
+        "TMPDIR": "${RUN_ROOT}/tmp"
+      },
+      "stdin": "",
+      "cwd": "${ROOT}",
+      "pid": 0,
+      "start_ns": 0,
+      "end_ns": 0,
+      "exit": 0,
+      "rule": 0
+    },
+    {
+      "occurrence": 2,
+      "stdout": "{\"list\": {\"columns\": [\"name\", \"spin\", \"managed\", \"host.target\"]}, \"nix\": {\"maxJobs\": \"auto\", \"impureEval\": true, \"legacyNixPath\": false}}\n",
+      "stderr": "",
+      "stdin_mode": "empty-open",
+      "tool": "nix",
+      "argv": [
+        "eval",
+        "--json",
+        "--no-write-lock-file",
+        "--no-update-lock-file",
+        "--option",
+        "max-jobs",
+        "auto",
+        ".#confctl.settings"
+      ],
+      "env": {
+        "COMPAT_CASE": "${RUN_ROOT}/case.json",
+        "CONFCTL_MAX_JOBS": "",
+        "CONFCTL_SSH_CONFIG": "",
+        "HOME": "${RUN_ROOT}/home",
+        "NIX_SSHOPTS": "",
+        "PWD": "${ROOT}",
+        "TMPDIR": "${RUN_ROOT}/tmp"
+      },
+      "stdin": "",
+      "cwd": "${ROOT}",
+      "pid": 0,
+      "start_ns": 0,
+      "end_ns": 0,
+      "exit": 0,
+      "rule": 0
+    },
+    {
+      "occurrence": 1,
+      "stdout": "[{\"outputs\":{\"out\":\"${ROOT}/fixtures/machines.json\"}}]\n",
+      "stderr": "",
+      "stdin_mode": "empty-open",
+      "tool": "nix",
+      "argv": [
+        "build",
+        "--json",
+        "--no-link",
+        "--impure",
+        "--no-write-lock-file",
+        "--no-update-lock-file",
+        "--option",
+        "max-jobs",
+        "auto",
+        ".#confctl.machinesJson"
+      ],
+      "env": {
+        "COMPAT_CASE": "${RUN_ROOT}/case.json",
+        "CONFCTL_MAX_JOBS": "",
+        "CONFCTL_SSH_CONFIG": "",
+        "HOME": "${RUN_ROOT}/home",
+        "NIX_SSHOPTS": "",
+        "PWD": "${ROOT}",
+        "TMPDIR": "${RUN_ROOT}/tmp"
+      },
+      "stdin": "",
+      "cwd": "${ROOT}",
+      "pid": 0,
+      "start_ns": 0,
+      "end_ns": 0,
+      "exit": 0,
+      "rule": 1
+    }
+  ],
+  "git_before": {},
+  "git_after": {},
+  "wall_ns": 0,
+  "user_ns": 0,
+  "system_ns": 0,
+  "max_rss_kb": 0
+}

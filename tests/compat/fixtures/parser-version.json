@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "id": "parser-version",
+  "tier": "fixture-process",
+  "sources": [
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/cli/app.rb",
+      "lines": "25-35,161-189"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/cli/command.rb",
+      "lines": "173-228"
+    }
+  ],
+  "argv": [
+    "--version"
+  ],
+  "env": {},
+  "stdin": "",
+  "tty": false,
+  "files": {},
+  "rules": [],
+  "expected": "../expected/parser-version.json",
+  "normalize": {
+    "root_fields": [
+      "stdout",
+      "stderr",
+      "events.cwd",
+      "events.argv",
+      "events.stdin",
+      "events.env.PWD",
+      "events.stdout",
+      "events.stderr"
+    ],
+    "volatile_fields": [
+      "events.pid",
+      "events.start_ns",
+      "events.end_ns",
+      "wall_ns",
+      "user_ns",
+      "system_ns",
+      "max_rss_kb"
+    ],
+    "concurrent_events": true,
+    "run_root_fields": [
+      "events.env.HOME",
+      "events.env.TMPDIR",
+      "events.env.COMPAT_CASE"
+    ],
+    "log_fields": [
+      "filename-time",
+      "command-uuid",
+      "gli-parent-address",
+      "process-duration",
+      "config-root"
+    ]
+  },
+  "deadline_ms": 30000
+}

@@ -1,0 +1,203 @@
+{
+  "config_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-observations-final39/list-empty-columns-449049153/config",
+  "run_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-observations-final39/list-empty-columns-449049153",
+  "schema": 1,
+  "case": "list-empty-columns",
+  "executable": "/nix/store/hwvcw1wyknlvk7xsclkasrl7lkcf41yx-confctl/bin/confctl",
+  "executable_sha256": "5bbb91ece29ffc9e7e3fd9be837e48f6eb8c6df2667055e6242e9ef128859e09",
+  "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "fixture_sha256": "00df35822f283a92c4738735fec035a13aec5305c8b6af085e9f52642bd82025",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "stdout": "",
+  "stderr": "",
+  "exit": 0,
+  "before": {
+    "cluster": {
+      "mode": 2147484141
+    },
+    "cluster/cluster.nix": {
+      "text": "[]\n",
+      "mode": 420
+    },
+    "configs": {
+      "mode": 2147484141
+    },
+    "configs/node": {
+      "mode": 2147484141
+    },
+    "configs/node/.keep": {
+      "mode": 420
+    },
+    "fixtures": {
+      "mode": 2147484141
+    },
+    "fixtures/machines.json": {
+      "text": "{\"alpha/site\": {\"name\": \"alpha/site\", \"key\": \"ka\", \"clusterName\": \"alpha/site\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": true, \"spin\": \"vpsadminos\", \"tags\": [\"node\", \"east\"], \"host\": {\"target\": \"alpha.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \"beta\": {\"name\": \"beta\", \"key\": \"kb\", \"clusterName\": \"beta\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": true, \"spin\": \"nixos\", \"tags\": [\"web\"], \"host\": {\"target\": \"beta.example\", \"port\": 2222}, \"netboot\": {\"enable\": false}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \".hidden\": {\"name\": \".hidden\", \"key\": \"kh\", \"clusterName\": \".hidden\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": false, \"spin\": \"vpsadminos\", \"tags\": [\"node\"], \"host\": {\"target\": \"hidden.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \"alpha/carried\": {\"name\": \"alpha/carried\", \"key\": \"kc\", \"clusterName\": \"alpha/carried\", \"carrier\": \"alpha/site\", \"alias\": \"guest/one\", \"metaConfig\": {\"managed\": true, \"spin\": \"vpsadminos\", \"tags\": [\"node\"], \"host\": {\"target\": \"own.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}}",
+      "mode": 420
+    },
+    "fixtures/module-options.json": {
+      "text": "[{\"name\": \"cluster.\u003cname\u003e.spin\"}, {\"name\": \"cluster.\u003cname\u003e.host.target\"}, {\"name\": \"unrelated\"}]",
+      "mode": 420
+    },
+    "fixtures/settings.json": {
+      "text": "{\"list\": {\"columns\": [\"name\", \"spin\", \"managed\", \"host.target\"]}, \"nix\": {\"maxJobs\": \"auto\", \"impureEval\": true, \"legacyNixPath\": false}}",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "after": {
+    ".confctl": {
+      "mode": 2147484141
+    },
+    ".confctl/logs": {
+      "mode": 2147484141
+    },
+    "cluster": {
+      "mode": 2147484141
+    },
+    "cluster/cluster.nix": {
+      "text": "[]\n",
+      "mode": 420
+    },
+    "configs": {
+      "mode": 2147484141
+    },
+    "configs/node": {
+      "mode": 2147484141
+    },
+    "configs/node/.keep": {
+      "mode": 420
+    },
+    "fixtures": {
+      "mode": 2147484141
+    },
+    "fixtures/machines.json": {
+      "text": "{\"alpha/site\": {\"name\": \"alpha/site\", \"key\": \"ka\", \"clusterName\": \"alpha/site\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": true, \"spin\": \"vpsadminos\", \"tags\": [\"node\", \"east\"], \"host\": {\"target\": \"alpha.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \"beta\": {\"name\": \"beta\", \"key\": \"kb\", \"clusterName\": \"beta\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": true, \"spin\": \"nixos\", \"tags\": [\"web\"], \"host\": {\"target\": \"beta.example\", \"port\": 2222}, \"netboot\": {\"enable\": false}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \".hidden\": {\"name\": \".hidden\", \"key\": \"kh\", \"clusterName\": \".hidden\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": false, \"spin\": \"vpsadminos\", \"tags\": [\"node\"], \"host\": {\"target\": \"hidden.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \"alpha/carried\": {\"name\": \"alpha/carried\", \"key\": \"kc\", \"clusterName\": \"alpha/carried\", \"carrier\": \"alpha/site\", \"alias\": \"guest/one\", \"metaConfig\": {\"managed\": true, \"spin\": \"vpsadminos\", \"tags\": [\"node\"], \"host\": {\"target\": \"own.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}}",
+      "mode": 420
+    },
+    "fixtures/module-options.json": {
+      "text": "[{\"name\": \"cluster.\u003cname\u003e.spin\"}, {\"name\": \"cluster.\u003cname\u003e.host.target\"}, {\"name\": \"unrelated\"}]",
+      "mode": 420
+    },
+    "fixtures/settings.json": {
+      "text": "{\"list\": {\"columns\": [\"name\", \"spin\", \"managed\", \"host.target\"]}, \"nix\": {\"maxJobs\": \"auto\", \"impureEval\": true, \"legacyNixPath\": false}}",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "events": [
+    {
+      "occurrence": 1,
+      "stdout": "{\"list\": {\"columns\": [\"name\", \"spin\", \"managed\", \"host.target\"]}, \"nix\": {\"maxJobs\": \"auto\", \"impureEval\": true, \"legacyNixPath\": false}}\n",
+      "stderr": "",
+      "stdin_mode": "empty-open",
+      "tool": "nix",
+      "argv": [
+        "eval",
+        "--json",
+        "--no-write-lock-file",
+        "--no-update-lock-file",
+        "--option",
+        "max-jobs",
+        "auto",
+        ".#confctl.settings"
+      ],
+      "env": {
+        "COMPAT_CASE": "${RUN_ROOT}/case.json",
+        "CONFCTL_MAX_JOBS": "",
+        "CONFCTL_SSH_CONFIG": "",
+        "HOME": "${RUN_ROOT}/home",
+        "NIX_SSHOPTS": "",
+        "PWD": "${ROOT}",
+        "TMPDIR": "${RUN_ROOT}/tmp"
+      },
+      "stdin": "",
+      "cwd": "${ROOT}",
+      "pid": 0,
+      "start_ns": 0,
+      "end_ns": 0,
+      "exit": 0,
+      "rule": 0
+    },
+    {
+      "occurrence": 2,
+      "stdout": "{\"list\": {\"columns\": [\"name\", \"spin\", \"managed\", \"host.target\"]}, \"nix\": {\"maxJobs\": \"auto\", \"impureEval\": true, \"legacyNixPath\": false}}\n",
+      "stderr": "",
+      "stdin_mode": "empty-open",
+      "tool": "nix",
+      "argv": [
+        "eval",
+        "--json",
+        "--no-write-lock-file",
+        "--no-update-lock-file",
+        "--option",
+        "max-jobs",
+        "auto",
+        ".#confctl.settings"
+      ],
+      "env": {
+        "COMPAT_CASE": "${RUN_ROOT}/case.json",
+        "CONFCTL_MAX_JOBS": "",
+        "CONFCTL_SSH_CONFIG": "",
+        "HOME": "${RUN_ROOT}/home",
+        "NIX_SSHOPTS": "",
+        "PWD": "${ROOT}",
+        "TMPDIR": "${RUN_ROOT}/tmp"
+      },
+      "stdin": "",
+      "cwd": "${ROOT}",
+      "pid": 0,
+      "start_ns": 0,
+      "end_ns": 0,
+      "exit": 0,
+      "rule": 0
+    },
+    {
+      "occurrence": 1,
+      "stdout": "[{\"outputs\":{\"out\":\"${ROOT}/fixtures/machines.json\"}}]\n",
+      "stderr": "",
+      "stdin_mode": "empty-open",
+      "tool": "nix",
+      "argv": [
+        "build",
+        "--json",
+        "--no-link",
+        "--impure",
+        "--no-write-lock-file",
+        "--no-update-lock-file",
+        "--option",
+        "max-jobs",
+        "auto",
+        ".#confctl.machinesJson"
+      ],
+      "env": {
+        "COMPAT_CASE": "${RUN_ROOT}/case.json",
+        "CONFCTL_MAX_JOBS": "",
+        "CONFCTL_SSH_CONFIG": "",
+        "HOME": "${RUN_ROOT}/home",
+        "NIX_SSHOPTS": "",
+        "PWD": "${ROOT}",
+        "TMPDIR": "${RUN_ROOT}/tmp"
+      },
+      "stdin": "",
+      "cwd": "${ROOT}",
+      "pid": 0,
+      "start_ns": 0,
+      "end_ns": 0,
+      "exit": 0,
+      "rule": 1
+    }
+  ],
+  "git_before": {},
+  "git_after": {},
+  "wall_ns": 0,
+  "user_ns": 0,
+  "system_ns": 0,
+  "max_rss_kb": 0
+}

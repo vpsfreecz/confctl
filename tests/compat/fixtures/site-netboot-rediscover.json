@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "id": "site-netboot-rediscover",
+  "tier": "fixture-process",
+  "sources": [
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/cli/app.rb",
+      "lines": "25-35,161-189"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/cli/command.rb",
+      "lines": "173-228"
+    },
+    {
+      "revision": "ae670dc0d4a5d43adf9560da1a6a0a35925cd2e5",
+      "path": "scripts/discover_netbootable.rb",
+      "lines": "7-22"
+    }
+  ],
+  "argv": [],
+  "env": {},
+  "stdin": "",
+  "tty": false,
+  "files": {
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n"
+    },
+    "cluster/cluster.nix": {
+      "text": "[]\n"
+    },
+    "configs/node/.keep": {
+      "text": ""
+    },
+    "fixtures/machines.json": {
+      "text": "{\"alpha/site\": {\"name\": \"alpha/site\", \"key\": \"ka\", \"clusterName\": \"alpha/site\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": true, \"spin\": \"vpsadminos\", \"tags\": [\"node\", \"east\"], \"host\": {\"target\": \"alpha.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \"beta\": {\"name\": \"beta\", \"key\": \"kb\", \"clusterName\": \"beta\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": true, \"spin\": \"nixos\", \"tags\": [\"web\"], \"host\": {\"target\": \"beta.example\", \"port\": 2222}, \"netboot\": {\"enable\": false}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \".hidden\": {\"name\": \".hidden\", \"key\": \"kh\", \"clusterName\": \".hidden\", \"carrier\": null, \"alias\": null, \"metaConfig\": {\"managed\": false, \"spin\": \"vpsadminos\", \"tags\": [\"node\"], \"host\": {\"target\": \"hidden.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}, \"alpha/carried\": {\"name\": \"alpha/carried\", \"key\": \"kc\", \"clusterName\": \"alpha/carried\", \"carrier\": \"alpha/site\", \"alias\": \"guest/one\", \"metaConfig\": {\"managed\": true, \"spin\": \"vpsadminos\", \"tags\": [\"node\"], \"host\": {\"target\": \"own.example\", \"port\": 22}, \"netboot\": {\"enable\": true}, \"healthChecks\": {}, \"custom\": {\"bool\": false, \"empty\": \"\", \"array\": [\"a\", \"b\"], \"null\": null, \"count\": 3}, \"carrier\": {\"enable\": false, \"machines\": []}}}}"
+    },
+    "fixtures/settings.json": {
+      "text": "{\"list\": {\"columns\": [\"name\", \"spin\", \"managed\", \"host.target\"]}, \"nix\": {\"maxJobs\": \"auto\", \"impureEval\": true, \"legacyNixPath\": false}}"
+    },
+    "fixtures/module-options.json": {
+      "text": "[{\"name\": \"cluster.<name>.spin\"}, {\"name\": \"cluster.<name>.host.target\"}, {\"name\": \"unrelated\"}]"
+    }
+  },
+  "rules": [
+    {
+      "tool": "nix",
+      "contains": ".#confctl.settings",
+      "stdout": "{\"list\": {\"columns\": [\"name\", \"spin\", \"managed\", \"host.target\"]}, \"nix\": {\"maxJobs\": \"auto\", \"impureEval\": true, \"legacyNixPath\": false}}\n"
+    },
+    {
+      "tool": "nix",
+      "contains": ".#confctl.machinesJson",
+      "stdout": "[{\"outputs\":{\"out\":\"${ROOT}/fixtures/machines.json\"}}]\n"
+    },
+    {
+      "tool": "nix",
+      "contains": ".#confctl.moduleOptions",
+      "stdout": "[{\"name\": \"cluster.<name>.spin\"}, {\"name\": \"cluster.<name>.host.target\"}, {\"name\": \"unrelated\"}]\n"
+    }
+  ],
+  "expected": "../expected/site-netboot-rediscover.json",
+  "normalize": {
+    "root_fields": [
+      "stdout",
+      "stderr",
+      "events.cwd",
+      "events.argv",
+      "events.stdin",
+      "events.env.PWD",
+      "events.stdout",
+      "events.stderr"
+    ],
+    "volatile_fields": [
+      "events.pid",
+      "events.start_ns",
+      "events.end_ns",
+      "wall_ns",
+      "user_ns",
+      "system_ns",
+      "max_rss_kb"
+    ],
+    "concurrent_events": true,
+    "run_root_fields": [
+      "events.env.HOME",
+      "events.env.TMPDIR",
+      "events.env.COMPAT_CASE"
+    ],
+    "log_fields": [
+      "filename-time",
+      "command-uuid",
+      "gli-parent-address",
+      "process-duration",
+      "config-root"
+    ]
+  },
+  "deadline_ms": 30000,
+  "causal": [],
+  "extensions": true,
+  "hook": "rediscover.after-write",
+  "selected": [
+    "alpha/site",
+    "beta",
+    "alpha/carried"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "config_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-observations-final39/parser-help-1445517187/config",
+  "run_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-observations-final39/parser-help-1445517187",
+  "schema": 1,
+  "case": "parser-help",
+  "executable": "/nix/store/hwvcw1wyknlvk7xsclkasrl7lkcf41yx-confctl/bin/confctl",
+  "executable_sha256": "5bbb91ece29ffc9e7e3fd9be837e48f6eb8c6df2667055e6242e9ef128859e09",
+  "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "fixture_sha256": "e9f9d0134944d7367d48c11ceacfdff4e9ba05826decc6d6bd8a7304d6e71c0f",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "stdout": "NAME\n    confctl - Nix deployment configuration management tool\n\n\nSYNOPSIS\n    confctl [global options] command [command options] [arguments...]\n\n\nGLOBAL OPTIONS\n    -c, --color=arg - Toggle color mode (default: auto)\n    --help          - Show this message\n\n\nCOMMANDS\n    add             - Add a new machine\n    build           - Build target systems\n    changelog       - Changelog between deployed and configured input roles\n    collect-garbage - Run nix-collect-garbage to deleted unreachable store paths\n    cssh            - Open ClusterSSH\n    deploy          - Deploy target systems\n    diff            - Diff between deployed and configured input roles\n    gen-data        - Generate data files\n    generation      - Manage built machine generations\n    health-check    - Run machine health-checks\n    help            - Shows a list of commands or help for one command\n    init            - Create a new configuration\n    inputs          - Manage flake inputs\n    ls              - List configured machines\n    rediscover      - Update cluster machine list with contents of cluster/\n    rename          - Rename an existing machine\n    ssh             - Run command over SSH\n    status          - Check machine status\n    test-connection - Test SSH connection\n",
+  "stderr": "",
+  "exit": 0,
+  "before": {},
+  "after": {},
+  "events": null,
+  "git_before": {},
+  "git_after": {},
+  "wall_ns": 0,
+  "user_ns": 0,
+  "system_ns": 0,
+  "max_rss_kb": 0
+}

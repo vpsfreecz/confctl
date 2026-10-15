@@ -1,0 +1,3 @@
+7c7539f6aab1d9fb1e294a017165228a51cc579277d85330085d750f75997588  tests/compat/expected/provenance-review-remediation.json
+aef64035a54aeafe3a3ff4774598b2e3a32e920fc8fdb143c3ecbc9528a9cc60  tests/compat/expected/site-kernels-error-value.json
+5fa00e594890314011bb03503d6388be20c3d127f7522d6b754595cc1ed41317  tests/compat/expected/site-kernels-failure-order.json
