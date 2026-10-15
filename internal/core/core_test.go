@@ -57,20 +57,20 @@ func TestCarriedBuilderChecks(t *testing.T) {
 		t.Fatal(m.Checks())
 	}
 }
-func TestUnsupportedNoMutation(t *testing.T) {
+func TestUnknownCommandNoMutation(t *testing.T) {
 	cwd, _ := os.Getwd()
 	dir := t.TempDir()
 	if e := os.Chdir(dir); e != nil {
 		t.Fatal(e)
 	}
 	defer os.Chdir(cwd)
-	for _, a := range [][]string{{"deploy"}} {
-		if code := Main(context.Background(), a); code != 2 {
+	for _, a := range [][]string{{"not-a-command"}} {
+		if code := Main(context.Background(), a); code != 64 {
 			t.Fatalf("%v: %d", a, code)
 		}
 		files, _ := os.ReadDir(dir)
 		if len(files) != 0 {
-			t.Fatal("unsupported mutated state")
+			t.Fatal("unknown command mutated state")
 		}
 	}
 }

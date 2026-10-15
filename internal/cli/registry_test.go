@@ -115,17 +115,10 @@ func TestBuiltinDeclarations(t *testing.T) {
 
 func TestComparisonDeclarationsAndAvailability(t *testing.T) {
 	r := BuiltinRegistry()
-	// Keep the complete unrelated leaf map explicit: public comparison must not
-	// accidentally enable the remaining deployment unit.
-	unavailable := map[string]bool{
-		"deploy": true,
-	}
+	// Every builtin leaf now has its public adapter.
 	available := 0
 	for _, c := range r.Leaves() {
 		mode := Available
-		if unavailable[pathKey(c.Path)] {
-			mode = Unavailable
-		}
 		if c.Availability.Mode != mode {
 			t.Fatal(c.Path, c.Availability, mode)
 		}
@@ -133,7 +126,7 @@ func TestComparisonDeclarationsAndAvailability(t *testing.T) {
 			available++
 		}
 	}
-	if available != 28 || len(r.Leaves()) != 29 {
+	if available != 29 || len(r.Leaves()) != 29 {
 		t.Fatal(available, len(r.Leaves()))
 	}
 	for _, command := range []string{"diff", "changelog"} {

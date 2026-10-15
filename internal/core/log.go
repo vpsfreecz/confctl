@@ -3,6 +3,7 @@ package core
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -362,6 +363,8 @@ func (e *Engine) LogTestConnectionCLI(inv cli.Invocation) error {
 			value = v.Bool
 		case cli.Text:
 			value = v.String
+		case cli.Number:
+			value = json.Number(v.Integer.String())
 		case cli.TextList:
 			a := make([]any, len(v.Strings))
 			for i, s := range v.Strings {

@@ -383,6 +383,10 @@ func (e *Engine) hooks(r Registry, event string, names []string, origin *cli.Inv
 		if origin != nil {
 			if event == "rediscover.after-write" {
 				in.Action = ""
+			} else if event == "deploy.prepare" && len(origin.Command.Path) == 1 && origin.Command.Path[0] == "deploy" && len(origin.Args) > 1 {
+				// The native deploy adapter validates the effective action before
+				// reaching this hook. No-origin fixtures keep their switch default.
+				in.Action = origin.Args[1]
 			}
 			in.OriginCommand = append([]string(nil), origin.Command.Path...)
 			in.Options = invocationOptions(*origin)

@@ -130,6 +130,8 @@ func Main(ctx context.Context, argv []string) (result int) {
 		err = e.LogBuildCLI(inv)
 	} else if inv.Command.Handler == cli.StatusHandler {
 		err = e.LogStatusCLI(inv)
+	} else if inv.Command.Handler == cli.DeployHandler {
+		err = e.LogDeployCLI(inv)
 	} else if !extensionCommand || supportedRuntimeCommand(command) {
 		err = e.LogCLI(cmd, opts, commandArgv)
 	} else {
@@ -330,6 +332,26 @@ func Main(ctx context.Context, argv []string) (result int) {
 			return fail(err, 1)
 		}
 		success = true
+		return 0
+	}
+	if inv.Command.Handler == cli.DeployHandler {
+		report, err := e.Deploy(inv, registrations, os.Stdin, os.Stdout, os.Stderr)
+		if err != nil {
+			var argumentErr *deployArgumentError
+			if errors.As(err, &argumentErr) {
+				code := fail(err, 64)
+				fmt.Fprintln(os.Stderr)
+				help, _ := registry.Help(inv.Command.Path, 80)
+				fmt.Print(help)
+				return code
+			}
+			var hookErr *DeployHookError
+			if errors.As(err, &hookErr) {
+				return fail(err, hookErr.Status)
+			}
+			return fail(err, 1)
+		}
+		success = !report.RetainLog
 		return 0
 	}
 	if inv.Command.Handler == cli.BuildHandler || inv.Command.Handler == cli.StatusHandler {
