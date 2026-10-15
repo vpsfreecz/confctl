@@ -189,6 +189,9 @@ func BuiltinRegistry() *Registry {
 		case "build":
 			commands[i].Handler = BuildHandler
 			commands[i].Availability = Availability{Mode: Available}
+		case "deploy":
+			commands[i].Handler = DeployHandler
+			commands[i].Availability = Availability{Mode: Available}
 		case "health-check":
 			commands[i].Handler = HealthCheckHandler
 			commands[i].Availability = Availability{Mode: Available}

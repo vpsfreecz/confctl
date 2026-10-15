@@ -75,6 +75,18 @@ build and infrastructure failures return 1 and retain the invocation log.
 
 ## Deployment and health checks (2)
 
+The Go CLI implements `deploy` through the shared build, generation, process and
+health owners. See [Deployment](../deployment.md) for operational behavior and
+partial failures. Native `deploy.prepare` hooks receive the validated effective
+action: `switch` by default, or the supplied second positional argument. The
+hook runs once before build or stored-generation resolution, and selected names
+are rebound to fresh inventory afterward.
+
+Usage errors return 64, a reached hook's nonzero status is preserved, and other
+operational failures return 1. Success returns 0. A failed health attempt retains
+the log even when a later retry or `--keep-going` permits successful completion.
+The reference sequence below describes the original Ruby implementation.
+
 `deploy [machine-pattern [switch-action]]` accepts F Y N, `--show-trace`, `-g/--generation`, `-i/--interactive`, `--dry-activate-first`, `--one-by-one`, integer `--max-concurrent-copy=5`, non-negatable `--copy-only`, non-negatable `--enable-auto-rollback=false` and `--disable-auto-rollback=false`, `--reboot`, `--wait-online=600` (string), `--health-checks=true`, `--keep-going=false` ([app:208–263](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/app.rb#L208)). Fixtures `deploy.*` must cover flag combinations, failures and causal order:
 
 1. Managed selection; action defaults `switch`, must be `boot|switch|test|dry-activate`; `--reboot` requires boot. Only with reboot, wait-online parses `wait` (unbounded), `nowait`, or decimal digits including zero; other strings fail. Empty selection fails.
