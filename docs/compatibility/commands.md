@@ -121,6 +121,23 @@ Declarations [app:419–513](https://github.com/vpsfreecz/confctl/blob/cc40679d2
 | `generation rotate [machine-pattern]`, F G Y, `--gc/--collect-garbage=true`, integer `--max-concurrent-gc=5` | Remote then local candidates. Uses per-machine min/max/maxAge or global defaults (5/30/180 days), skips current, removes when above max or too old but stops at min. Unresolved local current fails. Empty prints `No generations to delete`. Confirms plan; destroys sequentially. Remote+gc gates GC. Source checks machine **buildGenerations.collectGarbage** together with global **hostGenerations.collectGarbage**, not per-machine hostGenerations; preserve as a discrepancy pending runtime fixture/accepted correction. | [generation:55–106,182–270](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/generation.rb#L55); `generation.rotate` |
 | `collect-garbage [machine-pattern]`, F Y, integer `--max-concurrent-gc=5` | Runnable selection (including unmanaged); empty fails. Confirms table; runs nix-collect-garbage concurrently, streams progress and completion per host. G/managed flags are not declared. Any failed GC produces final error listing failed hosts after worker completion. | [generation:108–119,273–360](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/generation.rb#L108); `generation.gc` |
 
+The Go CLI executes all three commands through the shared generation readers,
+remover and GC adapter. It preserves confirmation, scope defaults and partial
+effects: a later error does not restore an earlier deletion. Local removal
+resolves the existing per-user GC-root directory lazily and does not repair
+current links. Rejected generation records remain untouched.
+
+GC progress is plain serialized text. `rm` and `rotate` preserve their distinct
+post-removal policies, including carrier mapping and deduplication; standalone
+GC includes runnable unmanaged machines and excludes carried machines. Zero or
+negative worker counts perform setup without starting tasks. An ordinary GC
+command failure does not stop the other tasks; the command returns status 1 after
+all workers finish. Infrastructure errors, output errors or cancellation can
+stop remaining work; the command waits for its workers before returning.
+Usage errors return 64; success returns 0. Operational failures
+retain the invocation log. These source and fake-tool checks do not establish
+installed-package or fleet acceptance.
+
 ## Data generation (3)
 
 `gen-data vpsadmin all`, `gen-data vpsadmin containers`, `gen-data vpsadmin network` declare no arguments or local flags ([app:515–534](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/app.rb#L515)). No Y bypass or ordinary confirmation. They prompt for API authentication, including dynamic protected fields. Containers evaluates all machines with non-nil container metadata (no managed filter), fetches each referenced VPS, writes `data/vpsadmin/containers.nix`. Network fetches network.list, partitions IPv4/IPv6, writes `data/vpsadmin/networks/containers.nix`. All executes containers then network with one memoized client; first file can remain updated if second fails. No directory creation in update_file. API/schema/serialization details and external-library uncertainties are [documented separately](interfaces.md#gen-data-and-authentication). Fixtures: `gen-data.containers`, `gen-data.network`, `gen-data.all`, `gen-data.auth`.
