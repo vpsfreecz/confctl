@@ -1,0 +1,14 @@
+NAME
+    update - Update inputs referenced by channels (optionally only a single
+             role)
+
+SYNOPSIS
+
+    confctl [global options] inputs channel update [command options] <channels> [role]
+
+COMMAND OPTIONS
+    --[no-]changelog     - (default: enabled)
+    --[no-]commit        - 
+    -d, --[no-]downgrade - 
+    --[no-]editor        - (default: enabled)
+

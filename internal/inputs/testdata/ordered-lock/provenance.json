@@ -1,0 +1,1588 @@
+{
+  "schema": 1,
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "ruby": "3.4.9",
+  "json": "2.21.2",
+  "acceptances": [
+    {
+      "path": "/home/aither/workspace/ai/vpsfree.cz/work/2026-10-09-evaluate-confctl-rewrite-language/evidence/stage3-i3-json-characterization-acceptance-v1.json",
+      "sha256": "c1e7627a00aa9d843de54a67044ba317f4fee1eb7d7926be9acedcfec86b8000",
+      "bytes": 42947
+    },
+    {
+      "path": "/home/aither/workspace/ai/vpsfree.cz/work/2026-10-09-evaluate-confctl-rewrite-language/evidence/stage3-i3-json-followup-acceptance-v1.json",
+      "sha256": "c059d99a7a0c85c22e3fc2f8ef8aaea3cb63866f8bab41a95104db33f4a17d68",
+      "bytes": 35092
+    },
+    {
+      "path": "/home/aither/workspace/ai/vpsfree.cz/work/2026-10-09-evaluate-confctl-rewrite-language/evidence/stage3-i3-json-exponent-acceptance-v1.json",
+      "sha256": "a361f017c03a92284476e538e7996c4ccca2be224e63ec786cecfe403a764ab2",
+      "bytes": 14605
+    }
+  ],
+  "loaded_features": [
+    {
+      "loaded_path": "/nix/store/g8nkyrhb3z1z1vy8dnhn3izzsnvfdgn2-ruby3.4-json-2.21.2/lib/ruby/gems/3.4.0/gems/json-2.21.2/lib/json/version.rb",
+      "realpath": "/nix/store/g8nkyrhb3z1z1vy8dnhn3izzsnvfdgn2-ruby3.4-json-2.21.2/lib/ruby/gems/3.4.0/gems/json-2.21.2/lib/json/version.rb",
+      "sha256": "de4f331af3334b21f17a5e345d9e3f43d2b6313c65a11cbed21de85953881b66"
+    },
+    {
+      "loaded_path": "/nix/store/g8nkyrhb3z1z1vy8dnhn3izzsnvfdgn2-ruby3.4-json-2.21.2/lib/ruby/gems/3.4.0/gems/json-2.21.2/lib/json/common.rb",
+      "realpath": "/nix/store/g8nkyrhb3z1z1vy8dnhn3izzsnvfdgn2-ruby3.4-json-2.21.2/lib/ruby/gems/3.4.0/gems/json-2.21.2/lib/json/common.rb",
+      "sha256": "4517bbea2ec577573dae3b065171e9c2fb73c2b47952a0359c7ae13e8c9dafb1"
+    },
+    {
+      "loaded_path": "/nix/store/g8nkyrhb3z1z1vy8dnhn3izzsnvfdgn2-ruby3.4-json-2.21.2/lib/ruby/gems/3.4.0/gems/json-2.21.2/lib/json/ext/parser.so",
+      "realpath": "/nix/store/g8nkyrhb3z1z1vy8dnhn3izzsnvfdgn2-ruby3.4-json-2.21.2/lib/ruby/gems/3.4.0/gems/json-2.21.2/lib/json/ext/parser.so",
+      "sha256": "275f0630dbd8ba8bbeef87f96599c295246f431973a0f4020f5b2686ae1a4181"
+    },
+    {
+      "loaded_path": "/nix/store/g8nkyrhb3z1z1vy8dnhn3izzsnvfdgn2-ruby3.4-json-2.21.2/lib/ruby/gems/3.4.0/gems/json-2.21.2/lib/json/ext/generator/state.rb",
+      "realpath": "/nix/store/g8nkyrhb3z1z1vy8dnhn3izzsnvfdgn2-ruby3.4-json-2.21.2/lib/ruby/gems/3.4.0/gems/json-2.21.2/lib/json/ext/generator/state.rb",
+      "sha256": "4eb20f9738d4be3df512b1e7adfef44e6dc72c47167c340b2eb27d1a79ff679f"
+    },
+    {
+      "loaded_path": "/nix/store/g8nkyrhb3z1z1vy8dnhn3izzsnvfdgn2-ruby3.4-json-2.21.2/lib/ruby/gems/3.4.0/gems/json-2.21.2/lib/json/ext/generator.so",
+      "realpath": "/nix/store/g8nkyrhb3z1z1vy8dnhn3izzsnvfdgn2-ruby3.4-json-2.21.2/lib/ruby/gems/3.4.0/gems/json-2.21.2/lib/json/ext/generator.so",
+      "sha256": "384ccec3d623f0ec5b6ff9834beaeb9893f3a1edb85e8a78dec0a2b930bd0f48"
+    },
+    {
+      "loaded_path": "/nix/store/g8nkyrhb3z1z1vy8dnhn3izzsnvfdgn2-ruby3.4-json-2.21.2/lib/ruby/gems/3.4.0/gems/json-2.21.2/lib/json/ext.rb",
+      "realpath": "/nix/store/g8nkyrhb3z1z1vy8dnhn3izzsnvfdgn2-ruby3.4-json-2.21.2/lib/ruby/gems/3.4.0/gems/json-2.21.2/lib/json/ext.rb",
+      "sha256": "a372ba0d5ef0498724e87d6ca655ee63e4ff135ab9c444164e80964bf219eacf"
+    },
+    {
+      "loaded_path": "/nix/store/g8nkyrhb3z1z1vy8dnhn3izzsnvfdgn2-ruby3.4-json-2.21.2/lib/ruby/gems/3.4.0/gems/json-2.21.2/lib/json.rb",
+      "realpath": "/nix/store/g8nkyrhb3z1z1vy8dnhn3izzsnvfdgn2-ruby3.4-json-2.21.2/lib/ruby/gems/3.4.0/gems/json-2.21.2/lib/json.rb",
+      "sha256": "60b93e4cdf32241445d9ee53d707745b43bd4ab49fb411e78dbe852c62a9bc9d"
+    }
+  ],
+  "records": [
+    {
+      "record": "J1",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/inputs/J1.json",
+        "sha256": "bf487d356b97bb4f69f1885cba1e0a4ab95503dfdaa46e8862d0cc1eecca3da1",
+        "bytes": 75
+      },
+      "copied_input": {
+        "path": "J1.json",
+        "sha256": "bf487d356b97bb4f69f1885cba1e0a4ab95503dfdaa46e8862d0cc1eecca3da1",
+        "bytes": 75
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J1/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 11774,
+          "sha256": "e5ae340a91ae5cedd2b7c4509ad6b36e1c03190c9d9bec1d42d721d9e8b4358a"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J1/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 125,
+          "sha256": "53c8f42fc55032a3cb2d3466f2ce3b1874db6608d2335051d5f559cbc22cf0e2"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J1/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J1/status.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 123,
+          "sha256": "754b989df6bd9c872091720548d2ed2292c70efd7a6a49cfa74477a1673135e0"
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "value_nodes",
+        "warning_selection",
+        "input",
+        "stdout"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "J2",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/inputs/J2.json",
+        "sha256": "fc7a6c647979ae1ec1c8c2dd9169fcfc5ad8c2bc89ffa8cdcf853b66768f65c3",
+        "bytes": 38
+      },
+      "copied_input": {
+        "path": "J2.json",
+        "sha256": "fc7a6c647979ae1ec1c8c2dd9169fcfc5ad8c2bc89ffa8cdcf853b66768f65c3",
+        "bytes": 38
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J2/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 10650,
+          "sha256": "ddc655cc31a60e7cf59e2e7b41ada83f6b0cebcafb07b06de0fa9bd2c89c7b4b"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J2/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 23,
+          "sha256": "dd6841067dcb55a636629b56cb45722d09c6a354f92a5b54183cea3b61b9a1e9"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J2/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J2/status.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 123,
+          "sha256": "08554c3ed68a6c4b485f78f373ba223545b8535139627c6559fbf4788b0294b0"
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "value_nodes",
+        "warning_selection",
+        "input",
+        "stdout"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "J3",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/inputs/J3.json",
+        "sha256": "228e14c4ccd2312098124b5f03e4b3f8be087f3329ad15b88224ef1a801ef2f7",
+        "bytes": 62
+      },
+      "copied_input": {
+        "path": "J3.json",
+        "sha256": "228e14c4ccd2312098124b5f03e4b3f8be087f3329ad15b88224ef1a801ef2f7",
+        "bytes": 62
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J3/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 10625,
+          "sha256": "ff1fedd5e568b7bc34970506f1300078a1c0ee6fbd89333b58e5b978efa6898b"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J3/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 75,
+          "sha256": "6f7e7e1ea8b7b513f462dbe0b0e1786a1e4e2d55db5f930e005d837ee253a3ff"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J3/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J3/status.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 123,
+          "sha256": "f8edb25c2f751ec72376fe19cf26f385eeef82c719f559a11b3acac69ce800ed"
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "value_nodes",
+        "warning_selection",
+        "input",
+        "stdout"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "J4",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/inputs/J4.json",
+        "sha256": "c77fff8dd33722c1fd4e16cbccbdfc1541b9e2ed18ac19fbc32c208445e95ee9",
+        "bytes": 75
+      },
+      "copied_input": {
+        "path": "J4.json",
+        "sha256": "c77fff8dd33722c1fd4e16cbccbdfc1541b9e2ed18ac19fbc32c208445e95ee9",
+        "bytes": 75
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J4/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 11332,
+          "sha256": "b41b357e52d9b3aaea66c7cbf06be55b8871fa6528159af59fc9222ddcea05a2"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J4/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 111,
+          "sha256": "8034c97f63628df7d3a3a23b1e4fe1568ab161b36160a778a76fc860d8ad64aa"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J4/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J4/status.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 123,
+          "sha256": "eaa4ed62b0ac58afdd35caf661006398e08124de41c3274bc11c2f4de8482f3e"
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "value_nodes",
+        "warning_selection",
+        "input",
+        "stdout"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "J5",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/inputs/J5.json",
+        "sha256": "c7f0379a0c71cc90d408c3cceaf92b74896a4a36adda0941446f9299719c97a1",
+        "bytes": 15
+      },
+      "copied_input": {
+        "path": "J5.json",
+        "sha256": "c7f0379a0c71cc90d408c3cceaf92b74896a4a36adda0941446f9299719c97a1",
+        "bytes": 15
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J5/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 10619,
+          "sha256": "d5058e6920dbccc302ecd9c2549cc8803f8036f7c24da9c04c7d25ad3b2197c3"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J5/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J5/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J5/status.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 123,
+          "sha256": "6fe6b2ff215cd0749a65bbad9ad8974342d8041d0fd446caf0c49507f8c65dbc"
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "exception",
+        "value_nodes",
+        "warning_selection",
+        "input"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "J6",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/inputs/J6.json",
+        "sha256": "0f234aa537c9c19910f3bd9ef209f2f379b79042bf6d09e7272c8bbafba40abe",
+        "bytes": 72
+      },
+      "copied_input": {
+        "path": "J6.json",
+        "sha256": "0f234aa537c9c19910f3bd9ef209f2f379b79042bf6d09e7272c8bbafba40abe",
+        "bytes": 72
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J6/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 11320,
+          "sha256": "efa0b51d8549db6c6e6de2493256122127aa8ca1b5cfdae1106b17e931051926"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J6/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 81,
+          "sha256": "68013a5db0d388334853f29c019252536f69d711946f1c0ca0d6f27664e7cb1b"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J6/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J6/status.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 123,
+          "sha256": "54f923f5fc9a119a0be6b1b357363a738098895d97e572873a213f7d512a2217"
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "value_nodes",
+        "warning_selection",
+        "input",
+        "stdout"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "J7",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/inputs/J7.json",
+        "sha256": "69119aac5ce42bc93c1667db0454297ffaa342c431efa2dfdf48af101c035106",
+        "bytes": 10
+      },
+      "copied_input": {
+        "path": "J7.json",
+        "sha256": "69119aac5ce42bc93c1667db0454297ffaa342c431efa2dfdf48af101c035106",
+        "bytes": 10
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J7/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 10368,
+          "sha256": "6234e4d274c4a259b1b574298afd02fa32694057df676163584388e3cc7777dc"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J7/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J7/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J7/status.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 123,
+          "sha256": "a5b0d47423fc67ec8a92fa7094191b8d9d90fec83f4a0837ea82fd5f33893c69"
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "stage",
+        "outcome",
+        "exception",
+        "warning_selection",
+        "input"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "J8",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/inputs/J8.json",
+        "sha256": "f1dec6e9ee608550bd1c39ff2b90134059bac5d02e4e78f6410aed2fbd870bd0",
+        "bytes": 9
+      },
+      "copied_input": {
+        "path": "J8.json",
+        "sha256": "f1dec6e9ee608550bd1c39ff2b90134059bac5d02e4e78f6410aed2fbd870bd0",
+        "bytes": 9
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J8/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 10353,
+          "sha256": "6f3bd110762364b58548bbe689ffb4de7572e092d34e99a85bf7cf08273b3201"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J8/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J8/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J8/status.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 123,
+          "sha256": "9f2952e5e8123008a044fa065a3889cc173ab9eda60bdcff30a796d24a1fc015"
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "stage",
+        "outcome",
+        "exception",
+        "warning_selection",
+        "input"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "J9",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/inputs/J9.json",
+        "sha256": "aa99a5ce3eb0dd8355f0bfb15376ea1d862ad75d0d278af1f8c280ca8c02c640",
+        "bytes": 8
+      },
+      "copied_input": {
+        "path": "J9.json",
+        "sha256": "aa99a5ce3eb0dd8355f0bfb15376ea1d862ad75d0d278af1f8c280ca8c02c640",
+        "bytes": 8
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J9/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 10335,
+          "sha256": "0b634108aca826c2075d820a29228ad6bd20acab15f695d131ba7154d9363d62"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J9/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J9/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J9/status.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 123,
+          "sha256": "9a8c6e451118dae2cdf44b7c47e58ccc215ca10ddbd680671f8fb956e0eb9b0b"
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "stage",
+        "outcome",
+        "exception",
+        "warning_selection",
+        "input"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "J10",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/inputs/J10.json",
+        "sha256": "638577393ecb248f472c18a1a95104181a3188551615d763873393eaf4eff186",
+        "bytes": 5
+      },
+      "copied_input": {
+        "path": "J10.json",
+        "sha256": "638577393ecb248f472c18a1a95104181a3188551615d763873393eaf4eff186",
+        "bytes": 5
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J10/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 10325,
+          "sha256": "9f2caaf99a00b301e9de48ad29cef6ee6f039530cafe65cfd2e28d4ebb936ef7"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J10/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J10/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J10/status.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 124,
+          "sha256": "0f7da9203f6cf4ae8de734fca84606f468bf36c1cfa24271129cb1ba4c9e4625"
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "stage",
+        "outcome",
+        "exception",
+        "warning_selection",
+        "input"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "J11",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/inputs/J11.json",
+        "sha256": "bf487d356b97bb4f69f1885cba1e0a4ab95503dfdaa46e8862d0cc1eecca3da1",
+        "bytes": 75
+      },
+      "copied_input": {
+        "path": "J11.json",
+        "sha256": "bf487d356b97bb4f69f1885cba1e0a4ab95503dfdaa46e8862d0cc1eecca3da1",
+        "bytes": 75
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J11/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 11778,
+          "sha256": "754158e1a60b922645912ff202f8fa8f3dd513e18f1ba97e4edf6f9e6e2f1227"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J11/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 125,
+          "sha256": "53c8f42fc55032a3cb2d3466f2ce3b1874db6608d2335051d5f559cbc22cf0e2"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J11/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 257,
+          "sha256": "464fbb8b3b50b268728fbe8299c2c3624239bb98247678eab378ed35a935f9f2"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J11/status.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 124,
+          "sha256": "e4ce3a08bf9c92e4f01473803d35ab2639c1b5aac6654e92766842e0aacbbcf2"
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "value_nodes",
+        "warning_selection",
+        "input",
+        "stdout",
+        "diagnostic_stderr"
+      ],
+      "warning_policy": "deprecated=true"
+    },
+    {
+      "record": "J12",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/inputs/J12.json",
+        "sha256": "fc7a6c647979ae1ec1c8c2dd9169fcfc5ad8c2bc89ffa8cdcf853b66768f65c3",
+        "bytes": 38
+      },
+      "copied_input": {
+        "path": "J12.json",
+        "sha256": "fc7a6c647979ae1ec1c8c2dd9169fcfc5ad8c2bc89ffa8cdcf853b66768f65c3",
+        "bytes": 38
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J12/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 10654,
+          "sha256": "2e56e5687172505958165794a4641255a47ac0017b4b7f9fec9e007adb1575e7"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J12/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 23,
+          "sha256": "dd6841067dcb55a636629b56cb45722d09c6a354f92a5b54183cea3b61b9a1e9"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J12/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 716,
+          "sha256": "885310ceae895e4592d26415e3f04c5412a3df63744d266317bb4c3d46b3bf73"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J12/status.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 124,
+          "sha256": "dd6ebd6f00047e57660371f2b30d398fc3aea8c31e82fa2d89b372d452cb3a62"
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "value_nodes",
+        "warning_selection",
+        "input",
+        "stdout",
+        "diagnostic_stderr"
+      ],
+      "warning_policy": "deprecated=true"
+    },
+    {
+      "record": "J13",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/inputs/J13.json",
+        "sha256": "3eea4e91319f844c11facd98dd4cc33c63720ac8ce96abe276868ba1f092589d",
+        "bytes": 201
+      },
+      "copied_input": {
+        "path": "J13.json",
+        "sha256": "3eea4e91319f844c11facd98dd4cc33c63720ac8ce96abe276868ba1f092589d",
+        "bytes": 201
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J13/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 26224,
+          "sha256": "ee3609f6c68e3031ec39ba43281e6b1b2d707474591fe95306b46c5dcabf5d12"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J13/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 20402,
+          "sha256": "8c0ed58204828d57a2f6a66c56336a1160cb1139bc8f4949c1150caae99cf2e8"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J13/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J13/status.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 124,
+          "sha256": "822f8136be66e002f86acbee72a94424f5fb2094162dd28fb4e7359e0d5394e8"
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "value_nodes",
+        "warning_selection",
+        "input",
+        "stdout"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "J14",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/inputs/J14.json",
+        "sha256": "93d7fcec41bf07395f56cd27fc8284f0daddf71ac80fbc4e34028648b0f7be7a",
+        "bytes": 203
+      },
+      "copied_input": {
+        "path": "J14.json",
+        "sha256": "93d7fcec41bf07395f56cd27fc8284f0daddf71ac80fbc4e34028648b0f7be7a",
+        "bytes": 203
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J14/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 10285,
+          "sha256": "6bc3d0684a1ccfd0d873f4ee91ac7562b7e222ed93845e8547f6e9e94d39d89a"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J14/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J14/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J14/status.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 124,
+          "sha256": "cce7d726aed974461a4eb44444513dc2e4363aa4e469d4066b51998ba15a34d3"
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "stage",
+        "outcome",
+        "exception",
+        "warning_selection",
+        "input"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "J15",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-characterization-v1/inputs/J15.rb",
+        "sha256": "ef8e05329578a41f70d8697f5cf160ba6bdf2a2ff564280b736db87a9b67168e",
+        "bytes": 40
+      },
+      "copied_input": {
+        "path": "J15.rb.source",
+        "sha256": "ef8e05329578a41f70d8697f5cf160ba6bdf2a2ff564280b736db87a9b67168e",
+        "bytes": 40
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J15/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 26795,
+          "sha256": "eb36d8358c6c208c49eced6ba93be4ffdf6e6a2bf10fd4a97632b625dda64c41"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J15/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J15/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-observations-v1/J15/status.json",
+          "mode": "0600",
+          "type": "file",
+          "bytes": 124,
+          "sha256": "975a073344c24d6519cb9d8e1ebd2f6f6e222bc40d3b476d18f2f4d4f048a88d"
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "stage",
+        "outcome",
+        "exception",
+        "value_nodes",
+        "warning_selection",
+        "input"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "F1",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-v1/inputs/F1.json",
+        "sha256": "a36b076492a0d23cdec4f15f8603993e39ef760e4cd95b94d0ae66dbeb10c323",
+        "bytes": 252
+      },
+      "copied_input": {
+        "path": "F1.json",
+        "sha256": "a36b076492a0d23cdec4f15f8603993e39ef760e4cd95b94d0ae66dbeb10c323",
+        "bytes": 252
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F1/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "6d91fb253fdedc6a761c858486609d06f961412a510a3ce06e98c3078cb27a6c",
+          "bytes": 10696
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F1/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "12981e35a8ed579c95b69e1dd4dfe38d9483fcf298339c81b5f8dd3e2e4811ff",
+          "bytes": 136
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F1/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F1/status.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "187e6309edd4c2f1b75491dae38be2b42cd9552c5820009e4dce04e4ffbd9413",
+          "bytes": 123
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "value_nodes",
+        "warning_selection",
+        "input",
+        "stdout"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "F2",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-v1/inputs/F2.json",
+        "sha256": "52a713093dc3d073659d0704a703fbb617df1c5b98f50401a5fc1e3de7f8308d",
+        "bytes": 104
+      },
+      "copied_input": {
+        "path": "F2.json",
+        "sha256": "52a713093dc3d073659d0704a703fbb617df1c5b98f50401a5fc1e3de7f8308d",
+        "bytes": 104
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F2/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "a70846a0a63cff6ef912b414051ddf18fb38d217d06bd3a428c4da8f6b7ad0bc",
+          "bytes": 10429
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F2/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F2/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F2/status.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "9ef123cf6850b60d6c77d3aaecc8311af52d047dccc69b4e8e38dd628c804171",
+          "bytes": 123
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "exception",
+        "value_nodes",
+        "warning_selection",
+        "input"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "F3",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-v1/inputs/F3.rb",
+        "sha256": "ec4206c4f86f1b8975d5a6167738d7ada8a00ffa3a01949cdf90999fa68d959e",
+        "bytes": 684
+      },
+      "copied_input": {
+        "path": "F3.rb.source",
+        "sha256": "ec4206c4f86f1b8975d5a6167738d7ada8a00ffa3a01949cdf90999fa68d959e",
+        "bytes": 684
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F3/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "8f5edbc916af90d14ae9bac59aeccf63bdfb0790a4a2353b2d643dde8771ae8a",
+          "bytes": 14175
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F3/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "75f7056c069257d0f9905c19643779f8577ef6cffb28f54f64f776602ac88295",
+          "bytes": 671
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F3/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F3/status.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "98582bd51d86f0913272e5abfbe7e127c64d90e38d921800d6ee5bdbd87df2c6",
+          "bytes": 123
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "stage",
+        "outcome",
+        "value_nodes",
+        "construction_binary64_big_endian_hex",
+        "warning_selection",
+        "input",
+        "stdout"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "F4",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-v1/inputs/F4.json",
+        "sha256": "d7e1fd6f762f8c56a677954609ede1f15b518a9dd565a719f7841ed6b3e3836a",
+        "bytes": 5
+      },
+      "copied_input": {
+        "path": "F4.json",
+        "sha256": "d7e1fd6f762f8c56a677954609ede1f15b518a9dd565a719f7841ed6b3e3836a",
+        "bytes": 5
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F4/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "d8fd41b2d3a4976d7a8ef5c480e6b699dd48c0e4d3f4734578558e40c9c0fdff",
+          "bytes": 9963
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F4/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F4/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F4/status.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "8e03cd436d49d259eaa395124083ef1a4a526df2830551e1ecf9a8a73cba81d2",
+          "bytes": 123
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "exception",
+        "value_nodes",
+        "warning_selection",
+        "input"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "F5",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-v1/inputs/F5.json",
+        "sha256": "0e37c36c2b694d042f797c964fb0f193b199a79500f1447f67acc95b91d68dc8",
+        "bytes": 10
+      },
+      "copied_input": {
+        "path": "F5.json",
+        "sha256": "0e37c36c2b694d042f797c964fb0f193b199a79500f1447f67acc95b91d68dc8",
+        "bytes": 10
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F5/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "1ed66a32dcf9d733253243621c0c64758ce55570bb1ad96e3400ae0a13b01169",
+          "bytes": 9967
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F5/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F5/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F5/status.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "9dd4832e8a8f19eb95739cfbdb9d5ff0241bc5a518bf8142df2eb51c6a1c0791",
+          "bytes": 123
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "exception",
+        "value_nodes",
+        "warning_selection",
+        "input"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "F6",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-v1/inputs/F6.json",
+        "sha256": "cbf9fc6d8ba8ec8fd26fd8d43ab5a96b10ff6675cb9d837ed7a1de9367c8c99e",
+        "bytes": 202
+      },
+      "copied_input": {
+        "path": "F6.json",
+        "sha256": "cbf9fc6d8ba8ec8fd26fd8d43ab5a96b10ff6675cb9d837ed7a1de9367c8c99e",
+        "bytes": 202
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F6/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "7988c358e443f9fbac3c52f9b96f592495afef4d621d2106a438301ae909b461",
+          "bytes": 25834
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F6/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F6/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-followup-observations-v1/F6/status.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "c90f0a1213d1ad55e66ce86b1fff8cb494a69e2cb8408c888908cf6833a2595d",
+          "bytes": 123
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "exception",
+        "value_nodes",
+        "warning_selection",
+        "input"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "E1",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-v1/inputs/E1.json",
+        "sha256": "c715da1bd6432e93aaaaa37c55ebcd770eb548f937c7e2748ea31950fae3f2a7",
+        "bytes": 24
+      },
+      "copied_input": {
+        "path": "E1.json",
+        "sha256": "c715da1bd6432e93aaaaa37c55ebcd770eb548f937c7e2748ea31950fae3f2a7",
+        "bytes": 24
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E1/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "c650e3bece59cd470600904523ce39d83f00e5e06538f1c68bfec25bab1b23d2",
+          "bytes": 9896
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E1/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E1/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E1/status.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "ae04f8a9a719fcadddae7d78c3878b384529c77ab0e45244f28593f74122183b",
+          "bytes": 123
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "exception",
+        "value_nodes",
+        "warning_selection",
+        "input"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "E2",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-v1/inputs/E2.json",
+        "sha256": "601e1eb815c38949696081461e555cbe50ed4bba2891324448b04819977b8039",
+        "bytes": 25
+      },
+      "copied_input": {
+        "path": "E2.json",
+        "sha256": "601e1eb815c38949696081461e555cbe50ed4bba2891324448b04819977b8039",
+        "bytes": 25
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E2/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e92b9f91b00330e8893b02c490fba8936b4781a2fa20a7d6967ac55a9ca66198",
+          "bytes": 9897
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E2/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E2/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E2/status.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "bd568dd6a01e41059c1ce17772e5bec97c432a4c0cd5c2955f22c522db88e558",
+          "bytes": 123
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "exception",
+        "value_nodes",
+        "warning_selection",
+        "input"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "E3",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-v1/inputs/E3.json",
+        "sha256": "9476ee6fdf5c2f5f177e53bc6604ef1595c357a49e0bd984c1e5248136f59dc0",
+        "bytes": 25
+      },
+      "copied_input": {
+        "path": "E3.json",
+        "sha256": "9476ee6fdf5c2f5f177e53bc6604ef1595c357a49e0bd984c1e5248136f59dc0",
+        "bytes": 25
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E3/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "b3032c228af10c4306c0f7555f41930fc597082ab99bb38f15dde1ecae5e1850",
+          "bytes": 9896
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E3/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E3/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E3/status.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "8f9080c9a34d61f4fdc4cec8508cb2508b35a368d26b08e25b9221914466ad19",
+          "bytes": 123
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "exception",
+        "value_nodes",
+        "warning_selection",
+        "input"
+      ],
+      "warning_policy": "unchanged_default"
+    },
+    {
+      "record": "E4",
+      "source_input": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-v1/inputs/E4.json",
+        "sha256": "45b58b0d8e155e6ba62be92588cec5e90809270fdd6995deb1b45a376d0f848a",
+        "bytes": 26
+      },
+      "copied_input": {
+        "path": "E4.json",
+        "sha256": "45b58b0d8e155e6ba62be92588cec5e90809270fdd6995deb1b45a376d0f848a",
+        "bytes": 26
+      },
+      "original_artifacts": [
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E4/metadata.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "d6183507df4e168931ecba7a290bd5663819f0df4be2da1ed20c967205f0c144",
+          "bytes": 9897
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E4/stdout.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E4/stderr.raw",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i3-json-exponent-observations-v1/E4/status.json",
+          "mode": "0600",
+          "type": "file",
+          "sha256": "58ddce3e8c1dcf748f650b5b706af59c2e2189a483f13c71dd7c2e6b0f428727",
+          "bytes": 123
+        }
+      ],
+      "selected_metadata_fields": [
+        "record",
+        "parse_requested",
+        "parse_completed",
+        "stage",
+        "outcome",
+        "exception",
+        "value_nodes",
+        "warning_selection",
+        "input"
+      ],
+      "warning_policy": "unchanged_default"
+    }
+  ],
+  "assets": {
+    "E1.json": {
+      "sha256": "c715da1bd6432e93aaaaa37c55ebcd770eb548f937c7e2748ea31950fae3f2a7",
+      "bytes": 24
+    },
+    "E2.json": {
+      "sha256": "601e1eb815c38949696081461e555cbe50ed4bba2891324448b04819977b8039",
+      "bytes": 25
+    },
+    "E3.json": {
+      "sha256": "9476ee6fdf5c2f5f177e53bc6604ef1595c357a49e0bd984c1e5248136f59dc0",
+      "bytes": 25
+    },
+    "E4.json": {
+      "sha256": "45b58b0d8e155e6ba62be92588cec5e90809270fdd6995deb1b45a376d0f848a",
+      "bytes": 26
+    },
+    "F1.json": {
+      "sha256": "a36b076492a0d23cdec4f15f8603993e39ef760e4cd95b94d0ae66dbeb10c323",
+      "bytes": 252
+    },
+    "F1.stdout": {
+      "sha256": "12981e35a8ed579c95b69e1dd4dfe38d9483fcf298339c81b5f8dd3e2e4811ff",
+      "bytes": 136
+    },
+    "F2.json": {
+      "sha256": "52a713093dc3d073659d0704a703fbb617df1c5b98f50401a5fc1e3de7f8308d",
+      "bytes": 104
+    },
+    "F3.rb.source": {
+      "sha256": "ec4206c4f86f1b8975d5a6167738d7ada8a00ffa3a01949cdf90999fa68d959e",
+      "bytes": 684
+    },
+    "F3.stdout": {
+      "sha256": "75f7056c069257d0f9905c19643779f8577ef6cffb28f54f64f776602ac88295",
+      "bytes": 671
+    },
+    "F4.json": {
+      "sha256": "d7e1fd6f762f8c56a677954609ede1f15b518a9dd565a719f7841ed6b3e3836a",
+      "bytes": 5
+    },
+    "F5.json": {
+      "sha256": "0e37c36c2b694d042f797c964fb0f193b199a79500f1447f67acc95b91d68dc8",
+      "bytes": 10
+    },
+    "F6.json": {
+      "sha256": "cbf9fc6d8ba8ec8fd26fd8d43ab5a96b10ff6675cb9d837ed7a1de9367c8c99e",
+      "bytes": 202
+    },
+    "J1.json": {
+      "sha256": "bf487d356b97bb4f69f1885cba1e0a4ab95503dfdaa46e8862d0cc1eecca3da1",
+      "bytes": 75
+    },
+    "J1.stdout": {
+      "sha256": "53c8f42fc55032a3cb2d3466f2ce3b1874db6608d2335051d5f559cbc22cf0e2",
+      "bytes": 125
+    },
+    "J10.json": {
+      "sha256": "638577393ecb248f472c18a1a95104181a3188551615d763873393eaf4eff186",
+      "bytes": 5
+    },
+    "J11.json": {
+      "sha256": "bf487d356b97bb4f69f1885cba1e0a4ab95503dfdaa46e8862d0cc1eecca3da1",
+      "bytes": 75
+    },
+    "J11.stderr": {
+      "sha256": "464fbb8b3b50b268728fbe8299c2c3624239bb98247678eab378ed35a935f9f2",
+      "bytes": 257
+    },
+    "J11.stdout": {
+      "sha256": "53c8f42fc55032a3cb2d3466f2ce3b1874db6608d2335051d5f559cbc22cf0e2",
+      "bytes": 125
+    },
+    "J12.json": {
+      "sha256": "fc7a6c647979ae1ec1c8c2dd9169fcfc5ad8c2bc89ffa8cdcf853b66768f65c3",
+      "bytes": 38
+    },
+    "J12.stderr": {
+      "sha256": "885310ceae895e4592d26415e3f04c5412a3df63744d266317bb4c3d46b3bf73",
+      "bytes": 716
+    },
+    "J12.stdout": {
+      "sha256": "dd6841067dcb55a636629b56cb45722d09c6a354f92a5b54183cea3b61b9a1e9",
+      "bytes": 23
+    },
+    "J13.json": {
+      "sha256": "3eea4e91319f844c11facd98dd4cc33c63720ac8ce96abe276868ba1f092589d",
+      "bytes": 201
+    },
+    "J13.stdout": {
+      "sha256": "8c0ed58204828d57a2f6a66c56336a1160cb1139bc8f4949c1150caae99cf2e8",
+      "bytes": 20402
+    },
+    "J14.json": {
+      "sha256": "93d7fcec41bf07395f56cd27fc8284f0daddf71ac80fbc4e34028648b0f7be7a",
+      "bytes": 203
+    },
+    "J15.rb.source": {
+      "sha256": "ef8e05329578a41f70d8697f5cf160ba6bdf2a2ff564280b736db87a9b67168e",
+      "bytes": 40
+    },
+    "J2.json": {
+      "sha256": "fc7a6c647979ae1ec1c8c2dd9169fcfc5ad8c2bc89ffa8cdcf853b66768f65c3",
+      "bytes": 38
+    },
+    "J2.stdout": {
+      "sha256": "dd6841067dcb55a636629b56cb45722d09c6a354f92a5b54183cea3b61b9a1e9",
+      "bytes": 23
+    },
+    "J3.json": {
+      "sha256": "228e14c4ccd2312098124b5f03e4b3f8be087f3329ad15b88224ef1a801ef2f7",
+      "bytes": 62
+    },
+    "J3.stdout": {
+      "sha256": "6f7e7e1ea8b7b513f462dbe0b0e1786a1e4e2d55db5f930e005d837ee253a3ff",
+      "bytes": 75
+    },
+    "J4.json": {
+      "sha256": "c77fff8dd33722c1fd4e16cbccbdfc1541b9e2ed18ac19fbc32c208445e95ee9",
+      "bytes": 75
+    },
+    "J4.stdout": {
+      "sha256": "8034c97f63628df7d3a3a23b1e4fe1568ab161b36160a778a76fc860d8ad64aa",
+      "bytes": 111
+    },
+    "J5.json": {
+      "sha256": "c7f0379a0c71cc90d408c3cceaf92b74896a4a36adda0941446f9299719c97a1",
+      "bytes": 15
+    },
+    "J6.json": {
+      "sha256": "0f234aa537c9c19910f3bd9ef209f2f379b79042bf6d09e7272c8bbafba40abe",
+      "bytes": 72
+    },
+    "J6.stdout": {
+      "sha256": "68013a5db0d388334853f29c019252536f69d711946f1c0ca0d6f27664e7cb1b",
+      "bytes": 81
+    },
+    "J7.json": {
+      "sha256": "69119aac5ce42bc93c1667db0454297ffaa342c431efa2dfdf48af101c035106",
+      "bytes": 10
+    },
+    "J8.json": {
+      "sha256": "f1dec6e9ee608550bd1c39ff2b90134059bac5d02e4e78f6410aed2fbd870bd0",
+      "bytes": 9
+    },
+    "J9.json": {
+      "sha256": "aa99a5ce3eb0dd8355f0bfb15376ea1d862ad75d0d278af1f8c280ca8c02c640",
+      "bytes": 8
+    },
+    "observations.json": {
+      "bytes": 69741,
+      "sha256": "a39101aa9bbda5f32e5407e0993dad6ed92bcf80f5a06d8df764cbe147873828"
+    }
+  },
+  "metadata_extraction": "observations.json selects literal original metadata fields; path/output asset names are local references. Inputs, generated stdout and J11/J12 diagnostic stderr are verbatim copies. No normalization or candidate observations.",
+  "limits": [
+    "Finite dependency observations, not setter CLI or all-float equivalence",
+    "J11/J12 forced deprecation warnings remain diagnostic only; private codec has the default quiet policy",
+    "J15/F3 Ruby construction source is preserved but never executed by Go tests"
+  ]
+}

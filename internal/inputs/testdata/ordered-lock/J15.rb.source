@@ -1,0 +1,2 @@
+value = 0
+101.times { value = [value] }

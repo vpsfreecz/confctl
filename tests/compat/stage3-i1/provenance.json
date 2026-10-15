@@ -1,0 +1,769 @@
+{
+  "schema": 1,
+  "scope": "15 read-only inputs listing/help cases; no candidate parity claim",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "acceptance": {
+    "path": "work/2026-10-09-evaluate-confctl-rewrite-language/evidence/stage3-i1-original-characterization.json",
+    "sha256": "ee41457e0ad2948bcb35cf32ab8ef7c949729de71016f957f1e1cb8a9c9e9342"
+  },
+  "capture": {
+    "argv.nul": {
+      "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-capture-v1/argv.nul",
+      "sha256": "c8ade887ec2678ab6f593118939ddef01095bdc88ce37decfd4bce14de46dc5a",
+      "bytes": 266
+    },
+    "stdout": {
+      "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-capture-v1/stdout",
+      "sha256": "ba287b7f75d8929ec888022341fb1c3067c62db6406e4032a74223867b00b84d",
+      "bytes": 6909
+    },
+    "status.json": {
+      "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-capture-v1/status.json",
+      "sha256": "7d5a23c1a2cdccb60a79fb0f113c1c0baf213b544438fbfeb993289e962ba76f",
+      "bytes": 694
+    },
+    "argv.json": {
+      "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-capture-v1/argv.json",
+      "sha256": "ee7cd6538927b1e990460616875612b40ed140c7ed5d56f6d21807aae45dbd9f",
+      "bytes": 284
+    },
+    "stderr": {
+      "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-capture-v1/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  },
+  "source_manifest": {
+    "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/manifest.json",
+    "sha256": "95015ff1b57e7a8809c48b5a02ade54c77fafd7793baf7d7030010ce4feee13a",
+    "bytes": 11324
+  },
+  "source_guard": {
+    "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/GUARDS.sha256",
+    "sha256": "61be9c0c20187d39535b620698eaa90d2257273ebbfe3577e9dccb0d3e723c90",
+    "bytes": 6104
+  },
+  "original_identities": [
+    {
+      "path": "/nix/store/5m2n2m6ipnfmlnzybwibdymh53xa80gq-687gh0mm2wkglzjadgchdnymam67jm9a-source/bin/confctl",
+      "source_path": "bin/confctl",
+      "sha256": "18e72dca99506e8068debb74c4e24812c7dcb23e6e6ad43651943410ce65fc7d",
+      "pinned_source_equal": true
+    },
+    {
+      "path": "/nix/store/5m2n2m6ipnfmlnzybwibdymh53xa80gq-687gh0mm2wkglzjadgchdnymam67jm9a-source/lib/confctl/cli/inputs/root.rb",
+      "source_path": "lib/confctl/cli/inputs/root.rb",
+      "sha256": "6d0f05b981d4ad0ca8c66dd733c5b600ff67af2b347c68584af838a8073f1f1f",
+      "pinned_source_equal": true
+    },
+    {
+      "path": "/nix/store/5m2n2m6ipnfmlnzybwibdymh53xa80gq-687gh0mm2wkglzjadgchdnymam67jm9a-source/lib/confctl/cli/inputs/channels.rb",
+      "source_path": "lib/confctl/cli/inputs/channels.rb",
+      "sha256": "f8a136006967aa5078cdf7baee1df13ea00bcb14fd86876c1e77ce63f0bb0d00",
+      "pinned_source_equal": true
+    },
+    {
+      "path": "/nix/store/5m2n2m6ipnfmlnzybwibdymh53xa80gq-687gh0mm2wkglzjadgchdnymam67jm9a-source/lib/confctl/cli/inputs/machines.rb",
+      "source_path": "lib/confctl/cli/inputs/machines.rb",
+      "sha256": "ad40444e4d364f967301f4bac3a0cf2478aef832c320a68069f8debe5c228fd2",
+      "pinned_source_equal": true
+    },
+    {
+      "path": "/nix/store/5m2n2m6ipnfmlnzybwibdymh53xa80gq-687gh0mm2wkglzjadgchdnymam67jm9a-source/lib/confctl/flake_lock.rb",
+      "source_path": "lib/confctl/flake_lock.rb",
+      "sha256": "1da5fc0d4c42f341b8b8470c54a809127d874b30a50e5fbf2cfecc0dd15f904d",
+      "pinned_source_equal": true
+    },
+    {
+      "path": "/nix/store/5m2n2m6ipnfmlnzybwibdymh53xa80gq-687gh0mm2wkglzjadgchdnymam67jm9a-source/lib/confctl/nix.rb",
+      "source_path": "lib/confctl/nix.rb",
+      "sha256": "77463f01726f0cfc4606defce1c7924d277643eef7cc754bc2112b4310d870c0",
+      "pinned_source_equal": true
+    },
+    {
+      "path": "/nix/store/5m2n2m6ipnfmlnzybwibdymh53xa80gq-687gh0mm2wkglzjadgchdnymam67jm9a-source/lib/confctl/nix/args.rb",
+      "source_path": "lib/confctl/nix/args.rb",
+      "sha256": "00a99b92be1e399f8fde06c7e6386663b5c351fcca640a163643ea6d251ca64e",
+      "pinned_source_equal": true
+    },
+    {
+      "path": "/nix/store/5m2n2m6ipnfmlnzybwibdymh53xa80gq-687gh0mm2wkglzjadgchdnymam67jm9a-source/lib/confctl/pattern.rb",
+      "source_path": "lib/confctl/pattern.rb",
+      "sha256": "fd89e93aa04c246cecc1709ba68d8b512adda7e47d416c800eae808ca7ff78d0",
+      "pinned_source_equal": true
+    },
+    {
+      "path": "/nix/store/5m2n2m6ipnfmlnzybwibdymh53xa80gq-687gh0mm2wkglzjadgchdnymam67jm9a-source/lib/confctl/logger.rb",
+      "source_path": "lib/confctl/logger.rb",
+      "sha256": "411807c834b088e470536b86e138b6d6949ad9a7e2fafa8d94ee5ec6af8b3217",
+      "pinned_source_equal": true
+    },
+    {
+      "path": "/nix/store/5m2n2m6ipnfmlnzybwibdymh53xa80gq-687gh0mm2wkglzjadgchdnymam67jm9a-source/lib/confctl/cli/app.rb",
+      "source_path": "lib/confctl/cli/app.rb",
+      "sha256": "5a36902f44b7acaec1a6120269c5a4c755ddfd365cea004a53433dda10d7cdbd",
+      "pinned_source_equal": true
+    },
+    {
+      "path": "/nix/store/5m2n2m6ipnfmlnzybwibdymh53xa80gq-687gh0mm2wkglzjadgchdnymam67jm9a-source/lib/confctl/cli/output_formatter.rb",
+      "source_path": "lib/confctl/cli/output_formatter.rb",
+      "sha256": "1ca9abec79a9454064febe38ffe7f980d28f38a17f63129f2c29e30844c65168",
+      "pinned_source_equal": true
+    },
+    {
+      "path": "/nix/store/5m2n2m6ipnfmlnzybwibdymh53xa80gq-687gh0mm2wkglzjadgchdnymam67jm9a-source/lib/confctl/cli/command.rb",
+      "source_path": "lib/confctl/cli/command.rb",
+      "sha256": "3dea0727a68ee472cf170a00c4ba368121eb99351d6c5e76366b7d341f02f5d0",
+      "pinned_source_equal": true
+    },
+    {
+      "path": "/nix/store/x96jzlpaq69bkdardsn56px7czybkbs8-confctl/bin/confctl",
+      "sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de"
+    },
+    {
+      "path": "/nix/store/is6f59d03q32hnq10rp5y9dzhy8a0fy4-confctl-compat-tools-0.1.0/bin/fixture-tool",
+      "sha256": "eb97fa6a82ec45cb493259a1058e251fcb8d17bf197f18c97e528f4ee544cfbb"
+    },
+    {
+      "path": "/nix/store/4hnlqddzap2zalbjfcq6jdfcpk05w4hr-confctl-compat-tools-0.1.0/bin/compat",
+      "sha256": "bf9dfb94e9cd511d15f4310253337eab256306db6da1cd491855bec589de0eee"
+    }
+  ],
+  "normalization": "existing per-case harness allowlist unchanged; expected observations copied verbatim, never regenerated or renormalized",
+  "cases": [
+    {
+      "id": "inputs-channel-empty",
+      "source_case": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/cases/inputs-channel-empty.json",
+        "sha256": "b323691e6794802edd7f4440076c099817d663e75b4d4d4d0d6116690aa17cb3",
+        "bytes": 3779
+      },
+      "fixture": {
+        "path": "tests/compat/stage3-i1/fixtures/inputs-channel-empty.json",
+        "sha256": "b323691e6794802edd7f4440076c099817d663e75b4d4d4d0d6116690aa17cb3",
+        "bytes": 3779
+      },
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-empty-3925531527/raw.json",
+        "sha256": "2dc255f74e3376c376b87624cf24d45a4e369e449b19a6a1ac62ab10263e5b1f",
+        "bytes": 7280
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-empty-3925531527/normalized.json",
+        "sha256": "b84c09d2f4594401508b06447e464963d8baea46dc37e352fa7199ce11b5aaa2",
+        "bytes": 5483
+      },
+      "expected": {
+        "path": "tests/compat/stage3-i1/expected/inputs-channel-empty.json",
+        "sha256": "b84c09d2f4594401508b06447e464963d8baea46dc37e352fa7199ce11b5aaa2"
+      },
+      "expected_fixture_sha256": "b323691e6794802edd7f4440076c099817d663e75b4d4d4d0d6116690aa17cb3",
+      "expected_is_original_verbatim": true,
+      "fixture_delta": "none; verbatim original source case",
+      "exit": 0,
+      "event_count": 3,
+      "expected_alias": {
+        "path": "tests/compat/stage3-i1/fixtures/UNACCEPTED-inputs-channel-empty.json",
+        "lstat_mode": "0o120777",
+        "type": "symlink",
+        "readlink": "../expected/inputs-channel-empty.json",
+        "resolved_path": "tests/compat/stage3-i1/expected/inputs-channel-empty.json",
+        "resolved_sha256": "b84c09d2f4594401508b06447e464963d8baea46dc37e352fa7199ce11b5aaa2"
+      }
+    },
+    {
+      "id": "inputs-channel-extra",
+      "source_case": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/cases/inputs-channel-extra.json",
+        "sha256": "98006908dbbb6ee27603edd055469883f6b6c839cda98e20b06f0a447eb32926",
+        "bytes": 2569
+      },
+      "fixture": {
+        "path": "tests/compat/stage3-i1/fixtures/inputs-channel-extra.json",
+        "sha256": "98006908dbbb6ee27603edd055469883f6b6c839cda98e20b06f0a447eb32926",
+        "bytes": 2569
+      },
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-extra-1738441702/raw.json",
+        "sha256": "d8f6cbaf836e430aab5af5cfd5722cbb729cfdbc5e49cfeacbc2fac99b998cc5",
+        "bytes": 3928
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-extra-1738441702/normalized.json",
+        "sha256": "41bd87881e4118b96551d099ef37103c3600bb5ac42142fb77824f13fca39420",
+        "bytes": 3770
+      },
+      "expected": {
+        "path": "tests/compat/stage3-i1/expected/inputs-channel-extra.json",
+        "sha256": "41bd87881e4118b96551d099ef37103c3600bb5ac42142fb77824f13fca39420"
+      },
+      "expected_fixture_sha256": "98006908dbbb6ee27603edd055469883f6b6c839cda98e20b06f0a447eb32926",
+      "expected_is_original_verbatim": true,
+      "fixture_delta": "none; verbatim original source case",
+      "exit": 64,
+      "event_count": 0,
+      "expected_alias": {
+        "path": "tests/compat/stage3-i1/fixtures/UNACCEPTED-inputs-channel-extra.json",
+        "lstat_mode": "0o120777",
+        "type": "symlink",
+        "readlink": "../expected/inputs-channel-extra.json",
+        "resolved_path": "tests/compat/stage3-i1/expected/inputs-channel-extra.json",
+        "resolved_sha256": "41bd87881e4118b96551d099ef37103c3600bb5ac42142fb77824f13fca39420"
+      }
+    },
+    {
+      "id": "inputs-channel-help",
+      "source_case": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/cases/inputs-channel-help.json",
+        "sha256": "5c648909eb12ffedfcd55cdee4916e840fba177ae93ecce4019c333d6e465328",
+        "bytes": 1605
+      },
+      "fixture": {
+        "path": "tests/compat/stage3-i1/fixtures/inputs-channel-help.json",
+        "sha256": "5c648909eb12ffedfcd55cdee4916e840fba177ae93ecce4019c333d6e465328",
+        "bytes": 1605
+      },
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-help-3377152159/raw.json",
+        "sha256": "5f7d50588b4c313cc91eb6fc36af2f88a71d4616818a42e56a41f74a9aafdfa9",
+        "bytes": 1121
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-help-3377152159/normalized.json",
+        "sha256": "5275d046905fe778de89f48fd9869f4f8e6c3614e6292cd9d9a3bb551c116e4f",
+        "bytes": 1091
+      },
+      "expected": {
+        "path": "tests/compat/stage3-i1/expected/inputs-channel-help.json",
+        "sha256": "5275d046905fe778de89f48fd9869f4f8e6c3614e6292cd9d9a3bb551c116e4f"
+      },
+      "expected_fixture_sha256": "5c648909eb12ffedfcd55cdee4916e840fba177ae93ecce4019c333d6e465328",
+      "expected_is_original_verbatim": true,
+      "fixture_delta": "none; verbatim original source case",
+      "exit": 0,
+      "event_count": 0,
+      "expected_alias": {
+        "path": "tests/compat/stage3-i1/fixtures/UNACCEPTED-inputs-channel-help.json",
+        "lstat_mode": "0o120777",
+        "type": "symlink",
+        "readlink": "../expected/inputs-channel-help.json",
+        "resolved_path": "tests/compat/stage3-i1/expected/inputs-channel-help.json",
+        "resolved_sha256": "5275d046905fe778de89f48fd9869f4f8e6c3614e6292cd9d9a3bb551c116e4f"
+      }
+    },
+    {
+      "id": "inputs-channel-literal-repeated",
+      "source_case": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/cases/inputs-channel-literal-repeated.json",
+        "sha256": "807aba65fff8b6fe7d9ee048e4c53ebb780b79ddce75b60d751e7ed42ce3f0cf",
+        "bytes": 3954
+      },
+      "fixture": {
+        "path": "tests/compat/stage3-i1/fixtures/inputs-channel-literal-repeated.json",
+        "sha256": "807aba65fff8b6fe7d9ee048e4c53ebb780b79ddce75b60d751e7ed42ce3f0cf",
+        "bytes": 3954
+      },
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-literal-repeated-3913152539/raw.json",
+        "sha256": "a502b4db40805e3a16550b1de48967f6923339ad41e4c605de04660dc33cecc3",
+        "bytes": 8056
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-literal-repeated-3913152539/normalized.json",
+        "sha256": "4c0c71e8f9cbbfe0c7596c278f9afa7d34ba6bd8a90b098fdcfb6090aa6055bd",
+        "bytes": 6094
+      },
+      "expected": {
+        "path": "tests/compat/stage3-i1/expected/inputs-channel-literal-repeated.json",
+        "sha256": "4c0c71e8f9cbbfe0c7596c278f9afa7d34ba6bd8a90b098fdcfb6090aa6055bd"
+      },
+      "expected_fixture_sha256": "807aba65fff8b6fe7d9ee048e4c53ebb780b79ddce75b60d751e7ed42ce3f0cf",
+      "expected_is_original_verbatim": true,
+      "fixture_delta": "none; verbatim original source case",
+      "exit": 0,
+      "event_count": 3,
+      "expected_alias": {
+        "path": "tests/compat/stage3-i1/fixtures/UNACCEPTED-inputs-channel-literal-repeated.json",
+        "lstat_mode": "0o120777",
+        "type": "symlink",
+        "readlink": "../expected/inputs-channel-literal-repeated.json",
+        "resolved_path": "tests/compat/stage3-i1/expected/inputs-channel-literal-repeated.json",
+        "resolved_sha256": "4c0c71e8f9cbbfe0c7596c278f9afa7d34ba6bd8a90b098fdcfb6090aa6055bd"
+      }
+    },
+    {
+      "id": "inputs-channel-missing-flake",
+      "source_case": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/cases/inputs-channel-missing-flake.json",
+        "sha256": "f64058a4840289b2ffbc34680390d4394737978ca09687569964d25394bb8af7",
+        "bytes": 2520
+      },
+      "fixture": {
+        "path": "tests/compat/stage3-i1/fixtures/inputs-channel-missing-flake.json",
+        "sha256": "f64058a4840289b2ffbc34680390d4394737978ca09687569964d25394bb8af7",
+        "bytes": 2520
+      },
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-missing-flake-419258623/raw.json",
+        "sha256": "504edf575598c3021addf5290314e8c49a667afc1ad3831fd698803f8eb89d6a",
+        "bytes": 3824
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-missing-flake-419258623/normalized.json",
+        "sha256": "4563a3277e3311fce4124bb885eda6db89ec359a038e4992e74bdc679a5ccf55",
+        "bytes": 3536
+      },
+      "expected": {
+        "path": "tests/compat/stage3-i1/expected/inputs-channel-missing-flake.json",
+        "sha256": "4563a3277e3311fce4124bb885eda6db89ec359a038e4992e74bdc679a5ccf55"
+      },
+      "expected_fixture_sha256": "f64058a4840289b2ffbc34680390d4394737978ca09687569964d25394bb8af7",
+      "expected_is_original_verbatim": true,
+      "fixture_delta": "none; verbatim original source case",
+      "exit": 1,
+      "event_count": 0,
+      "expected_alias": {
+        "path": "tests/compat/stage3-i1/fixtures/UNACCEPTED-inputs-channel-missing-flake.json",
+        "lstat_mode": "0o120777",
+        "type": "symlink",
+        "readlink": "../expected/inputs-channel-missing-flake.json",
+        "resolved_path": "tests/compat/stage3-i1/expected/inputs-channel-missing-flake.json",
+        "resolved_sha256": "4563a3277e3311fce4124bb885eda6db89ec359a038e4992e74bdc679a5ccf55"
+      }
+    },
+    {
+      "id": "inputs-channel-nonobject",
+      "source_case": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/cases/inputs-channel-nonobject.json",
+        "sha256": "f0da3da26cd89b75b4790a9c7fd993aa8b9fca2040081b46f7514c7dac29ec54",
+        "bytes": 3787
+      },
+      "fixture": {
+        "path": "tests/compat/stage3-i1/fixtures/inputs-channel-nonobject.json",
+        "sha256": "f0da3da26cd89b75b4790a9c7fd993aa8b9fca2040081b46f7514c7dac29ec54",
+        "bytes": 3787
+      },
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-nonobject-4163750161/raw.json",
+        "sha256": "e7581fb9c8d44f5a7b8cfd7fb4beb237a9e6bfdbb36594876da85af8be592027",
+        "bytes": 7352
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-nonobject-4163750161/normalized.json",
+        "sha256": "434a35ac7a50ed3d1d50a9d4053ecb095d5a51af53fa407f14382b851e1f81d0",
+        "bytes": 5495
+      },
+      "expected": {
+        "path": "tests/compat/stage3-i1/expected/inputs-channel-nonobject.json",
+        "sha256": "434a35ac7a50ed3d1d50a9d4053ecb095d5a51af53fa407f14382b851e1f81d0"
+      },
+      "expected_fixture_sha256": "f0da3da26cd89b75b4790a9c7fd993aa8b9fca2040081b46f7514c7dac29ec54",
+      "expected_is_original_verbatim": true,
+      "fixture_delta": "none; verbatim original source case",
+      "exit": 0,
+      "event_count": 3,
+      "expected_alias": {
+        "path": "tests/compat/stage3-i1/fixtures/UNACCEPTED-inputs-channel-nonobject.json",
+        "lstat_mode": "0o120777",
+        "type": "symlink",
+        "readlink": "../expected/inputs-channel-nonobject.json",
+        "resolved_path": "tests/compat/stage3-i1/expected/inputs-channel-nonobject.json",
+        "resolved_sha256": "434a35ac7a50ed3d1d50a9d4053ecb095d5a51af53fa407f14382b851e1f81d0"
+      }
+    },
+    {
+      "id": "inputs-channel-pattern",
+      "source_case": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/cases/inputs-channel-pattern.json",
+        "sha256": "5fecdd5fa1139a60566b3cecddf911e8313e5a040e2186bbb0f45933254722e8",
+        "bytes": 3911
+      },
+      "fixture": {
+        "path": "tests/compat/stage3-i1/fixtures/inputs-channel-pattern.json",
+        "sha256": "5fecdd5fa1139a60566b3cecddf911e8313e5a040e2186bbb0f45933254722e8",
+        "bytes": 3911
+      },
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-pattern-1338888601/raw.json",
+        "sha256": "36922c0a79a061adef11ab520107681592de80726e78d0c90fc38ae72ba181f5",
+        "bytes": 7574
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-pattern-1338888601/normalized.json",
+        "sha256": "7c78fbc50bbccccfc53601ed55fa57f50a3c8ff9aeac5d24b679968f5ad0553d",
+        "bytes": 5747
+      },
+      "expected": {
+        "path": "tests/compat/stage3-i1/expected/inputs-channel-pattern.json",
+        "sha256": "7c78fbc50bbccccfc53601ed55fa57f50a3c8ff9aeac5d24b679968f5ad0553d"
+      },
+      "expected_fixture_sha256": "5fecdd5fa1139a60566b3cecddf911e8313e5a040e2186bbb0f45933254722e8",
+      "expected_is_original_verbatim": true,
+      "fixture_delta": "none; verbatim original source case",
+      "exit": 0,
+      "event_count": 3,
+      "expected_alias": {
+        "path": "tests/compat/stage3-i1/fixtures/UNACCEPTED-inputs-channel-pattern.json",
+        "lstat_mode": "0o120777",
+        "type": "symlink",
+        "readlink": "../expected/inputs-channel-pattern.json",
+        "resolved_path": "tests/compat/stage3-i1/expected/inputs-channel-pattern.json",
+        "resolved_sha256": "7c78fbc50bbccccfc53601ed55fa57f50a3c8ff9aeac5d24b679968f5ad0553d"
+      }
+    },
+    {
+      "id": "inputs-channel-sorted",
+      "source_case": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/cases/inputs-channel-sorted.json",
+        "sha256": "6f89b97552f8f50b0674736f884189eecb3f0d15c265ea90589c98f102c013d6",
+        "bytes": 3899
+      },
+      "fixture": {
+        "path": "tests/compat/stage3-i1/fixtures/inputs-channel-sorted.json",
+        "sha256": "6f89b97552f8f50b0674736f884189eecb3f0d15c265ea90589c98f102c013d6",
+        "bytes": 3899
+      },
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-sorted-1065619431/raw.json",
+        "sha256": "b5540977e9812da324cfae53a6ef370c0bf637c76a6a26aa1377780683e1f32d",
+        "bytes": 7716
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-channel-sorted-1065619431/normalized.json",
+        "sha256": "51ef6fd76dce4803af2ef778130d227424dd7349e862e21af40ff2919edfdd70",
+        "bytes": 5904
+      },
+      "expected": {
+        "path": "tests/compat/stage3-i1/expected/inputs-channel-sorted.json",
+        "sha256": "51ef6fd76dce4803af2ef778130d227424dd7349e862e21af40ff2919edfdd70"
+      },
+      "expected_fixture_sha256": "6f89b97552f8f50b0674736f884189eecb3f0d15c265ea90589c98f102c013d6",
+      "expected_is_original_verbatim": true,
+      "fixture_delta": "none; verbatim original source case",
+      "exit": 0,
+      "event_count": 3,
+      "expected_alias": {
+        "path": "tests/compat/stage3-i1/fixtures/UNACCEPTED-inputs-channel-sorted.json",
+        "lstat_mode": "0o120777",
+        "type": "symlink",
+        "readlink": "../expected/inputs-channel-sorted.json",
+        "resolved_path": "tests/compat/stage3-i1/expected/inputs-channel-sorted.json",
+        "resolved_sha256": "51ef6fd76dce4803af2ef778130d227424dd7349e862e21af40ff2919edfdd70"
+      }
+    },
+    {
+      "id": "inputs-root-corrupt-lock",
+      "source_case": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/cases/inputs-root-corrupt-lock.json",
+        "sha256": "f6b97d21814534f126f074bbfdf2280ddbb0dec2b4788c46c97a6e215de819e7",
+        "bytes": 1695
+      },
+      "fixture": {
+        "path": "tests/compat/stage3-i1/fixtures/inputs-root-corrupt-lock.json",
+        "sha256": "f6b97d21814534f126f074bbfdf2280ddbb0dec2b4788c46c97a6e215de819e7",
+        "bytes": 1695
+      },
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-corrupt-lock-1724762170/raw.json",
+        "sha256": "6732b2effaa9df0ab90fc4e9a63d473476f425bc464c7d85d3bb4b462117f924",
+        "bytes": 1987
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-corrupt-lock-1724762170/normalized.json",
+        "sha256": "9f035bac1b6b3ae2641df4de3a96f0745f78853606d25a95c927b1f2e79444b9",
+        "bytes": 1824
+      },
+      "expected": {
+        "path": "tests/compat/stage3-i1/expected/inputs-root-corrupt-lock.json",
+        "sha256": "9f035bac1b6b3ae2641df4de3a96f0745f78853606d25a95c927b1f2e79444b9"
+      },
+      "expected_fixture_sha256": "f6b97d21814534f126f074bbfdf2280ddbb0dec2b4788c46c97a6e215de819e7",
+      "expected_is_original_verbatim": true,
+      "fixture_delta": "none; verbatim original source case",
+      "exit": 1,
+      "event_count": 0,
+      "expected_alias": {
+        "path": "tests/compat/stage3-i1/fixtures/UNACCEPTED-inputs-root-corrupt-lock.json",
+        "lstat_mode": "0o120777",
+        "type": "symlink",
+        "readlink": "../expected/inputs-root-corrupt-lock.json",
+        "resolved_path": "tests/compat/stage3-i1/expected/inputs-root-corrupt-lock.json",
+        "resolved_sha256": "9f035bac1b6b3ae2641df4de3a96f0745f78853606d25a95c927b1f2e79444b9"
+      }
+    },
+    {
+      "id": "inputs-root-default",
+      "source_case": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/cases/inputs-root-default.json",
+        "sha256": "e2d0059c95d30e7975e658685b5f227098631f4ff7a7b60b280a86ca7e059025",
+        "bytes": 2514
+      },
+      "fixture": {
+        "path": "tests/compat/stage3-i1/fixtures/inputs-root-default.json",
+        "sha256": "e2d0059c95d30e7975e658685b5f227098631f4ff7a7b60b280a86ca7e059025",
+        "bytes": 2514
+      },
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-default-2418121093/raw.json",
+        "sha256": "ad90f9c85921d3a4da49051f73bce76bdf377b79e6d2a37ff6944c18576af685",
+        "bytes": 3377
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-default-2418121093/normalized.json",
+        "sha256": "da58ec789f43163644fca75f342b774bac7dd9cb5195f6a6e78d154b41eab7a2",
+        "bytes": 3347
+      },
+      "expected": {
+        "path": "tests/compat/stage3-i1/expected/inputs-root-default.json",
+        "sha256": "da58ec789f43163644fca75f342b774bac7dd9cb5195f6a6e78d154b41eab7a2"
+      },
+      "expected_fixture_sha256": "e2d0059c95d30e7975e658685b5f227098631f4ff7a7b60b280a86ca7e059025",
+      "expected_is_original_verbatim": true,
+      "fixture_delta": "none; verbatim original source case",
+      "exit": 0,
+      "event_count": 0,
+      "expected_alias": {
+        "path": "tests/compat/stage3-i1/fixtures/UNACCEPTED-inputs-root-default.json",
+        "lstat_mode": "0o120777",
+        "type": "symlink",
+        "readlink": "../expected/inputs-root-default.json",
+        "resolved_path": "tests/compat/stage3-i1/expected/inputs-root-default.json",
+        "resolved_sha256": "da58ec789f43163644fca75f342b774bac7dd9cb5195f6a6e78d154b41eab7a2"
+      }
+    },
+    {
+      "id": "inputs-root-empty",
+      "source_case": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/cases/inputs-root-empty.json",
+        "sha256": "a98935ae3062b52ec5ff6c5e599344bc5a5b09f0d553b63ca485294f03722342",
+        "bytes": 1711
+      },
+      "fixture": {
+        "path": "tests/compat/stage3-i1/fixtures/inputs-root-empty.json",
+        "sha256": "a98935ae3062b52ec5ff6c5e599344bc5a5b09f0d553b63ca485294f03722342",
+        "bytes": 1711
+      },
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-empty-2175046919/raw.json",
+        "sha256": "4df52e0d62e9ca7a72819755d47b1a4fd46e625fed25345cbf3188b4b3f34a8c",
+        "bytes": 1460
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-empty-2175046919/normalized.json",
+        "sha256": "91a4e6ed3264571f20a3f32fc9d3a2dad1d0bef4959ce9e479a6df88b77ea7c4",
+        "bytes": 1431
+      },
+      "expected": {
+        "path": "tests/compat/stage3-i1/expected/inputs-root-empty.json",
+        "sha256": "91a4e6ed3264571f20a3f32fc9d3a2dad1d0bef4959ce9e479a6df88b77ea7c4"
+      },
+      "expected_fixture_sha256": "a98935ae3062b52ec5ff6c5e599344bc5a5b09f0d553b63ca485294f03722342",
+      "expected_is_original_verbatim": true,
+      "fixture_delta": "none; verbatim original source case",
+      "exit": 0,
+      "event_count": 0,
+      "expected_alias": {
+        "path": "tests/compat/stage3-i1/fixtures/UNACCEPTED-inputs-root-empty.json",
+        "lstat_mode": "0o120777",
+        "type": "symlink",
+        "readlink": "../expected/inputs-root-empty.json",
+        "resolved_path": "tests/compat/stage3-i1/expected/inputs-root-empty.json",
+        "resolved_sha256": "91a4e6ed3264571f20a3f32fc9d3a2dad1d0bef4959ce9e479a6df88b77ea7c4"
+      }
+    },
+    {
+      "id": "inputs-root-extra",
+      "source_case": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/cases/inputs-root-extra.json",
+        "sha256": "dc5e92065a94792d79c98c2bbff6adfaf52de09e880c3960640d6afcc7f37a04",
+        "bytes": 2548
+      },
+      "fixture": {
+        "path": "tests/compat/stage3-i1/fixtures/inputs-root-extra.json",
+        "sha256": "dc5e92065a94792d79c98c2bbff6adfaf52de09e880c3960640d6afcc7f37a04",
+        "bytes": 2548
+      },
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-extra-969848093/raw.json",
+        "sha256": "78e787cb0edde237e1ed87531da58732d8c0303aa1ef16a4319bfeaeb02a288b",
+        "bytes": 3323
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-extra-969848093/normalized.json",
+        "sha256": "651c98254b8aed85f61750459f08d4c3c2bc9e89328de231dc9d57f1d9e512d6",
+        "bytes": 3294
+      },
+      "expected": {
+        "path": "tests/compat/stage3-i1/expected/inputs-root-extra.json",
+        "sha256": "651c98254b8aed85f61750459f08d4c3c2bc9e89328de231dc9d57f1d9e512d6"
+      },
+      "expected_fixture_sha256": "dc5e92065a94792d79c98c2bbff6adfaf52de09e880c3960640d6afcc7f37a04",
+      "expected_is_original_verbatim": true,
+      "fixture_delta": "none; verbatim original source case",
+      "exit": 0,
+      "event_count": 0,
+      "expected_alias": {
+        "path": "tests/compat/stage3-i1/fixtures/UNACCEPTED-inputs-root-extra.json",
+        "lstat_mode": "0o120777",
+        "type": "symlink",
+        "readlink": "../expected/inputs-root-extra.json",
+        "resolved_path": "tests/compat/stage3-i1/expected/inputs-root-extra.json",
+        "resolved_sha256": "651c98254b8aed85f61750459f08d4c3c2bc9e89328de231dc9d57f1d9e512d6"
+      }
+    },
+    {
+      "id": "inputs-root-help",
+      "source_case": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/cases/inputs-root-help.json",
+        "sha256": "2188c6ba9838f000d0c4892435480e44b7a57ecd7a1399d367d0ef269059a416",
+        "bytes": 1572
+      },
+      "fixture": {
+        "path": "tests/compat/stage3-i1/fixtures/inputs-root-help.json",
+        "sha256": "2188c6ba9838f000d0c4892435480e44b7a57ecd7a1399d367d0ef269059a416",
+        "bytes": 1572
+      },
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-help-131830791/raw.json",
+        "sha256": "2c4062e8282625a96f5526a95ee4b55239e30e5e4aa5075c3b3ee1c055d7926d",
+        "bytes": 1083
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-help-131830791/normalized.json",
+        "sha256": "b1260507583a85289f81018dbb0c59a9220ae2bde6942896cb84f00f237ddc6c",
+        "bytes": 1053
+      },
+      "expected": {
+        "path": "tests/compat/stage3-i1/expected/inputs-root-help.json",
+        "sha256": "b1260507583a85289f81018dbb0c59a9220ae2bde6942896cb84f00f237ddc6c"
+      },
+      "expected_fixture_sha256": "2188c6ba9838f000d0c4892435480e44b7a57ecd7a1399d367d0ef269059a416",
+      "expected_is_original_verbatim": true,
+      "fixture_delta": "none; verbatim original source case",
+      "exit": 0,
+      "event_count": 0,
+      "expected_alias": {
+        "path": "tests/compat/stage3-i1/fixtures/UNACCEPTED-inputs-root-help.json",
+        "lstat_mode": "0o120777",
+        "type": "symlink",
+        "readlink": "../expected/inputs-root-help.json",
+        "resolved_path": "tests/compat/stage3-i1/expected/inputs-root-help.json",
+        "resolved_sha256": "b1260507583a85289f81018dbb0c59a9220ae2bde6942896cb84f00f237ddc6c"
+      }
+    },
+    {
+      "id": "inputs-root-missing-lock",
+      "source_case": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/cases/inputs-root-missing-lock.json",
+        "sha256": "abed4c0d6e68b0482f1634f2b2e2d5ca0c8c2675cdad722126b8af0a4ddcd9e3",
+        "bytes": 1641
+      },
+      "fixture": {
+        "path": "tests/compat/stage3-i1/fixtures/inputs-root-missing-lock.json",
+        "sha256": "abed4c0d6e68b0482f1634f2b2e2d5ca0c8c2675cdad722126b8af0a4ddcd9e3",
+        "bytes": 1641
+      },
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-missing-lock-1631973290/raw.json",
+        "sha256": "1fc36ac975252c42ad54ecfd1b7079f6bd76335f69b622f861c7b45555a26f21",
+        "bytes": 1974
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-missing-lock-1631973290/normalized.json",
+        "sha256": "ff071a5bcee3a07db6ec38c9b4b05f7522362a33d2609526a6659f9c9c3e9db0",
+        "bytes": 1691
+      },
+      "expected": {
+        "path": "tests/compat/stage3-i1/expected/inputs-root-missing-lock.json",
+        "sha256": "ff071a5bcee3a07db6ec38c9b4b05f7522362a33d2609526a6659f9c9c3e9db0"
+      },
+      "expected_fixture_sha256": "abed4c0d6e68b0482f1634f2b2e2d5ca0c8c2675cdad722126b8af0a4ddcd9e3",
+      "expected_is_original_verbatim": true,
+      "fixture_delta": "none; verbatim original source case",
+      "exit": 1,
+      "event_count": 0,
+      "expected_alias": {
+        "path": "tests/compat/stage3-i1/fixtures/UNACCEPTED-inputs-root-missing-lock.json",
+        "lstat_mode": "0o120777",
+        "type": "symlink",
+        "readlink": "../expected/inputs-root-missing-lock.json",
+        "resolved_path": "tests/compat/stage3-i1/expected/inputs-root-missing-lock.json",
+        "resolved_sha256": "ff071a5bcee3a07db6ec38c9b4b05f7522362a33d2609526a6659f9c9c3e9db0"
+      }
+    },
+    {
+      "id": "inputs-root-pattern",
+      "source_case": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-characterization-cases-v1/cases/inputs-root-pattern.json",
+        "sha256": "bd150d0f05b7cce8daac22a5cab2a2eab5a9207b56060c29867f0df5dc02f944",
+        "bytes": 2537
+      },
+      "fixture": {
+        "path": "tests/compat/stage3-i1/fixtures/inputs-root-pattern.json",
+        "sha256": "bd150d0f05b7cce8daac22a5cab2a2eab5a9207b56060c29867f0df5dc02f944",
+        "bytes": 2537
+      },
+      "raw": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-pattern-3224011257/raw.json",
+        "sha256": "423a647236f9e05af24396b3ab04bfa6e85419ca191f8e8df5cb005f7fb4fe2b",
+        "bytes": 3212
+      },
+      "normalized": {
+        "path": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i1-original-observations-v1/inputs-root-pattern-3224011257/normalized.json",
+        "sha256": "9526317771597d4434d27febcea38c808244a2bc363eee6f8812af11309d59a8",
+        "bytes": 3182
+      },
+      "expected": {
+        "path": "tests/compat/stage3-i1/expected/inputs-root-pattern.json",
+        "sha256": "9526317771597d4434d27febcea38c808244a2bc363eee6f8812af11309d59a8"
+      },
+      "expected_fixture_sha256": "bd150d0f05b7cce8daac22a5cab2a2eab5a9207b56060c29867f0df5dc02f944",
+      "expected_is_original_verbatim": true,
+      "fixture_delta": "none; verbatim original source case",
+      "exit": 0,
+      "event_count": 0,
+      "expected_alias": {
+        "path": "tests/compat/stage3-i1/fixtures/UNACCEPTED-inputs-root-pattern.json",
+        "lstat_mode": "0o120777",
+        "type": "symlink",
+        "readlink": "../expected/inputs-root-pattern.json",
+        "resolved_path": "tests/compat/stage3-i1/expected/inputs-root-pattern.json",
+        "resolved_sha256": "9526317771597d4434d27febcea38c808244a2bc363eee6f8812af11309d59a8"
+      }
+    }
+  ],
+  "excluded_machine_cases": [
+    "inputs-machine-boundary-key",
+    "inputs-machine-boundary-missing-role",
+    "inputs-machine-boundary-name",
+    "inputs-machine-boundary-unknown"
+  ],
+  "limits": [
+    "fake external tools establish original CLI boundary only",
+    "machine mutations unavailable in I1; injected exit73 is not real update coverage",
+    "no Go parity, package, runtime, performance or replacement acceptance"
+  ],
+  "fixture_layout": "Original source-case bytes and historical literal UNACCEPTED expected names are preserved. Those names are relative accepted-reference aliases to the owning canonical expected records; no source/reference/normalizer rewrite.",
+  "case_selector": "tests/compat/stage3-i1/fixtures/inputs-*.json",
+  "selector_proof": {
+    "count": 15,
+    "ids": [
+      "inputs-channel-empty",
+      "inputs-channel-extra",
+      "inputs-channel-help",
+      "inputs-channel-literal-repeated",
+      "inputs-channel-missing-flake",
+      "inputs-channel-nonobject",
+      "inputs-channel-pattern",
+      "inputs-channel-sorted",
+      "inputs-root-corrupt-lock",
+      "inputs-root-default",
+      "inputs-root-empty",
+      "inputs-root-extra",
+      "inputs-root-help",
+      "inputs-root-missing-lock",
+      "inputs-root-pattern"
+    ],
+    "alias_paths_selected": 0
+  }
+}

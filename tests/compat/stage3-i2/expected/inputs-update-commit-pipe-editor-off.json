@@ -1,0 +1,110 @@
+{
+  "config_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i2-original-observations-v2/inputs-update-commit-pipe-editor-off-1580838664/config",
+  "run_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i2-original-observations-v2/inputs-update-commit-pipe-editor-off-1580838664",
+  "schema": 1,
+  "case": "inputs-update-commit-pipe-editor-off",
+  "executable": "/nix/store/x96jzlpaq69bkdardsn56px7czybkbs8-confctl/bin/confctl",
+  "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de",
+  "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "fixture_sha256": "043823b0085a6ba85403ae688ba0d68219aebe434a6d56d9d12d8d9f76214107",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "stdout": "fixture git stdout\nUpdated inputs (1):\n  a: 11111111 -\u003e 22222222\n",
+  "stderr": "fixture git stderr\n",
+  "exit": 0,
+  "before": {
+    "flake.lock": {
+      "text": "{\"version\":7,\"root\":\"not-authoritative\",\"nodes\":{\"root\":{\"inputs\":{\"z\":\"node-z\",\"b\":\"node-b\",\"a\":[\"node-a\",\"ignored-follow\"]}},\"node-a\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"rev\":\"1111111111111111111111111111111111111111\"}},\"node-b\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"rev\":\"1111111111111111111111111111111111111111\"}},\"node-z\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"rev\":\"1111111111111111111111111111111111111111\"}}},\"fixtureUnknown\":{\"keep\":[null,false,\"untouched\"]}}\n",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "after": {
+    ".confctl": {
+      "mode": 2147484141
+    },
+    ".confctl/logs": {
+      "mode": 2147484141
+    },
+    "flake.lock": {
+      "text": "{\"version\":7,\"root\":\"not-authoritative\",\"nodes\":{\"root\":{\"inputs\":{\"z\":\"node-z\",\"b\":\"node-b\",\"a\":[\"node-a\",\"ignored-follow\"]}},\"node-a\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"rev\":\"2222222222222222222222222222222222222222\"}},\"node-b\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"rev\":\"1111111111111111111111111111111111111111\"}},\"node-z\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"rev\":\"1111111111111111111111111111111111111111\"}}},\"fixtureUnknown\":{\"keep\":[null,false,\"untouched\"]}}\n",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "events": [
+    {
+      "occurrence": 1,
+      "stdout": "",
+      "stderr": "",
+      "stdin_mode": "empty-open",
+      "tool": "nix",
+      "argv": [
+        "flake",
+        "update",
+        "a"
+      ],
+      "env": {
+        "COMPAT_CASE": "${RUN_ROOT}/case.json",
+        "CONFCTL_MAX_JOBS": "",
+        "CONFCTL_SSH_CONFIG": "",
+        "HOME": "${RUN_ROOT}/home",
+        "NIX_SSHOPTS": "",
+        "PWD": "${ROOT}",
+        "TMPDIR": "${RUN_ROOT}/tmp"
+      },
+      "stdin": "",
+      "cwd": "${ROOT}",
+      "pid": 0,
+      "start_ns": 0,
+      "end_ns": 0,
+      "exit": 0,
+      "rule": 0,
+      "writes": {
+        "flake.lock": {
+          "text": "{\"version\":7,\"root\":\"not-authoritative\",\"nodes\":{\"root\":{\"inputs\":{\"z\":\"node-z\",\"b\":\"node-b\",\"a\":[\"node-a\",\"ignored-follow\"]}},\"node-a\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"rev\":\"2222222222222222222222222222222222222222\"}},\"node-b\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"rev\":\"1111111111111111111111111111111111111111\"}},\"node-z\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"rev\":\"1111111111111111111111111111111111111111\"}}},\"fixtureUnknown\":{\"keep\":[null,false,\"untouched\"]}}\n"
+        }
+      }
+    },
+    {
+      "occurrence": 1,
+      "stdout": "fixture git stdout\n",
+      "stderr": "fixture git stderr\n",
+      "stdin_mode": "empty-eof",
+      "tool": "git",
+      "argv": [
+        "commit",
+        "-m",
+        "inputs: update a to 22222222\n\na: 11111111 -\u003e 22222222",
+        "flake.lock"
+      ],
+      "env": {
+        "COMPAT_CASE": "${RUN_ROOT}/case.json",
+        "CONFCTL_MAX_JOBS": "",
+        "CONFCTL_SSH_CONFIG": "",
+        "HOME": "${RUN_ROOT}/home",
+        "NIX_SSHOPTS": "",
+        "PWD": "${ROOT}",
+        "TMPDIR": "${RUN_ROOT}/tmp"
+      },
+      "stdin": "",
+      "cwd": "${ROOT}",
+      "pid": 0,
+      "start_ns": 0,
+      "end_ns": 0,
+      "exit": 0,
+      "rule": 1
+    }
+  ],
+  "git_before": {},
+  "git_after": {},
+  "wall_ns": 0,
+  "user_ns": 0,
+  "system_ns": 0,
+  "max_rss_kb": 0
+}

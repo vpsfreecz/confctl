@@ -1,0 +1,41 @@
+{
+  "config_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i2-original-observations-v2/inputs-update-channel-help-1372610028/config",
+  "run_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage3-i2-original-observations-v2/inputs-update-channel-help-1372610028",
+  "schema": 1,
+  "case": "inputs-update-channel-help",
+  "executable": "/nix/store/x96jzlpaq69bkdardsn56px7czybkbs8-confctl/bin/confctl",
+  "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de",
+  "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "fixture_sha256": "4a8dae18040fc5c5ca33e0dc21364ba36eacd15566c10460df91c730e09983ba",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "stdout": "NAME\n    update - Update inputs referenced by channels (optionally only a single\n             role)\n\nSYNOPSIS\n\n    confctl [global options] inputs channel update [command options] \u003cchannels\u003e [role]\n\nCOMMAND OPTIONS\n    --[no-]changelog     - (default: enabled)\n    --[no-]commit        - \n    -d, --[no-]downgrade - \n    --[no-]editor        - (default: enabled)\n\n",
+  "stderr": "",
+  "exit": 0,
+  "before": {
+    "flake.lock": {
+      "text": "{\"version\":7,\"root\":\"not-authoritative\",\"nodes\":{\"root\":{\"inputs\":{\"z\":\"node-z\",\"b\":\"node-b\",\"a\":[\"node-a\",\"ignored-follow\"]}},\"node-a\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"rev\":\"1111111111111111111111111111111111111111\"}},\"node-b\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"rev\":\"1111111111111111111111111111111111111111\"}},\"node-z\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"rev\":\"1111111111111111111111111111111111111111\"}}},\"fixtureUnknown\":{\"keep\":[null,false,\"untouched\"]}}\n",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "after": {
+    "flake.lock": {
+      "text": "{\"version\":7,\"root\":\"not-authoritative\",\"nodes\":{\"root\":{\"inputs\":{\"z\":\"node-z\",\"b\":\"node-b\",\"a\":[\"node-a\",\"ignored-follow\"]}},\"node-a\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository\",\"rev\":\"1111111111111111111111111111111111111111\"}},\"node-b\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/repository/\",\"rev\":\"1111111111111111111111111111111111111111\"}},\"node-z\":{\"original\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"ref\":\"main\"},\"locked\":{\"type\":\"git\",\"url\":\"https://example.invalid/other\",\"rev\":\"1111111111111111111111111111111111111111\"}}},\"fixtureUnknown\":{\"keep\":[null,false,\"untouched\"]}}\n",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{ outputs = _: {}; }\n",
+      "mode": 420
+    }
+  },
+  "events": null,
+  "git_before": {},
+  "git_after": {},
+  "wall_ns": 0,
+  "user_ns": 0,
+  "system_ns": 0,
+  "max_rss_kb": 0
+}

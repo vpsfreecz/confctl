@@ -54,6 +54,7 @@ func namedOption(specs []OptionSpec, name string, short bool) (OptionSpec, bool,
 // scanOptions is one ordered pass. A positional or -- makes the entire tail literal.
 func scanOptions(specs []OptionSpec, argv []string, stopVersion bool) (map[string]ParsedValue, []string, error) {
 	values := defaults(specs)
+	encounter := 0
 	for i := 0; i < len(argv); i++ {
 		token := argv[i]
 		if stopVersion && token == "--version" {
@@ -98,7 +99,12 @@ func scanOptions(specs []OptionSpec, argv []string, stopVersion bool) (map[strin
 				prior.Strings = append(prior.Strings, text)
 				v = prior
 			}
-			values[s.Key] = ParsedValue{Value: v, Present: true}
+			encounter++
+			first := values[s.Key].FirstEncounter
+			if first == 0 {
+				first = encounter
+			}
+			values[s.Key] = ParsedValue{Value: v, Present: true, FirstEncounter: first}
 			return nil
 		}
 		if strings.HasPrefix(token, "--") {

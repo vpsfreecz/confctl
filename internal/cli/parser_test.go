@@ -213,7 +213,108 @@ func TestNestedHelpAndAvailability(t *testing.T) {
 		t.Fatal(group, err)
 	}
 	text, _ := r.Help(group.HelpPath, 80)
-	if !strings.Contains(text, "Unavailable") {
+	if strings.Contains(text, "Unavailable") || strings.Count(text, "(Available)") != 3 {
 		t.Fatal(text)
+	}
+}
+
+func TestInputsOptionFirstEncounterAndFinalValue(t *testing.T) {
+	r := BuiltinRegistry()
+	type explicit struct {
+		first int
+		value bool
+	}
+	for _, tc := range []struct {
+		flags []string
+		want  map[string]explicit
+	}{
+		{[]string{"--all", "--editor", "-d", "--commit", "--no-all", "--no-downgrade", "--no-commit"}, map[string]explicit{"all": {1, false}, "editor": {2, true}, "downgrade": {3, false}, "commit": {4, false}}},
+		{[]string{"--downgrade", "--no-editor", "--all", "-d", "--no-changelog", "--no-downgrade", "--editor"}, map[string]explicit{"downgrade": {1, false}, "editor": {2, true}, "all": {3, true}, "changelog": {5, false}}},
+		{[]string{"-d", "--no-downgrade", "--commit", "--all", "--no-commit"}, map[string]explicit{"downgrade": {1, false}, "commit": {3, false}, "all": {4, true}}},
+	} {
+		argv := append(append([]string{"inputs", "update"}, tc.flags...), "a")
+		inv, err := r.Parse(argv)
+		if err != nil {
+			t.Fatal(argv, err)
+		}
+		for key, parsed := range inv.Options {
+			want, present := tc.want[key]
+			if parsed.FirstEncounter != want.first || parsed.Present != present || present && parsed.Value.Bool != want.value {
+				t.Fatal(argv, key, parsed, want)
+			}
+		}
+		// Invocation metadata belongs to this parse, including its scalar ordinal.
+		all := inv.Options["all"]
+		all.FirstEncounter = 99
+		all.Value.Bool = !all.Value.Bool
+		inv.Options["all"] = all
+		inv.Command.Options[0].Names[0] = "changed"
+		fresh, err := r.Parse(argv)
+		want := tc.want["all"]
+		if err != nil || fresh.Options["all"].FirstEncounter != want.first || fresh.Options["all"].Value.Bool != want.value || fresh.Command.Options[0].Names[0] == "changed" {
+			t.Fatal("parse metadata leaked", fresh, err)
+		}
+	}
+	defaults, err := r.Parse([]string{"inputs", "update", "a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, spec := range defaults.Command.Options {
+		parsed := defaults.Options[spec.Key]
+		if parsed.Present || parsed.FirstEncounter != 0 || parsed.Value.Bool != spec.Default.Bool {
+			t.Fatal("default acquired insertion metadata", spec.Key, parsed)
+		}
+	}
+}
+
+func TestOptionFirstEncounterOnlySuccessfulCallbacks(t *testing.T) {
+	r := BuiltinRegistry()
+	inv, err := r.Parse([]string{"health-check", "--yes", "--max-jobs=bad"})
+	if err == nil || inv.Options["yes"].FirstEncounter != 1 || !inv.Options["yes"].Present || inv.Options["max-jobs"].FirstEncounter != 0 || inv.Options["max-jobs"].Present {
+		t.Fatal("failed conversion inserted option", inv, err)
+	}
+	inv, err = r.Parse([]string{"inputs", "update", "--commit", "--commit=bad"})
+	if err == nil || inv.Options["commit"].FirstEncounter != 1 || !inv.Options["commit"].Value.Bool {
+		t.Fatal("failed repeat changed successful insertion", inv, err)
+	}
+	inv, err = r.Parse([]string{"-cnever", "inputs", "update", "--all", "a"})
+	if err != nil || inv.Globals["color"].FirstEncounter != 1 || inv.Options["all"].FirstEncounter != 1 {
+		t.Fatal("scan counters leaked across globals/command", inv, err)
+	}
+}
+
+func TestInputsSetOptionsAliasesNegationsAndLiteralRevision(t *testing.T) {
+	r := BuiltinRegistry()
+	for _, path := range [][]string{{"inputs", "set"}, {"inputs", "channel", "set"}, {"inputs", "machine", "set"}} {
+		positional := []string{"a", "opaque?/# --rev"}
+		if len(path) == 3 {
+			positional = []string{"a", "os", "opaque?/# --rev"}
+		}
+		inv, err := r.Parse(append(append([]string{}, path...), positional...))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for key, want := range map[string]bool{"commit": false, "changelog": true, "editor": true, "downgrade": false} {
+			p := inv.Options[key]
+			if p.Value.Bool != want || p.Present || p.FirstEncounter != 0 {
+				t.Fatal(path, key, p)
+			}
+		}
+		flags := []string{"--commit", "--no-commit", "--no-changelog", "--no-editor", "-d", "--no-downgrade", "--downgrade"}
+		if pathKey(path) == "inputs channel set" {
+			flags = append(flags, "--allow-shared", "--no-allow_shared", "--allow_shared")
+		}
+		argv := append(append(append([]string{}, path...), flags...), positional...)
+		inv, err = r.Parse(argv)
+		if err != nil || !reflect.DeepEqual(inv.Args, positional) || inv.Options["commit"].Value.Bool || inv.Options["changelog"].Value.Bool || inv.Options["editor"].Value.Bool || !inv.Options["downgrade"].Value.Bool || inv.Options["downgrade"].FirstEncounter != 5 {
+			t.Fatal(argv, inv, err)
+		}
+		if pathKey(path) == "inputs channel set" && !inv.Options["allow_shared"].Value.Bool {
+			t.Fatal(inv)
+		}
+		inv, err = r.Parse(append(append([]string{}, path...), "--", "--help", "--commit", ""))
+		if err != nil || inv.Help || !reflect.DeepEqual(inv.Args, []string{"--help", "--commit", ""}) {
+			t.Fatal("setter parser boundary", inv, err)
+		}
 	}
 }

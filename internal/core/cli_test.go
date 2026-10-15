@@ -335,8 +335,8 @@ func TestActualCLINestedAndExtensionHelp(t *testing.T) {
 		argv     []string
 		contains string
 	}{
-		{[]string{"help", "inputs", "channel", "set"}, "Unavailable in confctl-go-prototype."},
-		{[]string{"inputs", "channel", "--help"}, "Unavailable"},
+		{[]string{"help", "inputs", "channel", "set"}, "--[no-]allow_shared"},
+		{[]string{"inputs", "channel", "--help"}, "Available"},
 		{[]string{"status", "-h"}, "Execution requires --generation none."},
 		{[]string{"help", "runtime-kernels", "update"}, "Update runtime kernels"},
 		{[]string{"runtime-kernels", "--help"}, "Available"},

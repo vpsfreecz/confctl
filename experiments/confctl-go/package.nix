@@ -16,6 +16,13 @@ pkgs.buildGoModule {
     runHook postCheck
   '';
   postInstall = ''
+    install -Dm444 internal/inputs/ordered_lock.NOTICE \
+      "$out/share/doc/confctl-go-prototype/ordered_lock.NOTICE"
+    mkdir -p "$out/libexec"
+    substitute libexec/confctl-commit-stop-relay.bash \
+      "$out/libexec/confctl-commit-stop-relay.bash" \
+      --replace-fail '@BASH@' '${pkgs.bash}/bin/bash'
+    chmod 755 "$out/libexec/confctl-commit-stop-relay.bash"
     for bin in confctl-go-prototype hook-driver; do
       wrapProgram "$out/bin/$bin" --prefix PATH : ${
         pkgs.lib.makeBinPath [

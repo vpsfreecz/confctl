@@ -1,11 +1,38 @@
 package cli
 
 import (
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestInputsHelpReferences(t *testing.T) {
+	var reference struct {
+		SourceRevision string `json:"source_revision"`
+		HelpExtracts   []struct {
+			Case, Asset, SHA256 string
+		} `json:"help_extracts"`
+	}
+	b, err := os.ReadFile("../core/testdata/inputs_reference.json")
+	if err != nil || json.Unmarshal(b, &reference) != nil || reference.SourceRevision != "cc40679d267165aecfa569128438bb55fe910268" || len(reference.HelpExtracts) != 2 {
+		t.Fatal("invalid original inputs help provenance", err)
+	}
+	for _, record := range reference.HelpExtracts {
+		path := []string{"inputs", "ls"}
+		if record.Case == "inputs-channel-help" {
+			path = []string{"inputs", "channel", "ls"}
+		}
+		want, err := os.ReadFile("../core/testdata/" + record.Asset)
+		got, helpErr := BuiltinRegistry().Help(path, 80)
+		if err != nil || helpErr != nil || fmt.Sprintf("%x", sha256.Sum256(want)) != record.SHA256 || got != string(want) {
+			t.Fatal(record.Case, got, string(want), err, helpErr)
+		}
+	}
+}
 
 func TestBuiltinDeclarations(t *testing.T) {
 	r := BuiltinRegistry()
@@ -128,6 +155,52 @@ func TestRegistryValidation(t *testing.T) {
 				t.Fatal("accepted malformed declarations")
 			}
 		})
+	}
+}
+
+func TestInputsReadOnlyDeclarations(t *testing.T) {
+	r := BuiltinRegistry()
+	available := 0
+	for _, c := range r.Leaves() {
+		if c.Path[0] != "inputs" {
+			continue
+		}
+		inv, err := r.Parse(append(append([]string{}, c.Path...), "first", "--help", "extra"))
+		if err != nil || inv.Help || !reflect.DeepEqual(inv.Args, []string{"first", "--help", "extra"}) {
+			t.Fatal("inputs positional contract changed", c.Path, inv, err)
+		}
+		if c.Handler == InputsReadHandler {
+			available++
+			if c.Availability.Mode != Available || len(c.Options) != 0 || r.CheckAvailability(inv) != nil {
+				t.Fatal("read-only metadata changed", c)
+			}
+		} else if c.Handler == InputsUpdateHandler || c.Handler == InputsSetHandler {
+			if c.Availability.Mode != Available || r.CheckAvailability(inv) != nil {
+				t.Fatal("input mutation unavailable", c.Path)
+			}
+		} else if r.CheckAvailability(inv) == nil {
+			t.Fatal("unsupported input leaf advertised as available", c.Path)
+		}
+	}
+	if available != 2 {
+		t.Fatal("unexpected executing inputs leaf count", available)
+	}
+	// A derived registry's metadata still owns help and parsing.
+	commands := r.Commands()
+	for i := range commands {
+		if pathKey(commands[i].Path) == "inputs ls" {
+			commands[i].Summary, commands[i].Usage = "Changed input reader", "[selection]"
+			commands[i].Options = []OptionSpec{stringOption([]string{"q", "query"}, "Select input")}
+		}
+	}
+	derived, err := NewRegistry(r.Globals(), commands)
+	if err != nil {
+		t.Fatal(err)
+	}
+	help, _ := derived.Help([]string{"inputs", "ls"}, 80)
+	inv, err := derived.Parse([]string{"inputs", "ls", "-q", "a"})
+	if err != nil || inv.Options["query"].Value.String != "a" || !strings.Contains(help, "Changed input reader") || !strings.Contains(help, "[selection]") || !strings.Contains(help, "--query=arg") {
+		t.Fatal(help, inv, err)
 	}
 }
 
@@ -286,7 +359,7 @@ func TestHelpReferences(t *testing.T) {
 	}
 	for _, c := range r.Commands() {
 		text, err := r.Help(c.Path, 80)
-		if err != nil || !strings.Contains(text, c.Summary) {
+		if err != nil || !strings.Contains(strings.Join(strings.Fields(text), " "), strings.Join(strings.Fields(c.Summary), " ")) {
 			t.Fatal(c.Path, text, err)
 		}
 		if c.ArgumentPolicy != GroupArguments && c.Availability.Mode == Unavailable && !strings.Contains(text, "Unavailable in confctl-go-prototype.") {
@@ -359,5 +432,117 @@ func TestCapabilityTableMatchesREADME(t *testing.T) {
 	table, _, ok := strings.Cut(tail, end)
 	if !ok || table != BuiltinRegistry().CapabilityTable() {
 		t.Fatal("README capability table diverged from registry", table)
+	}
+}
+
+func TestInputsUpdateHelpReferencesAndMetadata(t *testing.T) {
+	var reference struct {
+		SourceRevision string                                 `json:"source_revision"`
+		HelpExtracts   []struct{ Case, Asset, SHA256 string } `json:"help_extracts"`
+	}
+	b, err := os.ReadFile("../core/testdata/inputs_update_reference.json")
+	if err != nil || json.Unmarshal(b, &reference) != nil || reference.SourceRevision != "cc40679d267165aecfa569128438bb55fe910268" || len(reference.HelpExtracts) != 3 {
+		t.Fatal(err)
+	}
+	for _, record := range reference.HelpExtracts {
+		path := []string{"inputs", "update"}
+		if strings.Contains(record.Case, "channel") {
+			path = []string{"inputs", "channel", "update"}
+		}
+		if strings.Contains(record.Case, "machine") {
+			path = []string{"inputs", "machine", "update"}
+		}
+		want, err := os.ReadFile("../core/testdata/" + record.Asset)
+		got, helpErr := BuiltinRegistry().Help(path, 80)
+		if err != nil || helpErr != nil || fmt.Sprintf("%x", sha256.Sum256(want)) != record.SHA256 || got != string(want) {
+			t.Fatal(record.Case, got, string(want), err, helpErr)
+		}
+	}
+	base := BuiltinRegistry()
+	commands := base.Commands()
+	for i := range commands {
+		if pathKey(commands[i].Path) == "inputs update" {
+			commands[i].Summary = "Changed update summary"
+			commands[i].Usage = "<changed>"
+			commands[i].Options[0].Description = "Changed commit switch"
+			commands[i].Options[0].Default = Bool(true)
+		}
+	}
+	derived, err := NewRegistry(base.Globals(), commands)
+	if err != nil {
+		t.Fatal(err)
+	}
+	help, _ := derived.Help([]string{"inputs", "update"}, 80)
+	if !strings.Contains(help, "update - Changed update summary") || !strings.Contains(help, "<changed>") || !strings.Contains(help, "Changed commit switch (default: enabled)") {
+		t.Fatal(help)
+	}
+	for _, path := range [][]string{{"inputs", "update"}, {"inputs", "channel", "update"}, {"inputs", "machine", "update"}} {
+		inv, err := derived.Parse(append(append([]string{}, path...), "--commit", "--no-commit", "-d", "--no-downgrade", "a"))
+		if err != nil || inv.Command.Handler != InputsUpdateHandler || derived.CheckAvailability(inv) != nil || inv.Options["commit"].Value.Bool || inv.Options["downgrade"].Value.Bool {
+			t.Fatal(inv, err)
+		}
+	}
+}
+
+func TestInputsSetDeclarationsAndMetadataHelp(t *testing.T) {
+	r := BuiltinRegistry()
+	count := 0
+	for _, c := range r.Leaves() {
+		if c.Handler != InputsSetHandler {
+			continue
+		}
+		count++
+		if c.Path[len(c.Path)-1] != "set" || c.Availability.Mode != Available || len(c.Arguments) != len(c.Path) || c.Arguments[len(c.Arguments)-1].Name != "rev" {
+			t.Fatal(c)
+		}
+		for _, a := range c.Arguments {
+			if !a.Required {
+				t.Fatal("setter required argument", c.Path, a)
+			}
+		}
+		help, err := r.Help(c.Path, 80)
+		if err != nil || !strings.HasPrefix(help, "NAME\n    set - ") || !strings.Contains(help, "confctl [global options] "+pathKey(c.Path)+" [command options] "+c.Usage) || strings.Contains(help, "Unavailable") || !strings.HasSuffix(help, "\n\n") {
+			t.Fatal(c.Path, help, err)
+		}
+		inv, err := r.Parse(c.Path)
+		if err != nil || r.CheckAvailability(inv) != nil {
+			t.Fatal(c.Path, err)
+		}
+	}
+	if count != 3 || InputsSetHandler != InputsUpdateHandler+1 {
+		t.Fatal("unexpected setter handler inventory", count)
+	}
+	help, _ := r.Help([]string{"inputs", "channel", "set"}, 80)
+	if !strings.Contains(help, "--[no-]allow_shared") || strings.Contains(help, "--[no-]allow-shared") {
+		t.Fatal("declaration spelling changed", help)
+	}
+	commands := r.Commands()
+	for i := range commands {
+		if pathKey(commands[i].Path) == "inputs set" {
+			commands[i].Summary = "Changed setter description"
+			commands[i].Usage = "<source> <revision>"
+			commands[i].Options[0].Description = "Changed commit description"
+			commands[i].Options[0].Default = Bool(true)
+		}
+	}
+	derived, err := NewRegistry(r.Globals(), commands)
+	if err != nil {
+		t.Fatal(err)
+	}
+	help, _ = derived.Help([]string{"inputs", "set"}, 80)
+	inv, err := derived.Parse([]string{"inputs", "set"})
+	if err != nil || !inv.Options["commit"].Value.Bool || !strings.Contains(help, "Changed setter description") || !strings.Contains(help, "<source> <revision>") || !strings.Contains(help, "Changed commit description") {
+		t.Fatal(help, inv, err)
+	}
+	for _, mode := range []AvailabilityMode{Unavailable, Conditional} {
+		bad := derived.Commands()
+		for i := range bad {
+			if pathKey(bad[i].Path) == "inputs set" {
+				bad[i].Availability.Mode = mode
+			}
+		}
+		if _, err = NewRegistry(derived.Globals(), bad); err == nil {
+			t.Fatal("accepted setter mode", mode)
+		}
 	}
 }

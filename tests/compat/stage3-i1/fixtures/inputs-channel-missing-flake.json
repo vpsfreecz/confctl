@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "id": "inputs-channel-missing-flake",
+  "tier": "fixture-process",
+  "sources": [
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/cli/inputs/channels.rb",
+      "lines": "11-35,152-181"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/flake_lock.rb",
+      "lines": "1-88"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/cli/app.rb",
+      "lines": "59-155"
+    },
+    {
+      "revision": "cc40679d267165aecfa569128438bb55fe910268",
+      "path": "lib/confctl/nix.rb",
+      "lines": "336-360,561-592"
+    }
+  ],
+  "argv": [
+    "inputs",
+    "channel",
+    "ls",
+    "alpha",
+    "extra"
+  ],
+  "env": {},
+  "stdin": "",
+  "tty": false,
+  "files": {
+    "flake.lock": {
+      "text": "{\"version\":7,\"root\":\"alternate\",\"nodes\":{\"root\":{\"inputs\":{\"zeta\":\"git-node\",\"alpha\":[\"github-node\",\"unfollowed\"],\"missing\":\"no-node\",\".hidden\":\"path-node\",\"slash/name\":\"path-node\"}},\"alternate\":{\"inputs\":{\"wrong\":\"git-node\"}},\"git-node\":{\"original\":{\"type\":\"git\",\"ref\":\"main\",\"url\":\"git+https://original.invalid/repository?dir=sub\"},\"locked\":{\"type\":\"git\",\"ref\":\"locked-ref\",\"url\":\"git+ssh://locked.invalid/repository\",\"rev\":\"0123456789abcdef\"}},\"github-node\":{\"original\":{\"type\":\"github\",\"owner\":\"original-owner\",\"repo\":\"original-repo\",\"ref\":\"stable\"},\"locked\":{\"type\":\"github\",\"owner\":\"locked-owner\",\"repo\":\"locked-repo\",\"rev\":\"abcdef0123456789\"}},\"path-node\":{\"original\":{\"type\":\"path\",\"path\":\"./vendor\"}}}}\n"
+    }
+  },
+  "rules": [],
+  "expected": "UNACCEPTED-inputs-channel-missing-flake.json",
+  "normalize": {
+    "root_fields": [
+      "stdout",
+      "stderr",
+      "events.cwd",
+      "events.argv",
+      "events.stdin",
+      "events.env.PWD",
+      "events.stdout",
+      "events.stderr"
+    ],
+    "volatile_fields": [
+      "events.pid",
+      "events.start_ns",
+      "events.end_ns",
+      "wall_ns",
+      "user_ns",
+      "system_ns",
+      "max_rss_kb"
+    ],
+    "concurrent_events": false,
+    "run_root_fields": [
+      "events.env.HOME",
+      "events.env.TMPDIR",
+      "events.env.COMPAT_CASE"
+    ],
+    "log_fields": [
+      "filename-time",
+      "command-uuid",
+      "gli-parent-address",
+      "process-duration",
+      "config-root"
+    ]
+  },
+  "deadline_ms": 30000,
+  "expected_no_calls": true
+}
