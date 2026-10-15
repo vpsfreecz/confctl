@@ -28,7 +28,11 @@ func TestNixPolicyMatchesFixedConfig(t *testing.T) {
 	}
 	checker := "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-confctl-hook-checker/bin/confctl-hooks"
 	expr := "import (builtins.toPath " + strconv.Quote(template) + ") { checker = " + strconv.Quote(checker) + "; }"
-	actual, err := nixPolicyOutput(exec.Command(nix, "--eval", "--strict", "--json", "--expr", expr))
+	cmd := exec.Command(nix, "--eval", "--strict", "--json", "--expr", expr)
+	// Nix initializes profile state even for this local template evaluation.
+	// Keep it writable and private inside package build sandboxes.
+	cmd.Env = append(os.Environ(), "NIX_STATE_DIR="+t.TempDir())
+	actual, err := nixPolicyOutput(cmd)
 	if err != nil {
 		t.Fatal(err)
 	}
