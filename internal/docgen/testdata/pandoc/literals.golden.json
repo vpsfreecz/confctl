@@ -1,0 +1,49 @@
+{
+  "provenance": "SOURCE-DERIVED / UNOBSERVED: exact literal text plus nominated fence syntax; no renderer run or normalizer",
+  "cases": [
+    {
+      "input": "",
+      "markdown": "```nix\n```\n"
+    },
+    {
+      "input": "null",
+      "markdown": "```nix\nnull\n```\n"
+    },
+    {
+      "input": "\"\"",
+      "markdown": "```nix\n\"\"\n```\n"
+    },
+    {
+      "input": "one\ntwo",
+      "markdown": "```nix\none\ntwo\n```\n"
+    },
+    {
+      "input": "one\n\ntwo\n",
+      "markdown": "```nix\none\n\ntwo\n```\n"
+    },
+    {
+      "input": "\n  indented\n\n",
+      "markdown": "```nix\n\n  indented\n\n```\n"
+    },
+    {
+      "input": "`edge`",
+      "markdown": "```nix\n`edge`\n```\n"
+    },
+    {
+      "input": "a```b\n````\nend",
+      "markdown": "`````nix\na```b\n````\nend\n`````\n"
+    },
+    {
+      "input": ".dot\n'apostrophe\n\\backslash",
+      "markdown": "```nix\n.dot\n'apostrophe\n\\backslash\n```\n"
+    },
+    {
+      "input": "caf\u00e9\t<&>\r\nlast\n",
+      "markdown": "```nix\ncaf\u00e9\t<&>\r\nlast\n```\n"
+    },
+    {
+      "input": "{\n  nested = [ (-1) 1.0e3 ];\n}",
+      "markdown": "```nix\n{\n  nested = [ (-1) 1.0e3 ];\n}\n```\n"
+    }
+  ]
+}
