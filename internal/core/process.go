@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"syscall"
 )
 
@@ -142,6 +143,28 @@ func Process(ctx context.Context, root string, argv []string, input []byte) (Res
 }
 
 func processWithTestConnectionLog(ctx context.Context, root string, argv []string, input []byte, chunk func([]byte) error) (Result, error) {
+	var tagged func([]byte, []byte) error
+	if chunk != nil {
+		tagged = func(stdout, stderr []byte) error {
+			if stdout != nil {
+				return chunk(stdout)
+			}
+			return chunk(stderr)
+		}
+	}
+	return processWithStreams(ctx, root, argv, input, tagged)
+}
+
+// processWithStreams extends the existing capture owner with stream identity.
+// Callbacks are serialized and borrow each chunk only until return. A callback
+// failure cancels the owned child and remains the capture's primary error.
+func processWithStreams(ctx context.Context, root string, argv []string, input []byte, chunk func(stdout, stderr []byte) error) (Result, error) {
+	return processWithStreamsEnv(ctx, root, argv, input, nil, chunk)
+}
+
+// A nil environment inherits the caller's environment. An explicit slice is a
+// command-local replacement, including an explicitly empty environment.
+func processWithStreamsEnv(ctx context.Context, root string, argv []string, input []byte, env []string, chunk func(stdout, stderr []byte) error) (Result, error) {
 	r := Result{ExitCode: -1, Command: ShellJoin(argv)}
 	if len(argv) == 0 {
 		return r, fmt.Errorf("empty argv")
@@ -150,7 +173,10 @@ func processWithTestConnectionLog(ctx context.Context, root string, argv []strin
 	defer owner.cancel(nil)
 	cmd := exec.CommandContext(owner.ctx, argv[0], argv[1:]...)
 	cmd.Dir = root
-	cmd.Env = os.Environ()
+	cmd.Env = env
+	if env == nil {
+		cmd.Env = os.Environ()
+	}
 	group := prepareChild(cmd)
 	if input == nil {
 		r, w, err := os.Pipe()
@@ -164,8 +190,22 @@ func processWithTestConnectionLog(ctx context.Context, root string, argv []strin
 		cmd.Stdin = bytes.NewReader(input)
 	}
 	var out, errout bytes.Buffer
-	stdout := &testConnectionCapture{buffer: &out, chunk: chunk, owner: owner, stream: "stdout"}
-	stderr := &testConnectionCapture{buffer: &errout, chunk: chunk, owner: owner, stream: "stderr"}
+	var chunkMu sync.Mutex
+	feed := func(stdout bool) func([]byte) error {
+		if chunk == nil {
+			return nil
+		}
+		return func(b []byte) error {
+			chunkMu.Lock()
+			defer chunkMu.Unlock()
+			if stdout {
+				return chunk(b, nil)
+			}
+			return chunk(nil, b)
+		}
+	}
+	stdout := &testConnectionCapture{buffer: &out, chunk: feed(true), owner: owner, stream: "stdout"}
+	stderr := &testConnectionCapture{buffer: &errout, chunk: feed(false), owner: owner, stream: "stderr"}
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 	e := cmd.Start()
 	if e == nil {

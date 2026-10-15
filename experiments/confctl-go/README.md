@@ -5,13 +5,30 @@
 `init`, `add`, `rename`, `rediscover`, `ls`, `inputs ls`, `inputs channel ls`,
 `inputs update`, `inputs channel update`, `inputs machine update`,
 `inputs set`, `inputs channel set`, `inputs machine set`,
-`status --generation none`, `generation ls`, `test-connection`, `ssh`, `cssh`,
+`build`, all `status` generation modes, `generation ls`, `test-connection`,
+`ssh`, `cssh`,
 `diff`, `changelog`, `health-check`, the three `gen-data vpsadmin` commands
 and explicitly registered external extensions. Other
-commands and generation modes fail before opening logs, evaluating Nix, running
+commands fail before opening logs, evaluating Nix, running
 SSH or changing configuration.
 Root help shows the reference builtin inventory. Detailed help describes the
-execution limits of unavailable commands and status modes.
+execution limits of unavailable commands.
+
+`build` selects managed machines, confirms once and builds their declared targets.
+It keeps string-valued Nix job/core overrides, groups builds using the configured
+input paths, and reuses matching local generations. New generations retain the
+existing JSON, links, GC-root names and current-generation pointer. A later
+failure can leave earlier files, roots or current selections in place; the
+command performs no rollback.
+
+`status` builds the selected machines when `--generation` is absent, then
+refreshes configured input metadata and queries their state. `--generation none`
+skips the build and toplevel comparison. An explicit generation name, numeric
+offset or `current` uses its stored input metadata and toplevel. Missing hosts
+require a second confirmation unless `--yes` is set. Offline or outdated hosts
+remain ordinary results with exit status 0; build or infrastructure failures
+return status 1 and retain the log. See [Build and status](../../docs/compatibility/commands.md)
+for selection and generation behavior.
 
 `test-connection` checks selected machines sequentially. It captures uptime
 command output and reports successful and failed hosts. Completed host failures
@@ -152,8 +169,8 @@ One typed command tree in `internal/cli` owns all builtin groups and 29 leaves,
 options, defaults, aliases, argument usage and availability. It generates help
 and drives parsing and the execution guard. Existing help text files are test
 references; the executable does not load them. Root and `ls` help retain their
-reference bytes. Detailed status help limits execution to `--generation none`;
-other unavailable leaf and group help identifies the current capabilities.
+reference bytes. Detailed status help exposes all generation modes;
+unavailable leaf and group help identifies the current capabilities.
 Help validates the explicit registry, live root and finite declared source
 bytes, and runs no tools or extensions.
 
@@ -256,7 +273,7 @@ The following table is checked against the command registry:
 | Builtin command | Execution |
 | --- | --- |
 | `add` | Available |
-| `build` | Unavailable |
+| `build` | Available |
 | `changelog` | Available |
 | `collect-garbage` | Unavailable |
 | `cssh` | Available |
@@ -282,7 +299,7 @@ The following table is checked against the command registry:
 | `rediscover` | Available |
 | `rename` | Available |
 | `ssh` | Available |
-| `status` | Only --generation none |
+| `status` | Available |
 | `test-connection` | Available |
 <!-- command-registry-capabilities:end -->
 
