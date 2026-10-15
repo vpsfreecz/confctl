@@ -1,0 +1,71 @@
+{
+  "config_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage2-b-original-v1/configuration-b-add-existing-3077608822/config",
+  "run_root": "/tmp/2026-10-09-evaluate-confctl-rewrite-language-stage2-b-original-v1/configuration-b-add-existing-3077608822",
+  "schema": 1,
+  "case": "configuration-b-add-existing",
+  "executable": "/nix/store/x96jzlpaq69bkdardsn56px7czybkbs8-confctl/bin/confctl",
+  "executable_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de",
+  "contract_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "fixture_sha256": "8d7e5f7c91d39bc2369872ef726a5696347650a68a10620bd4c7f6e248477a43",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "stdout": "",
+  "stderr": "\nLog file: ${ROOT}/.confctl/logs/${LOG_TIME:1}-confctl-add.log\nerror: cluster/old already exists\n",
+  "exit": 1,
+  "before": {
+    "cluster": {
+      "mode": 2147484141
+    },
+    "cluster/old": {
+      "mode": 2147484141
+    },
+    "cluster/old/config.nix": {
+      "text": "original",
+      "mode": 420
+    },
+    "cluster/old/module.nix": {
+      "text": "original",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{}",
+      "mode": 420
+    }
+  },
+  "after": {
+    ".confctl": {
+      "mode": 2147484141
+    },
+    ".confctl/logs": {
+      "mode": 2147484141
+    },
+    ".confctl/logs/${LOG_TIME:1}-confctl-add.log": {
+      "text": "{command: [\"add\"],\n global_options: {\"c\" =\u003e \"auto\", \"color\" =\u003e \"auto\", \"help\" =\u003e false},\n command_options: {},\n arguments: [\"old\"]}\n",
+      "mode": 420
+    },
+    "cluster": {
+      "mode": 2147484141
+    },
+    "cluster/old": {
+      "mode": 2147484141
+    },
+    "cluster/old/config.nix": {
+      "text": "original",
+      "mode": 420
+    },
+    "cluster/old/module.nix": {
+      "text": "original",
+      "mode": 420
+    },
+    "flake.nix": {
+      "text": "{}",
+      "mode": 420
+    }
+  },
+  "events": null,
+  "git_before": {},
+  "git_after": {},
+  "wall_ns": 0,
+  "user_ns": 0,
+  "system_ns": 0,
+  "max_rss_kb": 0
+}

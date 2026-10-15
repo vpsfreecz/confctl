@@ -1,0 +1,33 @@
+NAME
+    confctl - Nix deployment configuration management tool
+
+
+SYNOPSIS
+    confctl [global options] command [command options] [arguments...]
+
+
+GLOBAL OPTIONS
+    -c, --color=arg - Toggle color mode (default: auto)
+    --help          - Show this message
+
+
+COMMANDS
+    add             - Add a new machine
+    build           - Build target systems
+    changelog       - Changelog between deployed and configured input roles
+    collect-garbage - Run nix-collect-garbage to deleted unreachable store paths
+    cssh            - Open ClusterSSH
+    deploy          - Deploy target systems
+    diff            - Diff between deployed and configured input roles
+    gen-data        - Generate data files
+    generation      - Manage built machine generations
+    health-check    - Run machine health-checks
+    help            - Shows a list of commands or help for one command
+    init            - Create a new configuration
+    inputs          - Manage flake inputs
+    ls              - List configured machines
+    rediscover      - Update cluster machine list with contents of cluster/
+    rename          - Rename an existing machine
+    ssh             - Run command over SSH
+    status          - Check machine status
+    test-connection - Test SSH connection

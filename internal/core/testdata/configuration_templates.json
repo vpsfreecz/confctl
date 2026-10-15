@@ -1,0 +1,31 @@
+{
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "source_path": "lib/confctl/cli/configuration.rb",
+  "source_sha256": "c28e4487f5facf67a44801704faa576ba4409bd5e986ce88ad0497ad4967bccd",
+  "files": {
+    "cluster/module-list.nix": "d485259417c4663b269eedd4c9d1798e9a35e72c911b209814d07e783391474f",
+    "cluster/cluster.nix": "33899f33f19cb9d62a971d6b439cd59186d555058b5cb3b8ac449ca32d4e966d",
+    "configs/confctl.nix": "8ec3967c25d2d282be9080487f90eda345f6eb76d7d6d87c836c612a7ef803b5",
+    "data/default.nix": "cb01d5a5e0a7f077b62521b172e6411d37f28e801303025dcbcf6e57b2e90e62",
+    "data/ssh-keys.nix": "5d8f729f2b364a9a38d5333f90744731adda4276051f73ead7e7adbd92deb6c0",
+    "environments/base.nix": "8d6e45f838fb1e1684891ddea01dde5212456bfdcf703a40f3bbd76b8d931ce9",
+    "modules/module-list.nix": "92dae1f0bf0b5f3bd50c3f842409340b0e11d61f710817192620d08437aafb60",
+    "flake.nix": "0debd24662e729c2f71dc873f4e5f2b88c138c80041e2eb7c5b5097081ec5094"
+  },
+  "help_extracts": {
+    "add": {
+      "capture_case": "add-noarg",
+      "raw_field": "stdout.raw",
+      "sha256": "16623ac23195c50ffaba2a52889a08183de31b29adb9a678aa8e113cc1d766ab",
+      "oracle_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de",
+      "characterization_sha256": "6a49c43f096f3603511f8881b8c50a52a4bb6a290343de21c2abd290693a5a40"
+    },
+    "rename": {
+      "capture_case": "rename-noargs",
+      "raw_field": "stdout.raw",
+      "sha256": "5ceea2aab02b3f5a190ebdd9935047f81236af2eaba1330be0516e130fef533b",
+      "oracle_sha256": "eae4297146b9790b87f2e9935f3ea516ef5e1d047b683b64f9a57cf33c3c85de",
+      "characterization_sha256": "6a49c43f096f3603511f8881b8c50a52a4bb6a290343de21c2abd290693a5a40"
+    }
+  }
+}
