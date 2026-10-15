@@ -5,15 +5,13 @@
 `init`, `add`, `rename`, `rediscover`, `ls`, `inputs ls`, `inputs channel ls`,
 `inputs update`, `inputs channel update`, `inputs machine update`,
 `inputs set`, `inputs channel set`, `inputs machine set`,
-`build`, all `status` generation modes, `generation ls`, `generation rm`,
+`build`, `deploy`, all `status` generation modes, `generation ls`, `generation rm`,
 `generation rotate`, `collect-garbage`, `test-connection`,
 `ssh`, `cssh`,
 `diff`, `changelog`, `health-check`, the three `gen-data vpsadmin` commands
-and explicitly registered external extensions. Other
-commands fail before opening logs, evaluating Nix, running
-SSH or changing configuration.
-Root help shows the reference builtin inventory. Detailed help describes the
-execution limits of unavailable commands.
+and explicitly registered external extensions. All 29 builtin commands have
+public adapters. Root help shows the builtin inventory; each command's help
+describes its arguments and options.
 
 `build` selects managed machines, confirms once and builds their declared targets.
 It keeps string-valued Nix job/core overrides, groups builds using the configured
@@ -30,6 +28,12 @@ require a second confirmation unless `--yes` is set. Offline or outdated hosts
 remain ordinary results with exit status 0; build or infrastructure failures
 return status 1 and retain the log. See [Build and status](../../docs/compatibility/commands.md)
 for selection and generation behavior.
+
+`deploy` confirms the selected machines and action, then runs `deploy.prepare`
+before building or resolving stored generations. It reloads the selected names
+from fresh inventory afterward. Copy-only, activation, rollback confirmation,
+reboot and health behavior are described in [Deployment](../../docs/deployment.md).
+A later failure can leave earlier target or profile changes in place.
 
 `generation rm` and `generation rotate` confirm the selected removal plan unless
 `--yes` is set. Local removal deletes GC roots before generation files; a unified
@@ -156,7 +160,7 @@ driver copies it outside the configuration tree, binds the actual
 fixture `flake.nix` bytes and supplies both `CONFCTL_EXTENSION_REGISTRY` and
 `CONFCTL_EXTENSION_ROOT`. Original Ruby runs use no candidate preparation.
 The test-only `hook-driver` uses the same bound loader and executes
-`rediscover.after-write` and `deploy.prepare`; deployment remains unavailable.
+`rediscover.after-write` and `deploy.prepare`.
 Native rediscovery invokes `rediscover.after-write` after replacing the inventory,
 including rediscovery called by add/rename. Netboot output uses
 `cluster/netbootable.nix`; kernel state retains `configs/node/kernels.json`.
@@ -184,8 +188,8 @@ One typed command tree in `internal/cli` owns all builtin groups and 29 leaves,
 options, defaults, aliases, argument usage and availability. It generates help
 and drives parsing and the execution guard. Existing help text files are test
 references; the executable does not load them. Root and `ls` help retain their
-reference bytes. Detailed status help exposes all generation modes;
-unavailable leaf and group help identifies the current capabilities.
+reference bytes. Detailed status help exposes all generation modes; group help
+lists the commands in each family.
 Help validates the explicit registry, live root and finite declared source
 bytes, and runs no tools or extensions.
 
@@ -292,7 +296,7 @@ The following table is checked against the command registry:
 | `changelog` | Available |
 | `collect-garbage` | Available |
 | `cssh` | Available |
-| `deploy` | Unavailable |
+| `deploy` | Available |
 | `diff` | Available |
 | `gen-data vpsadmin all` | Available |
 | `gen-data vpsadmin containers` | Available |
@@ -396,7 +400,7 @@ confirmation and resolved-generation tables are outside that pager. Local
 fixtures and PTY tests cover these paths; installed package and real-provider
 checks remain separate from the source tests.
 
-Deployment and legacy software-pin migration remain unavailable. Operation
+Legacy software-pin migration remains unavailable. Operation
 tests use disposable records and fake child processes. The finite original
 adapters compare reader and table behavior; they do not establish packaged or
 fleet parity.
