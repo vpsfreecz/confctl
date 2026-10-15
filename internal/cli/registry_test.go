@@ -119,7 +119,7 @@ func TestComparisonDeclarationsAndAvailability(t *testing.T) {
 	// accidentally enable the next build, status, deployment or mutation units.
 	unavailable := map[string]bool{
 		"build": true, "deploy": true, "collect-garbage": true,
-		"generation rm": true, "generation rotate": true, "health-check": true,
+		"generation rm": true, "generation rotate": true,
 		"gen-data vpsadmin all": true, "gen-data vpsadmin containers": true, "gen-data vpsadmin network": true,
 	}
 	available := 0
@@ -137,7 +137,7 @@ func TestComparisonDeclarationsAndAvailability(t *testing.T) {
 			available++
 		}
 	}
-	if available != 19 || len(r.Leaves()) != 29 {
+	if available != 20 || len(r.Leaves()) != 29 {
 		t.Fatal(available, len(r.Leaves()))
 	}
 	for _, command := range []string{"diff", "changelog"} {

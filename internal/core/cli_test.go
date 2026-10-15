@@ -484,9 +484,9 @@ func TestActualCLIIntegerParsingHasNoEffects(t *testing.T) {
 		code        int
 		out, stderr string
 	}{
-		{[]string{"health-check", "-j9223372036854775808"}, 2, "", "confctl-go-prototype: health-check is unavailable in the measurement prototype\n"},
-		{[]string{"health-check", "-j-9223372036854775809"}, 2, "", "confctl-go-prototype: health-check is unavailable in the measurement prototype\n"},
-		{[]string{"health-check", "-j0x10"}, 2, "", "confctl-go-prototype: health-check is unavailable in the measurement prototype\n"},
+		{[]string{"health-check", "-j9223372036854775808", "--help"}, 0, help, ""},
+		{[]string{"health-check", "-j-9223372036854775809", "--help"}, 0, help, ""},
+		{[]string{"health-check", "-j0x10", "--help"}, 0, help, ""},
 		{[]string{"health-check", "-j08"}, 64, help, "error: invalid argument: -j 08\n\n"},
 		{[]string{"health-check", "-j08", "--help"}, 64, help, "error: invalid argument: -j 08\n\n"},
 		{[]string{"health-check", "--help", "-j08"}, 0, help, ""},

@@ -177,6 +177,9 @@ func BuiltinRegistry() *Registry {
 		case "diff", "changelog":
 			commands[i].Handler = ComparisonHandler
 			commands[i].Availability = Availability{Mode: Available}
+		case "health-check":
+			commands[i].Handler = HealthCheckHandler
+			commands[i].Availability = Availability{Mode: Available}
 		case "init", "add", "rename", "rediscover":
 			commands[i].Handler = ConfigurationHandler
 			commands[i].Availability = Availability{Mode: Available}

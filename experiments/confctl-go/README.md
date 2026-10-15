@@ -6,7 +6,7 @@
 `inputs update`, `inputs channel update`, `inputs machine update`,
 `inputs set`, `inputs channel set`, `inputs machine set`,
 `status --generation none`, `generation ls`, `test-connection`, `ssh`, `cssh`,
-`diff`, `changelog`
+`diff`, `changelog`, `health-check`
 and explicitly registered external extensions. Other
 commands and generation modes fail before opening logs, evaluating Nix, running
 SSH or changing configuration.
@@ -17,6 +17,13 @@ execution limits of unavailable commands and status modes.
 command output and reports successful and failed hosts. Completed host failures
 keep the overall exit status 0; start, wait or cancellation errors stop the
 invocation and retain its log.
+
+`health-check` selects managed runnable machines with configured checks and
+asks for confirmation unless `--yes` is set. It reports progress and ordered
+failures using the configured worker count, retry timeout and cooldown. A failed
+check or process error returns status 1. Logs remain available after any failed
+attempt, even when a later attempt succeeds and the command returns status 0.
+See [Health checks](../../docs/health-checks.md) for predicates and retry behavior.
 
 `ssh` selects managed runnable machines and retains literal OpenSSH arguments,
 including `CONFCTL_SSH_CONFIG` and per-machine ports. Commands run serially or
@@ -247,7 +254,7 @@ The following table is checked against the command registry:
 | `generation ls` | Available |
 | `generation rm` | Unavailable |
 | `generation rotate` | Unavailable |
-| `health-check` | Unavailable |
+| `health-check` | Available |
 | `init` | Available |
 | `inputs channel ls` | Available |
 | `inputs channel set` | Available |
