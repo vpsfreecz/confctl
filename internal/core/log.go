@@ -3,9 +3,13 @@ package core
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
+	"os"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -13,29 +17,145 @@ import (
 )
 
 func logID() string { var b [4]byte; _, _ = rand.Read(b[:]); return hex.EncodeToString(b[:]) }
-func (e *Engine) logText(s string) {
-	if e.Log == nil {
-		return
-	}
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	_, _ = e.Log.WriteString(s)
+
+type engineLogOps struct {
+	Write  func([]byte) (int, error)
+	Flush  func() error
+	Close  func() error
+	Remove func() error
 }
-func (e *Engine) processLogStart(argv []string) (string, time.Time) {
+type engineLog struct {
+	file      *os.File
+	ops       engineLogOps
+	rawMu     sync.Mutex
+	live      *liveLog
+	closeOnce sync.Once
+	closeErr  error
+}
+
+func newEngineLog(file *os.File, ops engineLogOps) *engineLog {
+	l := &engineLog{file: file, ops: ops}
+	l.live = newLiveLog(l.writeAndFlush)
+	return l
+}
+func nativeEngineLog(file *os.File) *engineLog {
+	// os.File has no buffered user-space output here. Flush is deliberately a
+	// no-op; Sync/fsync would introduce a different durability/effect contract.
+	return newEngineLog(file, engineLogOps{Write: file.Write, Flush: func() error { return nil }, Close: file.Close, Remove: func() error { return os.Remove(file.Name()) }})
+}
+
+var errLogOwnerUnavailable = errors.New("log owner is unavailable")
+
+func (e *Engine) checkedLogOwner() (*engineLog, error) {
+	if e.Log == nil && e.logOwner == nil {
+		return nil, nil
+	}
+	if e.Log == nil || e.logOwner == nil || e.logOwner.file != e.Log {
+		return nil, errLogOwnerUnavailable
+	}
+	return e.logOwner, nil
+}
+func (l *engineLog) rawWrite(b []byte) (int, error) {
+	if l.ops.Write == nil {
+		return 0, errLogOwnerUnavailable
+	}
+	n, err := l.ops.Write(b)
+	if err == nil && n != len(b) {
+		err = io.ErrShortWrite
+	}
+	return n, err
+}
+func (l *engineLog) writeAndFlush(b []byte) (int, error) {
+	l.rawMu.Lock()
+	defer l.rawMu.Unlock()
+	n, err := l.rawWrite(b)
+	if err != nil {
+		return n, err
+	}
+	if l.ops.Flush == nil {
+		return n, errLogOwnerUnavailable
+	}
+	return n, l.ops.Flush()
+}
+func (e *Engine) logText(s string) error {
+	l, err := e.checkedLogOwner()
+	if err != nil || l == nil {
+		return err
+	}
+	_, err = l.live.Write([]byte(s))
+	return err
+}
+func (e *Engine) logMetadata(s string) error {
+	l, err := e.checkedLogOwner()
+	if err != nil || l == nil {
+		return err
+	}
+	l.rawMu.Lock()
+	defer l.rawMu.Unlock()
+	_, err = l.rawWrite([]byte(s))
+	return err
+}
+func (e *Engine) attachLog(read func([]byte) error) (func() error, error) {
+	l, err := e.checkedLogOwner()
+	if err != nil {
+		return nil, err
+	}
+	if l == nil {
+		return func() error { return nil }, nil
+	}
+	return l.live.Attach(read)
+}
+
+// Root finalization only, after its children/copies/readers have quiesced.
+// The first success choice and exact cause are cached; no retry or reopening.
+func (e *Engine) CloseLog(success bool) error {
+	l, err := e.checkedLogOwner()
+	if err != nil || l == nil {
+		return err
+	}
+	l.closeOnce.Do(func() {
+		if l.ops.Close == nil {
+			l.closeErr = errLogOwnerUnavailable
+			return
+		}
+		l.closeErr = l.ops.Close()
+		if l.closeErr == nil && success {
+			if l.ops.Remove == nil {
+				l.closeErr = errLogOwnerUnavailable
+			} else {
+				l.closeErr = l.ops.Remove()
+			}
+		}
+	})
+	return l.closeErr
+}
+
+// Main and hook-driver preserve a body/nonzero status and try one diagnostic
+// on original stderr. Reporting failure is separate from the cached close cause.
+func LogCleanupStatus(status int, cleanupErr error, stderr io.Writer) (int, error) {
+	if cleanupErr == nil {
+		return status, nil
+	}
+	if status == 0 {
+		status = 1
+	}
+	b := []byte("log cleanup: " + cleanupErr.Error() + "\n")
+	n, err := stderr.Write(b)
+	if err == nil && n != len(b) {
+		err = io.ErrShortWrite
+	}
+	return status, err
+}
+func (e *Engine) processLogStart(argv []string) (string, time.Time, error) {
 	id := logID()
 	command := ShellJoin(argv)
 	if len(argv) > 0 && argv[0] == "nix" {
 		command = "cd " + ShellJoin([]string{e.Root}) + " && " + command
 	}
-	e.logText("[" + id + "] Running " + command + "\n")
-	return id, time.Now()
+	err := e.logText("[" + id + "] Running " + command + "\n")
+	return id, time.Now(), err
 }
-func (e *Engine) processLogFinish(id string, start time.Time, r Result) {
-	for _, b := range [][]byte{r.Stdout, r.Stderr} {
-		if len(b) > 0 {
-			e.logText("[" + id + "] \t" + strings.TrimSuffix(string(b), "\n") + "\n")
-		}
-	}
+func (e *Engine) processLogFinish(id string, start time.Time, r Result) error {
 	duration := time.Since(start).Seconds()
 	unit := "seconds"
 	if int(duration) == 1 {
@@ -45,9 +165,9 @@ func (e *Engine) processLogFinish(id string, start time.Time, r Result) {
 	if r.ExitCode != 0 {
 		state = "failed"
 	}
-	e.logText(fmt.Sprintf("[%s] Finished in %5.3f %s with exit status %d (%s)\n", id, duration, unit, r.ExitCode, state))
+	return e.logText(fmt.Sprintf("[%s] Finished in %5.3f %s with exit status %d (%s)\n", id, duration, unit, r.ExitCode, state))
 }
-func (e *Engine) LogCLI(cmd string, o Options, raw []string) {
+func (e *Engine) LogCLI(cmd string, o Options, raw []string) error {
 	command := []string{cmd}
 	if cmd == "runtime-kernels" {
 		command = []string{"runtime-kernels", "update"}
@@ -125,8 +245,7 @@ func (e *Engine) LogCLI(cmd string, o Options, raw []string) {
 	var b strings.Builder
 	b.WriteString("{command: " + rubyInspect(cmds) + ",\n global_options: {\"c\" => " + rubyInspect(e.Color) + ", \"color\" => " + rubyInspect(e.Color) + ", \"help\" => false},\n command_options:\n  {")
 	if cmd == "init" || cmd == "add" || cmd == "rename" || cmd == "rediscover" {
-		e.logText("{command: " + rubyInspect(cmds) + ",\n global_options: {\"c\" => " + rubyInspect(e.Color) + ", \"color\" => " + rubyInspect(e.Color) + ", \"help\" => false},\n command_options: {},\n arguments: " + rubyInspect(args) + "}\n")
-		return
+		return e.logMetadata("{command: " + rubyInspect(cmds) + ",\n global_options: {\"c\" => " + rubyInspect(e.Color) + ", \"color\" => " + rubyInspect(e.Color) + ", \"help\" => false},\n command_options: {},\n arguments: " + rubyInspect(args) + "}\n")
 	}
 	for i, v := range opts {
 		if i > 0 {
@@ -138,12 +257,12 @@ func (e *Engine) LogCLI(cmd string, o Options, raw []string) {
 		b.WriteString(",\n   #<GLI::Command::ParentKey:0x0000000000000000> => {}")
 	}
 	b.WriteString("},\n arguments: " + rubyInspect(args) + "}\n")
-	e.logText(b.String())
+	return e.logMetadata(b.String())
 }
 
 // The two option-free inputs leaves retain the original PP parent-key layout.
 // GLI uses one PARENT constant at both depths; its address is log-scoped only.
-func (e *Engine) LogInputsCLI(path []string, args []string) {
+func (e *Engine) LogInputsCLI(path []string, args []string) error {
 	command, arguments := make([]any, len(path)), make([]any, len(args))
 	for i, p := range path {
 		command[i] = p
@@ -156,13 +275,13 @@ func (e *Engine) LogInputsCLI(path []string, args []string) {
 	if len(path) == 3 {
 		options = "\n  {" + parent + " =>\n    {" + parent + " => {}}}"
 	}
-	e.logText(fmt.Sprintf("{command: %s,\n global_options: {\"c\" => %s, \"color\" => %s, \"help\" => false},\n command_options:%s,\n arguments: %s}\n", rubyInspect(command), rubyInspect(e.Color), rubyInspect(e.Color), options, rubyInspect(arguments)))
+	return e.logMetadata(fmt.Sprintf("{command: %s,\n global_options: {\"c\" => %s, \"color\" => %s, \"help\" => false},\n command_options:%s,\n arguments: %s}\n", rubyInspect(command), rubyInspect(e.Color), rubyInspect(e.Color), options, rubyInspect(arguments)))
 }
 
 // GLI callbacks insert explicit options in first encounter order, then append
 // defaults in declaration order. Each spelling stays together; the one parent
 // identity is reused at both depths, exactly as in the read-only adapter.
-func (e *Engine) LogInputUpdateCLI(inv cli.Invocation) {
+func (e *Engine) LogInputUpdateCLI(inv cli.Invocation) error {
 	command, arguments := make([]any, len(inv.Command.Path)), make([]any, len(inv.Args))
 	for i, p := range inv.Command.Path {
 		command[i] = p
@@ -192,7 +311,7 @@ func (e *Engine) LogInputUpdateCLI(inv cli.Invocation) {
 		b.WriteString(" {}}")
 	}
 	b.WriteString(inputLogArgumentsField(arguments))
-	e.logText(b.String())
+	return e.logMetadata(b.String())
 }
 
 // Logger's final arguments hash field has a 79-character PP context. The closing
@@ -215,11 +334,11 @@ func inputLogArgumentsField(arguments []any) string {
 }
 
 // Set uses the same ordered boolean declarations and PP parent layout.
-func (e *Engine) LogInputSetCLI(inv cli.Invocation) { e.LogInputUpdateCLI(inv) }
+func (e *Engine) LogInputSetCLI(inv cli.Invocation) error { return e.LogInputUpdateCLI(inv) }
 
 // This leaf has no GLI parent key. Aliases share one value and keep callback
 // encounter order before declaration defaults, including nil managed and lists.
-func (e *Engine) LogTestConnectionCLI(inv cli.Invocation) {
+func (e *Engine) LogTestConnectionCLI(inv cli.Invocation) error {
 	command, arguments := make([]any, len(inv.Command.Path)), make([]any, len(inv.Args))
 	for i, p := range inv.Command.Path {
 		command[i] = p
@@ -256,5 +375,5 @@ func (e *Engine) LogTestConnectionCLI(inv cli.Invocation) {
 		}
 	}
 	b.WriteString("}" + inputLogArgumentsField(arguments))
-	e.logText(b.String())
+	return e.logMetadata(b.String())
 }

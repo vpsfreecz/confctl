@@ -706,8 +706,10 @@ func TestParsedAdapterPreservesLogAndExtensionValues(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		e := &Engine{Log: f, Color: "auto"}
-		e.LogCLI(argv[0], o, argv)
+		e := &Engine{Log: f, logOwner: nativeEngineLog(f), Color: "auto"}
+		if err := e.LogCLI(argv[0], o, argv); err != nil {
+			t.Fatal(err)
+		}
 		if err = f.Close(); err != nil {
 			t.Fatal(err)
 		}
@@ -747,8 +749,10 @@ func TestLogCLIOriginalPPReference(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := &Engine{Log: f, Color: inv.Globals["color"].Value.String}
-	e.LogCLI("runtime-kernels", o, argv)
+	e := &Engine{Log: f, logOwner: nativeEngineLog(f), Color: inv.Globals["color"].Value.String}
+	if err := e.LogCLI("runtime-kernels", o, argv); err != nil {
+		t.Fatal(err)
+	}
 	if err = f.Close(); err != nil {
 		t.Fatal(err)
 	}

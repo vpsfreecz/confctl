@@ -28,8 +28,9 @@ func authenticationError(err error) error {
 	if err == nil {
 		return nil
 	}
-	var existing *AuthenticationError
-	if errors.As(err, &existing) {
+	// Only an existing outer wrapper represents this authentication boundary;
+	// an older AuthenticationError inside a trusted cause must not suppress it.
+	if _, ok := err.(*AuthenticationError); ok {
 		return err
 	}
 	return &AuthenticationError{cause: err}

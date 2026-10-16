@@ -18,14 +18,30 @@ import (
 // io.Copy path selects this ReaderFrom; no syscall.Conn or WriterTo is exposed.
 // Each positive real read is captured and logged before storage is reused.
 type testConnectionCapture struct {
-	buffer *bytes.Buffer
-	chunk  func([]byte)
+	buffer               *bytes.Buffer
+	chunk                func([]byte) error
+	owner                *commandCapture
+	stream               string
+	count                int64
+	callbackErr, readErr error
 }
 
 func (c *testConnectionCapture) Write(b []byte) (int, error) {
+	if c.callbackErr != nil {
+		return 0, c.callbackErr
+	}
 	n, err := c.buffer.Write(b)
+	c.count += int64(n)
 	if n > 0 {
-		c.chunk(b[:n])
+		if c.chunk != nil {
+			err = c.chunk(b[:n])
+		}
+	}
+	if err != nil {
+		c.callbackErr = err
+		if c.owner != nil {
+			c.owner.fail(captureCallback, err)
+		}
 	}
 	return n, err
 }
@@ -36,12 +52,22 @@ func (c *testConnectionCapture) ReadFrom(r io.Reader) (int64, error) {
 	for {
 		n, err := r.Read(b)
 		if n > 0 {
-			_, _ = c.Write(b[:n])
-			total += int64(n)
+			written, writeErr := c.Write(b[:n])
+			total += int64(written)
+			if writeErr != nil {
+				if err != nil && err != io.EOF {
+					c.readErr = err
+				}
+				return total, writeErr
+			}
 		}
 		if err != nil {
 			if err == io.EOF {
 				return total, nil
+			}
+			c.readErr = err
+			if c.owner != nil {
+				c.owner.fail(captureRead, err)
 			}
 			return total, err
 		}
@@ -167,6 +193,9 @@ func testConnectionArgs(m Machine) ([]string, error) {
 }
 
 func testConnectionStatus(ctx context.Context, argv []string, r Result, runErr error) (int, error) {
+	if primary := r.capturePrimary(); primary != nil {
+		return 0, primary
+	}
 	if ctx.Err() != nil {
 		return 0, ctx.Err()
 	}
@@ -194,11 +223,13 @@ func testConnectionStatus(ctx context.Context, argv []string, r Result, runErr e
 
 func (e *Engine) testConnectionProcess(ctx context.Context, root string, argv []string, input []byte) (Result, error) {
 	id := logID()
-	e.logText("[" + id + "] Running " + testConnectionShellJoin(argv) + "\n")
+	if err := e.logText("[" + id + "] Running " + testConnectionShellJoin(argv) + "\n"); err != nil {
+		return Result{}, err
+	}
 	start := time.Now()
-	r, err := processWithTestConnectionLog(ctx, root, argv, input, func(b []byte) {
+	r, err := processWithTestConnectionLog(ctx, root, argv, input, func(b []byte) error {
 		// Consume synchronously; never retain the reusable read buffer's slice.
-		e.logText("[" + id + "] \t" + strings.TrimSuffix(string(b), "\n") + "\n")
+		return e.logText("[" + id + "] \t" + strings.TrimSuffix(string(b), "\n") + "\n")
 	})
 	status, failure := testConnectionStatus(ctx, argv, r, err)
 	if failure != nil {
@@ -207,8 +238,7 @@ func (e *Engine) testConnectionProcess(ctx context.Context, root string, argv []
 	display := r
 	display.Stdout, display.Stderr = nil, nil
 	display.ExitCode = status
-	e.processLogFinish(id, start, display)
-	return r, nil
+	return r, e.processLogFinish(id, start, display)
 }
 
 func testConnectionShellJoin(argv []string) string {

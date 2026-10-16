@@ -514,7 +514,7 @@ func TestComparisonSelectedLocalReadersNoWritesAndLiteralSelectors(t *testing.T)
 	warnings := []string{}
 	e, d, _ := comparisonFixture(t, []Machine{m})
 	d.Builds = func(host string) (*generation.BuildList, error) {
-		return generation.LoadBuildList(root, host, generation.Options{Warn: func(s string) { warnings = append(warnings, s) }})
+		return generation.LoadBuildList(root, host, generation.Options{Warn: func(s string) error { warnings = append(warnings, s); return nil }})
 	}
 	for _, selector := range []string{"0", "bad"} {
 		out, err := runComparison(t, e, comparisonInvocation(t, "diff", "--yes", "-g", selector), "", d)

@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -20,7 +19,7 @@ type Engine struct {
 	ShowTrace     bool
 	Color         string
 	Yes           bool
-	mu            sync.Mutex
+	logOwner      *engineLog
 	Log           *os.File
 }
 
@@ -36,29 +35,33 @@ func New(ctx context.Context) (*Engine, error) {
 	return &Engine{Root: root, Context: ctx, Color: "auto"}, nil
 }
 func (e *Engine) OpenLog(name string) error {
+	if e.Log != nil || e.logOwner != nil {
+		return fmt.Errorf("log is already acquired")
+	}
 	dir := filepath.Join(e.Root, ".confctl", "logs")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 	f, err := os.Create(filepath.Join(dir, time.Now().Format("2006-01-02--15-04-05")+"-confctl-"+name+".log"))
-	e.Log = f
-	return err
-}
-func (e *Engine) CloseLog(success bool) {
-	if e.Log == nil {
-		return
+	if err != nil {
+		return err
 	}
-	name := e.Log.Name()
-	_ = e.Log.Close()
-	if success {
-		_ = os.Remove(name)
-	}
+	e.Log, e.logOwner = f, nativeEngineLog(f)
+	return nil
 }
 func (e *Engine) Process(argv []string, input []byte) (Result, error) {
-	id, start := e.processLogStart(argv)
-	r, err := Process(e.Context, e.Root, argv, input)
-	e.processLogFinish(id, start, r)
-	return r, err
+	id, start, err := e.processLogStart(argv)
+	if err != nil {
+		return Result{}, err
+	}
+	r, err := processWithTestConnectionLog(e.Context, e.Root, argv, input, func(b []byte) error { return e.logText("[" + id + "] \t" + strings.TrimSuffix(string(b), "\n") + "\n") })
+	if err != nil {
+		return r, err
+	}
+	if err = e.processLogFinish(id, start, r); err != nil {
+		return r, err
+	}
+	return r, nil
 }
 func (e *Engine) required() error {
 	if i, err := os.Stat(filepath.Join(e.Root, "flake.nix")); err == nil && i.Mode().IsRegular() {
