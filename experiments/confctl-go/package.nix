@@ -15,6 +15,9 @@ pkgs.buildGoModule {
     pkgs.coreutils
     pkgs.nix
   ];
+  ldflags = [
+    "-X github.com/vpsfreecz/confctl/internal/core.comparisonRuntimeShell=${pkgs.runtimeShell}"
+  ];
   checkPhase = ''
     runHook preCheck
     go test ./...

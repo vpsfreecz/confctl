@@ -5,7 +5,8 @@
 `init`, `add`, `rename`, `rediscover`, `ls`, `inputs ls`, `inputs channel ls`,
 `inputs update`, `inputs channel update`, `inputs machine update`,
 `inputs set`, `inputs channel set`, `inputs machine set`,
-`status --generation none`, `generation ls`, `test-connection`, `ssh`, `cssh`
+`status --generation none`, `generation ls`, `test-connection`, `ssh`, `cssh`,
+`diff`, `changelog`, `health-check`, the three `gen-data vpsadmin` commands
 and explicitly registered external extensions. Other
 commands and generation modes fail before opening logs, evaluating Nix, running
 SSH or changing configuration.
@@ -16,6 +17,27 @@ execution limits of unavailable commands and status modes.
 command output and reports successful and failed hosts. Completed host failures
 keep the overall exit status 0; start, wait or cancellation errors stop the
 invocation and retain its log.
+
+`health-check` selects managed runnable machines with configured checks and
+asks for confirmation unless `--yes` is set. It reports progress and ordered
+failures using the configured worker count, retry timeout and cooldown. A failed
+check or process error returns status 1. Logs remain available after any failed
+attempt, even when a later attempt succeeds and the command returns status 0.
+See [Health checks](../../docs/health-checks.md) for predicates and retry behavior.
+
+`gen-data vpsadmin containers`, `network` and `all` prompt for API credentials
+without an ordinary yes/no confirmation. Authentication completes before
+containers load machine metadata; network generation skips inventory entirely.
+The commands keep prompt, credential, token, response and protocol-warning data
+out of their invocation logs. Warnings go directly to stderr. Success removes
+the log; operational failures return status 1 and retain it.
+
+Generated files use the existing `data/vpsadmin` paths and fixed `.new` files.
+The parent directories must already exist. `all` saves containers before
+fetching and saving networks, so an error in the second step can leave the first
+file updated. Inspect retained files before retrying; the command performs no
+rollback. See [Gen-data and authentication](../../docs/compatibility/interfaces.md#gen-data-and-authentication)
+for the data and authentication contracts.
 
 `ssh` selects managed runnable machines and retains literal OpenSSH arguments,
 including `CONFCTL_SSH_CONFIG` and per-machine ports. Commands run serially or
@@ -235,18 +257,18 @@ The following table is checked against the command registry:
 | --- | --- |
 | `add` | Available |
 | `build` | Unavailable |
-| `changelog` | Unavailable |
+| `changelog` | Available |
 | `collect-garbage` | Unavailable |
 | `cssh` | Available |
 | `deploy` | Unavailable |
-| `diff` | Unavailable |
-| `gen-data vpsadmin all` | Unavailable |
-| `gen-data vpsadmin containers` | Unavailable |
-| `gen-data vpsadmin network` | Unavailable |
+| `diff` | Available |
+| `gen-data vpsadmin all` | Available |
+| `gen-data vpsadmin containers` | Available |
+| `gen-data vpsadmin network` | Available |
 | `generation ls` | Available |
 | `generation rm` | Unavailable |
 | `generation rotate` | Unavailable |
-| `health-check` | Unavailable |
+| `health-check` | Available |
 | `init` | Available |
 | `inputs channel ls` | Available |
 | `inputs channel set` | Available |
@@ -314,6 +336,33 @@ matching. For integers beyond a machine long, this bounded behavior differs
 from the original Ruby array's `RangeError`. Age selection uses a strict cutoff
 and retains timestamp fractions. Reads never repair current links or create
 profiles or roots.
+
+`diff` and `changelog` compare managed machines sequentially with deployed input
+metadata. Without `--generation`, the target is the current configuration;
+an explicit selector reads existing local generation records. Both confirm the
+selection unless `--yes` is used. A partial generation match prompts again before
+ignoring missing hosts. `--yes` still prints the resolved-generation table.
+
+`diff` reports role revisions without fetching comparison mirrors. `changelog`
+clones or fetches a mirror in the existing XDG/HOME cache and forwards Git's log
+body. `--downgrade` reverses the range; `--verbose` and `--patch` retain their
+existing meanings. An ordinary per-role Git error is displayed and comparison
+continues. Queries and mirror writes already completed remain on later failure.
+
+Paging requires terminal stdout and stderr, a nonblank `PAGER`, and
+`CONFCTL_TTY` other than `0`. Discovery honors the existing pager configuration
+and uses the package's declared shell for configured command strings. If no
+candidate is found, Basic paging shares the confirmation reader and restores
+terminal state after each key. A source binary without the shell linker binding
+fails only when it reaches a System pager operation. Ordinary completed pager
+nonzero status is ignored; start, input, cleanup and cancellation errors propagate.
+Cancellation joins the owned child without promising descendant termination.
+
+The existing Null pager suppresses comparison body output when stdout is
+redirected. It still performs queries and eligible changelog mirror operations;
+confirmation and resolved-generation tables are outside that pager. Local
+fixtures and PTY tests cover these paths; installed package and real-provider
+checks remain separate from the source tests.
 
 Default and selected-generation status, native build, deployment, generation
 removal, rotation and legacy software-pin migration remain unavailable. Native

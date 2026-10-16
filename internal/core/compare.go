@@ -39,11 +39,14 @@ type comparisonDeps struct {
 
 type comparisonArgumentError struct{ error }
 
-// Compare is private until the native pager/input/package gates close and the
-// dispatcher is separately assigned. Existing CLI initialization owns logging.
-// An enabled missing native pager adapter fails at its reached callback.
+// The package binds the shell used for operator-configured pager commands.
+// An unbound source binary can still use disabled or Basic paging.
+var comparisonRuntimeShell string
+
+// Compare shares one input reader between confirmations and Basic paging.
+// Existing CLI initialization owns logging and all supplied files are borrowed.
 func (e *Engine) Compare(inv cli.Invocation, stdin, stdout, stderr *os.File) error {
-	missing := func() error { return fmt.Errorf("comparison native pager adapter is not integrated") }
+	input := bufio.NewReader(stdin)
 	deps := comparisonDeps{
 		Machines: func() ([]Machine, error) { return e.Machines(false) },
 		List:     func(ms []Machine) (string, error) { return e.List(ms, nil, true) },
@@ -61,15 +64,24 @@ func (e *Engine) Compare(inv cli.Invocation, stdin, stdout, stderr *os.File) err
 		OutputTTY: func() bool { return commitStdoutTTY(stdout) },
 		ErrorTTY:  func() bool { return commitStdoutTTY(stderr) },
 		Pager: ui.PagerOps{
-			Env:       os.LookupEnv,
-			Exists:    func(path string) bool { _, err := os.Stat(path); return err == nil },
-			GitConfig: func(context.Context) (string, error) { return "", missing() },
-			Probe:     func(context.Context, string) (bool, error) { return false, missing() },
-			Start:     func(context.Context, string) (ui.PagerPipe, error) { return nil, missing() },
-			Basic:     func(context.Context, io.Writer) (ui.PagerSinkCloser, error) { return nil, missing() },
+			Env:    os.LookupEnv,
+			Exists: func(path string) bool { _, err := os.Stat(path); return err == nil },
+			GitConfig: func(ctx context.Context) (string, error) {
+				return pagerGitConfig(ctx, e.Root, stdin, stderr)
+			},
+			Probe: func(ctx context.Context, command string) (bool, error) {
+				_, clean, err := pagerProbe(ctx, e.Root, comparisonRuntimeShell, command)
+				return clean, err
+			},
+			Start: func(ctx context.Context, command string) (ui.PagerPipe, error) {
+				return startPagerPipe(ctx, e.Root, comparisonRuntimeShell, command, stdout, stderr)
+			},
+			Basic: func(ctx context.Context, _ io.Writer) (ui.PagerSinkCloser, error) {
+				return newLinuxBasicPager(ctx, stdin, stdout, stderr, input)
+			},
 		},
 	}
-	return e.compare(inv, bufio.NewReader(stdin), stdout, deps)
+	return e.compare(inv, input, stdout, deps)
 }
 
 func (e *Engine) LogComparisonCLI(inv cli.Invocation) error { return e.LogTestConnectionCLI(inv) }

@@ -460,12 +460,12 @@ func TestComparisonActualBasicZeroNegativeHeightsAndEmptyPuts(t *testing.T) {
 	}
 }
 
-func TestComparisonCLIStillUnavailableAndBorrowedInvocation(t *testing.T) {
+func TestComparisonCLIAvailableAndBorrowedInvocation(t *testing.T) {
 	for _, command := range []string{"diff", "changelog"} {
 		inv := comparisonInvocation(t, command, "-y", "-g", "", "z", "", "ignored", "--help")
 		before := fmt.Sprintf("%#v", inv)
-		if err := cli.BuiltinRegistry().CheckAvailability(inv); err == nil {
-			t.Fatal("private comparison available")
+		if err := cli.BuiltinRegistry().CheckAvailability(inv); err != nil || inv.Command.Handler != cli.ComparisonHandler {
+			t.Fatal("public comparison unavailable", err)
 		}
 		e, d, _ := comparisonFixture(t, []Machine{connectionMachine("z", "key-z", "unused.invalid", true)})
 		d.Builds = func(string) (*generation.BuildList, error) { return &generation.BuildList{Host: "z"}, nil }
