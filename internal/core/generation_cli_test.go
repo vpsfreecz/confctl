@@ -160,7 +160,7 @@ func TestGenerationListingActualCLIFailureWarningsAndAvailability(t *testing.T) 
 			t.Fatal(r)
 		}
 	}
-	for _, argv := range [][]string{{"generation", "rm"}, {"generation", "rotate"}, {"status"}, {"status", "-gcurrent"}} {
+	for _, argv := range [][]string{{"generation", "rm"}, {"generation", "rotate"}} {
 		r := generationCLI(t, argv, generationCLISetup(t), "exit 99\n")
 		if r.code != 2 || r.out != "" || r.trace != "" || r.log != "" || !strings.Contains(r.stderr, "unavailable") {
 			t.Fatal(r)

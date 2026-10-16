@@ -17,7 +17,7 @@ func TestGenerationListingAvailabilityAndScopeOptions(t *testing.T) {
 	if err != nil || !inv.Options["local"].Value.Bool || inv.Options["remote"].Value.Bool || len(inv.Args) != 2 || inv.Args[1] != "--local" {
 		t.Fatal(inv, err)
 	}
-	for _, args := range [][]string{{"generation", "rm"}, {"generation", "rotate"}, {"collect-garbage"}, {"build"}, {"status"}, {"status", "-gcurrent"}, {"status", "-g0"}} {
+	for _, args := range [][]string{{"generation", "rm"}, {"generation", "rotate"}, {"collect-garbage"}} {
 		inv, err := r.Parse(args)
 		if err != nil || r.CheckAvailability(inv) == nil {
 			t.Fatal("broadened availability", args, err)

@@ -65,6 +65,14 @@ Declarations: [app.rb:59–159](https://github.com/vpsfreecz/confctl/blob/cc4067
 
 Status assigns configured target input metadata sequentially (exceptions become unknown), unless an explicit build generation supplies metadata. Remote query executor has **selected machine count** threads, even when some statuses were removed for missing generations. It prints ordered rows HOST ONLINE UPTIME STATUS GENERATIONS plus sorted union of input roles; generations is `local-count:remote-count`. Online means uptime non-nil. “ok” requires online plus a nonempty target role set with all equal revisions and, when supplied, equal target toplevel. Other roles may display unknown without changing that target-only comparison. Missing/offline values render `-`; per-host SSH exit errors usually leave partial/unknown status rather than abort. `format_duration` selects the first unit with interval strictly greater than its size and raises for uptime <=1 second. Fixtures must include this edge case and failures at each query stage ([cluster:1429–1504,1577–1587](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/cluster.rb#L1429)).
 
+The Go CLI executes `build` and every declared `status` generation mode.
+Build-backed status uses one selection and confirmation, calls the shared build
+adapter once, then refreshes configured inputs before querying hosts. Explicit
+stored generations supply their own inputs and target toplevel. `none` skips
+both building and target-toplevel comparison. Human progress is serialized on
+both terminals and redirected output. Offline and outdated results return 0;
+build and infrastructure failures return 1 and retain the invocation log.
+
 ## Deployment and health checks (2)
 
 `deploy [machine-pattern [switch-action]]` accepts F Y N, `--show-trace`, `-g/--generation`, `-i/--interactive`, `--dry-activate-first`, `--one-by-one`, integer `--max-concurrent-copy=5`, non-negatable `--copy-only`, non-negatable `--enable-auto-rollback=false` and `--disable-auto-rollback=false`, `--reboot`, `--wait-online=600` (string), `--health-checks=true`, `--keep-going=false` ([app:208–263](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/cli/app.rb#L208)). Fixtures `deploy.*` must cover flag combinations, failures and causal order:

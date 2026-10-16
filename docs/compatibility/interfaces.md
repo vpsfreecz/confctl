@@ -104,6 +104,20 @@ Sources [nix.rb:13–181](https://github.com/vpsfreecz/confctl/blob/cc40679d2671
 
 NixBuildFlake consumes stdout JSON and stderr progress; NixCopy parses copying lines; line buffering/partial final lines and old/new Nix log forms require fixtures. There is no persistent daemon or universal inventory cache in this Ruby layer. A native cache is a separate hypothesis: measure reference-preserving path first, report cached optimization separately, and invalidate around configuration writes/hook mutations. Hook kernel state must be visible before build planning/evaluation. Real Nix evaluation cost may dominate even if language startup improves.
 
+The Go build adapter decodes ordered Nix values directly, preserving nested
+member order and exact JSON numbers. Each actual compatibility attempt has its
+own progress parser; failed tails do not enter the next attempt. Successful
+build output is validated as JSON before the authoritative output evaluation.
+Build and build-backed status share this adapter and the same generation writer.
+
+Generation reuse changes only the current selection, without rewriting stored
+metadata or creating new GC roots. New saves keep the existing sequence of
+record files, links, roots and current selection. Failure retains completed
+writes. The Linux package enables cgo for lazy libc login lookup: getlogin first,
+then USER only when getlogin returns null. Login is sampled at each reached
+root-directory demand; reuse does not require it. A source binary built without
+cgo refuses only when it needs that production lookup.
+
 ## SSH and process contract
 
 MachineControl remote argv: `ssh`, optional `-F config`, `-l root`, optional `-p port`, temporary extra options, target, **one Shellwords.join(command) string**. Localhost passes command argv directly through TTY::Command. execute raises on exit error; execute! returns result. Interactive uses root's passwd shell locally or Kernel.system SSH remotely. No generic SSH timeout is set except test-connection and reboot polling; don't add one to status parity. Bash script operations invoke `bash --norc` with script bytes on stdin. Sources [machine_control.rb:19–32,88–184](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/machine_control.rb#L19), [system_command.rb:7–8](https://github.com/vpsfreecz/confctl/blob/cc40679d267165aecfa569128438bb55fe910268/lib/confctl/system_command.rb#L7). Fixtures `process.argv`, `process.ssh`, `process.stdin`, `process.signals`.
