@@ -26,6 +26,8 @@ pkgs.buildGoModule {
     cp -R licenses/go/. "$out/share/doc/confctl-go-prototype/dependencies/"
     install -Dm444 internal/inputs/ordered_lock.NOTICE \
       "$out/share/doc/confctl-go-prototype/ordered_lock.NOTICE"
+    install -Dm444 internal/ui/pager_source.NOTICE \
+      "$out/share/doc/confctl-go-prototype/pager_source.NOTICE"
     mkdir -p "$out/libexec"
     substitute libexec/confctl-commit-stop-relay.bash \
       "$out/libexec/confctl-commit-stop-relay.bash" \

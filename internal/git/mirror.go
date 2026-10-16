@@ -49,11 +49,20 @@ func (m Mirror) Setup(ctx context.Context) error {
 }
 
 func (m Mirror) Log(ctx context.Context, from, to string) (string, error) {
+	return m.LogWithOptions(ctx, from, to, []string{"--oneline"})
+}
+
+// LogWithOptions appends literal options in caller order before one range
+// argument. It borrows options without modifying them; callers own any limits.
+func (m Mirror) LogWithOptions(ctx context.Context, from, to string, options []string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
 	span := from + ".." + to
-	text, err := m.Run(ctx, m.Root, []string{"git", "-C", m.Path(), "log", "--no-decorate", "--left-right", "--cherry-mark", "--oneline", span})
+	argv := []string{"git", "-C", m.Path(), "log", "--no-decorate", "--left-right", "--cherry-mark"}
+	argv = append(argv, options...)
+	argv = append(argv, span)
+	text, err := m.Run(ctx, m.Root, argv)
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}

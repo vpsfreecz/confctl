@@ -63,7 +63,14 @@ func short(s string) string {
 type queryOptions struct{ Toplevel, Generations, Inputs bool }
 
 func (e *Engine) query(st *Status, all []Machine, options queryOptions) {
-	m := st.Machine
+	e.queryWithInputs(st, all, options, e.Process, false)
+}
+
+// Status construction and querying share carrier lookup. Comparison constructs
+// its statuses before reading target metadata; ordinary callers still resolve
+// at their existing query point.
+func statusConnection(machine Machine, all []Machine) (Machine, error) {
+	m := machine
 	if m.CarrierName != nil {
 		found := false
 		for _, c := range all {
@@ -74,16 +81,27 @@ func (e *Engine) query(st *Status, all []Machine, options queryOptions) {
 			}
 		}
 		if !found {
-			st.Err = fmt.Errorf("Carrier %s not found in machine list", *st.Machine.CarrierName)
-			return
+			return Machine{}, fmt.Errorf("Carrier %s not found in machine list", *machine.CarrierName)
 		}
+	}
+	return m, nil
+}
+
+// Comparison selects ordered input decoding here, at the shared read/fallback
+// owner. The existing status/listing route retains its original decoder and
+// normalization. Injecting Process scripts transport without another runner.
+func (e *Engine) queryWithInputs(st *Status, all []Machine, options queryOptions, process func([]string, []byte) (Result, error), comparison bool) {
+	m, err := statusConnection(st.Machine, all)
+	if err != nil {
+		st.Err = err
+		return
 	}
 	run := func(a []string, input []byte) (Result, error) {
 		args, err := SSHArgs(m, a)
 		if err != nil {
 			return Result{}, err
 		}
-		return e.Process(args, input)
+		return process(args, input)
 	}
 	r, err := run([]string{"cat", "/proc/uptime"}, nil)
 	if err != nil {
@@ -145,9 +163,20 @@ func (e *Engine) query(st *Status, all []Machine, options queryOptions) {
 			return
 		}
 		if r.ExitCode == 0 {
-			var h map[string]any
-			if decodeJSONNumbers(r.Stdout, &h) == nil {
-				value = h["inputs-info"]
+			if comparison {
+				parsed, parseErr := generation.DecodeJSONValue(r.Stdout)
+				if parseErr == nil {
+					value, err = comparisonCarriedInfo(parsed)
+					if err != nil {
+						st.Err = err
+						return
+					}
+				}
+			} else {
+				var h map[string]any
+				if decodeJSONNumbers(r.Stdout, &h) == nil {
+					value = h["inputs-info"]
+				}
 			}
 		}
 		if !truth(value) {
@@ -166,11 +195,20 @@ func (e *Engine) query(st *Status, all []Machine, options queryOptions) {
 		value = string(r.Stdout)
 	}
 	if s, ok := value.(string); ok {
-		if decodeJSONNumbers([]byte(s), &value) != nil {
+		if comparison {
+			value, err = generation.DecodeJSONValue([]byte(s))
+		} else {
+			err = decodeJSONNumbers([]byte(s), &value)
+		}
+		if err != nil {
 			return
 		}
 	}
-	st.Deployed = normalizeInputs(value)
+	if comparison {
+		st.Deployed, st.Err = comparisonInputs(value)
+	} else {
+		st.Deployed = normalizeInputs(value)
+	}
 }
 
 func formatDuration(up float64) (string, error) {
