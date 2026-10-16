@@ -110,6 +110,11 @@ let
         src = appSrc;
         docs = appDocs;
       };
+  prototypeCLI =
+    if appSrc == null then
+      null
+    else
+      import (appSrc + "/experiments/confctl-go/package.nix") { inherit pkgs; };
   operationCLI =
     if appSrc == null then
       null
@@ -183,6 +188,7 @@ in
     tools
     fakeKexec
     cli
+    prototypeCLI
     operationCLI
     originalCLI
     peer

@@ -35,6 +35,8 @@ import ../make-test.nix (
       # Null defaults preserve the original helper-only selection. A full run
       # supplies an immutable corrected appSrc and its normal documentation.
       cli = if packages.cli == null then null else "${packages.cli}/bin/confctl";
+      prototypeCLI =
+        if packages.prototypeCLI == null then null else "${packages.prototypeCLI}/bin/confctl-go-prototype";
       operationCLI =
         if packages.operationCLI == null then null else "${packages.operationCLI}/bin/confctl";
       originalCLI = if packages.originalCLI == null then null else "${packages.originalCLI}/bin/confctl";
@@ -50,6 +52,7 @@ import ../make-test.nix (
       peer = "${packages.peer}/bin/delivery-peer";
       git = "${pkgs.git}/bin/git";
       coreutils = "${pkgs.coreutils}/bin";
+      system = pkgs.stdenv.hostPlatform.system;
       sitePairs = map (pair: {
         inherit (pair) name;
         source = toString pair.source;
@@ -95,6 +98,7 @@ import ../make-test.nix (
           appSrc
           appDocs
           packages.cli
+          packages.prototypeCLI
           packages.operationCLI
         ]
         ++ pkgs.lib.optionals (oracleSrc != null) [

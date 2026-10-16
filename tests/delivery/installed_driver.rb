@@ -160,6 +160,223 @@ DELIVERY_CLI_SUPPORT = <<~'RUBY_GUEST'.freeze
     result
   end
 
+  # The real package wrappers select real Nix, independent of fixture PATH.
+  # Only this guest-local, uncached derivation waits on the explicit release.
+  def fixture_installed_tui_build(label, executable)
+    require 'tmpdir'
+    root = fixture_case('tui-' + label)
+    gate = Dir.mktmpdir('confctl-delivery-tui-' + label + '-', '/tmp')
+    File.chmod(0777, gate) # The guest's Nix build user cannot enter ROOT's 0700 tree.
+    release, pidfile = File.join(gate, 'release'), File.join(gate, 'builder-pid')
+    token = 'delivery-tui-' + label + '-' + File.basename(gate)
+    child = builder = nil
+    File.write(root + '/flake.nix', <<~NIX)
+      {
+        outputs = _: let
+          inventory = builtins.derivation {
+            name = "delivery-tui-inventory";
+            system = #{B.fetch('system').to_json};
+            builder = #{B.fetch('bash').to_json};
+            args = [ "-eu" "-c" ''printf '%s' "$text" > "$out"'' ];
+            text = builtins.toJSON {
+              node = { name = "node"; clusterName = "node"; key = "node";
+                metaConfig = { managed = true; spin = "nixos"; }; };
+            };
+            preferLocalBuild = true;
+            allowSubstitutes = false;
+          };
+          top = builtins.derivation {
+            name = #{token.to_json};
+            system = #{B.fetch('system').to_json};
+            builder = #{B.fetch('bash').to_json};
+            PATH = #{B.fetch('coreutils').to_json};
+            preferLocalBuild = true;
+            allowSubstitutes = false;
+            args = [ "-eu" "-c" ''
+              printf '%s\\n' "$$" > "#{pidfile}"
+              printf '%s\\n' '#{token}' >&2
+              deadline=$((SECONDS + 60))
+              until test -f "#{release}"; do
+                if test "$SECONDS" -ge "$deadline"; then exit 97; fi
+                sleep 0.05
+              done
+              mkdir "$out"
+              printf '%s' '#{token}' > "$out/tui-token"
+            '' ];
+          };
+        in { confctl = {
+          settings = { list.columns = [ "name" ];
+            nix = { maxJobs = "1"; impureEval = false; legacyNixPath = false; }; };
+          machinesJson = inventory;
+          machineKeys.node = "node";
+          buildPlan.node = { key = "node"; inputs = {}; };
+          inputsInfo.node = {};
+          build.node = { toplevel = top; autoRollback = top; };
+        }; };
+      }
+    NIX
+    env = fixture_env(root).merge('CONFCTL_TTY' => '1', 'TERM' => 'xterm-256color',
+      'NIX_REMOTE' => 'local',
+      'NIX_CONFIG' => "experimental-features = nix-command flakes\nsandbox = false\nsubstituters =\nbuilders =\n")
+    color = label == 'normal'
+    argv = [executable]
+    argv << '--color=always' if color # Explicit always overrides this fixture's NO_COLOR=1.
+    argv.concat(['build', '--yes', '--max-jobs', '1', 'node'])
+    child = fixture_start(root, env, argv, tty: true, tty_stderr: true)
+    child[:master].ioctl(0x5414, [32, 160, 0, 0].pack('S4')) # This owned PTY only.
+    held = nil
+    prelude_lines = nil
+    frame_end = "\e[32;1H\e[2K"
+    separator = " \u2014 ".b
+    full_log = nil
+    header_command = 'Command: confctl ' + (color ? '--color\=always ' : '') + 'build --yes --max-jobs 1 node'
+    fixture_until(child, 45) do
+      if (done = Process.waitpid2(child[:pid], Process::WNOHANG))
+        child[:status] = done[1]
+        abort "packaged CLI exited before release: exit=#{done[1].exitstatus} signal=#{done[1].termsig} #{fixture_output(child)}"
+      end
+      if !builder && File.file?(pidfile) && File.read(pidfile).match?(/\A[0-9]+\n\z/)
+        builder = fixture_stat(Integer(File.read(pidfile)))
+        if builder
+          command = File.binread("/proc/#{builder[:pid]}/cmdline")
+          abort 'unexpected builder identity' unless command.include?(token) && command.include?(gate)
+        end
+      end
+      screen = fixture_output(child)
+      # Only a complete latest paint can satisfy admission; earlier prelude or
+      # partial rows cannot release the real builder. Keep the captured bytes.
+      finish = screen.rindex(frame_end)
+      start = screen.rindex("\e[H", finish) if finish
+      next false unless builder && start
+      frame = screen[start...(finish + frame_end.bytesize)]
+      rows = frame.delete_prefix("\e[H").delete_suffix(frame_end).split("\e[2K\r", -1)
+      next false unless rows.shift == '' && rows.length == 31
+      rows.map! { |row| row.delete_suffix("\r\n").delete_suffix("\n") }
+      plain = rows.map { |row| row.gsub(/\e\[[0-9;]*m/, '') } # Assertion view only, never transport/log bytes.
+      bottom = plain.index { |row| row.match?(/\A<-+\z/) }
+      next false unless bottom && plain[4...bottom].any? { |row| row.include?(token) } &&
+        plain[(bottom + 1)..].any? { |row| row.match?(/\ABuilding +\[running[^\]]*\] +1\/1\b/) }
+      abort 'wrong compact live header' unless plain[0] == header_command && plain[1] == 'Build group: 1/1 (1 machines)' &&
+        plain[2].start_with?('Full log: ' + root + '/.confctl/logs/') && plain[3].match?(/\ALive view -+>\z/)
+      bars = plain[(bottom + 1)..].reject(&:empty?)
+      abort 'log border/bar allocation changed' unless bottom - 4 >= 12 && bars.length == 2 &&
+        bars[0].match?(/\ABuilding +\[running[^\]]*\] +1\/1 \(100%\) +\[[= ]{4,20}\]/) &&
+        bars[1].match?(/\AFetching +\[pending\]\z/)
+      # Fetching has no observations in this real local build: no invented
+      # counter/bar. Main PTYs cover two actual positive-total tracks.
+      log_path = plain[2].delete_prefix('Full log: ')
+      full_log = plain[2] if File.file?(log_path)
+      if full_log
+        path = File.binread(log_path).scan(%r{/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-[^\s'"]+}).find do |candidate|
+          candidate.include?(token) && candidate.end_with?('.drv')
+        end
+        if path && (divider = bars[0].index(separator))
+          detail = bars[0][(divider + separator.bytesize)..]
+          # Prefix/count/track are ASCII here; the separator occupies 3 cells.
+          if path.bytesize <= 160 - divider - 3
+            abort 'fitting canonical detail was shortened' unless detail == path
+          else
+            abort 'canonical detail did not shorten only its hash' unless detail.start_with?(path[0, 18] + "\u2026-".b)
+          end
+          abort 'child log hash was shortened' unless plain[4...bottom].any? { |row| row.include?(path[0, 44]) }
+        end
+      end
+      abort 'old observed label survived' if plain.join("\n").match?(/observed (?:starts|step)/i)
+      abort 'child log was styled' if rows[4...bottom].any? { |row| row.match?(/\e\[[0-9;]*m/) }
+      prelude = screen.split("\e[H", 2).first
+      prelude_lines = prelude.gsub(/\e\[[0-9;]*m/, '').lines.map(&:strip)
+      abort 'prelude missing or repeated before view' unless prelude_lines.count('Building machines') == 1 && prelude_lines.count('node') == 1
+      abort 'prelude was not scrolled before first paint' unless prelude.match?(/(?:\r?\n){24,}\z/)
+      abort 'prelude repeated in repaint' if plain.any? { |row| ['Building machines', 'node', 'with inputs'].include?(row.strip) }
+      if color
+        abort 'missing confctl header styling' unless rows[0].start_with?("\e[1mCommand:\e[0m ") &&
+          rows[1].start_with?("\e[1mBuild group:\e[0m ") && rows[2].start_with?("\e[1mFull log:\e[0m ") &&
+          rows[3] == "\e[1m#{plain[3]}\e[0m"
+        abort 'missing confctl prelude styling' unless prelude.include?("\e[1mBuilding machines\e[0m") && prelude.include?("\e[33mnode\e[0m")
+      else
+        abort 'NO_COLOR frame/prelude has SGR' if (frame + prelude).match?(/\e\[[0-9;]*m/)
+      end
+      cli_now, builder_now = fixture_stat(child[:pid]), fixture_stat(builder[:pid])
+      abort 'release preceded live observation' if File.exist?(release)
+      abort 'CLI not alive at frame' unless cli_now && cli_now[:start] == child[:identity][:start] && cli_now[:state] != 'Z'
+      abort 'builder not alive at frame' unless builder_now && builder_now[:start] == builder[:start] && builder_now[:state] != 'Z'
+      abort 'generation completed before release' if File.exist?(root + '/.confctl/generations/node/current')
+      held = { 'release_absent' => true, 'cli_alive' => true, 'builder_alive' => true,
+               'builder_pid' => builder[:pid], 'builder_start' => builder[:start], 'frame_base64' => Base64.strict_encode64(screen) }
+      true
+    end
+    File.write(release, "release\n")
+    result = fixture_ok(fixture_wait(child, seconds: 45))
+    generations = root + '/.confctl/generations/node'
+    current = File.realpath(generations + '/current')
+    record = JSON.parse(File.read(current + '/generation.json'))
+    abort 'wrong built generation' unless record.fetch('mode') == 'flakes' &&
+      File.read(record.fetch('toplevel') + '/tui-token') == token &&
+      result.fetch('out').include?('Built generations:')
+    final_lines = result.fetch('out').gsub(/\e\[[0-9;]*m/, '').lines.map(&:strip)
+    abort 'prelude repeated during final summary' unless final_lines.count('Building machines') == 1 && final_lines.count('node') == 1 &&
+      final_lines.count('with inputs') == prelude_lines.count('with inputs')
+    output = result.fetch('out')
+    finish = output.rindex(frame_end)
+    start = output.rindex("\e[H", finish) if finish
+    abort 'missing final complete paint' unless start
+    final_frame = output[start...(finish + frame_end.bytesize)]
+    final_rows = final_frame.delete_prefix("\e[H").delete_suffix(frame_end).split("\e[2K\r", -1)
+    abort 'partial final paint' unless final_rows.shift == '' && final_rows.length == 31
+    final_rows.map! { |row| row.delete_suffix("\r\n").delete_suffix("\n") }
+    final_plain = final_rows.map { |row| row.gsub(/\e\[[0-9;]*m/, '') }
+    bottom = final_plain.index { |row| row.match?(/\A<-+\z/) }
+    abort 'final panel lost compact context or log border' unless bottom && bottom - 4 >= 12 &&
+      final_plain[0] == header_command && final_plain[1] == 'Build group: 1/1 (1 machines)' &&
+      final_plain[2].start_with?('Full log: ' + root + '/.confctl/logs/')
+    tasks = final_plain[(bottom + 1)..].reject(&:empty?)
+    abort 'final panel lost child outcomes' unless tasks.length == 3 &&
+      tasks[0].match?(/\ABuilding +\[succeeded\] +1\/1 \(100%\) +\[[= ]{4,20}\]/) &&
+      tasks[1].match?(/\AFetching +\[skipped\]/) && tasks[1].end_with?('No steps observed') &&
+      tasks[2].match?(/\Anix eval +\[succeeded\]/)
+    # All selected rows use one detail column. Counterless Fetching leaves the
+    # shared counter/track space blank instead of claiming work or an empty bar.
+    divider = tasks[0].index(separator)
+    fetch_divider = tasks[1].index(separator)
+    abort 'final detail columns differ' unless divider && fetch_divider == divider
+    abort 'unobserved Fetching gained a counter/bar' unless tasks[1][(tasks[1].index(']') + 1)...fetch_divider].strip.empty?
+    abort 'final child log was styled' if final_rows[4...bottom].any? { |row| row.match?(/\e\[[0-9;]*m/) }
+    suffix = output[(finish + frame_end.bytesize)..].gsub(/\e\[[0-9;]*m/, '')
+    suffix_lines = suffix.lines.map(&:strip)
+    abort 'header or selected task replayed after final paint' if suffix.include?("\e[H") ||
+      suffix_lines.any? { |line| line.match?(/\A(?:Command:|Build group:|(?:Building|Fetching|nix build|nix eval) +\[)/) }
+    locators = suffix_lines.grep(/\AFull log: /)
+    abort 'full log locator replayed' if locators.length > 1 || (locators.any? && final_plain.include?(locators.first))
+    abort 'wrong recovered full log locator' if locators.any? && (full_log ? locators.first != full_log :
+      !locators.first.start_with?('Full log: ' + root + '/.confctl/logs/'))
+    abort 'normal build result missing after final paint' unless suffix_lines.include?('Built generations:')
+    { 'product' => label, 'executable' => executable, 'exit' => result.fetch('exit'),
+      'signal' => result.fetch('signal'), 'before_release' => held, 'token' => token,
+      'generation' => record, 'output_base64' => Base64.strict_encode64(result.fetch('out')) }
+  ensure
+    # Release before cancel/join, including assertion failure; never remove the
+    # builder's files while its recorded PID/start identity can still be alive.
+    begin
+      File.write(release, "cleanup\n") if release && File.directory?(gate)
+    ensure
+      fixture_cleanup(child)
+    end
+    if !builder && pidfile && File.file?(pidfile) && File.read(pidfile).match?(/\A[0-9]+\n\z/)
+      builder = fixture_stat(Integer(File.read(pidfile)))
+      if builder
+        command = File.binread("/proc/#{builder[:pid]}/cmdline")
+        abort 'unexpected cleanup builder identity' unless command.include?(token) && command.include?(gate)
+      end
+    end
+    if builder
+      fixture_until(child, 10) do
+        now = fixture_stat(builder[:pid])
+        now.nil? || now[:start] != builder[:start]
+      end
+    end
+    FileUtils.remove_entry(gate) if gate && File.directory?(gate)
+  end
+
   def fixture_plan(root, rules)
     rules.group_by { |rule| rule.fetch('tool') }.each do |tool, rows|
       File.write(File.join(root, 'plan', tool + '.json'), JSON.generate(rows.each_with_index.map { |row, i| { index: i, rule: row } }))
@@ -343,6 +560,37 @@ describe 'installed CLI with ordinary and operation-bound packages', order: :def
       puts JSON.generate('help_count' => commands.length, 'version_exit' => version.fetch('exit'))
     RUBY_GUEST
     expect(actual.values_at('help_count', 'version_exit')).to eq([29, 1])
+  end
+
+  it 'shows the ordinary normal package live build frame before its real Nix builder is released', skip: !selected do
+    actual = delivery_guest(<<~RUBY_GUEST, timeout: 120)
+      puts JSON.generate(fixture_installed_tui_build('normal', B.fetch('cli')))
+    RUBY_GUEST
+    expect(actual.values_at('product', 'exit', 'signal')).to eq(['normal', 0, nil])
+    expect(actual.fetch('before_release').values_at('release_absent', 'cli_alive', 'builder_alive')).to eq([true, true, true])
+    screen = Base64.strict_decode64(actual.fetch('before_release').fetch('frame_base64'))
+    finish = screen.rindex("\e[32;1H\e[2K")
+    frame = screen[screen.rindex("\e[H", finish)...(finish + "\e[32;1H\e[2K".bytesize)]
+    plain = frame.gsub(/\e\[[0-9;]*m/, '')
+    expect(plain).to include(actual.fetch('token'), 'Command: confctl', 'Build group: 1/1 (1 machines)', 'Live view')
+    expect(plain).to match(%r{Building +\[running[^\]\r\n]*\] +1/1\b})
+    expect(plain).to match(/Fetching +\[pending\]/)
+    expect(frame).to include("\e[1mCommand:\e[0m", "\e[1mLive view ")
+  end
+
+  it 'shows the ordinary prototype package live build frame before its real Nix builder is released', skip: !selected do
+    actual = delivery_guest(<<~RUBY_GUEST, timeout: 120)
+      puts JSON.generate(fixture_installed_tui_build('prototype', B.fetch('prototypeCLI')))
+    RUBY_GUEST
+    expect(actual.values_at('product', 'exit', 'signal')).to eq(['prototype', 0, nil])
+    expect(actual.fetch('before_release').values_at('release_absent', 'cli_alive', 'builder_alive')).to eq([true, true, true])
+    screen = Base64.strict_decode64(actual.fetch('before_release').fetch('frame_base64'))
+    finish = screen.rindex("\e[32;1H\e[2K")
+    frame = screen[screen.rindex("\e[H", finish)...(finish + "\e[32;1H\e[2K".bytesize)]
+    expect(frame).to include(actual.fetch('token'), 'Command: confctl', 'Build group: 1/1 (1 machines)', 'Live view')
+    expect(frame).to match(%r{Building +\[running[^\]\r\n]*\] +1/1\b})
+    expect(frame).to match(/Fetching +\[pending\]/)
+    expect(frame).not_to match(/\e\[[0-9;]*m/)
   end
 
   it 'creates and renames a disposable configuration without losing duplicate-add state', skip: !selected do
