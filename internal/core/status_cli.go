@@ -129,11 +129,11 @@ func (e *Engine) statusCLI(inv cli.Invocation, in io.Reader, out, stderr io.Writ
 			for i, machine := range selected {
 				hosts[i] = machine.Name
 			}
-			built, err := e.buildSelected(hosts, buildOptions{}, e.buildOutput(out, stderr), deps)
+			built, err := e.buildWithPresentation(hosts, buildOptions{}, out, stderr, deps)
 			if err != nil {
 				return err
 			}
-			if err := writeBuildSummary(out, built); err != nil {
+			if err := e.writeBuildSummary(out, built); err != nil {
 				return err
 			}
 			for _, record := range built.Generations {

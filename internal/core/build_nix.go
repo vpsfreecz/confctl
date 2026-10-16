@@ -15,6 +15,7 @@ type buildNix struct {
 	options        buildOptions
 	run            func([]string, []byte, func([]byte, []byte) error) (Result, error)
 	progress       func(build.Event) error
+	commandEvent   func(buildCommandEvent) error
 	settings, plan generation.Object
 	keys           generation.Object
 	settingsReady  bool
@@ -139,6 +140,12 @@ func buildObjectValue(object generation.Object, key string) any {
 }
 
 func (n *buildNix) command(op string, installables, legacy []string, apply *string, settings generation.Object, progress bool) ([]byte, error) {
+	notify := func(stage buildCommandStage, err error) error {
+		if n.commandEvent == nil {
+			return nil
+		}
+		return n.commandEvent(buildCommandEvent{Op: op, Installables: append([]string(nil), installables...), Stage: stage, Err: err})
+	}
 	extra, noUpdate := false, true
 	for {
 		argv := []string{"nix", op, "--json"}
@@ -189,17 +196,25 @@ func (n *buildNix) command(op string, installables, legacy []string, apply *stri
 				return progressErr
 			}
 		}
+		if err := notify(buildCommandStarted, nil); err != nil {
+			return nil, err
+		}
 		result, runErr := n.run(argv, nil, chunk)
 		status, err := buildStatus(n.e.Context, result, runErr)
 		if err != nil {
+			_ = notify(buildCommandFailed, err) // The existing command cause wins.
 			return nil, err
 		}
 		if status == 0 {
 			if parser != nil {
 				parser.Finish()
 				if progressErr != nil {
+					_ = notify(buildCommandFailed, progressErr)
 					return nil, progressErr
 				}
+			}
+			if err := notify(buildCommandSucceeded, nil); err != nil {
+				return nil, err
 			}
 			return result.Stdout, nil
 		}
@@ -213,6 +228,7 @@ func (n *buildNix) command(op string, installables, legacy []string, apply *stri
 			extra = true
 			continue
 		}
+		_ = notify(buildCommandFailed, failure)
 		return nil, failure
 	}
 }

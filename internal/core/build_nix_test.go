@@ -77,8 +77,16 @@ func TestBuildNixCompatibilityAndFreshProgress(t *testing.T) {
 		t.Run(messages[0], func(t *testing.T) {
 			e := &Engine{Context: context.Background()}
 			var events []build.Event
+			var commands []buildCommandEvent
 			var attempts [][]string
 			n := &buildNix{e: e, settingsReady: true, progress: func(event build.Event) error { events = append(events, event); return nil }}
+			n.commandEvent = func(event buildCommandEvent) error {
+				commands = append(commands, event)
+				if event.Stage == buildCommandSucceeded && (len(events) != 3 || events[2].Path != "/successful-tail.drv") {
+					t.Fatal("completion preceded successful parser remainder", events)
+				}
+				return nil
+			}
 			n.run = func(argv []string, _ []byte, feed func([]byte, []byte) error) (Result, error) {
 				attempts = append(attempts, append([]string(nil), argv...))
 				i := len(attempts) - 1
@@ -107,7 +115,116 @@ func TestBuildNixCompatibilityAndFreshProgress(t *testing.T) {
 			if containsBuildArg(attempts[2], "--no-update-lock-file") || !containsBuildArg(attempts[2], "--extra-experimental-features") {
 				t.Fatal(attempts)
 			}
+			var stages []buildCommandStage
+			for _, event := range commands {
+				stages = append(stages, event.Stage)
+				if event.Op != "build" || event.Err != nil || !reflect.DeepEqual(event.Installables, []string{"literal"}) {
+					t.Fatal("incorrect attempt binding", event)
+				}
+			}
+			if !reflect.DeepEqual(stages, []buildCommandStage{buildCommandStarted, buildCommandStarted, buildCommandStarted, buildCommandSucceeded}) {
+				t.Fatal("retry emitted terminal event or missed start", stages)
+			}
 		})
+	}
+}
+
+func TestBuildNixCommandObservationPriority(t *testing.T) {
+	primary, notification := errors.New("command cause"), errors.New("notification cause")
+	for _, kind := range []string{"start", "capture", "process", "context", "status", "progress", "success"} {
+		t.Run(kind, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			n := &buildNix{e: &Engine{Context: ctx}, settingsReady: true}
+			var events []buildCommandEvent
+			var order []string
+			n.commandEvent = func(event buildCommandEvent) error {
+				events = append(events, event)
+				order = append(order, "event")
+				if kind == "start" || event.Stage != buildCommandStarted {
+					return notification
+				}
+				return nil
+			}
+			n.progress = func(build.Event) error { return primary }
+			n.run = func(_ []string, _ []byte, feed func([]byte, []byte) error) (Result, error) {
+				order = append(order, "run")
+				switch kind {
+				case "capture":
+					cancel()
+					return Result{capture: &captureCompletion{primary: primary}}, primary
+				case "process":
+					return Result{}, primary
+				case "context":
+					cancel()
+					return Result{}, nil
+				case "status":
+					return Result{ExitCode: 7}, nil
+				case "progress":
+					// Child succeeded but its final partial progress flush fails.
+					if err := feed(nil, []byte("building '/last.drv'")); err != nil {
+						t.Fatal(err)
+					}
+				}
+				return Result{Stdout: []byte("null")}, nil
+			}
+			_, err := n.build(build.BuildRequest{Installables: []string{"target"}}, nil)
+			if kind == "start" {
+				if err != notification || len(events) != 1 || !reflect.DeepEqual(order, []string{"event"}) {
+					t.Fatal("start refusal launched child", err, events, order)
+				}
+				return
+			}
+			if len(events) != 2 || !reflect.DeepEqual(order, []string{"event", "run", "event"}) {
+				t.Fatal("missing joined terminal boundary", err, events, order)
+			}
+			last := events[1]
+			switch kind {
+			case "success":
+				if err != notification || last.Stage != buildCommandSucceeded || last.Err != nil {
+					t.Fatal("accepted success notification error lost", err, last)
+				}
+			case "context":
+				if err != context.Canceled || last.Err != err {
+					t.Fatal("context priority lost", err, last)
+				}
+			case "status":
+				if err == nil || err == notification || last.Err != err || !strings.Contains(err.Error(), "exit status: 7") {
+					t.Fatal("exit failure replaced by notification", err, last)
+				}
+			default:
+				if err != primary || last.Err != primary {
+					t.Fatal("original command/progress cause replaced", err, last)
+				}
+			}
+			if kind != "success" && last.Stage != buildCommandFailed {
+				t.Fatal("failure terminal stage lost", last)
+			}
+		})
+	}
+}
+
+func TestBuildNixCommandSnapshotsAndDecodeBoundary(t *testing.T) {
+	n := &buildNix{e: &Engine{Context: context.Background()}, settingsReady: true}
+	var events []buildCommandEvent
+	n.commandEvent = func(event buildCommandEvent) error {
+		events = append(events, event)
+		if event.Stage == buildCommandStarted {
+			event.Installables[0] = "changed by observer"
+		}
+		return nil
+	}
+	n.run = func(argv []string, _ []byte, _ func([]byte, []byte) error) (Result, error) {
+		if argv[len(argv)-1] != ".#confctl.build" {
+			t.Fatal("observer changed executed target", argv)
+		}
+		return Result{Stdout: []byte("malformed JSON")}, nil
+	}
+	if _, err := n.evalWithSettings(".#confctl.build", nil, nil); err == nil {
+		t.Fatal("eval decode failure disappeared")
+	}
+	if len(events) != 2 || events[1].Stage != buildCommandSucceeded || events[1].Installables[0] != ".#confctl.build" || events[1].Err != nil {
+		t.Fatal("decode error reclassified child or snapshots alias", events)
 	}
 }
 

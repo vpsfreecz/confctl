@@ -30,7 +30,23 @@ type buildPresentation struct {
 	GroupsPrepared func([]build.Group) error
 	GroupStart     func(int, int, build.Group) error
 	Progress       func(build.Event) error
-	Close          func() error
+	Command        func(buildCommandEvent) error
+	Close          func(error) error
+}
+
+type buildCommandStage uint8
+
+const (
+	buildCommandStarted buildCommandStage = iota
+	buildCommandSucceeded
+	buildCommandFailed
+)
+
+type buildCommandEvent struct {
+	Op           string
+	Installables []string
+	Stage        buildCommandStage
+	Err          error
 }
 
 func (e *Engine) Build(inv cli.Invocation, stdin, stdout, stderr *os.File) error {
@@ -83,50 +99,18 @@ func (e *Engine) buildCLI(inv cli.Invocation, stdin io.Reader, stdout, stderr io
 	for i, machine := range machines {
 		hosts[i] = machine.Name
 	}
-	outcome, err := e.buildSelected(hosts, options, e.buildOutput(stdout, stderr), deps)
+	outcome, err := e.buildWithPresentation(hosts, options, stdout, stderr, deps)
 	if err != nil {
 		return err
 	}
-	return writeBuildSummary(stdout, outcome)
+	return e.writeBuildSummary(stdout, outcome)
 }
 
-// Standalone build and build-backed status share the same presentation owner.
-func (e *Engine) buildOutput(stdout, stderr io.Writer) buildPresentation {
-	return buildPresentation{
-		Evaluating: func(count int) error {
-			return buildWrite(stdout, fmt.Sprintf("Evaluating inputs for %d machines...\n", count))
-		},
-		GroupsPrepared: func(groups []build.Group) error {
-			return buildWrite(stdout, fmt.Sprintf("\nMachines will be built in %d groups\n\n", len(groups)))
-		},
-		GroupStart: func(index, count int, group build.Group) error {
-			var text strings.Builder
-			fmt.Fprintf(&text, "Building group %d/%d\n", index+1, count)
-			for _, host := range group.Hosts {
-				fmt.Fprintf(&text, "  %s\n", host.Host)
-			}
-			if inputs, ok := group.Inputs.(generation.Object); ok {
-				text.WriteString("with inputs\n")
-				for _, input := range inputs {
-					fmt.Fprintf(&text, "  %s=%s\n", input.Name, str(input.Value))
-				}
-			}
-			if e.Log != nil {
-				fmt.Fprintf(&text, "Full log: %s\n", e.Log.Name())
-			}
-			return buildWrite(stdout, text.String())
-		},
-		Progress: func(event build.Event) error {
-			return buildWrite(stderr, fmt.Sprintf("%s %s/%s %s\n", event.Type, event.Progress, event.Total, event.Path))
-		},
-	}
-}
-
-func writeBuildSummary(stdout io.Writer, outcome build.Outcome) error {
+func (e *Engine) writeBuildSummary(stdout io.Writer, outcome build.Outcome) error {
 	var summary strings.Builder
-	summary.WriteString("\nBuilt generations:\n")
+	summary.WriteString("\n" + e.liveText(stdout, "Built generations:", "bright") + "\n")
 	for _, row := range outcome.Generations {
-		fmt.Fprintf(&summary, "  %s: %s\n", row.Host, row.Generation.Name)
+		fmt.Fprintf(&summary, "  %s: %s\n", e.liveText(stdout, row.Host, "yellow"), e.liveText(stdout, row.Generation.Name, "cyan"))
 	}
 	return buildWrite(stdout, summary.String())
 }
@@ -169,7 +153,7 @@ func (e *Engine) buildSelected(hosts []string, options buildOptions, ui buildPre
 			return out, err
 		}
 	}
-	nix := &buildNix{e: e, options: options, run: deps.Run, progress: ui.Progress}
+	nix := &buildNix{e: e, options: options, run: deps.Run, progress: ui.Progress, commandEvent: ui.Command}
 	var writer *generation.Writer
 	getWriter := func() (*generation.Writer, error) {
 		if writer == nil {
@@ -182,18 +166,18 @@ func (e *Engine) buildSelected(hosts []string, options buildOptions, ui buildPre
 		return writer, nil
 	}
 	activeGroup := false
-	closeCurrent := func() error {
+	closeCurrent := func(bodyErr error) error {
 		if !activeGroup {
 			return nil
 		}
 		activeGroup = false
 		if ui.Close != nil {
-			return ui.Close()
+			return ui.Close(bodyErr)
 		}
 		return nil
 	}
 	defer func() {
-		if closeErr := closeCurrent(); closeErr != nil {
+		if closeErr := closeCurrent(err); closeErr != nil {
 			err = closeErr
 		}
 	}()
@@ -201,7 +185,7 @@ func (e *Engine) buildSelected(hosts []string, options buildOptions, ui buildPre
 		BuildPlan: nix.buildPlan, Settings: nix.settingsObject, MachineKey: nix.machineKey,
 		GroupsPrepared: ui.GroupsPrepared,
 		GroupStart: func(index, count int, group build.Group) error {
-			if err := closeCurrent(); err != nil {
+			if err := closeCurrent(nil); err != nil {
 				return err
 			}
 			if ui.GroupStart != nil {

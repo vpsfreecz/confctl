@@ -44,7 +44,7 @@ func (e *Engine) Deploy(inv cli.Invocation, registry Registry, stdin, stdout, st
 		Load: func(host string) (*generation.BuildList, error) {
 			return generation.LoadBuildList(e.Root, host, generation.Options{Warn: e.generationWarning(stderr)})
 		},
-		Build: func(hosts []string) ([]deploy.Target, error) { return e.deployBuild(hosts, inv, stdout) },
+		Build: func(hosts []string) ([]deploy.Target, error) { return e.deployBuild(hosts, inv, stdout, stderr) },
 		Operations: func(ctx context.Context, all, selected []Machine, line commandLine, out io.Writer, inv cli.Invocation) deploy.Deps {
 			return e.deployOperations(ctx, all, selected, line, out, inv)
 		},
@@ -252,7 +252,7 @@ func deployMachine(m Machine) deploy.Machine {
 
 // BuildSelected is called once with already selected/rebound names. Its owning
 // defaults and fresh dependency caches are retained; no public Build prompt runs.
-func (e *Engine) deployBuild(hosts []string, inv cli.Invocation, out io.Writer) ([]deploy.Target, error) {
+func (e *Engine) deployBuild(hosts []string, inv cli.Invocation, out, stderr io.Writer) ([]deploy.Target, error) {
 	options := buildOptions{ShowTrace: inv.Options["show-trace"].Value.Bool}
 	for _, option := range []struct {
 		name string
@@ -263,9 +263,7 @@ func (e *Engine) deployBuild(hosts []string, inv cli.Invocation, out io.Writer) 
 			*option.to = &text
 		}
 	}
-	outcome, err := e.buildSelected(hosts, options, buildPresentation{Evaluating: func(count int) error {
-		return buildWrite(out, fmt.Sprintf("Building %d deployment targets\n", count))
-	}}, buildDeps{})
+	outcome, err := e.buildWithPresentation(hosts, options, out, stderr, buildDeps{})
 	targets := make([]deploy.Target, len(outcome.Generations))
 	for i, row := range outcome.Generations {
 		targets[i] = deploy.Target{Host: row.Host, Generation: row.Generation}

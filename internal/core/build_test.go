@@ -93,7 +93,7 @@ func TestBuildDeliverySaveReuseAndOrderedMetadata(t *testing.T) {
 		},
 		GroupStart: func(i, count int, group build.Group) error { trace = append(trace, "group"); return nil },
 		Progress:   func(build.Event) error { trace = append(trace, "progress"); return nil },
-		Close:      func() error { trace = append(trace, "close"); return nil },
+		Close:      func(error) error { trace = append(trace, "close"); return nil },
 	}
 	out, err := f.e.buildSelected([]string{"one", "two"}, buildOptions{}, ui, f.deps())
 	if err != nil || !out.Complete || len(out.Generations) != 2 || f.rootCalls != 12 {
@@ -375,7 +375,7 @@ func TestBuildDeliveryGlobalOptionsAndGroupErrorOrder(t *testing.T) {
 	}
 	f = newBuildFixture(t)
 	closed := 0
-	out, err := f.e.buildSelected([]string{"one"}, buildOptions{}, buildPresentation{GroupStart: func(int, int, build.Group) error { return nil }, Close: func() error { closed++; return sentinel }}, f.deps())
+	out, err := f.e.buildSelected([]string{"one"}, buildOptions{}, buildPresentation{GroupStart: func(int, int, build.Group) error { return nil }, Close: func(error) error { closed++; return sentinel }}, f.deps())
 	if !out.Complete || !errors.Is(err, sentinel) || closed != 1 {
 		t.Fatal("group close failure lost complete outcome or retried", out, closed, err)
 	}
