@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -30,6 +31,18 @@ type gcView interface {
 	Finish(index int, text string) error
 	Flush(context.Context) error
 	Stop() error
+}
+
+// Only the acquired live adapter needs task lifecycle and asynchronous failure
+// observation. The existing gcView contract and worker pool stay unchanged:
+// raw Result/error determines terminal state, and each task joins its own
+// observer rather than cancelling the pool when a later worker fails.
+type gcTaskView interface {
+	gcView
+	Begin(index int) error
+	End(index int, result Result, bodyErr error) error
+	Err() error
+	Failed() <-chan struct{}
 }
 
 type gcDependencies struct {
@@ -119,7 +132,7 @@ func runGenerationGC(ctx context.Context, tasks []gcTask, request *big.Int, deps
 	return nil
 }
 
-func gcRunTask(parent context.Context, index int, task gcTask, execute gcExecute, view gcView, tty bool) (bool, error) {
+func gcRunTask(parent context.Context, index int, task gcTask, execute gcExecute, view gcView, tty bool) (success bool, primary error) {
 	if err := parent.Err(); err != nil {
 		return false, err
 	}
@@ -128,6 +141,40 @@ func gcRunTask(parent context.Context, index int, task gcTask, execute gcExecute
 	}
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
+	var result Result
+	var live gcTaskView
+	if tty {
+		live, _ = view.(gcTaskView)
+	}
+	if live != nil {
+		if err := live.Err(); err != nil {
+			return false, err
+		}
+		if err := live.Begin(index); err != nil {
+			return false, err
+		}
+		defer func() {
+			if err := live.End(index, result, primary); primary == nil {
+				primary = err
+			}
+		}()
+		settled, joined := make(chan struct{}), make(chan struct{})
+		go func() {
+			defer close(joined)
+			select {
+			case <-live.Failed():
+				cancel()
+			case <-settled:
+			case <-ctx.Done():
+			}
+		}()
+		defer func() { close(settled); <-joined }()
+		// Failure already published before the child starts is a refusal. A
+		// later failure cancels only this task and still waits for Execute.
+		if err := live.Err(); err != nil {
+			return false, err
+		}
+	}
 	progress := gcTaskProgress{index: index, host: task.Host, view: view, tty: tty}
 	var mu sync.Mutex
 	var presentationErr error
@@ -150,6 +197,16 @@ func gcRunTask(parent context.Context, index int, task gcTask, execute gcExecute
 	if presentationErr != nil {
 		return false, presentationErr
 	}
+	// A renderer notification may cancel this child, but it must not replace
+	// a distinct execution/capture failure already returned by its owner.
+	if err != nil && (result.capturePrimary() != nil || (!errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded))) {
+		return false, err
+	}
+	if live != nil {
+		if err := live.Err(); err != nil {
+			return false, err
+		}
+	}
 	if err != nil {
 		return false, err
 	}
@@ -159,7 +216,7 @@ func gcRunTask(parent context.Context, index int, task gcTask, execute gcExecute
 	if err := progress.finish(); err != nil {
 		return false, err
 	}
-	success := result.ExitCode == 0 && result.Signal == "" && result.signal == 0
+	success = result.ExitCode == 0 && result.Signal == "" && result.signal == 0
 	summary := "error occurred"
 	if success {
 		summary = progress.summary

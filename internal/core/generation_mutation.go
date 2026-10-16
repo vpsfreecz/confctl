@@ -45,7 +45,7 @@ func (e *Engine) generationMutationDependencies(stdout, stderr io.Writer) genera
 		Statuses: e.generationStatuses, Delete: e.removeHostGeneration,
 		Settings: e.Settings, Now: generationMutationNow,
 		GC: func(tasks []gcTask, workers *big.Int) error {
-			return runGenerationGC(e.Context, tasks, workers, e.generationGCDependencies(stdout))
+			return runGenerationGC(e.Context, tasks, workers, e.generationGCDependencies(stdout, stderr))
 		},
 	}
 }

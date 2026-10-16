@@ -85,19 +85,19 @@ func TestGenerationGCAdapterReachedSetupAndSignedNoWork(t *testing.T) {
 	}
 	for _, request := range []int64{0, -5} {
 		out.Reset()
-		if err := runGenerationGC(e.Context, []gcTask{{Host: "x", Machine: mutationMachine("x")}}, big.NewInt(request), e.generationGCAdapter(&out, never)); err != nil || out.String() != "Collecting garbage on x\n" {
+		if err := runGenerationGC(e.Context, []gcTask{{Host: "x", Machine: mutationMachine("x")}}, big.NewInt(request), e.generationGCAdapter(&out, io.Discard, never)); err != nil || out.String() != "Collecting garbage on x\n" {
 			t.Fatal(out.String(), err)
 		}
 	}
 	out.Reset()
-	if err := runGenerationGC(e.Context, nil, big.NewInt(5), e.generationGCAdapter(&out, never)); err != nil || out.String() != "Collecting garbage on \n" {
+	if err := runGenerationGC(e.Context, nil, big.NewInt(5), e.generationGCAdapter(&out, io.Discard, never)); err != nil || out.String() != "Collecting garbage on \n" {
 		t.Fatal(out.String(), err)
 	}
 	if err := os.Remove(e.Root + "/flake.nix"); err != nil {
 		t.Fatal(err)
 	}
 	out.Reset()
-	if err := runGenerationGC(e.Context, nil, big.NewInt(0), e.generationGCAdapter(&out, never)); err == nil || out.Len() != 0 {
+	if err := runGenerationGC(e.Context, nil, big.NewInt(0), e.generationGCAdapter(&out, io.Discard, never)); err == nil || out.Len() != 0 {
 		t.Fatal("zero workers bypassed setup", out.String(), err)
 	}
 }
@@ -126,7 +126,7 @@ func TestGenerationGCAdapterPreservesStreamsAndFailureAggregation(t *testing.T) 
 			}
 			defer e.Log.Close()
 			var out bytes.Buffer
-			err = e.collectGarbage(gcAdapterInvocation(t, "--yes"), nil, &out, e.generationGCDependencies(&out))
+			err = e.collectGarbage(gcAdapterInvocation(t, "--yes"), nil, &out, e.generationGCDependencies(&out, io.Discard))
 			if (status == 0 && err != nil) || (status != 0 && (err == nil || err.Error() != "Gargabe collection failed on: fixture")) {
 				t.Fatal(out.String(), err)
 			}
@@ -162,7 +162,7 @@ func TestGenerationGCAdapterOutputFailureCancelsAndJoins(t *testing.T) {
 	boom := errors.New("progress write failed")
 	out := &gcAdapterFailWriter{err: boom}
 	joined := false
-	d := e.generationGCAdapter(out, func(ctx context.Context, _ string, _ []string, input []byte, feed func([]byte, []byte) error) (Result, error) {
+	d := e.generationGCAdapter(out, io.Discard, func(ctx context.Context, _ string, _ []string, input []byte, feed func([]byte, []byte) error) (Result, error) {
 		if input != nil {
 			t.Fatal("GC inherited a payload")
 		}
@@ -178,7 +178,7 @@ func TestGenerationGCAdapterOutputFailureCancelsAndJoins(t *testing.T) {
 		t.Fatal(joined, out.calls, err)
 	}
 	short := &generationWarningWriter{count: 0}
-	d = e.generationGCAdapter(short, nil)
+	d = e.generationGCAdapter(short, io.Discard, nil)
 	if err := runGenerationGC(e.Context, nil, big.NewInt(0), d); !errors.Is(err, io.ErrShortWrite) {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestGenerationGCAdapterCancellationJoinsOwnedFakeCommand(t *testing.T) {
 		}
 	}()
 	go func() {
-		done <- e.collectGarbage(inv, nil, out, e.generationGCDependencies(out))
+		done <- e.collectGarbage(inv, nil, out, e.generationGCDependencies(out, io.Discard))
 	}()
 	select {
 	case <-out.ready:
