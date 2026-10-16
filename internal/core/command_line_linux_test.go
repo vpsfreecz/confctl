@@ -350,7 +350,7 @@ func TestCommandPromptPublicCallerCancellation(t *testing.T) {
 				e = healthCLIEngine(t, healthMachineJSON("node", "nixos", `{"builderCommands":[`+healthImmediateCommand("fixture")+`]}`))
 				e.Context = ctx
 				run = func() error {
-					_, err := e.healthCheck(healthInvocation(t, "node"), in, out, health.Deps{}, func(context.Context, string, []string, []byte) (Result, error) { unexpected(); return Result{}, nil })
+					_, err := e.healthCheck(healthInvocation(t, "node"), in, out, out, health.Deps{}, func(context.Context, string, []string, []byte) (Result, error) { unexpected(); return Result{}, nil })
 					return err
 				}
 			case "build":

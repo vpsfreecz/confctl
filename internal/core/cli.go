@@ -313,7 +313,7 @@ func Main(ctx context.Context, argv []string) (result int) {
 		return 0
 	}
 	if inv.Command.Handler == cli.HealthCheckHandler {
-		checked, err := e.HealthCheck(inv, os.Stdin, os.Stdout)
+		checked, err := e.HealthCheck(inv, os.Stdin, os.Stdout, os.Stderr)
 		if err != nil {
 			var argumentErr *healthArgumentError
 			if errors.As(err, &argumentErr) {

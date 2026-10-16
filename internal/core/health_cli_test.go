@@ -74,7 +74,7 @@ func TestHealthCLISelectionConfirmationAndReturnPolicy(t *testing.T) {
 			}
 			calls := 0
 			var out bytes.Buffer
-			result, err := engine.healthCheck(healthInvocation(t, args...), strings.NewReader(tc.input), &out, health.Deps{}, func(context.Context, string, []string, []byte) (Result, error) {
+			result, err := engine.healthCheck(healthInvocation(t, args...), strings.NewReader(tc.input), &out, io.Discard, health.Deps{}, func(context.Context, string, []string, []byte) (Result, error) {
 				calls++
 				return Result{ExitCode: 0}, nil
 			})
@@ -100,7 +100,7 @@ func TestHealthCLINoChecksAndInvalidWorkersBeforeEffects(t *testing.T) {
 	for _, args := range [][]string{{}, {"missing"}, {"-a", "name=absent"}, {"-t", "absent"}} {
 		engine := healthCLIEngine(t, healthMachineJSON("empty", "nixos", `{"builderCommands":[]}`))
 		var out bytes.Buffer
-		_, err := engine.HealthCheck(healthInvocation(t, args...), strings.NewReader("y\n"), &out)
+		_, err := engine.HealthCheck(healthInvocation(t, args...), strings.NewReader("y\n"), &out, io.Discard)
 		if !errors.Is(err, health.ErrNoChecks) || out.Len() != 0 {
 			t.Fatal(err, out.String())
 		}
@@ -110,7 +110,7 @@ func TestHealthCLINoChecksAndInvalidWorkersBeforeEffects(t *testing.T) {
 		// before inventory loading, confirmation, or process execution.
 		engine := &Engine{Root: t.TempDir(), Context: context.Background()}
 		var out bytes.Buffer
-		_, err := engine.HealthCheck(healthInvocation(t, "--max-jobs="+workers), strings.NewReader("y\n"), &out)
+		_, err := engine.HealthCheck(healthInvocation(t, "--max-jobs="+workers), strings.NewReader("y\n"), &out, io.Discard)
 		if err == nil || err.Error() != "max-jobs must be greater than zero" || out.Len() != 0 {
 			t.Fatal(err, out.String())
 		}
@@ -153,7 +153,7 @@ func TestHealthCLIRealNixLocalAndSSHChildren(t *testing.T) {
 	logPath := engine.Log.Name()
 	t.Cleanup(func() { _ = engine.CloseLog(false) })
 	var out bytes.Buffer
-	result, err := engine.HealthCheck(healthInvocation(t, "-y", "-t", "wanted", "--max-jobs=99999999999999999999999999999999"), strings.NewReader(""), &out)
+	result, err := engine.HealthCheck(healthInvocation(t, "-y", "-t", "wanted", "--max-jobs=99999999999999999999999999999999"), strings.NewReader(""), &out, io.Discard)
 	if err != nil || len(result.Report.Results) != 2 || result.RetainLog || !result.Report.Results[0].Passed() || !result.Report.Results[1].Passed() || !strings.Contains(out.String(), "2 checks passed, 0 failed") {
 		t.Fatal(result, err, out.String())
 	}
@@ -188,7 +188,7 @@ func TestHealthCLIFailedChildrenAndOrderedSummary(t *testing.T) {
 	path := engine.Log.Name()
 	t.Cleanup(func() { _ = engine.CloseLog(false) })
 	var out bytes.Buffer
-	result, err := engine.HealthCheck(healthInvocation(t, "-y", "-j", "2"), strings.NewReader(""), &out)
+	result, err := engine.HealthCheck(healthInvocation(t, "-y", "-j", "2"), strings.NewReader(""), &out, io.Discard)
 	text := out.String()
 	if err == nil || err.Error() != "Health checks failed" || !result.RetainLog || !strings.Contains(text, "0 checks passed, 3 failed") || strings.Index(text, "z-first: 2 failures") >= strings.Index(text, "a-second: 1 failures") {
 		t.Fatal(result, err, text)
@@ -210,7 +210,7 @@ func TestHealthCLIRetrySuccessRetainsLog(t *testing.T) {
 	t.Cleanup(func() { _ = engine.CloseLog(false) })
 	attempts := 0
 	var out bytes.Buffer
-	result, err := engine.healthCheck(healthInvocation(t, "-y"), strings.NewReader(""), &out, health.Deps{Now: func() time.Time { return time.Unix(0, 0) }, Cooldown: func(context.Context, *big.Int) error { return nil }}, func(context.Context, string, []string, []byte) (Result, error) {
+	result, err := engine.healthCheck(healthInvocation(t, "-y"), strings.NewReader(""), &out, io.Discard, health.Deps{Now: func() time.Time { return time.Unix(0, 0) }, Cooldown: func(context.Context, *big.Int) error { return nil }}, func(context.Context, string, []string, []byte) (Result, error) {
 		attempts++
 		if attempts == 1 {
 			return Result{ExitCode: 7}, nil
@@ -256,7 +256,7 @@ func TestHealthCLIStartupAndCancellationPartialResults(t *testing.T) {
 	t.Run("startup", func(t *testing.T) {
 		engine := healthCLIEngine(t, healthMachineJSON("m", "nixos", `{"builderCommands":[`+healthImmediateCommand(filepath.Join(t.TempDir(), "absent-tool"))+`]}`))
 		var out bytes.Buffer
-		result, err := engine.HealthCheck(healthInvocation(t, "-y"), strings.NewReader(""), &out)
+		result, err := engine.HealthCheck(healthInvocation(t, "-y"), strings.NewReader(""), &out, io.Discard)
 		if err == nil || len(result.Report.Results) != 1 || result.Report.Results[0].Passed() || !strings.Contains(out.String(), "1 incomplete") {
 			t.Fatal(result, err, out.String())
 		}
@@ -276,7 +276,7 @@ func TestHealthCLIStartupAndCancellationPartialResults(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
-			result, err = engine.healthCheck(healthInvocation(t, "-y", "-j", "2"), strings.NewReader(""), &out, health.Deps{}, func(ctx context.Context, _ string, _ []string, _ []byte) (Result, error) {
+			result, err = engine.healthCheck(healthInvocation(t, "-y", "-j", "2"), strings.NewReader(""), &out, io.Discard, health.Deps{}, func(ctx context.Context, _ string, _ []string, _ []byte) (Result, error) {
 				mu.Lock()
 				calls++
 				mu.Unlock()
@@ -321,7 +321,7 @@ func TestHealthCLIProcessCancellation(t *testing.T) {
 	}
 	defer detach()
 	var out bytes.Buffer
-	result, err := engine.HealthCheck(healthInvocation(t, "-y"), strings.NewReader(""), &out)
+	result, err := engine.HealthCheck(healthInvocation(t, "-y"), strings.NewReader(""), &out, io.Discard)
 	if !errors.Is(err, context.Canceled) || result.Report.Results[0].Passed() || result.Report.Results[0].Attempts != 1 {
 		t.Fatal("actual child cancellation became success or timed out", result, err)
 	}
@@ -346,7 +346,7 @@ func TestHealthCLIOutputFailureBeforeCommands(t *testing.T) {
 	engine := healthCLIEngine(t, healthMachineJSON("m", "nixos", `{"builderCommands":[`+healthImmediateCommand("fixture")+`]}`))
 	sentinel := fmt.Errorf("synthetic output failure")
 	called := false
-	_, err := engine.healthCheck(healthInvocation(t, "-y"), strings.NewReader(""), healthFailWriter{sentinel}, health.Deps{}, func(context.Context, string, []string, []byte) (Result, error) {
+	_, err := engine.healthCheck(healthInvocation(t, "-y"), strings.NewReader(""), healthFailWriter{sentinel}, io.Discard, health.Deps{}, func(context.Context, string, []string, []byte) (Result, error) {
 		called = true
 		return Result{}, nil
 	})
