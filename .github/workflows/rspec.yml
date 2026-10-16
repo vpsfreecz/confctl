@@ -1,7 +1,7 @@
-name: RSpec
+name: Original Ruby RSpec
 
 on:
-  push:
+  workflow_dispatch:
 
 jobs:
   rspec:
@@ -17,12 +17,12 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 1
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@v31.11.2
 
       - name: Prepare per-user Nix gcroots
         shell: bash
@@ -37,7 +37,7 @@ jobs:
           sudo chown "${user}:${group}" "$gcroot_dir"
 
       - name: Set up Ruby + Bundler cache
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@v1.329.0
         with:
           ruby-version: ${{ matrix.ruby-version }}
           bundler-cache: true

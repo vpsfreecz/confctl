@@ -149,6 +149,13 @@ pinned source revisions. Netboot and runtime-kernel workflows belong to the
 configuration and are separate from the 29 builtin commands. The bundle contains
 no symlinks to a source tree or renderer executable.
 
+The flake exposes `confctl-docgen`, `confctl-docs` and `kexec-netboot-man`.
+The normal `confctl` package includes the documentation bundle, and normal
+shells add its manuals to MANPATH. Build the separate bundle with
+`nix build .#confctl-docs`; open `result/share/doc/confctl/html/index.html` for
+the HTML reference. Ordinary checks include the focused renderer fixture.
+The retained Ruby generator belongs to the explicit original-tool lane.
+
 Consumers must check rendered structure/content, independent repeat renders,
 actual module-options coverage, installed links/modes, requisite closures and
 both supported architectures for the revision they build. Markdown tests alone

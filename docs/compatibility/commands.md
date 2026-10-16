@@ -32,7 +32,10 @@ All action handlers use the shared log wrapper, including commands that otherwis
 Confirmation and deployment retry prompts in the Go CLI on Linux can be
 interrupted without entering a newline or closing standard input. Cancellation
 prevents a pending answer from authorizing the next operation or retry. Earlier
-completed operations remain in effect.
+completed operations remain in effect. When the normal `confctl` process receives
+SIGINT or SIGTERM, it cancels the invocation and exits with status 1 after cleanup.
+Without a parent signal, it preserves the command's exit status, including child
+statuses 130 and 143.
 
 ## Configuration commands (4)
 

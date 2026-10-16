@@ -23,7 +23,8 @@
       hasTestRunner = system: builtins.elem system testSystems;
 
       mkConfigDevShell = import ./nix/flake/mk-config-devshell.nix { inherit self nixpkgs; };
-      mkConfctlDevShell = import ./nix/flake/mk-confctl-devshell.nix { inherit nixpkgs; };
+      mkConfctlDevShell = import ./nix/flake/mk-confctl-devshell.nix { inherit self nixpkgs; };
+      mkLegacyDevShell = import ./nix/flake/mk-legacy-devshell.nix { inherit nixpkgs; };
       mkConfctlPackage = import ./nix/package.nix;
 
       mkRspecCheck =
@@ -70,7 +71,7 @@
             export CONFCTL_TTY=0
             export NO_COLOR=1
             export PAGER=
-            export CONFCTL_BIN="${self.packages.${system}.confctl}/bin/confctl"
+            export CONFCTL_BIN="${self.packages.${system}.confctl-ruby}/bin/confctl"
             export CONFCTL_RSPEC_SANDBOX=1
             export CONFCTL_MAX_JOBS=auto
 
@@ -123,6 +124,7 @@
 
       devShells = forAllSystems (system: {
         default = mkConfctlDevShell { inherit system; };
+        ruby-original = mkLegacyDevShell { inherit system; };
         experimental = (import nixpkgs { inherit system; }).mkShell {
           packages = with (import nixpkgs { inherit system; }); [
             go
@@ -142,9 +144,45 @@
         {
           confctl-go-prototype = import ./experiments/confctl-go/package.nix { inherit pkgs; };
           confctl-compat-tools = import ./tests/compat/tools.nix { inherit pkgs; };
+          default = self.packages.${system}.confctl;
           confctl = mkConfctlPackage {
             inherit pkgs;
             src = self.outPath;
+            docs = self.packages.${system}.confctl-docs;
+          };
+          confctl-ruby = import ./nix/legacy-package.nix {
+            inherit pkgs;
+            src = self.outPath;
+          };
+          confctl-docgen = import ./nix/docgen-tool.nix {
+            inherit pkgs;
+            src = self.outPath;
+          };
+          confctl-docs = import ./nix/docs.nix {
+            inherit pkgs;
+            src = self.outPath;
+            moduleOptions = self.moduleOptions;
+            version = self.shortRev or (self.dirtyShortRev or "dev");
+            date = "2026-10-14";
+          };
+          kexec-netboot-man = import ./nix/kexec-netboot-man.nix { inherit pkgs; };
+          confctl-hook-checker = import ./nix/hook-checker.nix {
+            inherit pkgs;
+            src = self.outPath;
+          };
+          confctl-dev-tools = import ./nix/dev-tools.nix {
+            inherit pkgs;
+            checker = self.packages.${system}.confctl-hook-checker;
+            goModules = [
+              {
+                directory = ".";
+                source = self.outPath;
+                proxy = import ./nix/go-module-proxy.nix {
+                  inherit pkgs;
+                  src = self.outPath;
+                };
+              }
+            ];
           };
         }
         // nixpkgs.lib.optionalAttrs (hasTestRunner system) {
@@ -166,15 +204,27 @@
 
       testsMeta = forTestSystems (system: mkTestsMeta system);
 
-      checks = forAllSystems (
-        system:
-        {
-          rspec = mkRspecCheck system;
-          confctl-go-prototype = self.packages.${system}.confctl-go-prototype;
-          confctl-compat-tools = self.packages.${system}.confctl-compat-tools;
-        }
-        // nixpkgs.lib.optionalAttrs (hasTestRunner system) (mkTests system)
-      );
+      legacyChecks = forAllSystems (system: {
+        rspec = mkRspecCheck system;
+      });
+
+      checks = forAllSystems (system: {
+        confctl = self.packages.${system}.confctl;
+        confctl-docgen = self.packages.${system}.confctl-docgen;
+        confctl-dev-tools = self.packages.${system}.confctl-dev-tools;
+        hook-dependencies =
+          (import ./tests/hooks/dependencies.nix {
+            pkgs = import nixpkgs { inherit system; };
+            src = self.outPath;
+          }).check;
+        hook-policy = import ./tests/hooks/check.nix {
+          pkgs = import nixpkgs { inherit system; };
+          src = self.outPath;
+        };
+        docgen = import ./tests/docgen/check.nix {
+          pkgs = import nixpkgs { inherit system; };
+        };
+      });
 
       checksMeta = forAllSystems (
         system:

@@ -1,0 +1,113 @@
+name: Go tooling
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tooling:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            system: x86_64-linux
+            goarch: amd64
+          - runner: ubuntu-24.04-arm
+            system: aarch64-linux
+            goarch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      CONFCTL_CI_SYSTEM: ${{ matrix.system }}
+      CONFCTL_CI_GOARCH: ${{ matrix.goarch }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7.0.1
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31.11.2
+        with:
+          enable_kvm: false
+      - name: Verify native platform
+        run: |
+          set -euo pipefail
+          confctl_ci_commit="$(git rev-parse HEAD)"
+          confctl_ci_system="$(nix eval --impure --raw --expr builtins.currentSystem)"
+          printf 'Commit: %s\nRun: %s/%s\nRunner architecture: %s\nNative Nix system: %s\n' \
+            "$confctl_ci_commit" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" \
+            "$RUNNER_ARCH" "$confctl_ci_system" | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$confctl_ci_commit" = "$GITHUB_SHA"
+          test "$confctl_ci_system" = "$CONFCTL_CI_SYSTEM"
+          case "$RUNNER_ARCH" in
+            X64) test "$CONFCTL_CI_GOARCH" = amd64 ;;
+            ARM64) test "$CONFCTL_CI_GOARCH" = arm64 ;;
+            *) echo "Unsupported runner architecture: $RUNNER_ARCH" >&2; exit 1 ;;
+          esac
+      - name: Check Go sources and policy template
+        run: |
+          nix develop --no-write-lock-file ".#devShells.${CONFCTL_CI_SYSTEM}.experimental" --command bash -euc '
+            set -o pipefail
+            test "$(go env GOARCH)" = "$CONFCTL_CI_GOARCH"
+            test "$(go env GOOS)" = linux
+            test "$(go env CGO_ENABLED)" = 1
+            go list -f "{{range .CgoFiles}}{{println .}}{{end}}" ./internal/core |
+              grep -Fx build_login_linux_cgo.go
+            go test ./...
+            go test -race -timeout=30m ./...
+            go vet ./...
+            git ls-files -z "*.go" | xargs -0 gofmt -l > /tmp/gofmt-files
+            test ! -s /tmp/gofmt-files || { cat /tmp/gofmt-files; exit 1; }
+            nixfmt --check flake.nix shell.nix nix/package.nix \
+              nix/go-dependency-hashes.nix nix/go-module-proxy.nix \
+              nix/legacy-package.nix nix/docgen.nix nix/docgen-tool.nix nix/docs.nix \
+              nix/hook-checker.nix nix/dev-tools.nix nix/lefthook-config.nix nix/hook-go-tools.nix \
+              nix/flake/mk-confctl-devshell.nix nix/flake/mk-config-devshell.nix \
+              nix/flake/mk-legacy-devshell.nix tests/hooks/check.nix tests/hooks/dependencies.nix
+          '
+      - name: Build normal packages and focused rendering check
+        run: |
+          set -euo pipefail
+          confctl_ci_package_cgo="$(nix eval --no-write-lock-file --raw \
+            ".#packages.${CONFCTL_CI_SYSTEM}.confctl.drvAttrs.CGO_ENABLED" \
+            --apply builtins.toString)"
+          printf 'Normal package CGO_ENABLED: %s\n' "$confctl_ci_package_cgo"
+          test "$confctl_ci_package_cgo" = 1
+          nix build --no-write-lock-file ".#packages.${CONFCTL_CI_SYSTEM}.confctl" --out-link result-cli
+          nix build --no-write-lock-file ".#packages.${CONFCTL_CI_SYSTEM}.confctl-docs" --out-link result-docs
+          nix build --no-write-lock-file ".#packages.${CONFCTL_CI_SYSTEM}.confctl-dev-tools" --out-link result-tools
+          nix build --no-write-lock-file ".#checks.${CONFCTL_CI_SYSTEM}.docgen" \
+            ".#checks.${CONFCTL_CI_SYSTEM}.hook-policy" ".#checks.${CONFCTL_CI_SYSTEM}.hook-dependencies" --no-link
+      - name: Build fixture-bound helper packages
+        run: |
+          set -euo pipefail
+          nix build --impure --no-write-lock-file --no-link --json --expr '
+            let
+              f = builtins.getFlake (toString ./.);
+              pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; };
+              p = import (f.outPath + "/tests/delivery/packages.nix") {
+                inherit pkgs;
+                src = f.outPath;
+              };
+            in [ p.carrier p.rollback p.builder p.kexec ]
+          ' > "helper-build-${CONFCTL_CI_SYSTEM}.json"
+          cat "helper-build-${CONFCTL_CI_SYSTEM}.json"
+      - name: Check installed hooks in a disposable repository
+        run: |
+          export CONFCTL_HOOK_TOOLS="$(readlink -f result-tools)/bin/confctl-hooks"
+          nix develop --no-write-lock-file ".#devShells.${CONFCTL_CI_SYSTEM}.experimental" --command \
+            go test ./tests/hooks -run '^TestInstalledHook' -count=1 -v
+      - name: Check runtime closures
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix path-info --recursive ./result-cli ./result-docs ./result-tools > closure.txt
+          if grep -E -- '-(ruby[^/]*|bundler[^/]*|bundix[^/]*|overcommit[^/]*)$' closure.txt; then
+            echo 'Unexpected Ruby dependency in normal tooling' >&2
+            exit 1
+          fi
+          test -f result-docs/share/doc/confctl/html/index.html
+          test -f result-docs/share/man/man8/confctl.8
+          result-cli/bin/confctl --help

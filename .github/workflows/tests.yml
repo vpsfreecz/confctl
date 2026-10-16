@@ -1,4 +1,4 @@
-name: Tests
+name: VM integration
 
 on:
   workflow_dispatch:
@@ -8,20 +8,6 @@ on:
         required: true
         default: false
         type: boolean
-  push:
-    paths:
-      - .github/workflows/tests.yml
-      - flake.nix
-      - flake.lock
-      - Gemfile
-      - Gemfile.lock
-      - bin/**
-      - lib/**
-      - libexec/**
-      - example/**
-      - nix/**
-      - tests/**
-      - test-runner.sh
 
 permissions:
   contents: read
@@ -34,7 +20,7 @@ jobs:
 
     steps:
       - name: Checkout confctl
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 1
 

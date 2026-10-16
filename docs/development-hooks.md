@@ -1,5 +1,28 @@
 # Development and Git hooks
 
+Use the locked Go development shell from the confctl repository:
+
+```sh
+nix develop
+go test ./...
+go vet ./...
+```
+
+The shell provides the packaged CLI, Go, Git, Nix, nixfmt and `confctl-hooks`.
+It does not run Bundler, create `.gems`, install hooks or approve a policy.
+`nix-shell` selects the same shell through `shell.nix`. Configuration repositories
+can use `mkConfigDevShell`; `minimal` includes the CLI and runtime tools, while
+`tools` and `bundled-confctl` also include the development tools. Existing function
+arguments and mode names remain accepted. `legacyCompat` no longer enables a
+Ruby bootstrap.
+
+The normal flake outputs are `confctl`, `confctl-docgen`, `confctl-docs`,
+`confctl-hook-checker` and `confctl-dev-tools`. The default package is `confctl`.
+The checker is built separately from the tools bundle. Its executable contains
+no generated policy or upper bundle path, so preparing a policy does not change
+the checker that the policy names. The bundle binds Git, Lefthook, formatters,
+shell and child PATH to declared immutable outputs.
+
 ## Review and approve a hook policy
 
 Run these commands from the repository whose hooks you want to configure.
@@ -86,7 +109,8 @@ source is the immutable module source used by its Nix package, and proxy is that
 package's `buildGoModule` dependency output built with `proxyVendor = true`.
 Use `null` only for a module with no external dependencies. The shell rejects
 duplicate entries and directories other than `.` or `extensions`.
-Configuration tools must declare their own extension module explicitly.
+The normal confctl tools bind the root module source and its immutable file
+proxy. Configuration tools must declare their own extension module explicitly.
 The empty default works only when no Go module is reached.
 
 The Go-tool output binds exact `go.mod` and `go.sum` hashes and presence, so an
@@ -117,3 +141,26 @@ Normal checks reject reached Ruby source because no RuboCop tool is selected.
 For Ruby services or the original CLI, use their explicit Ruby environment and
 existing hook policy. Do not silently skip lint or add Ruby to the normal Go
 bundle to accommodate that lane.
+
+## Original Ruby and service checks
+
+The `confctl-ruby` package and `ruby-original` shell preserve the original tool
+for compatibility checks and recovery. They may use Bundler and `.gems`:
+
+```sh
+nix develop .#ruby-original
+bundle exec rspec
+bundle exec rubocop
+```
+
+The Ruby RSpec and RuboCop workflows are separate manual lanes. Existing VM
+integration tests remain available through `tests`, `testsMeta` and the test
+runner; their test framework can use Ruby independently of the normal CLI.
+`legacyChecks.SYSTEM.rspec` exposes the original RSpec package check.
+The Go tooling workflow runs on native x86_64 and ARM64 Linux runners. Each
+job requires cgo, tests the Go sources and builds the normal CLI, documentation
+and development tools. It checks installed hooks in a disposable repository
+and builds four helper packages using the confined delivery fixtures. Those
+helper builds cover package construction and derivation checks; VM scenarios,
+state interoperability and operational helper actions have separate checks.
+Each architecture needs its own passing job.
