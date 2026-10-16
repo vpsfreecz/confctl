@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/vpsfreecz/confctl/internal/cli"
 	"github.com/vpsfreecz/confctl/internal/deploy"
@@ -27,26 +28,30 @@ func (e *DeployHookError) Error() string {
 }
 
 type deployCommandDeps struct {
-	Machines   func() ([]Machine, error)
-	Prepare    func([]string) (int, error)
-	Build      func([]string) ([]deploy.Target, error)
-	Load       func(string) (*generation.BuildList, error)
-	Operations func(context.Context, []Machine, []Machine, commandLine, io.Writer, cli.Invocation) deploy.Deps
+	Machines     func() ([]Machine, error)
+	Prepare      func([]string) (int, error)
+	Build        func([]string) ([]deploy.Target, error)
+	Load         func(string) (*generation.BuildList, error)
+	Operations   func(context.Context, []Machine, []Machine, commandLine, io.Writer, io.Writer, cli.Invocation) deploy.Deps
+	presentation *deployPresentation
 }
 
 // Deploy prepares exactly once, rebinds selected names after hooks, then reuses
 // the existing build, local-generation and private deployment owners. It returns
 // partial outcomes and RetainLog even when a later phase fails.
 func (e *Engine) Deploy(inv cli.Invocation, registry Registry, stdin, stdout, stderr *os.File) (deploy.Report, error) {
-	return e.deployCommand(inv, stdin, stdout, deployCommandDeps{
-		Machines: func() ([]Machine, error) { return e.Machines(false) },
-		Prepare:  func(names []string) (int, error) { return e.HooksFrom(registry, "deploy.prepare", names, inv) },
+	presentation := &deployPresentation{engine: e}
+	return e.deployCommand(inv, stdin, stdout, stderr, deployCommandDeps{
+		presentation: presentation,
+		Machines:     func() ([]Machine, error) { return e.Machines(false) },
+		Prepare:      func(names []string) (int, error) { return e.HooksFrom(registry, "deploy.prepare", names, inv) },
 		Load: func(host string) (*generation.BuildList, error) {
 			return generation.LoadBuildList(e.Root, host, generation.Options{Warn: e.generationWarning(stderr)})
 		},
 		Build: func(hosts []string) ([]deploy.Target, error) { return e.deployBuild(hosts, inv, stdout, stderr) },
-		Operations: func(ctx context.Context, all, selected []Machine, line commandLine, out io.Writer, inv cli.Invocation) deploy.Deps {
-			return e.deployOperations(ctx, all, selected, line, out, inv)
+		Operations: func(ctx context.Context, all, selected []Machine, line commandLine, out, stderr io.Writer, inv cli.Invocation) deploy.Deps {
+			ops := deployProcessOps{Run: e.deployProcess, Now: time.Now, Sleep: deploySleep, CheckFile: deployCheckFile, presentation: presentation}
+			return e.deployOperationsWithOps(ctx, all, selected, line, out, stderr, inv, ops)
 		},
 	})
 }
@@ -103,7 +108,7 @@ func deployWaitMode(text string) (deploy.WaitMode, error) {
 	return deploy.WaitMode{Kind: deploy.WaitSeconds, Seconds: n}, nil
 }
 
-func (e *Engine) deployCommand(inv cli.Invocation, in io.Reader, out io.Writer, d deployCommandDeps) (deploy.Report, error) {
+func (e *Engine) deployCommand(inv cli.Invocation, in io.Reader, out, stderr io.Writer, d deployCommandDeps) (deploy.Report, error) {
 	all, err := d.Machines()
 	if err != nil {
 		return deploy.Report{}, err
@@ -220,7 +225,12 @@ func (e *Engine) deployCommand(inv cli.Invocation, in io.Reader, out io.Writer, 
 	}
 	ctx, cancel := context.WithCancel(e.Context)
 	defer cancel()
-	operations := d.Operations(ctx, all, selected, line, out, inv)
+	operations := d.Operations(ctx, all, selected, line, out, stderr, inv)
+	if d.presentation != nil {
+		d.presentation.initialize(ctx, out, stderr, cancel)
+		d.presentation.action = o.Action
+		operations = d.presentation.decorate(operations)
+	}
 	var mu sync.Mutex
 	var outputErr error
 	previous := operations.Event
@@ -233,6 +243,9 @@ func (e *Engine) deployCommand(inv cli.Invocation, in io.Reader, out io.Writer, 
 		if outputErr != nil {
 			return
 		}
+		if d.presentation != nil {
+			return // The invocation coordinator owns both live and textual events.
+		}
 		if err := buildWrite(out, fmt.Sprintf("%s: %s\n", event.Host, event.Kind)); err != nil {
 			outputErr = err
 			cancel()
@@ -242,6 +255,9 @@ func (e *Engine) deployCommand(inv cli.Invocation, in io.Reader, out io.Writer, 
 	// Run has joined all owned work before exposing the synchronous I/O cause.
 	if outputErr != nil {
 		return report, outputErr
+	}
+	if d.presentation != nil {
+		err = d.presentation.result(err)
 	}
 	return report, err
 }

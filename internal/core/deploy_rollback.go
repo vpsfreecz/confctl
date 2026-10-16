@@ -150,7 +150,12 @@ func deployUptime(ctx context.Context, m Machine, checkConnection bool, run depl
 	return up, true, nil
 }
 
-func deployReboot(ctx context.Context, m Machine, wait deploy.WaitMode, ops deployProcessOps) error {
+type rebootProgress struct {
+	State              string
+	Elapsed, Remaining *big.Rat
+}
+
+func deployReboot(ctx context.Context, m Machine, wait deploy.WaitMode, ops deployProcessOps, progress func(rebootProgress) error) error {
 	if wait.Kind == deploy.NoWait {
 		_, err := deployMachineCommand(ctx, m, []string{"reboot"}, false, true, ops.Run)
 		return err // source ignores ordinary reboot status
@@ -163,18 +168,52 @@ func deployReboot(ctx context.Context, m Machine, wait deploy.WaitMode, ops depl
 		return errors.New("unable to read initial uptime")
 	}
 	start := ops.Now()
+	observe := func(state string, elapsed *big.Rat) error {
+		if progress == nil {
+			return nil
+		}
+		snapshot := rebootProgress{State: state, Elapsed: new(big.Rat).Set(elapsed)}
+		if wait.Kind == deploy.WaitSeconds {
+			snapshot.Remaining = new(big.Rat).Sub(new(big.Rat).SetInt(wait.Seconds), elapsed)
+			if snapshot.Remaining.Sign() < 0 {
+				snapshot.Remaining.SetInt64(0)
+			}
+		}
+		return progress(snapshot)
+	}
+	if err := observe("reboot", new(big.Rat)); err != nil {
+		return err
+	}
 	if _, err := deployMachineCommand(ctx, m, []string{"reboot"}, false, true, ops.Run); err != nil {
 		return err
 	}
+	down := false
 	for {
 		current, online, err := deployUptime(ctx, m, true, ops.Run)
 		if err != nil {
 			return err
 		}
 		if online && current < initial {
+			if progress != nil {
+				return observe("up", deployElapsed(start, ops.Now()))
+			}
 			return nil
 		}
-		if wait.Kind == deploy.WaitSeconds && deployElapsed(start, ops.Now()).Cmp(new(big.Rat).SetInt(wait.Seconds)) >= 0 {
+		if !online {
+			down = true
+		}
+		var elapsed *big.Rat
+		if wait.Kind == deploy.WaitSeconds || progress != nil {
+			elapsed = deployElapsed(start, ops.Now())
+		}
+		state := "waiting-down"
+		if down {
+			state = "waiting-up"
+		}
+		if err := observe(state, elapsed); err != nil {
+			return err
+		}
+		if wait.Kind == deploy.WaitSeconds && elapsed.Cmp(new(big.Rat).SetInt(wait.Seconds)) >= 0 {
 			return fmt.Errorf("timeout")
 		}
 		if err := ops.Sleep(ctx, 300*time.Millisecond); err != nil {

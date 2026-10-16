@@ -379,7 +379,7 @@ func TestCommandPromptPublicCallerCancellation(t *testing.T) {
 				}
 			case "deploy":
 				run = func() error {
-					_, err := e.deployCommand(deployInvocation(t, "node"), in, out, deployCommandDeps{Machines: func() ([]Machine, error) { return e.Inventory, nil }, Prepare: func([]string) (int, error) { unexpected(); return 0, nil }})
+					_, err := e.deployCommand(deployInvocation(t, "node"), in, out, out, deployCommandDeps{Machines: func() ([]Machine, error) { return e.Inventory, nil }, Prepare: func([]string) (int, error) { unexpected(); return 0, nil }})
 					return err
 				}
 			}
@@ -409,7 +409,7 @@ func TestCommandPromptDeployUsesCallbackContext(t *testing.T) {
 			_, line := commandInput(in)
 			out := newCommandPromptOutput()
 			e := &Engine{Context: context.Background()}
-			d := e.deployOperationsWithOps(e.Context, nil, nil, line, out, cli.Invocation{}, deployProcessOps{})
+			d := e.deployOperationsWithOps(e.Context, nil, nil, line, out, out, cli.Invocation{}, deployProcessOps{})
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			done := commandPromptStart(t, cancel, in, producer, func() error {

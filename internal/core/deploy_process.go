@@ -22,10 +22,11 @@ import (
 type deployRun func(context.Context, []string, []byte, []string, bool, func([]byte, []byte) error) (Result, error)
 
 type deployProcessOps struct {
-	Run       deployRun
-	Now       func() time.Time
-	Sleep     func(context.Context, time.Duration) error
-	CheckFile func() (string, error)
+	Run          deployRun
+	Now          func() time.Time
+	Sleep        func(context.Context, time.Duration) error
+	CheckFile    func() (string, error)
+	presentation *deployPresentation
 }
 
 func (e *Engine) deployProcess(ctx context.Context, argv []string, input []byte, env []string, logged bool, chunk func([]byte, []byte) error) (Result, error) {
@@ -56,12 +57,12 @@ func deployCheckFile() (string, error) {
 	return "/run/confctl-confirm-" + hex.EncodeToString(random[:]), nil
 }
 
-func (e *Engine) deployOperations(ctx context.Context, all, selected []Machine, line commandLine, out io.Writer, inv cli.Invocation) deploy.Deps {
+func (e *Engine) deployOperations(ctx context.Context, all, selected []Machine, line commandLine, out, stderr io.Writer, inv cli.Invocation) deploy.Deps {
 	ops := deployProcessOps{Run: e.deployProcess, Now: time.Now, Sleep: deploySleep, CheckFile: deployCheckFile}
-	return e.deployOperationsWithOps(ctx, all, selected, line, out, inv, ops)
+	return e.deployOperationsWithOps(ctx, all, selected, line, out, stderr, inv, ops)
 }
 
-func (e *Engine) deployOperationsWithOps(ctx context.Context, all, selected []Machine, line commandLine, out io.Writer, inv cli.Invocation, ops deployProcessOps) deploy.Deps {
+func (e *Engine) deployOperationsWithOps(ctx context.Context, all, selected []Machine, line commandLine, out, stderr io.Writer, inv cli.Invocation, ops deployProcessOps) deploy.Deps {
 	byName := map[string]Machine{}
 	for _, m := range selected {
 		byName[m.Name] = m
@@ -124,7 +125,10 @@ func (e *Engine) deployOperationsWithOps(ctx context.Context, all, selected []Ma
 			return deployMachineCommand(ctx, carrier, []string{"carrier-env", "-p", v.Profile, "--set", top}, false, true, ops.Run)
 		},
 		RebootAndWait: func(ctx context.Context, m deploy.Machine, wait deploy.WaitMode) error {
-			return deployReboot(ctx, machine(m), wait, ops)
+			if ops.presentation != nil {
+				return ops.presentation.reboot(ctx, machine(m), wait, ops)
+			}
+			return deployReboot(ctx, machine(m), wait, ops, nil)
 		},
 		Checks: func(ms []deploy.Machine) ([]health.Check, error) {
 			var checks []health.Check
@@ -154,9 +158,9 @@ func (e *Engine) deployOperationsWithOps(ctx context.Context, all, selected []Ma
 			}
 			attempt := *e
 			attempt.Context = ctx
-			result, err := attempt.runHealth(HealthPlan{Machines: scope, Checks: checks, Workers: *workers}, health.Deps{}, func(ctx context.Context, _ string, argv []string, data []byte) (Result, error) {
+			result, err := attempt.runHealthPresented(HealthPlan{Machines: scope, Checks: checks, Workers: *workers}, health.Deps{}, func(ctx context.Context, _ string, argv []string, data []byte) (Result, error) {
 				return ops.Run(ctx, argv, data, nil, true, nil)
-			})
+			}, out, stderr)
 			return result.Report, err
 		},
 		Confirm: func(ctx context.Context, _ deploy.Confirmation) (bool, error) { return deployConfirm(ctx, line, out) },
