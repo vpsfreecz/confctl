@@ -18,6 +18,7 @@ type Engine struct {
 	Inventory     []Machine
 	ShowTrace     bool
 	Color         string
+	liveCommand   string
 	Yes           bool
 	logOwner      *engineLog
 	Log           *os.File

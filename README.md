@@ -16,6 +16,9 @@ machines.
 * [Automatically roll back faulty configurations](docs/auto-rollback.md)
 * Support for creating netboot servers with option to kexec, see [docs/carrier.md](docs/carrier.md)
 
+See [live operation views](docs/live-operations.md) for progress displays,
+confirmation controls, text output and command-log access.
+
 ## Packages and extensions
 
 The normal `confctl` package builds the Go CLI, hook driver and command manuals.

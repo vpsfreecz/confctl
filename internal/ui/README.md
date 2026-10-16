@@ -18,3 +18,14 @@ The [Linux terminal bindings](../core/terminal.md) own borrowed descriptors,
 mode restoration and cancellation wakeups. Authentication uses those primitives
 with its own editing and protected-input policy; it does not use a second reader
 from a terminal library.
+
+The live operation model copies its compact semantic header and task snapshots,
+retains bounded recent output, and lays out safe display columns with `x/ansi`.
+It places bordered plain log rows above bounded progress rows, reserving at least
+twelve log slots at 80×24. Confctl's finite field/state palette is applied after
+sanitation and grapheme clipping; child data cannot supply terminal styles.
+Complete machine/input preludes belong to the build caller and never enter the
+model, repaint or final summary. Its caller serializes updates;
+the model has no reader, worker, terminal handle or execution policy. The Linux
+session owns rendering and prompt barriers. See [live operations](../../docs/live-operations.md)
+for the command families, progress and controls.

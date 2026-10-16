@@ -3,9 +3,9 @@ package core
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
+	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +15,10 @@ import (
 	"testing"
 	"time"
 	"unsafe"
+
+	"github.com/charmbracelet/x/ansi"
+	"github.com/vpsfreecz/confctl/internal/ui"
+	"golang.org/x/sys/unix"
 )
 
 type sshTerminalTranscript struct {
@@ -80,33 +84,26 @@ func TestSSHLiveTTYChild(t *testing.T) {
 	root := os.Getenv("CORE_SSH_LIVE_ROOT")
 	slow := connectionMachine("alpha", "alpha", "slow.invalid", true)
 	fast := connectionMachine("zeta", "zeta", "fast.invalid", true)
-	e := &Engine{Root: root, Context: context.Background(), Color: "never", Inventory: []Machine{slow, fast}}
+	e := &Engine{Root: root, Context: context.Background(), Color: "never", liveCommand: "confctl ssh -y -p -g * cat literal", Inventory: []Machine{slow, fast}}
 	if err := e.OpenLog("ssh"); err != nil {
 		t.Fatal(err)
 	}
 	defer e.Log.Close()
-	command := []string{"cat", "literal token"}
-	view, err := e.sshLive(os.Stdout, os.Stderr, command, 2)
-	if err != nil || view == nil {
-		t.Fatal(view, err)
-	}
-	r, err := e.sshParallelProgress([]Machine{slow, fast}, command, sshInput{}, sshDeps{Run: e.sshCommandProcess}, view.advance)
-	if finishErr := view.finish(e.Context, err == nil); err != nil || finishErr != nil {
-		t.Fatal(err, finishErr)
-	}
-	if len(r) != 2 || r[0].Name != "zeta" || r[1].Name != "alpha" {
-		t.Fatal("terminal view changed completion order", r)
-	}
-	if err := sshPrintResults(os.Stdout, r, true); err != nil {
+	var before, after unix.Termios
+	if err := basicNativeTermios(os.Stdin, unix.TCGETS, &before); err != nil {
 		t.Fatal(err)
 	}
+	command := []string{"cat", "literal token"}
+	if err := e.SSH(sshInvocation(t, "ssh", "-y", "-p", "-g", "*", command[0], command[1]), os.Stdin, os.Stdout, os.Stderr); err != nil {
+		t.Fatal(err)
+	}
+	if err := basicNativeTermios(os.Stdin, unix.TCGETS, &after); err != nil || before != after {
+		t.Fatal("live SSH changed terminal mode", err)
+	}
+
 	log, err := os.ReadFile(e.Log.Name())
 	if err != nil || !bytes.Contains(log, []byte("fast\toutput\n")) {
 		t.Fatal("terminal substitution changed raw log", string(log), err)
-	}
-	b, _ := json.Marshal([]string{r[0].Name, r[1].Name})
-	if err := os.WriteFile(filepath.Join(root, "result.json"), b, 0600); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -130,62 +127,102 @@ func TestSSHLiveTTYStreamsCompletionProgressAndResize(t *testing.T) {
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = slave, slave, slave
 	cmd.Env = os.Environ()
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true, Ctty: 0}
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-	waitDone := make(chan struct{})
-	var waitErr error
-	go func() { waitErr = cmd.Wait(); close(waitDone) }()
-	defer func() {
-		cancel()
-		select {
-		case <-waitDone:
-		case <-time.After(5 * time.Second):
-			t.Error("terminal child not reaped")
+	owned := startDeliveryFixture(t, cmd)
+	readJoined := false
+	owned.closeIO = func() error {
+		_ = slave.Close()
+		_ = master.Close()
+		if !readJoined {
+			select {
+			case <-readDone:
+				readJoined = true
+			case <-time.After(5 * time.Second):
+				return errors.New("SSH PTY reader did not join")
+			}
 		}
-	}()
+		return nil
+	}
+
 	_ = slave.Close()
 	sshAwaitTerminal(t, transcript, "1/2 (50%)")
 	if strings.Contains(transcript.String(), "2/2 (100%)") {
 		t.Fatal("progress waited for complete batch", transcript.String())
 	}
-	sshAwaitTerminal(t, transcript, "fast  output")
+	sshAwaitTerminal(t, transcript, "fast output")
+	// Full command context belongs to the wide live panel, before resize.
+	for _, header := range []string{"Command: confctl ssh -y -p -g * cat literal\r\n", "SSH: cat literal\\ token\r\n"} {
+		sshAwaitTerminal(t, transcript, header)
+	}
+	select {
+	case <-owned.done:
+		t.Fatal("live output was only observed after batch exit")
+	default:
+	}
 	sshPTYSize(t, master, 30, 32)
-	sshAwaitTerminal(t, transcript, "Live view --------------------->")
+	if err := cmd.Process.Signal(syscall.SIGWINCH); err != nil {
+		t.Fatal(err)
+	}
+	logs := deliveryLogs(t, root)
+	if len(logs) != 1 {
+		t.Fatal("missing active log", logs)
+	}
+	sshAwaitTerminal(t, transcript, ansi.Truncate("Full log: "+logs[0], 32, "…"))
 	if err := os.WriteFile(release, []byte("release"), 0600); err != nil {
 		t.Fatal(err)
 	}
+	if err, joined := owned.wait(5 * time.Second); !joined || err != nil {
+		t.Fatal("terminal child did not finish", joined, err)
+	}
 	select {
-	case <-waitDone:
-		if waitErr != nil {
-			t.Fatal(waitErr)
+	case err := <-readDone:
+		readJoined = true
+		if !errors.Is(err, syscall.EIO) && !errors.Is(err, io.EOF) {
+			t.Fatal(err)
 		}
 	case <-time.After(5 * time.Second):
-		t.Fatal("terminal child did not finish")
+		t.Fatal("PTY reader did not join")
 	}
-	if err := <-readDone; !errors.Is(err, syscall.EIO) && !errors.Is(err, io.EOF) {
-		t.Fatal(err)
-	}
+
 	text := transcript.String()
-	for _, want := range []string{"Executing cat literal\\ token\r\n", "Live view", "\x1b7\x1b[H", "\x1b8", "2/2 (100%)", "zeta:\r\nExit status: 0\r\nfast\toutput\r\n\r\nalpha:"} {
+	for _, want := range []string{"Live view", "\x1b[H", "zeta:\r\nExit status: 0\r\nfast\toutput\r\n\r\nalpha:"} {
 		if !strings.Contains(text, want) {
 			t.Fatal("missing source display/result boundary", want, text)
 		}
 	}
+	frame, after := liveLastPaint(t, text, 30)
+	// Final selected fields obey the actual 32-column geometry; the full
+	// percentage is not replayed outside the retained panel to evade clipping.
+	finalModel, err := ui.NewLiveModel(ui.LiveHeader{}, []ui.LiveRow{
+		{ID: "ssh", Label: "Commands", Current: big.NewInt(2), Total: big.NewInt(2), State: ui.LiveSucceeded},
+		{ID: "host:alpha", Label: "alpha", State: ui.LiveSucceeded, Detail: "exit status 0", Target: true},
+		{ID: "host:zeta", Label: "zeta", State: ui.LiveSucceeded, Detail: "exit status 0", Target: true},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finalRows := finalModel.Frame(30, 32, 0)
+	for _, row := range finalRows[len(finalRows)-3:] {
+		if !strings.Contains(frame, "\x1b[2K\r"+row) {
+			t.Fatal("wrong final selected count/state", row, frame)
+		}
+	}
+	if !strings.Contains(frame, ansi.Truncate("Command: confctl ssh -y -p -g * cat literal", 32, "…")) || !strings.Contains(frame, "SSH: cat literal\\ token") {
+		t.Fatal("resized final header missing", frame)
+	}
+	if strings.Contains(after, "Command:") || strings.Contains(after, "SSH:") || strings.Contains(after, "Commands [") || strings.Count(after, "Full log: "+logs[0]) != 1 {
+		t.Fatal("final panel replayed/missing full locator", after)
+	}
 	if strings.Contains(text, "on 2 machines") {
 		t.Fatal("terminal display acquired non-TTY header", text)
-	}
-	b, err := os.ReadFile(filepath.Join(root, "result.json"))
-	if err != nil || string(b) != `["zeta","alpha"]` {
-		t.Fatal(string(b), err)
 	}
 }
 
 func TestSSHLiveDisabledByEitherPipeAndEnvironment(t *testing.T) {
 	_, tty := openCommitTestPTY(t)
 	e := connectionEngine(t)
+	e.Color = "always" // Forced styling never forces live-view admission.
 	t.Setenv("CONFCTL_TTY", "0")
-	v, err := e.sshLive(tty, tty, []string{"cat"}, 1)
+	v, err := e.sshLive(e.Context, tty, tty, []string{"cat"}, []Machine{{Name: "host"}}, nil)
 	if err != nil || v != nil {
 		t.Fatal(v, err)
 	}
@@ -197,9 +234,37 @@ func TestSSHLiveDisabledByEitherPipeAndEnvironment(t *testing.T) {
 	defer r.Close()
 	defer w.Close()
 	for _, files := range [][2]*os.File{{tty, w}, {w, tty}, {w, w}} {
-		v, err := e.sshLive(files[0], files[1], []string{"cat"}, 1)
+		v, err := e.sshLive(e.Context, files[0], files[1], []string{"cat"}, []Machine{{Name: "host"}}, nil)
 		if err != nil || v != nil {
 			t.Fatal(v, err)
 		}
+	}
+}
+
+func TestLiveViewTTYConstructionRefusalKeepsBorrowedTerminal(t *testing.T) {
+	t.Setenv("CONFCTL_TTY", "1")
+	_, tty := openCommitTestPTY(t)
+	readonly, err := os.OpenFile(tty.Name(), os.O_RDONLY|syscall.O_NOCTTY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer readonly.Close()
+	var before, after unix.Termios
+	if err := basicNativeTermios(tty, unix.TCGETS, &before); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	v, err := (&Engine{}).openLiveView(context.Background(), readonly, tty, liveViewSpec{Rows: []ui.LiveRow{{ID: "all", Label: "Fixture", Current: big.NewInt(0)}}}, func(error) { calls++ })
+	if err == nil || v != nil || calls != 1 {
+		if v != nil {
+			_ = v.Close()
+		}
+		t.Fatal("read-only terminal construction accepted", err, calls)
+	}
+	if !sshIsTTY(readonly) || !sshIsTTY(tty) {
+		t.Fatal("construction closed borrowed descriptors")
+	}
+	if err := basicNativeTermios(tty, unix.TCGETS, &after); err != nil || before != after {
+		t.Fatal("construction changed terminal mode", err)
 	}
 }

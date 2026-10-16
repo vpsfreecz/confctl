@@ -10,6 +10,7 @@ import (
 
 	"github.com/vpsfreecz/confctl/internal/cli"
 	"github.com/vpsfreecz/confctl/internal/inputs"
+	"github.com/vpsfreecz/confctl/internal/ui"
 )
 
 func Main(ctx context.Context, argv []string) (result int) {
@@ -92,6 +93,7 @@ func Main(ctx context.Context, argv []string) (result int) {
 		return 1
 	}
 	e.Color = color
+	e.liveCommand = ui.LiveText(ShellJoin(append([]string{"confctl"}, argv...)), "", false)
 	e.Yes = inv.Options["yes"].Value.Bool
 	e.ShowTrace = inv.Options["show-trace"].Value.Bool
 	logName := cmd
@@ -237,7 +239,7 @@ func Main(ctx context.Context, argv []string) (result int) {
 	}
 	if inv.Command.Handler == cli.SSHHandler || inv.Command.Handler == cli.CSSHHandler {
 		if inv.Command.Handler == cli.SSHHandler {
-			err = e.SSH(inv, os.Stdin, os.Stdout)
+			err = e.SSH(inv, os.Stdin, os.Stdout, os.Stderr)
 		} else {
 			err = e.CSSH(inv, os.Stdin, os.Stdout)
 		}

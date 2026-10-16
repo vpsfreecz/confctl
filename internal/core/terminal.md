@@ -26,6 +26,29 @@ EBADF. Prompt permission and serialized extension confirmations remain with thei
 existing owners.
 
 Inherited SSH, Git job control and SystemPager keep their distinct process and
-child-wait owners. Live command logs retain their operation and machine context;
-this terminal-library change does not replace them with a deferred display.
+child-wait owners. The shared live session owns one output region, resize
+notification and a bounded display model. It never reads stdin or changes
+termios. Its prompt barrier stops painting before the existing prompt runs and
+resumes only after successful completion. Rendering errors latch once and notify
+the operation outside model/output locks; shutdown joins that notification.
+
+Before its first home repaint the session scrolls one viewport of ordinary LF,
+preserving the caller's once-only machine/input prelude in terminal history.
+Actual geometry changes reserve a new viewport once. A resize during a prompt
+records dimensions but defers scrolling and painting until successful resume or
+final teardown after the prompt returns. Unchanged resize notifications and
+timer frames do not reserve again. Every complete paint positions the cursor in
+the last reserved row; a one-row terminal positions without erasing its only row.
+Color policy resolves against the supplied destination, independently of live
+TTY admission. Sanitized data receives only fixed confctl field/state SGR with
+balanced resets; raw and semantic child records remain plain.
+
+Raw live views reopen the checked command log read-only, validate file identity
+and start at the existing end. Bounded reads follow file offsets; synchronous
+log subscribers are not an ordered payload source. Flush captures a finite end,
+and close always drains the final stable end after child/callback joins, even
+when the operation context was cancelled. Only acquired read/console descriptors
+are closed. The renderer owns no child, input reader or execution policy.
+See [live operations](../../docs/live-operations.md) for progress meaning,
+operator controls, text fallback and full-log access.
 See [comparison paging](../ui/README.md) for wrapping and pager boundaries.

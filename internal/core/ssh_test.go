@@ -52,7 +52,7 @@ func TestSSHSelectionPresenceAndConfirmation(t *testing.T) {
 			e := connectionEngine(t, all...)
 			var out bytes.Buffer
 			hosts := []string{}
-			err := e.runSSH(sshInvocation(t, tc.args...), strings.NewReader(tc.in), &out, sshDeps{Run: func(ctx context.Context, root string, argv []string, input sshInput) (Result, error) {
+			err := e.runSSH(sshInvocation(t, tc.args...), strings.NewReader(tc.in), &out, io.Discard, sshDeps{Run: func(ctx context.Context, root string, argv []string, input sshInput) (Result, error) {
 				hosts = append(hosts, argv[len(argv)-2])
 				return Result{ExitCode: 0, Stdout: []byte("ok\n")}, nil
 			}})
@@ -81,14 +81,14 @@ func TestSSHSelectionPresenceAndConfirmation(t *testing.T) {
 		runs++
 		return Result{ExitCode: 0}, nil
 	}}
-	err := e.runSSH(sshInvocation(t, "ssh", "zeta", "cat", "token"), strings.NewReader("\nY\n"), &out, deps)
+	err := e.runSSH(sshInvocation(t, "ssh", "zeta", "cat", "token"), strings.NewReader("\nY\n"), &out, io.Discard, deps)
 	if err != nil || runs != 1 || strings.Count(out.String(), "Continue? [y/N]: ") != 2 || !strings.Contains(out.String(), "Command: cat token\n") || !strings.Contains(out.String(), "NAME") {
 		t.Fatal(err, runs, out.String())
 	}
 	for _, answer := range []string{"n\n", ""} {
 		out.Reset()
 		runs = 0
-		err = e.runSSH(sshInvocation(t, "ssh", "-f", "missing", "zeta", "cat", "token"), strings.NewReader(answer), &out, deps)
+		err = e.runSSH(sshInvocation(t, "ssh", "-f", "missing", "zeta", "cat", "token"), strings.NewReader(answer), &out, io.Discard, deps)
 		if err == nil || runs != 0 {
 			t.Fatal(err, runs)
 		}
@@ -129,7 +129,7 @@ func TestSSHCommandAndInteractiveLiteralArguments(t *testing.T) {
 	// command string. The uncharacterized prompt variant remains an open gate.
 	e := connectionEngine(t, m)
 	var out bytes.Buffer
-	err = e.runSSH(sshInvocation(t, "ssh", "-y"), strings.NewReader(""), &out, sshDeps{Run: func(ctx context.Context, root string, a []string, input sshInput) (Result, error) {
+	err = e.runSSH(sshInvocation(t, "ssh", "-y"), strings.NewReader(""), &out, io.Discard, sshDeps{Run: func(ctx context.Context, root string, a []string, input sshInput) (Result, error) {
 		if a[len(a)-1] != "" {
 			t.Fatal(a)
 		}
@@ -139,7 +139,7 @@ func TestSSHCommandAndInteractiveLiteralArguments(t *testing.T) {
 		t.Fatal(err, out.String())
 	}
 	out.Reset()
-	err = e.runSSH(sshInvocation(t, "ssh"), strings.NewReader("y\n"), &out, sshDeps{Run: func(context.Context, string, []string, sshInput) (Result, error) {
+	err = e.runSSH(sshInvocation(t, "ssh"), strings.NewReader("y\n"), &out, io.Discard, sshDeps{Run: func(context.Context, string, []string, sshInput) (Result, error) {
 		t.Fatal("zero-positional confirmation failure ran a command")
 		return Result{}, nil
 	}})
@@ -147,7 +147,7 @@ func TestSSHCommandAndInteractiveLiteralArguments(t *testing.T) {
 		t.Fatal(err, out.String())
 	}
 	out.Reset()
-	err = e.runSSH(sshInvocation(t, "ssh", "-y", "-p"), strings.NewReader(""), &out, sshDeps{Run: func(context.Context, string, []string, sshInput) (Result, error) {
+	err = e.runSSH(sshInvocation(t, "ssh", "-y", "-p"), strings.NewReader(""), &out, io.Discard, sshDeps{Run: func(context.Context, string, []string, sshInput) (Result, error) {
 		t.Fatal("zero-positional parallel header failure ran a command")
 		return Result{}, nil
 	}})
@@ -349,7 +349,7 @@ func TestSSHActualStreamsInputAndSerialHostFailures(t *testing.T) {
 	}
 	defer e.Log.Close()
 	var out bytes.Buffer
-	if err := e.SSH(sshInvocation(t, "ssh", "-y", "*", "cat", "token"), strings.NewReader(""), &out); err != nil {
+	if err := e.SSH(sshInvocation(t, "ssh", "-y", "*", "cat", "token"), strings.NewReader(""), &out, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if out.String() != "zeta:\nOUT1\nERR1\nOUT2\n\nbeta:\n\n\nalpha:\n\n\n" {
@@ -392,7 +392,7 @@ func TestSSHActualStreamsInputAndSerialHostFailures(t *testing.T) {
 			args := append([]string{"ssh", "-y"}, tc.args...)
 			args = append(args, "local", "cat", "token")
 			var out bytes.Buffer
-			if err := e.SSH(sshInvocation(t, args...), strings.NewReader(""), &out); err != nil {
+			if err := e.SSH(sshInvocation(t, args...), strings.NewReader(""), &out, io.Discard); err != nil {
 				t.Fatal(err)
 			}
 			r := sshRecord(t, trace, "cat", 1)
@@ -409,7 +409,7 @@ func TestSSHInputFileReopensAtEachHost(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(e.Root, "input.txt"), []byte("first file bytes\n"), 0600)
 	trace := sshExecutables(t, map[string]sshChildStimulus{"zeta.invalid": {Read: true, WritePath: "input.txt", WriteText: "second file bytes\n"}, "alpha.invalid": {Read: true}})
 	var out bytes.Buffer
-	if err := e.SSH(sshInvocation(t, "ssh", "-y", "-f", "input.txt", "*", "cat", "token"), strings.NewReader(""), &out); err != nil {
+	if err := e.SSH(sshInvocation(t, "ssh", "-y", "-f", "input.txt", "*", "cat", "token"), strings.NewReader(""), &out, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if sshRecord(t, trace, "zeta.invalid", 1).Input != "first file bytes\n" || sshRecord(t, trace, "alpha.invalid", 1).Input != "second file bytes\n" {
@@ -418,7 +418,7 @@ func TestSSHInputFileReopensAtEachHost(t *testing.T) {
 	// First missing-path conversion happens before the first response creates it.
 	trace = sshExecutables(t, map[string]sshChildStimulus{"zeta.invalid": {Read: true, WritePath: "created.txt", WriteText: "created after first spawn\n"}, "alpha.invalid": {Read: true}})
 	out.Reset()
-	if err := e.SSH(sshInvocation(t, "ssh", "-y", "-f", "created.txt", "*", "cat", "token"), strings.NewReader(""), &out); err != nil {
+	if err := e.SSH(sshInvocation(t, "ssh", "-y", "-f", "created.txt", "*", "cat", "token"), strings.NewReader(""), &out, io.Discard); err != nil {
 		t.Fatal(err)
 	}
 	if sshRecord(t, trace, "zeta.invalid", 1).Input != "created.txt" || sshRecord(t, trace, "alpha.invalid", 1).Input != "created after first spawn\n" {
@@ -456,7 +456,7 @@ func TestSSHInputFilePreservesPhysicalSymlinkParentTraversal(t *testing.T) {
 			}
 			argv = append(argv, "*", "cat", "token")
 			var out bytes.Buffer
-			if err := e.SSH(sshInvocation(t, argv...), strings.NewReader(""), &out); err != nil {
+			if err := e.SSH(sshInvocation(t, argv...), strings.NewReader(""), &out, io.Discard); err != nil {
 				t.Fatal(err)
 			}
 			for _, host := range []string{"one.invalid", "two.invalid"} {
@@ -491,7 +491,7 @@ func TestSSHInputFileOpenFailureStopsBeforeSpawn(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	err := e.SSH(sshInvocation(t, "ssh", "-y", "-f", "denied.txt", "*", "cat", "token"), strings.NewReader(""), &out)
+	err := e.SSH(sshInvocation(t, "ssh", "-y", "-f", "denied.txt", "*", "cat", "token"), strings.NewReader(""), &out, io.Discard)
 	if !errors.Is(err, os.ErrPermission) || out.String() != "zeta:\n" {
 		t.Fatal(err, out.String())
 	}
@@ -525,7 +525,7 @@ func TestSSHParallelSpawnFailureCancelsActivePeer(t *testing.T) {
 		return e.sshCommandProcess(ctx, root, argv, input)
 	}}
 	var out bytes.Buffer
-	err := e.runSSH(sshInvocation(t, "ssh", "-y", "-p", "*", "cat", "token"), strings.NewReader(""), &out, deps)
+	err := e.runSSH(sshInvocation(t, "ssh", "-y", "-p", "*", "cat", "token"), strings.NewReader(""), &out, io.Discard, deps)
 	var missing *exec.Error
 	if !errors.As(err, &missing) || !errors.Is(err, exec.ErrNotFound) || out.String() != "Executing cat token on 2 machines\n" {
 		t.Fatal(err, out.String())
@@ -553,7 +553,7 @@ func TestSSHParallelCompletionAndAggregateGroups(t *testing.T) {
 			}
 			args = append(args, "*", "cat", "token")
 			var out bytes.Buffer
-			if err := e.SSH(sshInvocation(t, args...), strings.NewReader(""), &out); err != nil {
+			if err := e.SSH(sshInvocation(t, args...), strings.NewReader(""), &out, io.Discard); err != nil {
 				t.Fatal(err)
 			}
 			blocks := []string{"beta:\nsame\n\n", "gamma:\n\n\n", "alpha:\n\n\n", "zeta:\n\n\n"}
@@ -602,7 +602,7 @@ func TestSSHSerialAggregateAndTransportFailures(t *testing.T) {
 		}
 		return Result{ExitCode: status, Stdout: []byte("same\n")}, nil
 	}}
-	if err := e.runSSH(sshInvocation(t, "ssh", "-y", "-g", "*", "cat", "token"), strings.NewReader(""), &out, deps); err != nil {
+	if err := e.runSSH(sshInvocation(t, "ssh", "-y", "-g", "*", "cat", "token"), strings.NewReader(""), &out, io.Discard, deps); err != nil {
 		t.Fatal(err)
 	}
 	if out.String() != "alpha, zeta:\nExit status: 7\nsame\n\nbeta:\nExit status: 255\nsame\n\n" {
@@ -626,7 +626,7 @@ func TestSSHSerialAggregateAndTransportFailures(t *testing.T) {
 		calls++
 		return Result{ExitCode: 255}, failure
 	}
-	if err := e.runSSH(sshInvocation(t, "ssh", "-y", "*", "cat", "token"), strings.NewReader(""), &out, deps); !errors.Is(err, failure) || calls != 1 || out.String() != "zeta:\n" {
+	if err := e.runSSH(sshInvocation(t, "ssh", "-y", "*", "cat", "token"), strings.NewReader(""), &out, io.Discard, deps); !errors.Is(err, failure) || calls != 1 || out.String() != "zeta:\n" {
 		t.Fatal(err, calls, out.String())
 	}
 	if _, err := e.sshCommandProcess(context.Background(), e.Root, []string{filepath.Join(e.Root, "missing")}, sshInput{}); err == nil {
@@ -672,7 +672,7 @@ func TestSSHInteractiveAdapterIgnoresHostNonzero(t *testing.T) {
 	var out bytes.Buffer
 	in := strings.NewReader("")
 	called := false
-	err := e.runSSH(sshInvocation(t, "ssh", "-y", "one"), in, &out, sshDeps{Interactive: func(ctx context.Context, root string, argv []string, stdin io.Reader, stdout io.Writer) (Result, error) {
+	err := e.runSSH(sshInvocation(t, "ssh", "-y", "one"), in, &out, io.Discard, sshDeps{Interactive: func(ctx context.Context, root string, argv []string, stdin io.Reader, stdout io.Writer) (Result, error) {
 		called = true
 		if stdin != in || stdout != &out || root != e.Root || !reflect.DeepEqual(argv, []string{"ssh", "-l", "root", "one.invalid"}) {
 			t.Fatal(argv)

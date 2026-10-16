@@ -337,7 +337,7 @@ func TestCommandPromptPublicCallerCancellation(t *testing.T) {
 				}
 			case "ssh":
 				run = func() error {
-					return e.runSSH(sshInvocation(t, "ssh", "node", "true"), in, out, sshDeps{Run: func(context.Context, string, []string, sshInput) (Result, error) { unexpected(); return Result{}, nil }})
+					return e.runSSH(sshInvocation(t, "ssh", "node", "true"), in, out, out, sshDeps{Run: func(context.Context, string, []string, sshInput) (Result, error) { unexpected(); return Result{}, nil }})
 				}
 			case "cssh":
 				run = func() error { return e.CSSH(sshInvocationForPrompt(t, "cssh", "node"), in, out) }

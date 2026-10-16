@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/vpsfreecz/confctl/internal/cli"
+	"github.com/vpsfreecz/confctl/internal/ui"
 )
 
 // Presence is distinct from content: an absent input leaves the child's pipe
@@ -37,8 +39,8 @@ type sshArgumentError struct{ error }
 func (e *Engine) LogSSHCLI(inv cli.Invocation) error { return e.LogTestConnectionCLI(inv) }
 
 // Command mode uses pipes; interactive mode retains the caller's descriptors.
-func (e *Engine) SSH(inv cli.Invocation, in io.Reader, out io.Writer) error {
-	return e.runSSH(inv, in, out, sshDeps{Run: e.sshCommandProcess, Interactive: e.sshInteractiveProcess, RootShell: e.sshRootShell})
+func (e *Engine) SSH(inv cli.Invocation, in io.Reader, out, stderr io.Writer) error {
+	return e.runSSH(inv, in, out, stderr, sshDeps{Run: e.sshCommandProcess, Interactive: e.sshInteractiveProcess, RootShell: e.sshRootShell})
 }
 
 func (e *Engine) sshMachines(inv cli.Invocation, empty string) ([]Machine, error) {
@@ -105,7 +107,7 @@ func (e *Engine) sshConfirmation(inv cli.Invocation, machines []Machine, in io.R
 	return testConnectionConfirm(e.Context, line, out)
 }
 
-func (e *Engine) runSSH(inv cli.Invocation, in io.Reader, out io.Writer, deps sshDeps) error {
+func (e *Engine) runSSH(inv cli.Invocation, in io.Reader, out, stderr io.Writer, deps sshDeps) error {
 	machines, err := e.sshMachines(inv, "No machines to ssh to")
 	if err != nil {
 		return err
@@ -159,19 +161,47 @@ func (e *Engine) runSSH(inv cli.Invocation, in io.Reader, out io.Writer, deps ss
 			// Executing header. Serial --yes alone reaches the empty command.
 			return fmt.Errorf("undefined method 'map' for nil")
 		}
-		view, err := e.sshLive(out, os.Stderr, command, len(machines))
+		ctx, cancel := context.WithCancel(e.Context)
+		defer cancel()
+		operation := *e
+		operation.Context = ctx
+		view, err := e.sshLive(ctx, out, stderr, command, machines, func(error) { cancel() })
 		if err != nil {
 			return err
 		}
-		var advance func()
+		var advance func(sshHostResult)
+		completed := make(map[string]bool, len(machines))
+		failedHost := false
 		if view == nil {
 			fmt.Fprintf(out, "Executing %s on %d machines\n", sshShellJoin(command), len(machines))
 		} else {
-			advance = view.advance
+			advance = func(r sshHostResult) {
+				completed[r.Name] = true // callback is serialized by the SSH result owner
+				state := ui.LiveSucceeded
+				if r.Status != 0 {
+					state = ui.LiveFailed
+					failedHost = true
+				}
+				_ = view.SetRows(ui.LiveRow{ID: "host:" + r.Name, Label: r.Name, State: state, Detail: fmt.Sprintf("exit status %d", r.Status), Target: true})
+				_ = view.Advance("ssh")
+			}
 		}
-		results, err := e.sshParallelProgress(machines, command, input, deps, advance)
+		results, err := operation.sshParallelProgress(machines, command, input, deps, advance)
 		if view != nil {
-			err = errors.Join(err, view.finish(e.Context, err == nil))
+			state := ui.LiveSucceeded
+			if failedHost {
+				state = ui.LiveFailed
+			}
+			if err != nil {
+				state = ui.LiveIncomplete
+			}
+			_ = view.SetRows(ui.LiveRow{ID: "ssh", Label: "Commands", Current: big.NewInt(int64(len(completed))), Total: big.NewInt(int64(len(machines))), State: state})
+			for _, m := range machines {
+				if !completed[m.Name] {
+					_ = view.SetRows(ui.LiveRow{ID: "host:" + m.Name, Label: m.Name, State: ui.LiveIncomplete, Target: true})
+				}
+			}
+			err = errors.Join(err, view.Close())
 			if e.Context.Err() != nil {
 				err = errors.Join(err, e.Context.Err())
 			}
@@ -302,7 +332,7 @@ func (e *Engine) sshParallel(machines []Machine, command []string, input sshInpu
 	return e.sshParallelProgress(machines, command, input, deps, nil)
 }
 
-func (e *Engine) sshParallelProgress(machines []Machine, command []string, input sshInput, deps sshDeps, advance func()) ([]sshHostResult, error) {
+func (e *Engine) sshParallelProgress(machines []Machine, command []string, input sshInput, deps sshDeps, advance func(sshHostResult)) ([]sshHostResult, error) {
 	ctx, cancel := context.WithCancel(e.Context)
 	defer cancel()
 	var mu sync.Mutex
@@ -327,7 +357,7 @@ func (e *Engine) sshParallelProgress(machines []Machine, command []string, input
 			// transcripts, or logs by machine name to conceal scheduling.
 			results = append(results, r)
 			if advance != nil {
-				advance()
+				advance(r)
 			}
 		}(m)
 	}
