@@ -436,12 +436,87 @@ func TestTestConnectionTypedSpawnAndProcessMetadata(t *testing.T) {
 	}
 }
 
+// Each record frames one untagged callback, whose final LF is optional in the
+// original chunk. Retain every possible pair of stream offsets so shared bytes
+// and callback interleaving cannot make a greedy match lose valid payloads.
+func connectionLogFramesConserve(records []string, prefix, stdout, stderr string) bool {
+	positions := map[[2]int]bool{{}: true}
+	streams := [2]string{stdout, stderr}
+	for _, record := range records {
+		if !strings.HasPrefix(record, prefix) || !strings.HasSuffix(record, "\n") {
+			return false
+		}
+		body := record[len(prefix) : len(record)-1]
+		chunks := []string{body + "\n"}
+		if body != "" && !strings.HasSuffix(body, "\n") {
+			chunks = append(chunks, body)
+		}
+		next := map[[2]int]bool{}
+		for position := range positions {
+			for stream, payload := range streams {
+				for _, chunk := range chunks {
+					if strings.HasPrefix(payload[position[stream]:], chunk) {
+						advanced := position
+						advanced[stream] += len(chunk)
+						next[advanced] = true
+					}
+				}
+			}
+		}
+		positions = next
+	}
+	return positions[[2]int{len(stdout), len(stderr)}]
+}
+
+func TestTestConnectionAdapterLogFrameConservation(t *testing.T) {
+	// Literal frames for controlled partitions validate the oracle used on the
+	// real adapter below; neither test prescribes the OS pipe's read partitions.
+	const prefix = "[01234567] \t"
+	for _, tc := range []struct {
+		name    string
+		records []string
+		want    bool
+	}{
+		{"whole-streams", []string{prefix + "inside\nlast\n", prefix + "stderr\n"}, true},
+		{"split-lines", []string{prefix + "inside\n", prefix + "last\n", prefix + "stderr\n"}, true},
+		{"split-lf", []string{prefix + "inside\n", prefix + "\n", prefix + "last\n", prefix + "\n", prefix + "stderr\n"}, true},
+		{"interior-splits-both-streams", []string{prefix + "in\n", prefix + "st\n", prefix + "side\nla\n", prefix + "st\n", prefix + "derr\n"}, true},
+		{"stderr-first", []string{prefix + "stderr\n", prefix + "inside\nlast\n"}, true},
+		{"lost-stdout", []string{prefix + "inside\n", prefix + "stderr\n"}, false},
+		{"lost-interior-lf", []string{prefix + "insidelast\n", prefix + "stderr\n"}, false},
+		{"duplicate-stdout", []string{prefix + "inside\nlast\n", prefix + "last\n", prefix + "stderr\n"}, false},
+		{"reordered-stdout", []string{prefix + "last\ninside\n", prefix + "stderr\n"}, false},
+		{"lost-stderr", []string{prefix + "inside\nlast\n", prefix + "stder\n"}, false},
+		{"duplicate-stderr", []string{prefix + "inside\nlast\n", prefix + "stderr\n", prefix + "stderr\n"}, false},
+		{"wrong-id", []string{"[76543210] \tinside\nlast\n", prefix + "stderr\n"}, false},
+		{"missing-tab", []string{"[01234567] inside\nlast\n", prefix + "stderr\n"}, false},
+		{"missing-frame-lf", []string{prefix + "inside\nlast", prefix + "stderr\n"}, false},
+		{"extra-frame-lf", []string{prefix + "inside\nlast\n\n", prefix + "stderr\n"}, false},
+		{"extra-empty-frame", []string{prefix + "\n", prefix + "inside\nlast\n", prefix + "stderr\n"}, false},
+		{"finished-among-output", []string{prefix + "inside\nlast\n", "[01234567] Finished\n", prefix + "stderr\n"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := connectionLogFramesConserve(tc.records, prefix, "inside\nlast\n", "stderr"); got != tc.want {
+				t.Fatalf("frame conservation = %v, want %v: %q", got, tc.want, tc.records)
+			}
+		})
+	}
+}
+
 func TestTestConnectionAdapterLogAndFullCapture(t *testing.T) {
 	e := connectionEngine(t)
 	if err := e.OpenLog("test-connection"); err != nil {
 		t.Fatal(err)
 	}
 	defer e.CloseLog(false)
+	// Observe the existing raw writes without replacing native file output.
+	// The log owner serializes writes, and the adapter returns after copy joins.
+	var records []string
+	write := e.logOwner.ops.Write
+	e.logOwner.ops.Write = func(b []byte) (int, error) {
+		records = append(records, string(b))
+		return write(b)
+	}
 	bash, bashErr := exec.LookPath("bash")
 	if bashErr != nil {
 		t.Fatal("declared Bash required for confined connection tests", bashErr)
@@ -459,7 +534,15 @@ func TestTestConnectionAdapterLogAndFullCapture(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(b)
-	if strings.Count(text, "] \tinside\nlast\n") != 1 || strings.Count(text, "] \tstderr\n") != 1 || strings.Count(text, "] Finished") != 1 || !strings.Contains(text, "exit status 7 (failed)") || strings.Index(text, "] Running") > strings.Index(text, "] \t") || strings.Index(text, "] \t") > strings.Index(text, "] Finished") {
+	if len(records) < 4 || strings.Join(records, "") != text || strings.Count(text, "] Running") != 1 || strings.Count(text, "] Finished") != 1 {
+		t.Fatal(text)
+	}
+	id, _, ok := strings.Cut(records[0], "] Running ")
+	if !ok || len(id) != 9 || id[0] != '[' || strings.Trim(id[1:], "0123456789abcdef") != "" {
+		t.Fatal("missing Running identity", records[0])
+	}
+	prefix := id + "] "
+	if !strings.HasPrefix(records[len(records)-1], prefix+"Finished in ") || !strings.HasSuffix(records[len(records)-1], "with exit status 7 (failed)\n") || !connectionLogFramesConserve(records[1:len(records)-1], prefix+"\t", string(r.Stdout), string(r.Stderr)) {
 		t.Fatal(text)
 	}
 	t.Setenv("PATH", t.TempDir())

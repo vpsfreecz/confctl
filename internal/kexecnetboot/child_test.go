@@ -30,8 +30,13 @@ func TestFakeKexecChild(t *testing.T) {
 		}
 	}
 	if mode == "signal" {
-		_ = syscall.Kill(os.Getpid(), syscall.SIGTERM)
-		os.Exit(31)
+		if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
+			t.Fatalf("send SIGTERM: %v", err)
+		}
+		// Wait for actual signal delivery; an explicit exit can win that race.
+		for {
+			_ = syscall.Pause()
+		}
 	}
 	input, err := io.ReadAll(os.Stdin)
 	if err != nil {
