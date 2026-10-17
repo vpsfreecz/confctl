@@ -148,6 +148,69 @@ func TestBuildPresentationCommandAttemptsRealModel(t *testing.T) {
 	}
 }
 
+func TestBuildTimingCanonicalRows(t *testing.T) {
+	f := newBuildFixture(t)
+	v := &buildTestView{}
+	p := f.e.buildOutputWithView(io.Discard, io.Discard, nil, func(_ context.Context, _, _ io.Writer, spec liveViewSpec, _ func(error)) (liveView, error) {
+		var err error
+		v.model, err = ui.NewLiveModel(spec.Header, spec.Rows, false)
+		return v, err
+	})
+	if err := p.GroupStart(0, 1, build.Group{}); err != nil {
+		t.Fatal(err)
+	}
+	assertOrder := func(want []string) {
+		t.Helper()
+		var ids []string
+		for _, row := range v.model.Rows() {
+			ids = append(ids, row.ID)
+			if row.DisplayOrder != map[string]int{"build": 10, "fetch": 20, "observed": 30, "eval": 40}[row.ID] {
+				t.Fatal("build snapshot lost canonical rank", row)
+			}
+		}
+		if !reflect.DeepEqual(ids, want) {
+			t.Fatal("late aggregate/eval admission reordered rows", ids, want)
+		}
+		for _, height := range []int{8, 24} {
+			last := 0
+			for _, line := range v.model.Frame(height, 80, 0) {
+				for i, label := range []string{"Building", "Fetching", "nix build", "nix eval"} {
+					if strings.HasPrefix(line, label+" ") {
+						if i+1 <= last {
+							t.Fatal("priority selection rendered out of canonical order", height, v.model.Frame(height, 80, 0))
+						}
+						last = i + 1
+					}
+				}
+			}
+		}
+	}
+	command := func(op string, stage buildCommandStage) {
+		t.Helper()
+		if err := p.Command(buildCommandEvent{Op: op, Stage: stage, Installables: []string{".#confctl.inputs"}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	command("eval", buildCommandStarted)
+	assertOrder([]string{"build", "fetch", "eval"})
+	command("eval", buildCommandSucceeded)
+	command("build", buildCommandStarted)
+	for _, family := range []string{"fetch", "build"} {
+		if err := p.Progress(build.Event{Type: family, Progress: big.NewInt(1), Total: big.NewInt(2)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	assertOrder([]string{"build", "fetch", "observed", "eval"})
+	command("build", buildCommandSucceeded)
+	command("eval", buildCommandStarted)
+	assertOrder([]string{"build", "fetch", "observed", "eval"})
+	command("eval", buildCommandSucceeded)
+	if err := p.Close(nil); err != nil {
+		t.Fatal(err)
+	}
+	assertOrder([]string{"build", "fetch", "observed", "eval"})
+}
+
 func TestBuildPresentationChildOutcomeSurvivesLaterErrors(t *testing.T) {
 	for _, failure := range []string{"decode", "outputs", "metadata", "save", "current"} {
 		t.Run(failure, func(t *testing.T) {

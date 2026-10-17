@@ -52,8 +52,8 @@ func (e *Engine) buildOutputWithView(stdout, stderr io.Writer, cancel context.Ca
 		},
 		GroupStart: func(index, count int, group build.Group) error {
 			rows = []ui.LiveRow{
-				{ID: "build", Label: "Building", State: ui.LivePending},
-				{ID: "fetch", Label: "Fetching", State: ui.LivePending},
+				{ID: "build", Label: "Building", State: ui.LivePending, DisplayOrder: 10},
+				{ID: "fetch", Label: "Fetching", State: ui.LivePending, DisplayOrder: 20},
 			}
 			// Detailed context belongs to scrollback, never to a repaint or the
 			// final view summary. Check this write before acquiring the view.
@@ -125,7 +125,7 @@ func (e *Engine) buildOutputWithView(stdout, stderr io.Writer, cancel context.Ca
 			// totals. A missing family may still appear later in this group.
 			aggregateIndex := rowIndex("observed")
 			if rows[0].Current != nil && rows[1].Current != nil && rows[0].Total != nil && rows[1].Total != nil {
-				aggregate := ui.LiveRow{ID: "observed", Label: "nix build", State: ui.LiveRunning,
+				aggregate := ui.LiveRow{ID: "observed", Label: "nix build", State: ui.LiveRunning, DisplayOrder: 30,
 					Current: new(big.Int).Add(rows[0].Current, rows[1].Current),
 					Total:   new(big.Int).Add(rows[0].Total, rows[1].Total)}
 				if aggregateIndex < 0 {
@@ -168,7 +168,7 @@ func (e *Engine) buildOutputWithView(stdout, stderr io.Writer, cancel context.Ca
 			case "eval":
 				index := rowIndex("eval")
 				if index < 0 {
-					rows = append(rows, ui.LiveRow{ID: "eval", Label: "nix eval"})
+					rows = append(rows, ui.LiveRow{ID: "eval", Label: "nix eval", DisplayOrder: 40})
 					index = len(rows) - 1
 				}
 				rows[index].Detail = strings.Join(event.Installables, " ")

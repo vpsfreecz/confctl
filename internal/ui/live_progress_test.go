@@ -97,7 +97,7 @@ func TestLiveAlignedMixedProgressFields(t *testing.T) {
 		tasks := frame[len(frame)-len(rows):]
 		trackStart, trackWidth, countStart, detailStart := -1, -1, -1, -1
 		for i, styled := range tasks {
-			rowIndex := []int{0, 2, 1, 3, 4}[i] // Running rows retain selector priority.
+			rowIndex := i // All-fit rows retain canonical registration order.
 			line := ansi.Strip(styled)
 			liveAssertStyles(t, styled, color)
 			if liveWidth(line) > 100 {

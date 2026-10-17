@@ -232,7 +232,7 @@ func TestLiveBorderedLogRegionAboveBoundedProgress(t *testing.T) {
 				t.Fatal("log not above progress", plain)
 			}
 		}
-		if !strings.HasPrefix(plain[17], "All machines") || !strings.HasPrefix(plain[18], "node-17 [failed]") || !strings.HasPrefix(plain[19], "node-18 [incomplete]") || plain[22] != "… 16 more tasks (0 failed, 0 incomplete)" {
+		if !strings.HasPrefix(plain[17], "All machines") || !strings.HasPrefix(plain[18], "node-00 [running") || !strings.HasPrefix(plain[20], "node-17 [failed]") || !strings.HasPrefix(plain[21], "node-18 [incomplete]") || plain[22] != "… 16 more tasks (0 failed, 0 incomplete)" {
 			t.Fatal("task priority/count", plain[17:])
 		}
 		if len(m.Header()) != 3 || len(m.Summary(0)) != 21 {

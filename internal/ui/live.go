@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"math/big"
+	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -30,6 +31,7 @@ type LiveRow struct {
 	Current, Total    *big.Int
 	State             LiveState
 	Target            bool
+	DisplayOrder      int
 }
 
 const liveLineLimit = 8192
@@ -71,7 +73,7 @@ func liveCopyRow(row LiveRow) LiveRow {
 }
 
 // Validate the whole update before applying any part. First registration owns
-// order; replacing a snapshot never infers completion or drops another row.
+// rank and stable tie order; replacing a snapshot never infers completion.
 func (m *LiveModel) SetRows(rows ...LiveRow) error {
 	seen := make(map[string]bool, len(rows))
 	for _, row := range rows {
@@ -79,14 +81,25 @@ func (m *LiveModel) SetRows(rows ...LiveRow) error {
 			return fmt.Errorf("live row IDs must be nonempty and distinct: %q", row.ID)
 		}
 		seen[row.ID] = true
+		if i, ok := m.index[row.ID]; ok && m.rows[i].DisplayOrder != row.DisplayOrder {
+			return fmt.Errorf("live row %q cannot change display order", row.ID)
+		}
 	}
+	inserted := false
 	for _, row := range rows {
 		row = liveCopyRow(row)
 		if i, ok := m.index[row.ID]; ok {
 			m.rows[i] = row
 		} else {
+			inserted = true
 			m.index[row.ID] = len(m.rows)
 			m.rows = append(m.rows, row)
+		}
+	}
+	if inserted {
+		sort.SliceStable(m.rows, func(i, j int) bool { return m.rows[i].DisplayOrder < m.rows[j].DisplayOrder })
+		for i, row := range m.rows {
+			m.index[row.ID] = i
 		}
 	}
 	return nil
@@ -443,6 +456,13 @@ func (m *LiveModel) selectTaskRows(slots int) []int {
 	if slots <= 0 || len(m.rows) == 0 {
 		return nil
 	}
+	if len(m.rows) <= slots {
+		selected := make([]int, len(m.rows))
+		for i := range selected {
+			selected[i] = i
+		}
+		return selected
+	}
 	limit := min(slots, len(m.rows))
 	if len(m.rows) > limit {
 		limit--
@@ -470,6 +490,8 @@ func (m *LiveModel) selectTaskRows(slots int) []int {
 		chosen[i] = true
 		selected = append(selected, i)
 	}
+	// Priority chooses membership only; painting always follows canonical rank.
+	sort.Ints(selected)
 	return selected
 }
 

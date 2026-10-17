@@ -41,6 +41,11 @@ their full hash when they fit; otherwise the display shortens a canonical
 store hash to its first seven characters and an ellipsis. Logs and command
 results keep their original paths.
 
+Task rows keep their registered display order as their states change. When
+space is limited, failed and incomplete tasks take priority for inclusion;
+the visible rows still follow that order. Build rows appear as Building,
+Fetching, combined nix build when reported, then nix eval.
+
 Before each build group, confctl prints its complete machine and input list once
 as ordinary scrolling output. The list stays in terminal scrollback while the
 compact group header remains visible. The bordered Live view shows recent plain

@@ -132,6 +132,7 @@ esac
 						}
 					}
 					bars := strings.Join(lines[bottom+1:], "\n")
+					buildAssertCanonicalFrame(t, frame)
 					for _, want := range []string{"Building", "Fetching", "nix build", "2/5"} {
 						if !strings.Contains(bars, want) {
 							t.Fatal("progress missing below bordered log", want, frame)
@@ -177,6 +178,7 @@ esac
 						t.Fatal(err)
 					}
 					evalFrame := buildAwaitPresentationFrame(t, transcript, fmt.Sprintf("Build group: %d/2 (1 machines)", n), fmt.Sprintf("held-output-eval-%d", n))
+					buildAssertCanonicalFrame(t, evalFrame)
 					plainEval := ansi.Strip(evalFrame)
 					for _, label := range []string{"Building", "Fetching", "nix build", "nix eval"} {
 						found := false
@@ -287,6 +289,21 @@ esac
 				t.Fatal("later production phase missing", f.text("trace"), f.text("effects"), text)
 			}
 		})
+	}
+}
+
+func buildAssertCanonicalFrame(t *testing.T, frame string) {
+	t.Helper()
+	var found []string
+	for _, line := range strings.Split(ansi.Strip(frame), "\n") {
+		for _, label := range []string{"Building", "Fetching", "nix build", "nix eval"} {
+			if strings.HasPrefix(line, label+" ") {
+				found = append(found, label)
+			}
+		}
+	}
+	if strings.Join(found, ",") != "Building,Fetching,nix build,nix eval" {
+		t.Fatal("current complete frame lost canonical row order", found, frame)
 	}
 }
 
