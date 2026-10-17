@@ -164,6 +164,7 @@ DELIVERY_CLI_SUPPORT = <<~'RUBY_GUEST'.freeze
   # Only this guest-local, uncached derivation waits on the explicit release.
   def fixture_installed_tui_build(label, executable)
     require 'tmpdir'
+    require 'time'
     root = fixture_case('tui-' + label)
     gate = Dir.mktmpdir('confctl-delivery-tui-' + label + '-', '/tmp')
     File.chmod(0777, gate) # The guest's Nix build user cannot enter ROOT's 0700 tree.
@@ -230,6 +231,22 @@ DELIVERY_CLI_SUPPORT = <<~'RUBY_GUEST'.freeze
     separator = " \u2014 ".b
     full_log = nil
     header_command = 'Command: confctl ' + (color ? '--color\=always ' : '') + 'build --yes --max-jobs 1 node'
+    duration_ms = lambda do |value, live: false|
+      parts = value.match(/\A(?:(\d+)h )?(?:(\d+)m )?(\d+)(?:\.(\d{3}))?s\z/)
+      abort 'invalid timing duration' unless parts && (live ? parts[4].nil? : !parts[4].nil?)
+      hours, minutes, seconds = parts.captures.first(3).map { |part| part.to_i }
+      prefix = hours > 0 ? "#{hours}h #{minutes}m " : (minutes > 0 ? "#{minutes}m " : '')
+      canonical = prefix + (live ? seconds.to_s : format('%d.%03d', seconds, parts[4].to_i)) + 's'
+      abort 'noncanonical timing duration' unless value == canonical && minutes < 60 && seconds < 60
+      ((hours * 3600 + minutes * 60 + seconds) * 1000) + parts[4].to_i
+    end
+    timing_header = lambda do |line|
+      timing = line.match(/\AStarted: (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2}))  Elapsed: (.+)\z/)
+      abort 'missing invocation timing header' unless timing
+      Time.iso8601(timing[1])
+      [timing[1], duration_ms.call(timing[2], live: true)]
+    end
+    held_started = held_elapsed = nil
     fixture_until(child, 45) do
       if (done = Process.waitpid2(child[:pid], Process::WNOHANG))
         child[:status] = done[1]
@@ -254,18 +271,19 @@ DELIVERY_CLI_SUPPORT = <<~'RUBY_GUEST'.freeze
       rows.map! { |row| row.delete_suffix("\r\n").delete_suffix("\n") }
       plain = rows.map { |row| row.gsub(/\e\[[0-9;]*m/, '') } # Assertion view only, never transport/log bytes.
       bottom = plain.index { |row| row.match?(/\A<-+\z/) }
-      next false unless bottom && plain[4...bottom].any? { |row| row.include?(token) } &&
+      next false unless bottom && plain[5...bottom].any? { |row| row.include?(token) } &&
         plain[(bottom + 1)..].any? { |row| row.match?(/\ABuilding +\[running[^\]]*\] +1\/1\b/) }
-      abort 'wrong compact live header' unless plain[0] == header_command && plain[1] == 'Build group: 1/1 (1 machines)' &&
-        plain[2].start_with?('Full log: ' + root + '/.confctl/logs/') && plain[3].match?(/\ALive view -+>\z/)
+      held_started, held_elapsed = timing_header.call(plain[1])
+      abort 'wrong compact live header' unless plain[0] == header_command && plain[2] == 'Build group: 1/1 (1 machines)' &&
+        plain[3].start_with?('Full log: ' + root + '/.confctl/logs/') && plain[4].match?(/\ALive view -+>\z/)
       bars = plain[(bottom + 1)..].reject(&:empty?)
-      abort 'log border/bar allocation changed' unless bottom - 4 >= 12 && bars.length == 2 &&
+      abort 'log border/bar allocation changed' unless bottom - 5 >= 12 && bars.length == 2 &&
         bars[0].match?(/\ABuilding +\[running[^\]]*\] +1\/1 \(100%\) +\[[= ]{4,20}\]/) &&
         bars[1].match?(/\AFetching +\[pending\]\z/)
       # Fetching has no observations in this real local build: no invented
       # counter/bar. Main PTYs cover two actual positive-total tracks.
-      log_path = plain[2].delete_prefix('Full log: ')
-      full_log = plain[2] if File.file?(log_path)
+      log_path = plain[3].delete_prefix('Full log: ')
+      full_log = plain[3] if File.file?(log_path)
       if full_log
         path = File.binread(log_path).scan(%r{/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-[^\s'"]+}).find do |candidate|
           candidate.include?(token) && candidate.end_with?('.drv')
@@ -278,11 +296,11 @@ DELIVERY_CLI_SUPPORT = <<~'RUBY_GUEST'.freeze
           else
             abort 'canonical detail did not shorten only its hash' unless detail.start_with?(path[0, 18] + "\u2026-".b)
           end
-          abort 'child log hash was shortened' unless plain[4...bottom].any? { |row| row.include?(path[0, 44]) }
+          abort 'child log hash was shortened' unless plain[5...bottom].any? { |row| row.include?(path[0, 44]) }
         end
       end
       abort 'old observed label survived' if plain.join("\n").match?(/observed (?:starts|step)/i)
-      abort 'child log was styled' if rows[4...bottom].any? { |row| row.match?(/\e\[[0-9;]*m/) }
+      abort 'child log was styled' if rows[5...bottom].any? { |row| row.match?(/\e\[[0-9;]*m/) }
       prelude = screen.split("\e[H", 2).first
       prelude_lines = prelude.gsub(/\e\[[0-9;]*m/, '').lines.map(&:strip)
       abort 'prelude missing or repeated before view' unless prelude_lines.count('Building machines') == 1 && prelude_lines.count('node') == 1
@@ -290,8 +308,9 @@ DELIVERY_CLI_SUPPORT = <<~'RUBY_GUEST'.freeze
       abort 'prelude repeated in repaint' if plain.any? { |row| ['Building machines', 'node', 'with inputs'].include?(row.strip) }
       if color
         abort 'missing confctl header styling' unless rows[0].start_with?("\e[1mCommand:\e[0m ") &&
-          rows[1].start_with?("\e[1mBuild group:\e[0m ") && rows[2].start_with?("\e[1mFull log:\e[0m ") &&
-          rows[3] == "\e[1m#{plain[3]}\e[0m"
+          rows[1].include?("\e[1mStarted:\e[0m") && rows[1].include?("\e[1mElapsed:\e[0m") &&
+          rows[2].start_with?("\e[1mBuild group:\e[0m ") && rows[3].start_with?("\e[1mFull log:\e[0m ") &&
+          rows[4] == "\e[1m#{plain[4]}\e[0m"
         abort 'missing confctl prelude styling' unless prelude.include?("\e[1mBuilding machines\e[0m") && prelude.include?("\e[33mnode\e[0m")
       else
         abort 'NO_COLOR frame/prelude has SGR' if (frame + prelude).match?(/\e\[[0-9;]*m/)
@@ -326,9 +345,11 @@ DELIVERY_CLI_SUPPORT = <<~'RUBY_GUEST'.freeze
     final_rows.map! { |row| row.delete_suffix("\r\n").delete_suffix("\n") }
     final_plain = final_rows.map { |row| row.gsub(/\e\[[0-9;]*m/, '') }
     bottom = final_plain.index { |row| row.match?(/\A<-+\z/) }
-    abort 'final panel lost compact context or log border' unless bottom && bottom - 4 >= 12 &&
-      final_plain[0] == header_command && final_plain[1] == 'Build group: 1/1 (1 machines)' &&
-      final_plain[2].start_with?('Full log: ' + root + '/.confctl/logs/')
+    abort 'final panel lost compact context or log border' unless bottom && bottom - 5 >= 12 &&
+      final_plain[0] == header_command && final_plain[2] == 'Build group: 1/1 (1 machines)' &&
+      final_plain[3].start_with?('Full log: ' + root + '/.confctl/logs/')
+    final_started, final_elapsed = timing_header.call(final_plain[1])
+    abort 'invocation timing reset between paints' unless final_started == held_started && final_elapsed >= held_elapsed
     tasks = final_plain[(bottom + 1)..].reject(&:empty?)
     abort 'final panel lost child outcomes' unless tasks.length == 3 &&
       tasks[0].match?(/\ABuilding +\[succeeded\] +1\/1 \(100%\) +\[[= ]{4,20}\]/) &&
@@ -340,18 +361,40 @@ DELIVERY_CLI_SUPPORT = <<~'RUBY_GUEST'.freeze
     fetch_divider = tasks[1].index(separator)
     abort 'final detail columns differ' unless divider && fetch_divider == divider
     abort 'unobserved Fetching gained a counter/bar' unless tasks[1][(tasks[1].index(']') + 1)...fetch_divider].strip.empty?
-    abort 'final child log was styled' if final_rows[4...bottom].any? { |row| row.match?(/\e\[[0-9;]*m/) }
-    suffix = output[(finish + frame_end.bytesize)..].gsub(/\e\[[0-9;]*m/, '')
+    abort 'final child log was styled' if final_rows[5...bottom].any? { |row| row.match?(/\e\[[0-9;]*m/) }
+    raw_suffix = output[(finish + frame_end.bytesize)..]
+    suffix = raw_suffix.gsub(/\e\[[0-9;]*m/, '')
     suffix_lines = suffix.lines.map(&:strip)
     abort 'header or selected task replayed after final paint' if suffix.include?("\e[H") ||
-      suffix_lines.any? { |line| line.match?(/\A(?:Command:|Build group:|(?:Building|Fetching|nix build|nix eval) +\[)/) }
+      suffix_lines.any? { |line| line.match?(/\A(?:Command:|Build group:|Started:.*  Elapsed:|(?:Building|Fetching|nix build|nix eval) +\[)/) }
     locators = suffix_lines.grep(/\AFull log: /)
     abort 'full log locator replayed' if locators.length > 1 || (locators.any? && final_plain.include?(locators.first))
     abort 'wrong recovered full log locator' if locators.any? && (full_log ? locators.first != full_log :
       !locators.first.start_with?('Full log: ' + root + '/.confctl/logs/'))
     abort 'normal build result missing after final paint' unless suffix_lines.include?('Built generations:')
+    # These two PTYs merge original stderr with stdout. Keep its exact bytes,
+    # and accept only this invocation's complete terminal footer, never a
+    # blanket Timing-line filter. Separate-stream Main tests own stderr policy.
+    footer_start = raw_suffix.index("Timing: completed (exit 0)")
+    abort 'missing or repeated final timing report' unless footer_start && final_lines.grep(/\ATiming:/).length == 1
+    footer = raw_suffix[footer_start..].lines.map { |line| line.delete_suffix("\r\n").delete_suffix("\n") }
+    labels = ['Timing: completed (exit 0)', '  Started: ', '  Ended: ', '  Evaluation: ', '  Build: ', '  Prompt wait: ', '  Other: ', '  Total: ']
+    abort 'malformed installed build timing footer' unless footer.length == labels.length && footer[0] == labels[0] &&
+      labels.drop(1).each_with_index.all? { |label, i| footer[i + 1].start_with?(label) } && raw_suffix.end_with?("\n")
+    abort 'timing report was not on a fresh line after normal results' unless footer_start > 0 && raw_suffix[footer_start - 1] == "\n" &&
+      suffix_lines.index('Timing: completed (exit 0)') > suffix_lines.index('Built generations:')
+    report_started = footer[1].delete_prefix(labels[1])
+    report_ended = footer[2].delete_prefix(labels[2])
+    abort 'footer invocation start changed' unless report_started == held_started &&
+      report_ended.match?(/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})\z/) &&
+      Time.iso8601(report_ended) >= Time.iso8601(report_started)
+    durations = footer.drop(3).each_with_index.map { |line, i| duration_ms.call(line.delete_prefix(labels[i + 3])) }
+    abort 'footer timing does not cover final panel and work' unless durations[2] == 0 && durations[4] >= final_elapsed &&
+      durations[4] >= durations[0] + durations[1]
     { 'product' => label, 'executable' => executable, 'exit' => result.fetch('exit'),
       'signal' => result.fetch('signal'), 'before_release' => held, 'token' => token,
+      'timing' => { 'started' => held_started, 'held_elapsed_ms' => held_elapsed, 'final_elapsed_ms' => final_elapsed,
+                    'total_ms' => durations[4], 'footer_count' => 1 },
       'generation' => record, 'output_base64' => Base64.strict_encode64(result.fetch('out')) }
   ensure
     # Release before cancel/join, including assertion failure; never remove the
@@ -572,7 +615,8 @@ describe 'installed CLI with ordinary and operation-bound packages', order: :def
     finish = screen.rindex("\e[32;1H\e[2K")
     frame = screen[screen.rindex("\e[H", finish)...(finish + "\e[32;1H\e[2K".bytesize)]
     plain = frame.gsub(/\e\[[0-9;]*m/, '')
-    expect(plain).to include(actual.fetch('token'), 'Command: confctl', 'Build group: 1/1 (1 machines)', 'Live view')
+    expect(plain).to include(actual.fetch('token'), 'Command: confctl', "Started: #{actual.fetch('timing').fetch('started')}", '  Elapsed: ', 'Build group: 1/1 (1 machines)', 'Live view')
+    expect(actual.fetch('timing').fetch('footer_count')).to eq(1)
     expect(plain).to match(%r{Building +\[running[^\]\r\n]*\] +1/1\b})
     expect(plain).to match(/Fetching +\[pending\]/)
     expect(frame).to include("\e[1mCommand:\e[0m", "\e[1mLive view ")
@@ -587,7 +631,8 @@ describe 'installed CLI with ordinary and operation-bound packages', order: :def
     screen = Base64.strict_decode64(actual.fetch('before_release').fetch('frame_base64'))
     finish = screen.rindex("\e[32;1H\e[2K")
     frame = screen[screen.rindex("\e[H", finish)...(finish + "\e[32;1H\e[2K".bytesize)]
-    expect(frame).to include(actual.fetch('token'), 'Command: confctl', 'Build group: 1/1 (1 machines)', 'Live view')
+    expect(frame).to include(actual.fetch('token'), 'Command: confctl', "Started: #{actual.fetch('timing').fetch('started')}", '  Elapsed: ', 'Build group: 1/1 (1 machines)', 'Live view')
+    expect(actual.fetch('timing').fetch('footer_count')).to eq(1)
     expect(frame).to match(%r{Building +\[running[^\]\r\n]*\] +1/1\b})
     expect(frame).to match(/Fetching +\[pending\]/)
     expect(frame).not_to match(/\e\[[0-9;]*m/)
