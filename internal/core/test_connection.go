@@ -124,7 +124,7 @@ func (e *Engine) runTestConnection(inv cli.Invocation, in io.Reader, out io.Writ
 		}
 		fmt.Fprint(out, "Test SSH connection to the following machines:\n"+text)
 		_, line := commandInput(in)
-		if err := testConnectionConfirm(e.Context, line, out); err != nil {
+		if err := testConnectionConfirm(e.Context, e.timedPromptLine(line), out); err != nil {
 			return err
 		}
 	}
@@ -134,7 +134,11 @@ func (e *Engine) runTestConnection(inv cli.Invocation, in io.Reader, out io.Writ
 		if err != nil {
 			return err
 		}
-		r, err := deps.Run(e.Context, e.Root, argv, nil)
+		r, err := func() (Result, error) {
+			done := e.beginTiming(timingConnection)
+			defer done()
+			return deps.Run(e.Context, e.Root, argv, nil)
+		}()
 		status, err := testConnectionStatus(e.Context, argv, r, err)
 		if err != nil {
 			return err

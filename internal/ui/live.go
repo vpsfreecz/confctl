@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -34,6 +35,11 @@ type LiveRow struct {
 	DisplayOrder      int
 }
 
+type LiveTiming struct {
+	StartedAt time.Time
+	Elapsed   time.Duration
+}
+
 const liveLineLimit = 8192
 const liveHistoryLimit = 128
 
@@ -48,7 +54,10 @@ type LiveModel struct {
 	lines   []string
 	partial []byte
 	trimmed bool
+	timing  LiveTiming
 }
+
+func (m *LiveModel) SetTiming(t LiveTiming) { m.timing = t }
 
 func NewLiveModel(header LiveHeader, rows []LiveRow, color bool) (*LiveModel, error) {
 	m := &LiveModel{index: make(map[string]int), color: color, header: LiveHeader{
@@ -151,6 +160,18 @@ func (m *LiveModel) headerLines(cols int) []string {
 		liveField(&b, " "+m.header.Command, "", &left, m.color)
 		lines = append(lines, b.String())
 	}
+	if !m.timing.StartedAt.IsZero() {
+		var b strings.Builder
+		left := cols
+		if cols <= 0 {
+			left = -1
+		}
+		liveField(&b, "Started:", "bright", &left, m.color)
+		liveField(&b, " "+m.timing.StartedAt.Local().Format(time.RFC3339)+"  ", "", &left, m.color)
+		liveField(&b, "Elapsed:", "bright", &left, m.color)
+		liveField(&b, " "+liveElapsed(m.timing.Elapsed), "", &left, m.color)
+		lines = append(lines, b.String())
+	}
 	if line := m.operationLine(cols); line != "" {
 		lines = append(lines, line)
 	}
@@ -165,6 +186,17 @@ func (m *LiveModel) headerLines(cols int) []string {
 		lines = append(lines, b.String())
 	}
 	return lines
+}
+
+func liveElapsed(d time.Duration) string {
+	seconds := int64(max(d, 0) / time.Second)
+	if d >= time.Hour {
+		return fmt.Sprintf("%dh %dm %ds", seconds/3600, seconds/60%60, seconds%60)
+	}
+	if d >= time.Minute {
+		return fmt.Sprintf("%dm %ds", seconds/60, seconds%60)
+	}
+	return fmt.Sprintf("%ds", seconds)
 }
 
 func (m *LiveModel) operationLine(cols int) string {
@@ -394,12 +426,16 @@ func (m *LiveModel) FrameWithRemainder(rows, cols int, tick uint64) (frame, rema
 			locatorShown = h == len(header) && liveWidth(m.Header()[len(header)-1]) <= cols
 		}
 		r := budget - h - 2
+		maxTasks := 6
+		if h == 4 {
+			maxTasks = 5
+		}
 		p := 0
 		if len(m.rows) > 0 {
 			if r >= 11 {
-				p = min(len(m.rows), 6, r-10)
+				p = min(len(m.rows), maxTasks, r-10)
 			} else {
-				p = min(len(m.rows), 6, max(1, r/3))
+				p = min(len(m.rows), maxTasks, max(1, r/3))
 			}
 		}
 		selected = m.selectTaskRows(p)
@@ -514,6 +550,9 @@ func (m *LiveModel) tinyFrame(budget, cols int, tick uint64) ([]string, []int) {
 		hiddenHeader++
 	}
 	if m.header.LogPath != "" {
+		hiddenHeader++
+	}
+	if !m.timing.StartedAt.IsZero() {
 		hiddenHeader++
 	}
 	if budget == 1 {

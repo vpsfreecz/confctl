@@ -199,7 +199,15 @@ func (n *buildNix) command(op string, installables, legacy []string, apply *stri
 		if err := notify(buildCommandStarted, nil); err != nil {
 			return nil, err
 		}
-		result, runErr := n.run(argv, nil, chunk)
+		result, runErr := func() (Result, error) {
+			phase := timingEvaluation
+			if op == "build" {
+				phase = timingBuild
+			}
+			end := n.e.beginTiming(phase)
+			defer end()
+			return n.run(argv, nil, chunk)
+		}()
 		status, err := buildStatus(n.e.Context, result, runErr)
 		if err != nil {
 			_ = notify(buildCommandFailed, err) // The existing command cause wins.

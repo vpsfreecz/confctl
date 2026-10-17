@@ -105,13 +105,24 @@ esac
 			if failEval {
 				env = append(env, "FAIL_OUTPUT_EVAL=1")
 			}
+			invocationStarted := ""
+			lastElapsed := time.Duration(0)
 			text := f.terminal(t, args, func(cmd *exec.Cmd, master *os.File, transcript *sshTerminalTranscript) {
 				sshPTYSize(t, master, 24, 80)
 				for i, gate := range gates {
 					n := i + 1
 					frame := buildAwaitPresentationFrame(t, transcript, fmt.Sprintf("Build group: %d/2 (1 machines)", n), fmt.Sprintf("raw-build-%d-before-release", n))
+					started, elapsed := buildFrameTiming(t, frame)
+					if invocationStarted == "" {
+						invocationStarted = started
+					}
+					if started != invocationStarted || elapsed < lastElapsed {
+						t.Fatal("group reset invocation start/elapsed", started, elapsed, invocationStarted, lastElapsed)
+					}
+					frame = buildAwaitTimingAdvance(t, transcript, fmt.Sprintf("Build group: %d/2 (1 machines)", n), fmt.Sprintf("raw-build-%d-before-release", n), invocationStarted, elapsed)
+					_, lastElapsed = buildFrameTiming(t, frame)
 					lines := strings.Split(ansi.Strip(frame), "\n")
-					if len(lines) != 23 || lines[0] != "Command: confctl "+sshShellJoin(args) || !strings.HasPrefix(lines[2], "Full log: ") || !strings.HasPrefix(lines[3], "Live view --") {
+					if len(lines) != 23 || lines[0] != "Command: confctl "+sshShellJoin(args) || !strings.HasPrefix(lines[1], "Started: ") || !strings.HasPrefix(lines[3], "Full log: ") || !strings.HasPrefix(lines[4], "Live view --") {
 						t.Fatal("compact header or 80x24 frame changed", frame)
 					}
 					bottom := -1
@@ -123,10 +134,10 @@ esac
 							t.Fatal("prelude, old label or overwide line in latest frame", frame)
 						}
 					}
-					if bottom < 16 || len(lines)-bottom-1 > 6 {
-						t.Fatal("logs lost twelve slots or bars exceed six slots", frame)
+					if bottom < 17 || len(lines)-bottom-1 > 5 {
+						t.Fatal("logs lost twelve slots or bars exceed five slots with timing", frame)
 					}
-					for _, line := range lines[4:bottom] {
+					for _, line := range lines[5:bottom] {
 						if !strings.Contains(line, fmt.Sprintf("raw-build-%d-", n)) {
 							t.Fatal("log region not filled before release", frame)
 						}
@@ -161,7 +172,7 @@ esac
 						t.Fatal("no-color frame contains styles", frame)
 					}
 					rawLines := strings.Split(frame, "\n")
-					if strings.Contains(strings.Join(rawLines[4:bottom], "\n"), "\x1b") {
+					if strings.Contains(strings.Join(rawLines[5:bottom], "\n"), "\x1b") {
 						t.Fatal("child log styled by confctl", frame)
 					}
 					if i == 0 && strings.Contains(transcript.String(), "Build group: 2/2") {
@@ -178,6 +189,12 @@ esac
 						t.Fatal(err)
 					}
 					evalFrame := buildAwaitPresentationFrame(t, transcript, fmt.Sprintf("Build group: %d/2 (1 machines)", n), fmt.Sprintf("held-output-eval-%d", n))
+					started, elapsed = buildFrameTiming(t, evalFrame)
+					if started != invocationStarted || elapsed < lastElapsed {
+						t.Fatal("eval reset invocation timing", started, elapsed, invocationStarted, lastElapsed)
+					}
+					evalFrame = buildAwaitTimingAdvance(t, transcript, fmt.Sprintf("Build group: %d/2 (1 machines)", n), fmt.Sprintf("held-output-eval-%d", n), invocationStarted, elapsed)
+					_, lastElapsed = buildFrameTiming(t, evalFrame)
 					buildAssertCanonicalFrame(t, evalFrame)
 					plainEval := ansi.Strip(evalFrame)
 					for _, label := range []string{"Building", "Fetching", "nix build", "nix eval"} {
@@ -254,9 +271,27 @@ esac
 				t.Fatal("missing retained final panel", text)
 			}
 			suffix := ansi.Strip(text[last+len(endMarker):])
-			for _, duplicate := range []string{"Command:", "Build group:", "Building [", "Fetching [", "nix build [", "nix eval ["} {
-				if strings.Contains(suffix, duplicate) {
+			body, footer, err := splitTimingFooter(strings.ReplaceAll(suffix, "\r\n", "\n"))
+			if err != nil || footer == "" || strings.Count(plain, "\nTiming: ") != 1 || !strings.Contains(footer, fmt.Sprintf("(exit %d)\n", wantCode)) {
+				t.Fatal("missing, invalid or repeated final timing report", err, footer, text)
+			}
+			for _, duplicate := range []string{"Command:", "Started: ", "Build group:", "Building [", "Fetching [", "nix build [", "nix eval ["} {
+				if strings.Contains(body, duplicate) {
 					t.Fatal("selected task/header replayed after final frame", duplicate, suffix)
+				}
+			}
+			if !strings.Contains(footer, "  Started: "+invocationStarted+"\n") || !strings.Contains(footer, "  Evaluation: ") || !strings.Contains(footer, "  Build: ") {
+				t.Fatal("report did not retain invocation/actual child phases", footer)
+			}
+			if command != "deploy" && !failEval && !strings.Contains(body, "Built generations:") || failEval && !strings.Contains(body, "error:") {
+				t.Fatal("report preceded normal result/error", body, footer)
+			}
+			for _, line := range strings.Split(footer, "\n") {
+				if value, ok := strings.CutPrefix(line, "  Total: "); ok {
+					total, err := time.ParseDuration(strings.ReplaceAll(value, " ", ""))
+					if err != nil || total < lastElapsed {
+						t.Fatal("final report predates observed live elapsed", total, lastElapsed, err)
+					}
 				}
 			}
 			if failEval {
@@ -304,6 +339,54 @@ func buildAssertCanonicalFrame(t *testing.T, frame string) {
 	}
 	if strings.Join(found, ",") != "Building,Fetching,nix build,nix eval" {
 		t.Fatal("current complete frame lost canonical row order", found, frame)
+	}
+}
+
+func buildFrameTiming(t *testing.T, frame string) (string, time.Duration) {
+	t.Helper()
+	for _, line := range strings.Split(ansi.Strip(frame), "\n") {
+		if text, ok := strings.CutPrefix(line, "Started: "); ok {
+			stamp, elapsed, ok := strings.Cut(text, "  Elapsed: ")
+			if !ok {
+				t.Fatal("missing live elapsed field", frame)
+			}
+			if _, err := time.Parse(time.RFC3339, stamp); err != nil {
+				t.Fatal("invalid invocation start", frame, err)
+			}
+			duration, err := time.ParseDuration(strings.ReplaceAll(elapsed, " ", ""))
+			if err != nil || duration < 0 {
+				t.Fatal("invalid live elapsed", frame, err)
+			}
+			return stamp, duration
+		}
+	}
+	t.Fatal("missing timing in current complete frame", frame)
+	return "", 0
+}
+
+func buildAwaitTimingAdvance(t *testing.T, transcript *sshTerminalTranscript, header, raw, started string, after time.Duration) string {
+	t.Helper()
+	deadline := time.NewTimer(5 * time.Second)
+	defer deadline.Stop()
+	tick := time.NewTicker(10 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		frame := buildLatestPresentationFrame(transcript.String())
+		plain := ansi.Strip(frame)
+		if strings.Contains(plain, header) && strings.Contains(plain, raw) {
+			stamp, elapsed := buildFrameTiming(t, frame)
+			if stamp != started {
+				t.Fatal("view/phase changed invocation start", stamp, started)
+			}
+			if elapsed > after {
+				return frame
+			}
+		}
+		select {
+		case <-deadline.C:
+			t.Fatal("live elapsed did not advance while child held", after, frame, transcript.String())
+		case <-tick.C:
+		}
 	}
 }
 

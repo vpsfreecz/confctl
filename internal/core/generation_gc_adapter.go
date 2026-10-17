@@ -38,6 +38,8 @@ func (e *Engine) generationGCAdapter(stdout, stderr io.Writer, run generationGCS
 				if err != nil {
 					return Result{}, err
 				}
+				done := e.beginTiming(timingGC)
+				defer done()
 				return run(ctx, e.Root, argv, nil, func(stdout, stderr []byte) error {
 					feed(stdout, stderr)
 					return nil // feed errors cancel the task through its GC owner.
@@ -261,7 +263,7 @@ func (e *Engine) collectGarbage(inv cli.Invocation, in io.Reader, out io.Writer,
 		if err != nil {
 			return err
 		}
-		if err := generationConfirm(e.Context, inv, in, out, "Collect garbage on the following machines:\n"+table); err != nil {
+		if err := e.generationConfirm(inv, in, out, "Collect garbage on the following machines:\n"+table); err != nil {
 			return err
 		}
 	}

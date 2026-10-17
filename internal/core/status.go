@@ -272,6 +272,10 @@ func (e *Engine) statusTargetInputs(statuses []Status) error {
 }
 
 func (e *Engine) statusQuery(statuses []Status, all []Machine, options queryOptions, workers int) {
+	if len(statuses) > 0 && workers > 0 {
+		done := e.beginTiming(timingStatusChecks)
+		defer done()
+	}
 	// Keep the selected-machine worker count even after missing generations
 	// remove statuses. Each job still uses the existing per-host query owner.
 	jobs := make(chan int, len(statuses))

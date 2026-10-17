@@ -80,6 +80,7 @@ func (e *Engine) buildCLI(inv cli.Invocation, stdin io.Reader, stdout, stderr io
 			return err
 		}
 		_, line := commandInput(stdin)
+		line = e.timedPromptLine(line)
 		if err := testConnectionConfirm(e.Context, line, stdout); err != nil {
 			return err
 		}

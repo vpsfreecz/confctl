@@ -4,11 +4,14 @@ When both standard output and standard error are terminals, confctl shows the
 current operation, task states, progress and recent output in one live view.
 The compact header identifies the confctl command, operation or build group,
 target and action where applicable, and the full command log when enabled.
-That file is available during the operation. Afterwards,
+The log is available during the operation. Afterwards,
 failed or explicitly retained logs remain available under `.confctl/logs`;
 successful commands normally remove their logs. Redirecting either output stream
 or setting `CONFCTL_TTY=0` selects ordinary text output. Color settings remain
 independent of this choice.
+
+The live header also shows the command's local start time and elapsed time in
+whole seconds. The clock continues across build groups and operation views.
 
 | Operation | What the view reports |
 | --- | --- |
@@ -50,8 +53,26 @@ Before each build group, confctl prints its complete machine and input list once
 as ordinary scrolling output. The list stays in terminal scrollback while the
 compact group header remains visible. The bordered Live view shows recent plain
 log output above progress bars and host rows. At 80 columns by 24 rows it reserves
-at least twelve log lines and at most six progress rows, including any overflow
-count. Smaller terminals reduce the display to the space available.
+at least twelve log lines and at most five progress rows when timing adds a
+fourth header line, or six otherwise, including any overflow count. Smaller
+terminals reduce the display to the space available.
+
+Build, status, deploy, health-check, SSH command mode, test-connection and
+generation garbage collection commands print one final timing report to
+standard error after children, views and log cleanup finish. Generation remove
+and rotate also report timing, whether or not garbage collection was requested.
+The report is present when output is redirected or the live view is disabled.
+Interactive SSH, CSSH, help, version and other commands keep their existing
+output. Timing status follows the command's exit status; individual host
+results remain authoritative.
+
+The report includes local start/end timestamps, work phases, prompt wait, Other
+and total elapsed time. Durations retain milliseconds. Build time includes
+fetching performed by the Nix build command. Parallel work in the same phase
+counts once. If phases overlap, their durations can add up to more than the
+total wall time. Prompt wait is measured separately; any overlap with work is
+reported. Other covers time outside the combined work and prompt intervals,
+including setup, formatting and cleanup.
 
 Confctl headings are bold; machine names and actions are yellow, generation
 names cyan, success green, failure red, and skipped or incomplete states yellow.

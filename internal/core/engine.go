@@ -19,6 +19,7 @@ type Engine struct {
 	ShowTrace     bool
 	Color         string
 	liveCommand   string
+	timing        *invocationTiming
 	Yes           bool
 	logOwner      *engineLog
 	Log           *os.File
@@ -127,7 +128,14 @@ func (e *Engine) nix(op string, installables []string, impure, trace bool, max s
 			a = append(a, "--option", "max-jobs", max)
 		}
 		a = append(a, installables...)
-		r, err := e.Process(a, nil)
+		r, err := func() (Result, error) {
+			if op == "eval" {
+				defer e.beginTiming(timingEvaluation)()
+			} else if op == "build" {
+				defer e.beginTiming(timingBuild)()
+			}
+			return e.Process(a, nil)
+		}()
 		if err != nil {
 			return nil, err
 		}
@@ -243,6 +251,7 @@ func (e *Engine) Confirm(stdin *os.File, message string, always bool) (bool, err
 		ctx = context.Background()
 	}
 	_, line := commandInput(stdin)
+	line = e.timedPromptLine(line)
 	return e.confirm(ctx, line, os.Stdout, message, always)
 }
 

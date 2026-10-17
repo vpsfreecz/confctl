@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,6 +28,104 @@ type buildFixture struct {
 	calls          []string
 	plan, metadata string
 	outputs        string
+}
+
+type buildTimingReader struct {
+	now    *time.Time
+	lines  []string
+	reads  int
+	err    error
+	cancel context.CancelFunc
+}
+
+func (r *buildTimingReader) Read(b []byte) (int, error) {
+	r.reads++
+	*r.now = r.now.Add(3 * time.Second)
+	if r.cancel != nil {
+		r.cancel()
+	}
+	if r.err != nil {
+		return 0, r.err
+	}
+	if len(r.lines) == 0 {
+		return 0, io.EOF
+	}
+	line := r.lines[0]
+	r.lines = r.lines[1:]
+	return copy(b, line), nil
+}
+
+type buildTimingWriter struct{ now *time.Time }
+
+func (w buildTimingWriter) Write(b []byte) (int, error) {
+	*w.now = w.now.Add(time.Second)
+	return len(b), nil
+}
+
+func TestBuildTimingCLIPromptReadsAndClone(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		lines   []string
+		readErr error
+		cancel  bool
+		want    string
+	}{
+		{name: "refuse", lines: []string{"n\n"}, want: "Aborted"},
+		{name: "invalid-then-refuse", lines: []string{"invalid\n", "n\n"}, want: "Aborted"},
+		{name: "EOF", want: "end of file reached"},
+		{name: "read-error", readErr: errors.New("fixture read"), want: "fixture read"},
+		{name: "cancel", lines: []string{"y\n"}, cancel: true, want: "context canceled"},
+		{name: "accepted", lines: []string{"y\n"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newBuildFixture(t)
+			f.e.Inventory = []Machine{{Name: "one", Managed: true}}
+			now := f.clock
+			ledger := newInvocationTiming(now, func() time.Time { return now })
+			f.e.timing = ledger
+			ctx, cancel := context.WithCancel(f.e.Context)
+			defer cancel()
+			f.e.Context = ctx
+			reader := &buildTimingReader{now: &now, lines: tc.lines, err: tc.readErr}
+			if tc.cancel {
+				reader.cancel = cancel
+			}
+			deps := f.deps()
+			deps.Run = func(argv []string, input []byte, chunk func([]byte, []byte) error) (Result, error) {
+				now = now.Add(2 * time.Second)
+				return f.run(argv, input, chunk)
+			}
+			inv, err := cli.BuiltinRegistry().Parse([]string{"build", "one"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			writer := buildTimingWriter{&now}
+			err = f.e.buildCLI(inv, reader, writer, writer, deps)
+			if tc.want == "" && err != nil || tc.want != "" && (err == nil || err.Error() != tc.want) {
+				t.Fatal("timing changed confirmation result", err)
+			}
+			if tc.readErr != nil && err != tc.readErr {
+				t.Fatal("reader error identity lost", err)
+			}
+			snapshot := ledger.Snapshot()
+			if snapshot.Prompt != time.Duration(reader.reads)*3*time.Second || snapshot.PromptOverlap != 0 {
+				t.Fatal("timed prompt rendering, duplicate wrapper or read interval lost", reader.reads, snapshot)
+			}
+			if tc.want == "" {
+				// The synthetic run includes its checked progress write: two
+				// seconds of child work plus one second in buildTimingWriter.
+				if snapshot.Phases[timingBuild] != 3*time.Second || snapshot.Phases[timingEvaluation] != 8*time.Second {
+					t.Fatal("Engine value clones lost invocation ledger", snapshot, f.calls)
+				}
+			} else if snapshot.Work != 0 || len(f.calls) != 0 || f.rootCalls != 0 {
+				t.Fatal("refusal/EOF/error advanced timed work", snapshot, f.calls, f.rootCalls)
+			}
+			now = now.Add(time.Hour)
+			if after := ledger.Snapshot(); after.Prompt != snapshot.Prompt || after.Work != snapshot.Work {
+				t.Fatal("prompt or child interval left active after return", snapshot, after)
+			}
+		})
+	}
 }
 
 func newBuildFixture(t *testing.T) *buildFixture {

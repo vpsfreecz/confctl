@@ -10,8 +10,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vpsfreecz/confctl/internal/cli"
 )
@@ -24,12 +27,119 @@ func TestCLIStage1Subprocess(t *testing.T) {
 	if err := json.Unmarshal([]byte(os.Getenv("CONFCTL_STAGE1_ARGV")), &argv); err != nil {
 		panic(err)
 	}
-	os.Exit(Main(context.Background(), argv))
+	ctx := context.Background()
+	if os.Getenv("CONFCTL_STAGE1_CANCELED") == "1" {
+		canceled, cancel := context.WithCancel(ctx)
+		cancel()
+		ctx = canceled
+	}
+	os.Exit(Main(ctx, argv))
 }
 
 type connectionCLIResult struct {
 	code                                int
 	out, stderr, trace, args, log, root string
+	rawStderr, timingFooter             string
+}
+
+// Split only the exact terminal appendix. The separating LF belongs to the
+// footer, leaving the preexisting stderr body byte-for-byte intact.
+func splitTimingFooter(stderr string) (body, footer string, err error) {
+	at := strings.LastIndex(stderr, "\nTiming: ")
+	if at < 0 {
+		return stderr, "", nil
+	}
+	body, footer = stderr[:at], stderr[at:]
+	lines := strings.Split(footer[1:], "\n")
+	bad := func() (string, string, error) { return "", "", fmt.Errorf("invalid timing footer: %q", footer) }
+	if len(lines) < 7 || lines[len(lines)-1] != "" {
+		return bad()
+	}
+	status := regexp.MustCompile(`^Timing: (completed|failed|canceled) \(exit (0|[1-9][0-9]*)\)$`).FindStringSubmatch(lines[0])
+	if status == nil {
+		return bad()
+	}
+	code, e := strconv.Atoi(status[2])
+	if e != nil || status[1] == "completed" && code != 0 || status[1] == "failed" && code == 0 {
+		return bad()
+	}
+	for i, label := range []string{"Started", "Ended"} {
+		stamp, ok := strings.CutPrefix(lines[i+1], "  "+label+": ")
+		if !ok {
+			return bad()
+		}
+		if _, e := time.Parse(time.RFC3339, stamp); e != nil {
+			return bad()
+		}
+	}
+	duration := func(line, label string) (time.Duration, bool) {
+		text, ok := strings.CutPrefix(line, "  "+label+": ")
+		if !ok {
+			return 0, false
+		}
+		d, e := time.ParseDuration(strings.ReplaceAll(text, " ", ""))
+		return d, e == nil && d >= 0 && formatTimingDuration(d) == text
+	}
+	i, lastPhase := 3, -1
+	for i < len(lines)-1 && !strings.HasPrefix(lines[i], "  Prompt wait: ") {
+		phase := -1
+		for n, label := range timingPhaseLabels {
+			if _, ok := duration(lines[i], label); ok {
+				phase = n
+				break
+			}
+		}
+		if phase <= lastPhase {
+			return bad()
+		}
+		lastPhase = phase
+		i++
+	}
+	if i >= len(lines)-1 {
+		return bad()
+	}
+	if _, ok := duration(lines[i], "Prompt wait"); !ok {
+		return bad()
+	}
+	i++
+	if i < len(lines)-1 && strings.HasPrefix(lines[i], "  Prompt/work overlap: ") {
+		// A positive sub-millisecond overlap legitimately formats as 0.000s.
+		if _, ok := duration(lines[i], "Prompt/work overlap"); !ok {
+			return bad()
+		}
+		i++
+	}
+	for _, label := range []string{"Other", "Total"} {
+		if i >= len(lines)-1 {
+			return bad()
+		}
+		if _, ok := duration(lines[i], label); !ok {
+			return bad()
+		}
+		i++
+	}
+	if i < len(lines)-1 && lines[i] == "  Note: phase times overlap; total is wall time." {
+		i++
+	}
+	if i != len(lines)-1 {
+		return bad()
+	}
+	if _, earlier, e := splitTimingFooter(body); e == nil && earlier != "" {
+		return bad()
+	}
+	return body, footer, nil
+}
+
+func assertTimingFooterAdmission(t *testing.T, argv []string, footer string) {
+	t.Helper()
+	if footer == "" {
+		return // Registry/setup errors can precede admission even for a known leaf.
+	}
+	registry := cli.BuiltinRegistry()
+	inv, err := registry.Parse(argv)
+	if err != nil || inv.Help || registry.CheckAvailability(inv) != nil || !invocationHasTiming(inv) {
+		t.Fatal("excluded invocation acquired a timing footer", argv, footer)
+	}
 }
 
 func connectionCLI(t *testing.T, argv []string, input string, ms []Machine, toolBody string, catMode os.FileMode, flake bool, config string) connectionCLIResult {
@@ -125,7 +235,12 @@ fi
 		}
 		log = string(b)
 	}
-	return connectionCLIResult{code, out.String(), stderr.String(), string(trace), string(args), log, root}
+	body, footer, err := splitTimingFooter(stderr.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertTimingFooterAdmission(t, argv, footer)
+	return connectionCLIResult{code: code, out: out.String(), stderr: body, rawStderr: stderr.String(), timingFooter: footer, trace: string(trace), args: string(args), log: log, root: root}
 }
 
 func TestTestConnectionMainHelpAndExecution(t *testing.T) {
@@ -327,6 +442,15 @@ func actualCLI(t *testing.T, argv []string, registry string) (int, string, strin
 }
 
 func actualCLIWithSetup(t *testing.T, argv []string, registry string, setup func(string, string, *[]string)) (int, string, string, string) {
+	r := actualCLISubprocessWithSetup(t, argv, registry, setup, false)
+	return r.code, r.out, r.stderr, r.root
+}
+
+func actualCLIRawWithSetup(t *testing.T, argv []string, registry string, setup func(string, string, *[]string)) connectionCLIResult {
+	return actualCLISubprocessWithSetup(t, argv, registry, setup, true)
+}
+
+func actualCLISubprocessWithSetup(t *testing.T, argv []string, registry string, setup func(string, string, *[]string), allowNewLog bool) connectionCLIResult {
 	t.Helper()
 	root := t.TempDir()
 	configuration := filepath.Join(root, "configuration")
@@ -394,10 +518,43 @@ func actualCLIWithSetup(t *testing.T, argv []string, registry string, setup func
 		t.Fatal(err)
 	}
 	after := testConfigurationState(t, configuration)
+	log := ""
+	if allowNewLog {
+		// Explicit operational-footer tests may acquire their ordinary command
+		// log. Preserve the original helpers' exact pre-execution state guard.
+		logs, err := filepath.Glob(filepath.Join(configuration, ".confctl", "logs", "*.log"))
+		if err != nil || len(logs) > 1 {
+			t.Fatal(logs, err)
+		}
+		for _, path := range logs {
+			rel, err := filepath.Rel(configuration, path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, existed := before[rel]; !existed {
+				b, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				log = string(b)
+				delete(after, rel)
+			}
+		}
+		for _, dir := range []string{".confctl", filepath.Join(".confctl", "logs")} {
+			if _, existed := before[dir]; !existed {
+				delete(after, dir)
+			}
+		}
+	}
 	if !reflect.DeepEqual(before, after) {
 		t.Fatal("pre-execution path changed configuration", argv, before, after)
 	}
-	return code, out.String(), stderr.String(), configuration
+	body, footer, err := splitTimingFooter(stderr.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertTimingFooterAdmission(t, argv, footer)
+	return connectionCLIResult{code: code, out: out.String(), stderr: body, rawStderr: stderr.String(), timingFooter: footer, log: log, root: configuration}
 }
 
 type stage1Reference struct {

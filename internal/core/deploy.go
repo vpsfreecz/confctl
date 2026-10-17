@@ -130,6 +130,7 @@ func (e *Engine) deployCommand(inv cli.Invocation, in io.Reader, out, stderr io.
 		return deploy.Report{}, errors.New("No machines to deploy")
 	}
 	_, line := commandInput(in)
+	line = e.timedPromptLine(line)
 	names := make([]string, len(selected))
 	for i, m := range selected {
 		names[i] = m.Name

@@ -580,3 +580,46 @@ func TestLiveViewRemainderWriteFailureStillClosesAndNotifiesOnce(t *testing.T) {
 		}
 	}
 }
+
+func TestInvocationTimingLivePaintCatchesUpAfterPromptWithoutHeaderReplay(t *testing.T) {
+	c := &invocationTestClock{now: time.Now()}
+	ledger := newInvocationTiming(c.read(), c.read)
+	out := &liveTestWriter{}
+	model, _ := ui.NewLiveModel(ui.LiveHeader{Command: "confctl ssh", Operation: "SSH", LogPath: "/log"}, nil, false)
+	v := newLiveSession(out, nil, nil, model, false, nil)
+	v.timing = ledger
+	go v.loop()
+	t.Cleanup(func() { _ = v.Close() })
+	if err := v.Flush(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.text(), "Elapsed: 0s") {
+		t.Fatal(out.text())
+	}
+	if err := v.WithPrompt(context.Background(), func() error {
+		before := out.text()
+		c.advance(65 * time.Second)
+		if err := v.Line("retained during prompt"); err != nil {
+			return err
+		}
+		if err := v.Flush(context.Background()); err != nil {
+			return err
+		}
+		if out.text() != before {
+			return errors.New("timing repainted during prompt")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.Close(); err != nil {
+		t.Fatal(err)
+	}
+	frame, after := liveLastPaint(t, out.text(), 24)
+	if !strings.Contains(frame, "Started: "+c.read().Add(-65*time.Second).Local().Format(time.RFC3339)+"  Elapsed: 1m 5s") || !strings.Contains(frame, "retained during prompt") || after != "" {
+		t.Fatal("elapsed did not catch up/teardown replayed header", frame, after)
+	}
+	if ledger.Snapshot().Prompt != 0 {
+		t.Fatal("whole prompt suspension was counted as a read")
+	}
+}

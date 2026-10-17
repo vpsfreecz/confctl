@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
-	"github.com/vpsfreecz/confctl/internal/core"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/vpsfreecz/confctl/internal/core"
 )
 
 func main() {
@@ -23,15 +24,20 @@ func main() {
 		case <-ctx.Done():
 		}
 	}()
-	code := core.Main(ctx, os.Args[1:])
+	code := core.MainWithExitPolicy(ctx, os.Args[1:], func(code int) (int, bool) {
+		return signalExitStatus(code, received)
+	})
+	os.Exit(code)
+}
+
+func signalExitStatus(code int, received <-chan os.Signal) (int, bool) {
 	select {
 	case sig := <-received:
 		if sig == syscall.SIGTERM {
-			code = 143
-		} else {
-			code = 130
+			return 143, true
 		}
+		return 130, true
 	default:
+		return code, false
 	}
-	os.Exit(code)
 }

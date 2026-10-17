@@ -7,13 +7,34 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/vpsfreecz/confctl/internal/cli"
 	"github.com/vpsfreecz/confctl/internal/inputs"
 	"github.com/vpsfreecz/confctl/internal/ui"
 )
 
-func Main(ctx context.Context, argv []string) (result int) {
+func Main(ctx context.Context, argv []string) int {
+	return MainWithExitPolicy(ctx, argv, nil)
+}
+
+// MainWithExitPolicy resolves the executable's status after cleanup and before
+// the optional timing report. The resolver is called once, even on early returns.
+func MainWithExitPolicy(ctx context.Context, argv []string, resolveExit func(code int) (finalCode int, signaled bool)) (result int) {
+	startedAt, originalStderr := time.Now(), os.Stderr
+	var timing *invocationTiming
+	var err error
+	timingCanceled := false
+	defer func() {
+		signaled := false
+		if resolveExit != nil {
+			result, signaled = resolveExit(result)
+		}
+		if timing != nil {
+			canceled := signaled || timingCanceled || ctx.Err() != nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+			result = finishTimingReport(originalStderr, timing, result, canceled)
+		}
+	}()
 	builtins := cli.BuiltinRegistry()
 	globals, commandArgv, globalErr := builtins.ParseGlobals(argv)
 	// Keep the accepted version failure before any extension registry read.
@@ -70,6 +91,9 @@ func Main(ctx context.Context, argv []string) (result int) {
 		fmt.Fprintln(os.Stderr, "confctl-go-prototype: "+err.Error())
 		return 2
 	}
+	if invocationHasTiming(inv) {
+		timing = newInvocationTiming(startedAt, nil)
+	}
 	cmd := inv.Command.Path[0]
 	extensionCommand := inv.Command.Handler == cli.KnownExtension
 	var registration Registration
@@ -93,6 +117,7 @@ func Main(ctx context.Context, argv []string) (result int) {
 		return 1
 	}
 	e.Color = color
+	e.timing = timing
 	e.liveCommand = ui.LiveText(ShellJoin(append([]string{"confctl"}, argv...)), "", false)
 	e.Yes = inv.Options["yes"].Value.Bool
 	e.ShowTrace = inv.Options["show-trace"].Value.Bool
@@ -107,7 +132,6 @@ func Main(ctx context.Context, argv []string) (result int) {
 		return 1
 	}
 	success := false
-	originalStderr := os.Stderr
 	defer func() { result, _ = LogCleanupStatus(result, e.CloseLog(success), originalStderr) }()
 
 	if inv.Command.Handler == cli.InputsReadHandler {
@@ -145,6 +169,7 @@ func Main(ctx context.Context, argv []string) (result int) {
 		return 1
 	}
 	fail := func(err error, code int) int {
+		timingCanceled = errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 		fmt.Fprintf(os.Stderr, "\nLog file: %s\n", e.Log.Name())
 		diagnostic := err.Error()
 		if inv.Command.Handler == cli.InputsSetHandler {

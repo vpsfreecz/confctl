@@ -55,6 +55,7 @@ func (e *Engine) healthCheck(inv cli.Invocation, in io.Reader, out, stderr io.Wr
 			return HealthResult{}, err
 		}
 		_, line := commandInput(in)
+		line = e.timedPromptLine(line)
 		if err := testConnectionConfirm(e.Context, line, out); err != nil {
 			return HealthResult{}, err
 		}

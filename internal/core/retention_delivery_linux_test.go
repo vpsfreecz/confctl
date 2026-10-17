@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -10,6 +11,31 @@ import (
 )
 
 type retentionDeliveryFixture struct{ comparisonDeliveryFixture }
+
+type retentionDeliveryResult struct {
+	code                                 int
+	out, stderr, rawStderr, timingFooter string
+}
+
+func (r retentionDeliveryResult) requireTiming(t *testing.T, admitted bool) {
+	t.Helper()
+	if r.rawStderr != r.stderr+r.timingFooter {
+		t.Fatal("timing split changed raw stderr", r)
+	}
+	if !admitted {
+		if r.timingFooter != "" {
+			t.Fatal("excluded invocation emitted timing", r)
+		}
+		return
+	}
+	state := "completed"
+	if r.code != 0 {
+		state = "failed"
+	}
+	if !strings.HasPrefix(r.timingFooter, fmt.Sprintf("\nTiming: %s (exit %d)\n", state, r.code)) {
+		t.Fatal("missing timing or exit status mismatch", r)
+	}
+}
 
 func retentionDelivery(t *testing.T, hosts ...string) retentionDeliveryFixture {
 	t.Helper()
@@ -60,14 +86,18 @@ esac
 	return f
 }
 
-func (f retentionDeliveryFixture) run(t *testing.T, args []string, input string, env ...string) (int, string, string) {
+func (f retentionDeliveryFixture) run(t *testing.T, args []string, input string, env ...string) retentionDeliveryResult {
 	t.Helper()
 	cmd := f.command(t, args, env...)
 	cmd.Stdin = strings.NewReader(input)
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr
 	code := comparisonDeliveryExit(t, cmd.Run())
-	return code, out.String(), stderr.String()
+	body, footer, err := splitTimingFooter(stderr.String())
+	if err != nil {
+		t.Fatal("invalid timing footer", err, stderr.String())
+	}
+	return retentionDeliveryResult{code: code, out: out.String(), stderr: body, rawStderr: stderr.String(), timingFooter: footer}
 }
 
 func TestRetentionDeliveryMainRefusalPreservesGenerations(t *testing.T) {
@@ -76,7 +106,9 @@ func TestRetentionDeliveryMainRefusalPreservesGenerations(t *testing.T) {
 			t.Run(strings.Join(args, "/")+"/"+input, func(t *testing.T) {
 				f := retentionDelivery(t, "node")
 				before := testConfigurationState(t, filepath.Join(f.root, ".confctl/generations"))
-				code, out, stderr := f.run(t, args, input)
+				r := f.run(t, args, input)
+				r.requireTiming(t, true)
+				code, out, stderr := r.code, r.out, r.stderr
 				trace := f.text("trace")
 				diagnostic := "Aborted"
 				if input == "" {
@@ -107,7 +139,9 @@ func TestRetentionDeliveryMainRemoteRemovalAndRotation(t *testing.T) {
 				if yes {
 					args = append(args, "--yes")
 				}
-				code, out, stderr := f.run(t, args, "y\n")
+				r := f.run(t, args, "y\n")
+				r.requireTiming(t, true)
+				code, out, stderr := r.code, r.out, r.stderr
 				want := "node:1\nnode:2\n"
 				if command == "rotate" {
 					want = "node:1\n" // Current is excluded from rotation only.
@@ -125,7 +159,9 @@ func TestRetentionDeliveryMainRemoteRemovalAndRotation(t *testing.T) {
 
 func TestRetentionDeliveryMainPartialRemoteFailure(t *testing.T) {
 	f := retentionDelivery(t, "node")
-	code, out, stderr := f.run(t, []string{"generation", "rm", "-ry", "--max-concurrent-gc=0x2"}, "", "FAIL_DELETE=2")
+	r := f.run(t, []string{"generation", "rm", "-ry", "--max-concurrent-gc=0x2"}, "", "FAIL_DELETE=2")
+	r.requireTiming(t, true)
+	code, out, stderr := r.code, r.out, r.stderr
 	if code != 1 || !strings.Contains(stderr, "exit status 23") || f.text("remote-deletions") != "node:1\n" || strings.Contains(f.text("trace"), "nix-collect-garbage") || len(f.logs(t)) != 1 {
 		t.Fatal(code, out, stderr, f.text("trace"))
 	}
@@ -138,7 +174,9 @@ func TestRetentionDeliveryMainPartialRemoteFailure(t *testing.T) {
 func TestRetentionDeliveryMainPostGCPolicies(t *testing.T) {
 	for _, command := range []string{"rm", "rotate"} {
 		f := retentionDelivery(t, "node")
-		code, out, stderr := f.run(t, []string{"generation", command, "-ry"}, "")
+		r := f.run(t, []string{"generation", command, "-ry"}, "")
+		r.requireTiming(t, true)
+		code, out, stderr := r.code, r.out, r.stderr
 		trace := f.text("trace")
 		if code != 0 || stderr != "" || !strings.Contains(trace, "--delete-generations 1") || strings.Count(trace, "ssh:node.invalid:nix-collect-garbage\n") != 1 || len(f.logs(t)) != 0 || !strings.Contains(out, "1 store paths deleted") {
 			t.Fatal(command, code, out, stderr, trace)
@@ -151,7 +189,9 @@ func TestRetentionDeliveryMainPostGCPolicies(t *testing.T) {
 
 func TestRetentionDeliveryMainGCFailureDrainsAndJoins(t *testing.T) {
 	f := retentionDelivery(t, "first", "second")
-	code, out, stderr := f.run(t, []string{"collect-garbage", "-y", "--max-concurrent-gc=1"}, "", "FAIL_GC_HOST=first.invalid")
+	r := f.run(t, []string{"collect-garbage", "-y", "--max-concurrent-gc=1"}, "", "FAIL_GC_HOST=first.invalid")
+	r.requireTiming(t, true)
+	code, out, stderr := r.code, r.out, r.stderr
 	trace := f.text("trace")
 	if code != 1 || !strings.Contains(stderr, "failed on: first") || strings.Contains(stderr, "failed on: first, second") || len(f.logs(t)) != 1 || strings.Count(trace, "gc-finished:") != 2 || !strings.Contains(out, "second: 1 store paths deleted") {
 		t.Fatal(code, out, stderr, trace)
@@ -165,7 +205,9 @@ func TestRetentionDeliveryMainGCFailureDrainsAndJoins(t *testing.T) {
 
 func TestRetentionDeliveryMainGCConfirmation(t *testing.T) {
 	f := retentionDelivery(t, "node")
-	code, out, stderr := f.run(t, []string{"collect-garbage"}, "y\n")
+	r := f.run(t, []string{"collect-garbage"}, "y\n")
+	r.requireTiming(t, true)
+	code, out, stderr := r.code, r.out, r.stderr
 	if code != 0 || stderr != "" || strings.Count(out, "Continue?") != 1 || strings.Count(f.text("trace"), "gc-finished:node.invalid\n") != 1 || len(f.logs(t)) != 0 {
 		t.Fatal(code, out, stderr, f.text("trace"))
 	}
@@ -174,7 +216,9 @@ func TestRetentionDeliveryMainGCConfirmation(t *testing.T) {
 func TestRetentionDeliveryMainGCWorkersAndEmptySelection(t *testing.T) {
 	for _, workers := range []string{"0", "-1", "9999999999999999999999999999999999"} {
 		f := retentionDelivery(t, "node")
-		code, out, stderr := f.run(t, []string{"collect-garbage", "-y", "--max-concurrent-gc=" + workers}, "")
+		r := f.run(t, []string{"collect-garbage", "-y", "--max-concurrent-gc=" + workers}, "")
+		r.requireTiming(t, true)
+		code, out, stderr := r.code, r.out, r.stderr
 		wantGC := workers[0] != '-' && workers != "0"
 		if code != 0 || stderr != "" || strings.Contains(f.text("trace"), "gc-finished:") != wantGC || len(f.logs(t)) != 0 || !strings.Contains(out, "Collecting garbage on node") {
 			t.Fatal(workers, code, out, stderr, f.text("trace"))
@@ -182,7 +226,9 @@ func TestRetentionDeliveryMainGCWorkersAndEmptySelection(t *testing.T) {
 	}
 	for _, args := range [][]string{{"generation", "rm", "-y", "missing"}, {"generation", "rotate", "-y", "missing"}, {"collect-garbage", "-y", "missing"}} {
 		f := retentionDelivery(t, "node")
-		code, out, stderr := f.run(t, args, "")
+		r := f.run(t, args, "")
+		r.requireTiming(t, true)
+		code, out, stderr := r.code, r.out, r.stderr
 		want := 0
 		if args[0] == "collect-garbage" {
 			want = 1
@@ -198,7 +244,11 @@ func TestRetentionDeliveryMainUsageAndHelp(t *testing.T) {
 		for _, flags := range [][]string{{"--help"}, {"--unknown"}, {"--max-concurrent-gc=auto"}, {"-a", "invalid"}} {
 			f := retentionDelivery(t, "node")
 			args := append(append([]string{}, path...), flags...)
-			code, out, stderr := f.run(t, args, "")
+			r := f.run(t, args, "")
+			// Filter syntax is rejected by the admitted handler; help, unknown
+			// options and invalid integer values return before timing admission.
+			r.requireTiming(t, flags[0] == "-a")
+			code, out, stderr := r.code, r.out, r.stderr
 			want := 64
 			if flags[0] == "--help" {
 				want = 0

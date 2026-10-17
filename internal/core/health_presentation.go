@@ -101,7 +101,9 @@ func (e *Engine) runHealthPresented(plan HealthPlan, deps health.Deps, process h
 		}
 		fail(emit(healthEventText(event, len(plan.Checks))))
 	}
+	roundDone := attempt.beginTiming(timingHealth)
 	result, runErr := attempt.runHealth(plan, deps, process)
+	roundDone()
 	if failure() == nil && view != nil {
 		presentation.finish(result.Report)
 		fail(view.SetRows(presentation.rows...))

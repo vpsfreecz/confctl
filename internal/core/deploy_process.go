@@ -70,6 +70,8 @@ func (e *Engine) deployOperationsWithOps(ctx context.Context, all, selected []Ma
 	machine := func(m deploy.Machine) Machine { return byName[m.Name] }
 	return deploy.Deps{
 		QueryTarget: func(ctx context.Context, m deploy.Machine) (deploy.Status, error) {
+			done := e.beginTiming(timingStatusChecks)
+			defer done()
 			attempt := *e
 			attempt.Context = ctx
 			st := Status{Machine: machine(m)}
@@ -98,9 +100,13 @@ func (e *Engine) deployOperationsWithOps(ctx context.Context, all, selected []Ma
 			return truth(v), nil
 		},
 		Copy: func(ctx context.Context, m deploy.Machine, paths []string, progress func(deploy.CopyProgress)) (bool, error) {
+			done := e.beginTiming(timingCopy)
+			defer done()
 			return deployCopy(ctx, machine(m), all, paths, ops.Run, progress)
 		},
 		Activate: func(ctx context.Context, m deploy.Machine, g *generation.Build, action deploy.Action) (bool, error) {
+			done := e.beginTiming(timingDeployment)
+			defer done()
 			// Stored toplevels retain physical symlink/.. semantics. Append the
 			// child without lexically cleaning or resolving the borrowed path.
 			top := g.Toplevel
@@ -110,13 +116,19 @@ func (e *Engine) deployOperationsWithOps(ctx context.Context, all, selected []Ma
 			return deployMachineCommand(ctx, machine(m), []string{top + "bin/switch-to-configuration", string(action)}, false, true, ops.Run)
 		},
 		ActivateWithRollback: func(ctx context.Context, m deploy.Machine, g *generation.Build, action deploy.Action) (bool, error) {
+			done := e.beginTiming(timingDeployment)
+			defer done()
 			return deployRollback(ctx, machine(m), g, action, ops)
 		},
 		SetProfile: func(ctx context.Context, m deploy.Machine, top string) (bool, error) {
+			done := e.beginTiming(timingDeployment)
+			defer done()
 			v := machine(m)
 			return deployMachineCommand(ctx, v, []string{"nix-env", "-p", v.Profile, "--set", top}, false, true, ops.Run)
 		},
 		SetCarriedProfile: func(ctx context.Context, m deploy.Machine, top string) (bool, error) {
+			done := e.beginTiming(timingDeployment)
+			defer done()
 			v := machine(m)
 			carrier, err := statusConnection(v, all)
 			if err != nil {
@@ -125,6 +137,8 @@ func (e *Engine) deployOperationsWithOps(ctx context.Context, all, selected []Ma
 			return deployMachineCommand(ctx, carrier, []string{"carrier-env", "-p", v.Profile, "--set", top}, false, true, ops.Run)
 		},
 		RebootAndWait: func(ctx context.Context, m deploy.Machine, wait deploy.WaitMode) error {
+			done := e.beginTiming(timingRebootWait)
+			defer done()
 			if ops.presentation != nil {
 				return ops.presentation.reboot(ctx, machine(m), wait, ops)
 			}

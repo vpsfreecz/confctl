@@ -104,6 +104,7 @@ func (e *Engine) sshConfirmation(inv cli.Invocation, machines []Machine, in io.R
 		fmt.Fprint(out, "\nCommand: "+command+"\n")
 	}
 	_, line := commandInput(in)
+	line = e.timedPromptLine(line)
 	return testConnectionConfirm(e.Context, line, out)
 }
 
@@ -323,7 +324,10 @@ func (e *Engine) sshRunMachine(ctx context.Context, m Machine, command []string,
 	if err != nil {
 		return sshHostResult{}, err
 	}
-	r, err := deps.Run(ctx, e.Root, argv, input)
+	r, err := func() (Result, error) {
+		defer e.beginTiming(timingSSH)()
+		return deps.Run(ctx, e.Root, argv, input)
+	}()
 	status, err := sshStatus(ctx, r, err)
 	return sshHostResult{Name: m.Name, Status: status, Result: r}, err
 }

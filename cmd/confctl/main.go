@@ -24,11 +24,17 @@ func main() {
 		case <-ctx.Done():
 		}
 	}()
-	code := core.Main(ctx, os.Args[1:])
+	code := core.MainWithExitPolicy(ctx, os.Args[1:], func(code int) (int, bool) {
+		return signalExitStatus(code, received)
+	})
+	os.Exit(code)
+}
+
+func signalExitStatus(code int, received <-chan os.Signal) (int, bool) {
 	select {
 	case <-received:
-		code = 1
+		return 1, true
 	default:
+		return code, false
 	}
-	os.Exit(code)
 }

@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vpsfreecz/confctl/internal/build"
 	"github.com/vpsfreecz/confctl/internal/generation"
@@ -57,6 +58,117 @@ func TestBuildNixOptionsCacheAndOrderedValues(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestBuildTimingNixAttempts(t *testing.T) {
+	for _, op := range []string{"eval", "build"} {
+		for _, messages := range [][]string{{"unknown --no-update-lock-file", "experimental flakes"}, {"experimental nix-command", "unsupported --no-update-lock-file"}} {
+			t.Run(op+"/"+messages[0], func(t *testing.T) {
+				now := time.Date(2026, 10, 17, 10, 0, 0, 0, time.UTC)
+				ledger := newInvocationTiming(now, func() time.Time { return now })
+				phase := timingEvaluation
+				if op == "build" {
+					phase = timingBuild
+				}
+				attempts, total := 0, time.Duration(0)
+				n := &buildNix{e: &Engine{Context: context.Background(), timing: ledger}}
+				n.commandEvent = func(event buildCommandEvent) error {
+					// Admission, retry gaps and terminal notification are not
+					// elapsed child work, even when an observer consumes time.
+					if got := ledger.Snapshot().Phases[phase]; got != total {
+						t.Fatal("timing extended outside actual child call", got, total, event)
+					}
+					now = now.Add(10 * time.Second)
+					return nil
+				}
+				n.progress = func(build.Event) error { now = now.Add(3 * time.Second); return nil }
+				n.run = func(argv []string, input []byte, feed func([]byte, []byte) error) (Result, error) {
+					attempts++
+					if input != nil || argv[1] != op || argv[len(argv)-1] != "literal" {
+						t.Fatal("timing changed actual child inputs", argv, input)
+					}
+					duration := time.Duration(attempts) * time.Second
+					now = now.Add(duration)
+					if got := ledger.Snapshot().Phases[phase]; got != total+duration {
+						t.Fatal("child interval not active during run", got, total, duration)
+					}
+					total += duration
+					if attempts <= 2 {
+						return Result{ExitCode: 1, Stderr: []byte(messages[attempts-1])}, nil
+					}
+					if feed != nil {
+						if err := feed(nil, []byte("building '/last.drv'")); err != nil {
+							t.Fatal(err)
+						}
+					}
+					return Result{Stdout: []byte("null")}, nil
+				}
+				_, err := n.command(op, []string{"literal"}, nil, nil, nil, op == "build")
+				snapshot := ledger.Snapshot()
+				if err != nil || attempts != 3 || total != 6*time.Second || snapshot.Phases[phase] != total || snapshot.Work != total || !snapshot.Seen[phase] {
+					t.Fatal("attempt work lost or retries counted as one interval", attempts, err, snapshot)
+				}
+				now = now.Add(time.Hour)
+				if got := ledger.Snapshot().Phases[phase]; got != total {
+					t.Fatal("attempt timer leaked after return", got, total)
+				}
+			})
+		}
+	}
+}
+
+func TestBuildTimingNixFailureAndAdmission(t *testing.T) {
+	sentinel := errors.New("timed child failure")
+	for _, kind := range []string{"start", "capture", "process", "cancel", "nonzero", "progress", "terminal"} {
+		t.Run(kind, func(t *testing.T) {
+			now := time.Date(2026, 10, 17, 10, 0, 0, 0, time.UTC)
+			ledger := newInvocationTiming(now, func() time.Time { return now })
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			n := &buildNix{e: &Engine{Context: ctx, timing: ledger}}
+			n.commandEvent = func(event buildCommandEvent) error {
+				if kind == "start" && event.Stage == buildCommandStarted || kind == "terminal" && event.Stage != buildCommandStarted {
+					return sentinel
+				}
+				return nil
+			}
+			n.progress = func(build.Event) error { return sentinel }
+			calls := 0
+			n.run = func(_ []string, _ []byte, feed func([]byte, []byte) error) (Result, error) {
+				calls++
+				now = now.Add(2 * time.Second)
+				switch kind {
+				case "capture":
+					return Result{capture: &captureCompletion{primary: sentinel}}, nil
+				case "process":
+					return Result{}, sentinel
+				case "cancel":
+					cancel()
+					return Result{}, nil
+				case "nonzero":
+					return Result{ExitCode: 7}, nil
+				case "progress":
+					if err := feed(nil, []byte("building '/last.drv'")); err != nil {
+						t.Fatal(err)
+					}
+				}
+				return Result{Stdout: []byte("null")}, nil
+			}
+			_, err := n.command("build", nil, nil, nil, nil, true)
+			if err == nil || kind == "cancel" && err != context.Canceled || kind != "cancel" && kind != "nonzero" && !errors.Is(err, sentinel) {
+				t.Fatal("instrumentation changed failure identity", kind, err)
+			}
+			want := 2 * time.Second
+			if kind == "start" {
+				want = 0
+			}
+			now = now.Add(time.Hour)
+			snapshot := ledger.Snapshot()
+			if snapshot.Phases[timingBuild] != want || snapshot.Work != want || snapshot.Seen[timingBuild] != (calls == 1) {
+				t.Fatal("failure leaked timer or refused launch created phase", snapshot, calls)
+			}
+		})
 	}
 }
 

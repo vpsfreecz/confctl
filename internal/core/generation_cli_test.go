@@ -85,7 +85,11 @@ fi
 	if len(logs) == 1 {
 		log = fixtureFile(t, filepath.Dir(logs[0]), filepath.Base(logs[0]))
 	}
-	return connectionCLIResult{code: code, out: out.String(), stderr: stderr.String(), trace: fixtureFile(t, root, "trace"), args: fixtureFile(t, root, "args"), log: log, root: root}
+	body, footer, err := splitTimingFooter(stderr.String())
+	if err != nil {
+		t.Fatal("invalid timing footer", err, stderr.String())
+	}
+	return connectionCLIResult{code: code, out: out.String(), stderr: body, rawStderr: stderr.String(), timingFooter: footer, trace: fixtureFile(t, root, "trace"), args: fixtureFile(t, root, "args"), log: log, root: root}
 }
 
 func generationCLISetup(t *testing.T) func(string) {
@@ -104,7 +108,7 @@ func TestGenerationListingActualCLIScopesColumnsAndCarriedQuery(t *testing.T) {
 esac
 `)
 		remote := strings.Contains(strings.Join(args, " "), "remote") || strings.Contains(strings.Join(args, " "), "-lr")
-		if r.code != 0 || r.stderr != "" || r.log != "" {
+		if r.code != 0 || r.stderr != "" || r.log != "" || r.timingFooter != "" || r.rawStderr != r.stderr {
 			t.Fatal(args, r)
 		}
 		if remote {
@@ -206,5 +210,8 @@ esac
 `)
 	if r.code != 0 || r.stderr != "" || r.log != "" || !strings.Contains(r.out, "1:1") || !strings.Contains(r.out, "ok") || strings.Contains(r.trace, "realpath") || !strings.Contains(r.trace, "inputsInfo.a-key") || !strings.HasSuffix(r.trace, "cat /proc/uptime\nbash --norc\ncat /nix/var/nix/profiles/confctl-site:..:logical/machine.json\n") {
 		t.Fatal(r)
+	}
+	if r.rawStderr != r.stderr+r.timingFooter || !strings.HasPrefix(r.timingFooter, "\nTiming: completed (exit 0)\n") || !strings.Contains(r.timingFooter, "\n  Status checks: ") {
+		t.Fatal("status query footer absent or raw stderr changed", r)
 	}
 }

@@ -103,12 +103,62 @@ func (f buildStatusDeliveryFixture) seed(t *testing.T, host string) {
 
 func (f buildStatusDeliveryFixture) run(t *testing.T, args []string, input string, env ...string) (int, string, string) {
 	t.Helper()
+	result := f.runRaw(t, args, input, env...)
+	return result.code, result.out, result.stderr
+}
+
+type buildStatusDeliveryResult struct {
+	code                                 int
+	out, stderr, rawStderr, timingFooter string
+}
+
+// Keep raw stderr available for timing assertions, while older operation tests
+// compare the exact preexisting body after the one validated terminal appendix.
+func (f buildStatusDeliveryFixture) runRaw(t *testing.T, args []string, input string, env ...string) buildStatusDeliveryResult {
+	t.Helper()
 	cmd := f.command(t, args, env...)
 	cmd.Stdin = strings.NewReader(input)
 	var out, stderr strings.Builder
 	cmd.Stdout, cmd.Stderr = &out, &stderr
 	code := comparisonDeliveryExit(t, cmd.Run())
-	return code, out.String(), stderr.String()
+	body, footer, err := splitTimingFooter(stderr.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry := cli.BuiltinRegistry()
+	inv, parseErr := registry.Parse(args)
+	admitted := parseErr == nil && !inv.Help && registry.CheckAvailability(inv) == nil
+	if admitted && footer == "" || !admitted && footer != "" {
+		t.Fatal("incorrect timing footer admission", args, code, stderr.String())
+	}
+	if footer != "" && !strings.Contains(footer, fmt.Sprintf("(exit %d)\n", code)) {
+		t.Fatal("timing footer lost command status", code, footer)
+	}
+	return buildStatusDeliveryResult{code: code, out: out.String(), stderr: body, rawStderr: stderr.String(), timingFooter: footer}
+}
+
+func TestBuildTimingDeliveryRawFooter(t *testing.T) {
+	for _, tc := range []struct {
+		args   []string
+		input  string
+		footer bool
+	}{
+		{[]string{"build", "-y"}, "", true},
+		{[]string{"status", "-y", "-gselected"}, "", true},
+		{[]string{"build"}, "n\n", true},
+		{[]string{"build", "--help"}, "", false},
+		{[]string{"status", "--unknown"}, "", false},
+	} {
+		f := buildStatusDelivery(t, "node")
+		f.seed(t, "node")
+		result := f.runRaw(t, tc.args, tc.input)
+		if result.rawStderr != result.stderr+result.timingFooter || (result.timingFooter != "") != tc.footer {
+			t.Fatal("raw stderr appendix/body not retained", result)
+		}
+		if tc.footer && (strings.Count(result.rawStderr, "\nTiming: ") != 1 || !strings.HasSuffix(result.timingFooter, "\n")) {
+			t.Fatal("missing or duplicated final report", result.rawStderr)
+		}
+	}
 }
 
 func TestBuildStatusDeliveryMainModes(t *testing.T) {

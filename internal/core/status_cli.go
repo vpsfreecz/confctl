@@ -21,6 +21,7 @@ func (e *Engine) LogBuildCLI(inv cli.Invocation) error  { return e.LogTestConnec
 
 func (e *Engine) statusCLI(inv cli.Invocation, in io.Reader, out, stderr io.Writer, deps buildDeps) error {
 	_, line := commandInput(in)
+	line = e.timedPromptLine(line)
 	all, err := e.Machines(false)
 	if err != nil {
 		return err

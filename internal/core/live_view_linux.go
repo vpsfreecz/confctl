@@ -44,6 +44,7 @@ type liveViewRequest struct {
 type liveSession struct {
 	mu             sync.Mutex
 	model          *ui.LiveModel
+	timing         *invocationTiming
 	raw            bool
 	err            error
 	closing        bool
@@ -97,6 +98,7 @@ func (e *Engine) openLiveView(ctx context.Context, stdout, stderr io.Writer, spe
 	// streams alone decide admission; opening this never forces a redirected UI.
 	console, _ := os.OpenFile("/dev/tty", os.O_RDONLY|syscall.O_NOCTTY, 0)
 	v := newLiveSession(stdout, console, tail, model, spec.RawLog, onError)
+	v.timing = e.timing
 	v.fetchSize()
 	if err := v.paint(false); err != nil {
 		v.fail(err)
@@ -225,7 +227,11 @@ func (v *liveSession) paint(final bool) error {
 		}
 		v.reservePending = false
 	}
+	snapshot := v.timing.Snapshot()
 	v.mu.Lock()
+	if v.timing != nil {
+		v.model.SetTiming(ui.LiveTiming{StartedAt: snapshot.StartedAt, Elapsed: snapshot.Elapsed})
+	}
 	frame, remainder := v.model.FrameWithRemainder(v.rows, v.cols, v.tick)
 	v.mu.Unlock()
 	var b strings.Builder
