@@ -9,6 +9,8 @@ let
   ruby = if pkgs ? ruby_3_4 then pkgs.ruby_3_4 else pkgs.ruby;
 in
 pkgs.mkShell {
+  # Compile the audited no-read entry, preserving the multicall argv[0].
+  CONFCTL_LOGNAME = "${pkgs.coreutils}/bin/logname";
   packages = [
     pkgs.git
     pkgs.ncurses

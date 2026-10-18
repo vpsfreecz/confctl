@@ -6,6 +6,8 @@ let
     ./confctl/nix.nix
     ./confctl/inputs-info.nix
     ./confctl/configuration-info.nix
+    ./confctl/runtime-kernels.nix
+    ./confctl/netboot-inventory.nix
   ];
 
   nixos = [

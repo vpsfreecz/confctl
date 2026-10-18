@@ -1,9 +1,46 @@
 //! Errors distinguish infrastructure failure from ordinary per-host outcomes.
 
-use std::{io, path::PathBuf};
+use std::{ffi::OsString, fmt, io, path::PathBuf};
+
+pub struct NixCommandContext {
+    pub cwd: PathBuf,
+    pub program: OsString,
+    pub args: Vec<OsString>,
+}
+impl fmt::Debug for NixCommandContext {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("NixCommandContext { <redacted> }")
+    }
+}
+impl fmt::Display for NixCommandContext {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Nix command")
+    }
+}
+pub struct NixCommandFailure {
+    pub context: NixCommandContext,
+    pub source: Box<ConfctlError>,
+}
+impl fmt::Debug for NixCommandFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("NixCommandFailure { <redacted> }")
+    }
+}
+impl fmt::Display for NixCommandFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.source, f)
+    }
+}
+impl std::error::Error for NixCommandFailure {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.source.as_ref())
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfctlError {
+    #[error("{0}")]
+    NixCommandFailure(#[source] Box<NixCommandFailure>),
     #[error("{0}")]
     Usage(String),
     #[error("{0}")]
@@ -46,6 +83,12 @@ pub enum ConfctlError {
         source: Box<ConfctlError>,
         evidence: Box<crate::process::PartialProcessEvidence>,
     },
+    #[error("{source}")]
+    OutputFailure {
+        #[source]
+        source: Box<ConfctlError>,
+        pending: Box<crate::presentation::PendingOutput>,
+    },
     #[error("event delivery failed: {0}")]
     EventDelivery(String),
     #[error("terminal is already owned by another foreground operation")]
@@ -78,6 +121,19 @@ pub enum ConfctlError {
 }
 
 impl ConfctlError {
+    /// Evidence and cleanup wrappers do not change the primary cancellation
+    /// disposition. A later canceled cleanup cannot replace an earlier failure.
+    pub fn is_cancelled(&self) -> bool {
+        match self {
+            Self::NixCommandFailure(failure) => failure.source.is_cancelled(),
+            Self::Cancelled => true,
+            Self::ProcessFailure { source, .. } | Self::OutputFailure { source, .. } => {
+                source.is_cancelled()
+            }
+            Self::Cleanup { primary, .. } => primary.is_cancelled(),
+            _ => false,
+        }
+    }
     /// Preserve the first failure and append cleanup failures in arrival order.
     /// The presentation owner decides how to report the secondary diagnostics.
     pub fn with_secondary(self, mut later: Vec<Self>) -> Self {
@@ -103,6 +159,69 @@ impl ConfctlError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nix_wrapper_redacts_command_and_captures_and_keeps_primary_cancellation() {
+        use crate::process::{Captured, PartialProcessEvidence};
+        let error = ConfctlError::NixCommandFailure(Box::new(NixCommandFailure {
+            context: NixCommandContext {
+                cwd: "/private-cwd".into(),
+                program: "private-program".into(),
+                args: vec!["private-argument".into()],
+            },
+            source: Box::new(ConfctlError::ProcessFailure {
+                source: Box::new(ConfctlError::Cancelled),
+                evidence: Box::new(PartialProcessEvidence {
+                    status: None,
+                    stdout: Captured::Memory(b"private-stdout".to_vec()),
+                    stderr: Captured::Memory(b"private-stderr".to_vec()),
+                    stdout_complete: false,
+                    stderr_complete: false,
+                    log: None,
+                }),
+            }),
+        }))
+        .with_secondary(vec![ConfctlError::State("later cleanup".into())]);
+        assert!(error.is_cancelled());
+        for rendered in [format!("{error}"), format!("{error:?}")] {
+            for private in [
+                "private-cwd",
+                "private-program",
+                "private-argument",
+                "private-stdout",
+                "private-stderr",
+            ] {
+                assert!(!rendered.contains(private));
+            }
+        }
+        let ConfctlError::Cleanup { primary, secondary } = error else {
+            panic!()
+        };
+        assert!(primary.is_cancelled());
+        assert_eq!(secondary.len(), 1);
+    }
+
+    #[test]
+    fn wrapped_primary_cancellation_preserves_disposition_without_replacing_prior_failure() {
+        use crate::process::{Captured, PartialProcessEvidence};
+        let error = ConfctlError::ProcessFailure {
+            source: Box::new(ConfctlError::Cancelled.with_secondary(vec![ConfctlError::InputEof])),
+            evidence: Box::new(PartialProcessEvidence {
+                status: None,
+                stdout: Captured::Unavailable,
+                stderr: Captured::Unavailable,
+                stdout_complete: false,
+                stderr_complete: false,
+                log: None,
+            }),
+        };
+        assert!(error.is_cancelled());
+        assert!(
+            !ConfctlError::Health("earlier failure".into())
+                .with_secondary(vec![error])
+                .is_cancelled()
+        );
+    }
 
     #[test]
     fn cleanup_preserves_primary_source_and_secondary_order() {

@@ -507,8 +507,10 @@ end
 ```
 
 ## More information
-See the [man pages](./man/man8) for more information:
+See the [man pages](./man/man8) and focused guides:
 
 * [confctl(8)](./man/man8/confctl.8.md)
 * [confctl-options.nix(8)](./man/man8/confctl-options.nix.8.md)
 * [Migrating from swpins to flakes](docs/swpins-to-flakes.md)
+* [CLI and state compatibility during the Rust replacement](docs/compatibility.md)
+* [Terminal and output ownership in the Rust implementation](docs/terminal-and-output.md)

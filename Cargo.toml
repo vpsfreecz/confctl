@@ -19,10 +19,12 @@ path = "src/main.rs"
 clap = { version = "4.6.7", default-features = false, features = ["std", "string"] }
 chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 crossterm = "0.29.0"
+nix = { version = "0.31.3", default-features = false, features = ["signal"] }
 ratatui = { version = "0.30.2", default-features = false, features = ["crossterm_0_29"] }
 rustix = { version = "1.1.5", features = ["process", "event", "pipe", "termios", "fs", "pty"] }
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = { version = "1.0.154", features = ["preserve_order"] }
+serde_json = { version = "1.0.154", features = ["preserve_order", "arbitrary_precision"] }
+sha2 = { version = "0.11.1", default-features = false }
 thiserror = "2.0.21"
 tempfile = "3.27.0"
 tokio = { version = "1.53.3", features = ["rt-multi-thread", "macros", "process", "io-util", "signal", "sync", "time", "net", "fs"] }

@@ -3,11 +3,11 @@
 //! The broker polls original input plus a wake socket; it never changes shared
 //! descriptor O_NONBLOCK flags and reads one byte at a time only for a request.
 //! Cancellation wakes and joins the read before ownership can pass elsewhere.
-//! Actual inline painting and controlling-TTY job control remain later gates.
+//! Presentation parks its sole writer before prompt or foreground ownership.
 
 use crate::{
     error::ConfctlError,
-    events::{EventSink, OutputStream, Style, UiEvent},
+    events::{EventSink, UiEvent},
     timing::Timing,
 };
 use std::{
@@ -25,6 +25,8 @@ use std::{
 };
 use tokio::sync::{oneshot, watch};
 use tokio_util::sync::CancellationToken;
+
+pub mod foreground;
 
 /// Includes the line terminator when present. Never applies to child stdin.
 pub const PROMPT_LINE_LIMIT: usize = 1024 * 1024;
@@ -60,6 +62,8 @@ struct Session {
     state: watch::Sender<TerminalState>,
     owned: AtomicBool,
     controlling_tty: bool,
+    terminal: OwnedFd,
+    suspend: Mutex<Option<tokio::sync::mpsc::Sender<foreground::ForegroundSuspendRequest>>>,
 }
 
 #[derive(Clone)]
@@ -87,15 +91,34 @@ pub struct ForegroundLease {
 }
 
 impl ForegroundLease {
-    /// Explicit staging refusal: no shipped interactive route may use this
-    /// until tcsetpgrp/SIGTTOU-safe restoration passes native PTY acceptance.
+    /// Validate real handoff prerequisites before a child exists. Non-TTY
+    /// inheritance needs no job control; controlling TTYs need the app's live
+    /// suspend owner and current foreground ownership.
     pub fn validate_process_handoff(&self) -> Result<(), ConfctlError> {
         self._lease.session.broker.check_available()?;
-        if self._lease.session.controlling_tty {
-            Err(ConfctlError::ForegroundJobControlUnavailable)
-        } else {
-            Ok(())
+        let session = &self._lease.session;
+        if session.controlling_tty {
+            let ready = session
+                .suspend
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .as_ref()
+                .is_some_and(|sender| !sender.is_closed());
+            if !ready {
+                return Err(ConfctlError::ForegroundJobControlUnavailable);
+            }
+            let foreground = rustix::termios::tcgetpgrp(&session.terminal).map_err(|source| {
+                ConfctlError::Io {
+                    operation: "validate foreground terminal ownership",
+                    path: None,
+                    source: source.into(),
+                }
+            })?;
+            if foreground != rustix::process::getpgrp() {
+                return Err(ConfctlError::TerminalBusy);
+            }
         }
+        Ok(())
     }
 }
 
@@ -106,8 +129,9 @@ impl Ui {
         cancellation: CancellationToken,
         timing: Option<Timing>,
     ) -> Result<Self, ConfctlError> {
-        let controlling_tty = rustix::termios::tcgetpgrp(input.as_fd()).is_ok();
-        let broker = InputBroker::new(input)?;
+        let terminal = input.as_fd().try_clone_to_owned().map_err(input_error)?;
+        let controlling_tty = rustix::termios::tcgetpgrp(&terminal).is_ok();
+        let broker = InputBroker::new(&terminal)?;
         let (state, _) = watch::channel(TerminalState::Idle);
         Ok(Self {
             session: Arc::new(Session {
@@ -115,11 +139,25 @@ impl Ui {
                 state,
                 owned: AtomicBool::new(false),
                 controlling_tty,
+                terminal,
+                suspend: Mutex::new(None),
             }),
             events,
             cancellation,
             timing,
         })
+    }
+
+    pub fn with_foreground_suspend(
+        self,
+        sender: tokio::sync::mpsc::Sender<foreground::ForegroundSuspendRequest>,
+    ) -> Self {
+        *self
+            .session
+            .suspend
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = Some(sender);
+        self
     }
 
     pub fn observe_state(&self) -> watch::Receiver<TerminalState> {
@@ -174,13 +212,10 @@ impl Ui {
             return Ok(true);
         }
         let _lease = self.acquire(TerminalState::Prompt).await?;
-        for event in prompt.preview {
-            self.emit(event).await?;
-        }
+        let mut preview = prompt.preview;
         loop {
-            self.emit(UiEvent::Diagnostic {
-                stream: OutputStream::Stdout,
-                style: Style::Plain,
+            self.emit(UiEvent::PromptFrame {
+                preview: std::mem::take(&mut preview),
                 text: prompt.message.clone(),
             })
             .await?;
@@ -199,9 +234,8 @@ impl Ui {
                 .to_ascii_lowercase();
             match answer.as_str() {
                 "y" | "n" => {
-                    self.emit(UiEvent::Diagnostic {
-                        stream: OutputStream::Stdout,
-                        style: Style::Plain,
+                    self.emit(UiEvent::PromptFrame {
+                        preview: Vec::new(),
                         text: "\n".into(),
                     })
                     .await?;
@@ -214,9 +248,8 @@ impl Ui {
 
     pub async fn protected_line(&self, prompt: String) -> Result<Vec<u8>, ConfctlError> {
         let _lease = self.acquire(TerminalState::Prompt).await?;
-        self.emit(UiEvent::Diagnostic {
-            stream: OutputStream::Stdout,
-            style: Style::Plain,
+        self.emit(UiEvent::PromptFrame {
+            preview: Vec::new(),
             text: prompt,
         })
         .await?;
@@ -665,3 +698,6 @@ fn broker(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+pub(crate) mod pty_tests;

@@ -176,6 +176,8 @@
         nix = import ./nix/modules/confctl/nix.nix;
         inputs-info = import ./nix/modules/confctl/inputs-info.nix;
         configuration-info = import ./nix/modules/confctl/configuration-info.nix;
+        runtime-kernels = import ./nix/modules/confctl/runtime-kernels.nix;
+        netboot-inventory = import ./nix/modules/confctl/netboot-inventory.nix;
         default = {
           imports = [
             (import ./nix/modules/confctl/generations.nix)
@@ -183,6 +185,8 @@
             (import ./nix/modules/confctl/nix.nix)
             (import ./nix/modules/confctl/inputs-info.nix)
             (import ./nix/modules/confctl/configuration-info.nix)
+            (import ./nix/modules/confctl/runtime-kernels.nix)
+            (import ./nix/modules/confctl/netboot-inventory.nix)
           ];
         };
       };

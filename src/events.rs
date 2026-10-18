@@ -46,10 +46,53 @@ pub enum TaskState {
     Canceled,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum TableLayout {
+    #[default]
+    Auto,
+    Columns,
+    Rows,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum TableAlignment {
+    #[default]
+    Left,
+    Right,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TableFormat {
+    pub layout: TableLayout,
+    pub header: bool,
+    pub align: Vec<TableAlignment>,
+}
+
+impl Default for TableFormat {
+    fn default() -> Self {
+        Self {
+            layout: TableLayout::Auto,
+            header: true,
+            align: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum UiEvent {
     /// The consumer acknowledges only after it parks any live repaint.
     TerminalState(crate::terminal::TerminalState),
+    /// Only the active prompt lease may bypass parked background output.
+    PromptFrame {
+        preview: Vec<UiEvent>,
+        text: String,
+    },
+    /// Prelude contains only Table/Diagnostic values, validated before dedup.
+    OperationGroup {
+        group: u64,
+        description: String,
+        prelude: Vec<UiEvent>,
+    },
     Output {
         task: TaskId,
         stream: OutputStream,
@@ -59,6 +102,9 @@ pub enum UiEvent {
         stream: OutputStream,
         columns: Vec<String>,
         rows: Vec<Vec<String>>,
+        /// Original unescaped values; empty/missing entries use Plain.
+        cell_styles: Vec<Vec<Style>>,
+        format: TableFormat,
     },
     TaskStarted {
         task: TaskId,
@@ -100,7 +146,26 @@ pub struct Delivery {
     acknowledgement: oneshot::Sender<Result<(), String>>,
 }
 
+pub struct DeliveryAcknowledgement {
+    acknowledgement: oneshot::Sender<Result<(), String>>,
+}
+
+impl DeliveryAcknowledgement {
+    pub fn acknowledge(self, result: Result<(), String>) {
+        let _ = self.acknowledgement.send(result);
+    }
+}
+
 impl Delivery {
+    /// Move the event's owned bytes without cloning a failed current chunk.
+    pub fn into_parts(self) -> (UiEvent, DeliveryAcknowledgement) {
+        (
+            self.event,
+            DeliveryAcknowledgement {
+                acknowledgement: self.acknowledgement,
+            },
+        )
+    }
     /// Acknowledge only after the event's required output/log effects succeed.
     pub fn acknowledge(self, result: Result<(), String>) {
         let _ = self.acknowledgement.send(result);

@@ -8,7 +8,7 @@
 use crate::{
     error::ConfctlError,
     events::{EventSink, OutputStream, TaskId, UiEvent},
-    terminal::ForegroundLease,
+    terminal::{ForegroundLease, foreground::ForegroundAttachment},
     timing::{Phase, Timing},
 };
 use std::{
@@ -16,6 +16,7 @@ use std::{
     fmt,
     future::Future,
     io,
+    os::fd::{AsFd, OwnedFd},
     path::{Path, PathBuf},
     process::{ExitStatus, Stdio},
     sync::{
@@ -42,6 +43,21 @@ pub enum StdinPolicy {
     Bytes(Vec<u8>),
     File(PathBuf),
     Foreground,
+    /// Reserved for the audited no-read GNU logname probe, never arbitrary
+    /// interactive inheritance. The resolver owns its pinned executable path.
+    LoginProbe(LoginProbeStdin),
+}
+
+/// A duplicate of the original fd0 open-file description, not a reopened
+/// /proc path or an input-broker read. Only the qualified login resolver uses
+/// this private implementation seam with no args and capture-only outputs.
+#[derive(Debug)]
+pub struct LoginProbeStdin(OwnedFd);
+
+impl LoginProbeStdin {
+    pub fn original() -> io::Result<Self> {
+        std::io::stdin().as_fd().try_clone_to_owned().map(Self)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -72,6 +88,12 @@ pub struct ProcessSpec {
     pub stdout: StreamPolicy,
     pub stderr: StreamPolicy,
     pub redacted_description: String,
+    // Native fixtures may wait for an actual queued kernel stop before attach.
+    // This observes with NOWAIT in the sole worker; it skips no route policy.
+    #[cfg(test)]
+    before_attach_stop: Option<rustix::process::Signal>,
+    #[cfg(test)]
+    before_attach_exit: bool,
 }
 
 impl ProcessSpec {
@@ -86,6 +108,10 @@ impl ProcessSpec {
             stdout: StreamPolicy::Capture,
             stderr: StreamPolicy::Capture,
             redacted_description: redacted_description.into(),
+            #[cfg(test)]
+            before_attach_stop: None,
+            #[cfg(test)]
+            before_attach_exit: false,
         }
     }
 }
@@ -475,6 +501,40 @@ impl Group {
         #[cfg(test)]
         self.transitions.push("disarm");
     }
+    /// Stop/continue notification consumption excludes EXITED and never reaps
+    /// the leader. The same worker owns this and the WNOWAIT exit observation.
+    fn transition(&mut self) -> io::Result<Option<ChildTransition>> {
+        use rustix::process::{WaitId, WaitIdOptions, waitid};
+        loop {
+            match waitid(
+                WaitId::Pid(self.pid),
+                WaitIdOptions::STOPPED | WaitIdOptions::CONTINUED | WaitIdOptions::NOHANG,
+            ) {
+                Ok(Some(status)) if status.stopped() => {
+                    return Ok(Some(ChildTransition::Stopped(
+                        status.stopping_signal().expect("stopped signal"),
+                    )));
+                }
+                Ok(Some(_)) => return Ok(Some(ChildTransition::Continued)),
+                Ok(None) => return Ok(None),
+                Err(rustix::io::Errno::INTR) => {}
+                Err(rustix::io::Errno::CHILD) if self.active => {
+                    // Notification eligibility excludes exited children. Linux
+                    // may report ECHILD for our unreaped zombie; only the exit
+                    // ownership probe can confirm that its identity is retained.
+                    if self.probe()?.is_some() {
+                        return Ok(None);
+                    }
+                    self.disarm();
+                    return Err(rustix::io::Errno::CHILD.into());
+                }
+                Err(error) => {
+                    self.disarm();
+                    return Err(error.into());
+                }
+            }
+        }
+    }
     fn signal(&mut self, signal: rustix::process::Signal) -> io::Result<()> {
         self.signal_using(signal, rustix::process::kill_process_group)
     }
@@ -494,6 +554,11 @@ impl Group {
             Err(error) => Err(error.into()),
         }
     }
+}
+
+enum ChildTransition {
+    Stopped(i32),
+    Continued,
 }
 
 async fn final_wait(
@@ -530,6 +595,83 @@ async fn observe_exit(group: &mut Group) -> io::Result<ExitStatus> {
     }
 }
 
+/// Exactly one nonblocking observation before the first yield. Only an already
+/// reportable initial TTIN/TTOU gets one automatic continuation; a later startup
+/// stop is indistinguishable from a deliberate stop and follows app suspension.
+fn initial_attachment_transition(
+    group: &mut Group,
+    attachment: &ForegroundAttachment,
+) -> Result<Option<i32>, ConfctlError> {
+    let transition = group
+        .transition()
+        .map_err(|source| io_error("observe initial child stop", None, source))?;
+    match transition {
+        Some(ChildTransition::Stopped(signal))
+            if signal == rustix::process::Signal::TTIN.as_raw()
+                || signal == rustix::process::Signal::TTOU.as_raw() =>
+        {
+            group
+                .probe()
+                .map_err(|source| io_error("verify initial child ownership", None, source))?;
+            if !attachment.owns_terminal()? {
+                return Err(ConfctlError::TerminalBusy);
+            }
+            group
+                .signal(rustix::process::Signal::CONT)
+                .map_err(|source| io_error("resume initial terminal I/O stop", None, source))?;
+            Ok(None)
+        }
+        Some(ChildTransition::Stopped(signal)) => Ok(Some(signal)),
+        _ => Ok(None),
+    }
+}
+
+async fn observe_foreground_exit(
+    group: &mut Group,
+    attachment: &mut ForegroundAttachment,
+    mut pending_stop: Option<i32>,
+    cancel: &CancellationToken,
+) -> Result<ExitStatus, ConfctlError> {
+    loop {
+        if let Some(status) = group
+            .probe()
+            .map_err(|source| io_error("observe child exit", None, source))?
+        {
+            return Ok(status);
+        }
+        let stopped = if let Some(signal) = pending_stop.take() {
+            Some(signal)
+        } else {
+            match group
+                .transition()
+                .map_err(|source| io_error("observe child stop/continue", None, source))?
+            {
+                Some(ChildTransition::Stopped(signal)) => Some(signal),
+                _ => None,
+            }
+        };
+        if stopped.is_some() {
+            attachment.request_suspend(cancel).await?;
+            // The app grants only its own fresh foreground ownership. This
+            // worker separately owns leader/PGID reservation and child resume.
+            if cancel.is_cancelled() {
+                return Err(ConfctlError::Cancelled);
+            }
+            if let Some(status) = group
+                .probe()
+                .map_err(|source| io_error("verify resumed child ownership", None, source))?
+            {
+                return Ok(status);
+            }
+            attachment.reattach()?;
+            group
+                .signal(rustix::process::Signal::CONT)
+                .map_err(|source| io_error("resume foreground child group", None, source))?;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
 struct RunState {
     group: Group,
     stopped: bool,
@@ -560,8 +702,8 @@ impl RunState {
 
 async fn execute(
     owner: &Owner,
-    spec: ProcessSpec,
-    scope: ProcessScope,
+    mut spec: ProcessSpec,
+    mut scope: ProcessScope,
     cancel: CancellationToken,
 ) -> Result<ProcessOutcome, ConfctlError> {
     if cancel.is_cancelled()
@@ -613,11 +755,24 @@ async fn execute(
             command.env_remove(key);
         }
     }
-    command.stdin(match spec.stdin {
-        StdinPolicy::Null => Stdio::null(),
-        StdinPolicy::Foreground => Stdio::inherit(),
-        _ => Stdio::piped(),
-    });
+    let stdin_work = match std::mem::replace(&mut spec.stdin, StdinPolicy::Null) {
+        StdinPolicy::Null => {
+            command.stdin(Stdio::null());
+            StdinPolicy::Null
+        }
+        StdinPolicy::Foreground => {
+            command.stdin(Stdio::inherit());
+            StdinPolicy::Null
+        }
+        StdinPolicy::LoginProbe(probe) => {
+            command.stdin(Stdio::from(probe.0));
+            StdinPolicy::Null
+        }
+        policy => {
+            command.stdin(Stdio::piped());
+            policy
+        }
+    };
     command.stdout(if spec.stdout == StreamPolicy::Foreground {
         Stdio::inherit()
     } else {
@@ -656,6 +811,37 @@ async fn execute(
         };
         Group::new(pid)
     };
+    let mut attachment = None;
+    let mut initial_stop = None;
+    let mut setup_errors = Vec::new();
+    if foreground {
+        let setup = (|| {
+            #[cfg(test)]
+            if let Some(signal) = spec.before_attach_stop {
+                foreground_tests::wait_before_attachment(group.pid, signal)?;
+            }
+            #[cfg(test)]
+            if spec.before_attach_exit {
+                foreground_tests::wait_for_exit_before_attachment(&mut group)?;
+            }
+            group
+                .probe()
+                .map_err(|source| io_error("verify foreground child ownership", None, source))?;
+            let attached = scope
+                .foreground
+                .as_mut()
+                .expect("validated foreground lease")
+                .attach(group.pid)?;
+            if attached.controlling_tty() {
+                initial_stop = initial_attachment_transition(&mut group, &attached)?;
+            }
+            attachment = Some(attached);
+            Ok::<(), ConfctlError>(())
+        })();
+        if let Err(error) = setup {
+            setup_errors.push(error);
+        }
+    }
     let (errors, mut failures) = mpsc::unbounded_channel();
     let mut pumps = Vec::new();
     let mut relays = Vec::new();
@@ -697,7 +883,7 @@ async fn execute(
             return;
         };
         let write = async {
-            match spec.stdin {
+            match stdin_work {
                 StdinPolicy::Bytes(bytes) => stdin.write_all(&bytes).await?,
                 StdinPolicy::File(path) => {
                     let mut source = File::open(path).await?;
@@ -713,10 +899,26 @@ async fn execute(
         }
     });
     drop(errors);
-    let reason = tokio::select! {
-        status = observe_exit(&mut group) => WaitReason::Exited(status),
-        _ = cancel.cancelled() => WaitReason::Canceled,
-        Some(error) = failures.recv() => WaitReason::Failed(error),
+    let reason = if let Some(primary) = setup_errors.pop() {
+        WaitReason::Failed(primary)
+    } else {
+        let observe = async {
+            if let Some(attached) = attachment
+                .as_mut()
+                .filter(|attached| attached.controlling_tty())
+            {
+                observe_foreground_exit(&mut group, attached, initial_stop, &cancel).await
+            } else {
+                observe_exit(&mut group)
+                    .await
+                    .map_err(|source| io_error("observe child exit", None, source))
+            }
+        };
+        tokio::select! {
+            status = observe => match status { Ok(status) => WaitReason::Exited(Ok(status)), Err(ConfctlError::Cancelled) => WaitReason::Canceled, Err(error) => WaitReason::Failed(error) },
+            _ = cancel.cancelled() => WaitReason::Canceled,
+            Some(error) = failures.recv() => WaitReason::Failed(error),
+        }
     };
     let child_finished_first = matches!(reason, WaitReason::Exited(Ok(_)));
     let mut observed = None;
@@ -792,6 +994,11 @@ async fn execute(
     match final_wait(&mut child, &mut state.group).await {
         Ok(status) => observed = Some(status),
         Err(error) => state.errors.push(io_error("reap owned child", None, error)),
+    }
+    if let Some(attached) = attachment
+        && let Err(error) = attached.restore()
+    {
+        state.errors.push(error);
     }
     for (stream, spool, complete) in joined {
         let prior_errors = state.errors.len();
@@ -1080,3 +1287,6 @@ async fn relay_stream(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod foreground_tests;

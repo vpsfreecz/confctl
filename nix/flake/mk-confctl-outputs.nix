@@ -312,6 +312,8 @@ let
     (confctlSrc + "/nix/modules/confctl/nix.nix")
     (confctlSrc + "/nix/modules/confctl/inputs-info.nix")
     (confctlSrc + "/nix/modules/confctl/configuration-info.nix")
+    (confctlSrc + "/nix/modules/confctl/runtime-kernels.nix")
+    (confctlSrc + "/nix/modules/confctl/netboot-inventory.nix")
   ];
 
   confctlConfig = confDir + "/configs/confctl.nix";

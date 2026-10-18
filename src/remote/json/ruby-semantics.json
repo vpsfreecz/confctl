@@ -1,0 +1,116 @@
+{
+  "provenance": {
+    "ruby": "ruby 3.4.9 (2026-03-11 revision 76cca827ab) +PRISM [x86_64-linux]",
+    "json": "2.21.2",
+    "source": "original Ruby operations recorded by evidence/m2/ruby-feature-semantics-v1/probe.rb; full raw stdout/stderr retained in session evidence"
+  },
+  "json_cases": [
+    {
+      "input": "{}",
+      "type": "Hash",
+      "scalar_string": "{}",
+      "pretty": "{}"
+    },
+    {
+      "input": "[]",
+      "type": "Array",
+      "scalar_string": "[]",
+      "pretty": "[]"
+    },
+    {
+      "input": "{\"z\":[],\"a\":{},\"mixed\":[[],{},null,false]}",
+      "type": "Hash",
+      "scalar_string": "{\"z\" => [], \"a\" => {}, \"mixed\" => [[], {}, nil, false]}",
+      "pretty": "{\n  \"z\": [],\n  \"a\": {},\n  \"mixed\": [\n    [],\n    {},\n    null,\n    false\n  ]\n}"
+    },
+    {
+      "input": "17",
+      "type": "Integer",
+      "scalar_string": "17",
+      "pretty": "17"
+    },
+    {
+      "input": "null",
+      "type": "NilClass",
+      "scalar_string": "",
+      "pretty": "null"
+    },
+    {
+      "input": "true",
+      "type": "TrueClass",
+      "scalar_string": "true",
+      "pretty": "true"
+    },
+    {
+      "input": "184467440737095516160001",
+      "type": "Integer",
+      "scalar_string": "184467440737095516160001",
+      "pretty": "184467440737095516160001"
+    },
+    {
+      "input": "-184467440737095516160001",
+      "type": "Integer",
+      "scalar_string": "-184467440737095516160001",
+      "pretty": "-184467440737095516160001"
+    },
+    {
+      "input": "1.0",
+      "type": "Float",
+      "scalar_string": "1.0",
+      "pretty": "1.0"
+    },
+    {
+      "input": "-0.0",
+      "type": "Float",
+      "scalar_string": "-0.0",
+      "pretty": "-0.0"
+    },
+    {
+      "input": "1e15",
+      "type": "Float",
+      "scalar_string": "1.0e+15",
+      "pretty": "1e+15"
+    },
+    {
+      "input": "1e16",
+      "type": "Float",
+      "scalar_string": "1.0e+16",
+      "pretty": "1e+16"
+    },
+    {
+      "input": "1e14",
+      "type": "Float",
+      "scalar_string": "100000000000000.0",
+      "pretty": "100000000000000.0"
+    },
+    {
+      "input": "1e-4",
+      "type": "Float",
+      "scalar_string": "0.0001",
+      "pretty": "0.0001"
+    },
+    {
+      "input": "1e-5",
+      "type": "Float",
+      "scalar_string": "1.0e-05",
+      "pretty": "0.00001"
+    },
+    {
+      "input": "1.2345678901234567",
+      "type": "Float",
+      "scalar_string": "1.2345678901234567",
+      "pretty": "1.2345678901234567"
+    },
+    {
+      "input": "1e400",
+      "error_class": "JSON::GeneratorError",
+      "error": "Infinity not allowed in JSON"
+    },
+    {
+      "input": "{\"keep\":1e15,\"big\":184467440737095516160001}",
+      "type": "Hash",
+      "scalar_string": "{\"keep\" => 1.0e+15, \"big\" => 184467440737095516160001}",
+      "pretty": "{\n  \"keep\": 1e+15,\n  \"big\": 184467440737095516160001\n}"
+    }
+  ]
+}

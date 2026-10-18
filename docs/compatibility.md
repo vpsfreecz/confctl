@@ -50,6 +50,24 @@ print help to stdout while reporting an error to stderr. GLI usage errors and
 ordinary exceptions have different exits; exact output and version failure are
 recorded, not inferred from a new CLI framework.
 
+Available operations open an invocation log before constructing the command
+or reading default settings. Logs use the configuration directory and
+`.confctl/logs/YYYY-MM-DD--HH-MM-SS-confctl-<command-path>.log`, with spaces in
+the command path replaced by hyphens. Help, parser errors and unavailable
+development routes do not open a log. Successful `ls` and `inputs ls` operations
+remove their logs; failures retain them and report the path on stderr.
+
+Nix child failures with complete captures preserve the baseline command escaping,
+native exit or signal value and separate stdout/stderr diagnostics. Error
+`Debug` and `Display` keep command arguments and captured bytes redacted. After
+process owners have joined, the app appends labeled fatal captures, including
+incomplete prefixes, to the invocation log. It verifies the appended bytes,
+syncs and closes the file, then checks the path's identity and contents before
+releasing process captures. Any uncertainty keeps fallback evidence and reports
+the log error after the original failure. A log filename alone does not prove
+capture retention; partial captures do not establish a complete stream.
+Presentation replay offsets and pending bytes retain their separate evidence path.
+
 Confirmation displays `Continue? [y/N]: ` but only explicit `y`/`n` terminates
 the loop; blank input loops, EOF errors. `--yes` bypasses the confirmation's
 selection-description block too. Interactive per-host questions may override
@@ -70,12 +88,49 @@ inputs_info; reads also accept inputsInfo. Unsupported or malformed records and
 their GC roots remain untouched. Numeric selection can refuse a mixed inventory;
 invalid current must not become an implicit newest-generation fallback.
 
+Rust state and generation writers require a borrowed guard for the same
+canonical configuration root. The persistent private `.confctl/mutation.lock`
+uses an exclusive advisory flock; acquisition is cancelable and has no expiry.
+Writers keep the lock inode without truncating, unlinking or replacing it.
+Read-only routes must not acquire this lock. The additional lock file is an
+accepted compatibility difference for mutating routes. Ruby does not
+participate, so concurrent Ruby and Rust mutation is unsupported.
+
+An outer mutation must acquire once after prompts and retain that guard across
+the source write, fresh Nix evaluation and generated-file publication. A later
+failure preserves an earlier successful write; the sequence provides no
+rollback transaction. Integration of these app-level workflows remains a
+separate acceptance gate from the guarded writer and service tests.
+
 GC roots incorporate real configuration path hash, login, host, generation and
 suffix. Local fixtures use a pre-existing generation to test reuse without
 writing host gcroots. New-generation publication/root failures and bidirectional
 Ruby/Rust writes still need their owning state package tests. Moving the
 configuration directory or collecting retained closures affects rollback and
 is not authorized by test completion.
+
+Login preserves the baseline `Etc.getlogin` contract: use libc login first,
+then raw `USER` only if libc returns no login. If that fallback is needed, empty
+USER remains empty and absent USER produces an error before GC-root effects.
+Neither `LOGNAME` nor a username derived from the UID supplies a fallback.
+Preserve Ruby's native-byte `File.join` behavior for leading and repeated
+slashes, dot segments and non-UTF-8 login bytes. A USER value beginning with `/`
+does not discard the per-user prefix.
+
+The Rust adapter runs pinned GNU `logname` with a duplicate of the original
+stdin descriptor, without reading it, and captures both output streams. Only
+the qualified no-login result permits USER fallback. Spawn, signal, capture
+and malformed-output failures remain infrastructure errors. Keep the lexical
+`bin/logname` entry: resolving its multicall symlink to `bin/coreutils` changes
+dispatch. This read-only child is an accepted login-lookup intervention; other
+children do not gain permission to inherit stdin through this path.
+
+Flake-lock input arrays preserve the baseline first-segment interpretation:
+`["node", "nested"]` reads `nodes["node"]` and ignores the suffix. Setter
+restoration uses the temporary lock's first-segment mapping too. Recursive
+follows resolution would change this behavior. Eight additional immutable
+observations cover varied suffixes, missing first nodes, original metadata
+restoration, distinct nested leaves and exact result/error streams.
 
 Nix output names, channels/overrides, machine keys, evaluation impurity,
 no-lock-write/update flags and recognized retry policy are interfaces. The fake

@@ -1,0 +1,57 @@
+{
+  "baseline": "cc40679d267165aecfa569128438bb55fe910268",
+  "cases": {
+    "dots": {
+      "login_b64": "Li9maXh0dXJlLy4uL2xvZ2lu",
+      "path_b64": "PFJPT1Q+Ly4vZml4dHVyZS8uLi9sb2dpbi9jb25mY3RsLWZpeHR1cmU=",
+      "path_hex": "3c524f4f543e2f2e2f666978747572652f2e2e2f6c6f67696e2f636f6e6663746c2d66697874757265"
+    },
+    "embedded": {
+      "login_b64": "Zml4dHVyZS9taWRkbGU=",
+      "path_b64": "PFJPT1Q+L2ZpeHR1cmUvbWlkZGxlL2NvbmZjdGwtZml4dHVyZQ==",
+      "path_hex": "3c524f4f543e2f666978747572652f6d6964646c652f636f6e6663746c2d66697874757265"
+    },
+    "empty": {
+      "login_b64": "",
+      "path_b64": "PFJPT1Q+L2NvbmZjdGwtZml4dHVyZQ==",
+      "path_hex": "3c524f4f543e2f636f6e6663746c2d66697874757265"
+    },
+    "leading": {
+      "login_b64": "L2ZpeHR1cmU=",
+      "path_b64": "PFJPT1Q+L2ZpeHR1cmUvY29uZmN0bC1maXh0dXJl",
+      "path_hex": "3c524f4f543e2f666978747572652f636f6e6663746c2d66697874757265"
+    },
+    "nil": {
+      "error": {
+        "class": "TypeError",
+        "message": "no implicit conversion of nil into String"
+      },
+      "login_b64": null
+    },
+    "non-utf8": {
+      "login_b64": "Zv94",
+      "path_b64": "PFJPT1Q+L2b/eC9jb25mY3RsLWZpeHR1cmU=",
+      "path_hex": "3c524f4f543e2f66ff782f636f6e6663746c2d66697874757265"
+    },
+    "relative": {
+      "login_b64": "Zml4dHVyZQ==",
+      "path_b64": "PFJPT1Q+L2ZpeHR1cmUvY29uZmN0bC1maXh0dXJl",
+      "path_hex": "3c524f4f543e2f666978747572652f636f6e6663746c2d66697874757265"
+    },
+    "repeated": {
+      "login_b64": "Ly9maXh0dXJlLy8vbWlkZGxlLy8=",
+      "path_b64": "PFJPT1Q+Ly9maXh0dXJlLy8vbWlkZGxlLy9jb25mY3RsLWZpeHR1cmU=",
+      "path_hex": "3c524f4f543e2f2f666978747572652f2f2f6d6964646c652f2f636f6e6663746c2d66697874757265"
+    },
+    "root": {
+      "login_b64": "Lw==",
+      "path_b64": "PFJPT1Q+L2NvbmZjdGwtZml4dHVyZQ==",
+      "path_hex": "3c524f4f543e2f636f6e6663746c2d66697874757265"
+    },
+    "trailing": {
+      "login_b64": "Zml4dHVyZS8=",
+      "path_b64": "PFJPT1Q+L2ZpeHR1cmUvY29uZmN0bC1maXh0dXJl",
+      "path_hex": "3c524f4f543e2f666978747572652f636f6e6663746c2d66697874757265"
+    }
+  }
+}
