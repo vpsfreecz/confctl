@@ -1,0 +1,46 @@
+{
+  "baseline": "cc40679d267165aecfa569128438bb55fe910268",
+  "contract": "first string segment selects nodes[id]; suffix ignored; no recursive resolution",
+  "cases": {
+    "follows-different-suffix-ls.json": {
+      "sha256": "86f19cb2e46a54a0f9bc8a60117479722f62bcd366a1d63e508338dfb43ce8d0",
+      "origin": "follows-v2/expected/follows-different-suffix-ls.json",
+      "exit": 0
+    },
+    "follows-different-suffix-set.json": {
+      "sha256": "7d83d460eb66fd5a443ff0a3f43c9c80e840900a2a9bd91ef74eca1428b11fc8",
+      "origin": "follows-v2/expected/follows-different-suffix-set.json",
+      "exit": 0
+    },
+    "follows-missing-first-ls.json": {
+      "sha256": "0e14a4641b2920e3bb26518a7dc7193b6a68a3520a035bce597787e8ae7bbe23",
+      "origin": "follows-v2/expected/follows-missing-first-ls.json",
+      "exit": 0
+    },
+    "follows-nested-ls.json": {
+      "sha256": "a9481466d70eba29fbce939cb1570e85eba90dd6a3b731e4cb4f126c930cb4bb",
+      "origin": "follows-v2/expected/follows-nested-ls.json",
+      "exit": 0
+    },
+    "follows-nested-set.json": {
+      "sha256": "21f487bfcd33f2d7fc7173367fa4df8a5448970949cd4c1815d950bde6cdbe3f",
+      "origin": "follows-v2/expected/follows-nested-set.json",
+      "exit": 0
+    },
+    "follows-single-ls.json": {
+      "sha256": "83347179ae708afdff71d7e3c25b2654a254afce43525207d606e78a6dd54f3e",
+      "origin": "follows-v2/expected/follows-single-ls.json",
+      "exit": 0
+    },
+    "follows-single-set.json": {
+      "sha256": "828de833b8c1cdd5af840a902e6b6584634b6c83b310692e41c53ac5404aba0f",
+      "origin": "follows-v2/expected/follows-single-set.json",
+      "exit": 0
+    },
+    "follows-missing-first-set.json": {
+      "sha256": "4b3e48f6ec4c689f8cd530f1fde487fd6a00c8c1de543968bc19915d371939d9",
+      "origin": "follows-v3/expected/follows-missing-first-set.json",
+      "exit": 1
+    }
+  }
+}

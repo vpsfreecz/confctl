@@ -81,3 +81,47 @@ unexpected child refusal must retain raw streams, status and effects; the GC
 candidate predicate must accept success only after a successful child and require
 exit 1 after a genuine fake-child failure. This test driver validates the harness
 policy; Rust mixed-host, renderer-fault and joining tests remain separate gates.
+
+Additional input qualification is independent of the 372-case manifest:
+
+```sh
+python3 tests/compat/core/qualify_inputs.py --evidence /owned/evidence/raw
+python3 tests/compat/core/qualify_inputs.py --record-output /owned/evidence/expected --evidence /owned/evidence/raw
+```
+
+The eight `expected-follows` observations use the same SHA-checked Ruby archive.
+Array references resolve only their first string segment, including when later
+segments name a different leaf or do not exist. The confined `child_follows.py`
+accepts only the exact setter lock invocation, changes that first node, and
+replaces its original metadata. The real setter restores the saved metadata
+before publishing; the different nested leaf remains unchanged. A missing first
+node yields empty list fields and a failed set with the original log-locator
+prelude, no child invocation and no lock mutation. `follows-manifest.json` binds
+the source revision and reviewed snapshot checksums. `--case` selects a named
+observation for a focused rerun; recording never invokes a candidate.
+
+`qualify_login.py --evidence /owned/evidence/raw` compares ten native-byte path
+observations in `expected-login-join.json`. It runs the archived `GCRoot.dir`
+with an injected login and disposable per-user root, forwarding the actual Ruby
+`File.join` call without changing the login bytes. It never creates that root.
+Cases cover empty and nil login values, leading, embedded, trailing and repeated
+slashes, dot segments and non-UTF-8 bytes. Raw output uses Base64; the normalized
+expectation also stores equivalent hex so Rust tests need no new codec
+dependency. These cases establish path-joining behavior only. They do not
+exercise libc failure or its USER fallback.
+
+`qualify_settings.py` uses ten separate observations in `expected-settings` to
+check invocation defaults, per-Nix settings and command construction order.
+The two settings replies deliberately differ, so the fixtures can distinguish
+captured jobs from later settings and invocation columns from client settings.
+Failures in the first or second settings child preserve exact streams, native
+status and the invocation-log diagnostic. The two build observations remain
+Ruby-only while the Rust build route is unavailable.
+
+```sh
+python3 tests/compat/core/qualify_settings.py --candidate /absolute/path/to/confctl-rust --case settings-bootstrap-failure --case settings-client-failure --evidence /owned/evidence/raw
+```
+
+Recording requires `--record-output` and always invokes the archived Ruby
+baseline. Review the source and raw evidence before promoting new expectations;
+the original 372-case manifest remains unchanged.

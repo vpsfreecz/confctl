@@ -46,7 +46,7 @@ async fn prompt_preserves_explicit_answers_and_owns_terminal_until_done() {
     let consumer = tokio::spawn(async move {
         let mut prompts = 0;
         while let Some(delivery) = receiver.receive().await {
-            if matches!(&delivery.event, UiEvent::Diagnostic { text, .. } if text.contains("Continue?"))
+            if matches!(&delivery.event, UiEvent::PromptFrame { text, .. } if text.contains("Continue?"))
             {
                 prompts += 1;
             }

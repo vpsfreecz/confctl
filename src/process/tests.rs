@@ -970,3 +970,63 @@ async fn queued_canceled_outcome_drop_does_not_create_failure() {
         .await
         .expect("canceled outcome stays normal");
 }
+
+#[tokio::test]
+async fn login_probe_preserves_original_stdin_flags_identity_and_unread_typeahead() {
+    const MARKER: &str = "CONFCTL_TEST_ORIGINAL_LOGIN_STDIN";
+    if std::env::var_os(MARKER).is_none() {
+        use std::io::Write;
+        let (input, mut peer) =
+            std::os::unix::net::UnixStream::pair().expect("known original stdin");
+        peer.write_all(b"unread-typeahead\n").expect("typeahead");
+        let descriptor: OwnedFd = input.into();
+        let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
+            .args(["--exact","process::tests::login_probe_preserves_original_stdin_flags_identity_and_unread_typeahead","--nocapture"])
+            .env(MARKER,"1").stdin(Stdio::from(descriptor)).output().expect("isolated original fd0 fixture");
+        assert!(
+            output.status.success(),
+            "isolated probe failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+    let input = std::io::stdin();
+    let before = rustix::fs::fstat(&input).expect("original fd0 identity");
+    let flags = rustix::fs::fcntl_getfl(&input).expect("original fd0 flags");
+    let probe = LoginProbeStdin::original().expect("owned original duplicate");
+    let duplicate = rustix::fs::fstat(&probe.0).expect("duplicate identity");
+    assert_eq!(
+        (before.st_dev, before.st_ino, before.st_mode),
+        (duplicate.st_dev, duplicate.st_ino, duplicate.st_mode)
+    );
+    assert_eq!(
+        rustix::fs::fcntl_getfl(&probe.0).expect("duplicate flags"),
+        flags
+    );
+    let directory = tempfile::tempdir().expect("spools");
+    let (runner, _receiver) = owner(directory.path(), 128, None);
+    // Qualified lexical multicall entry; resolving the symlink changes argv0.
+    let mut spec = ProcessSpec::new(
+        "/nix/store/mhv491ysr5xqajfipq4r18wcqhjw4smz-coreutils-9.11/bin/logname",
+        "qualified no-read login probe",
+    );
+    spec.stdin = StdinPolicy::LoginProbe(probe);
+    spec.env = vec![
+        ("LC_ALL".into(), Some("C".into())),
+        ("LANG".into(), Some("C".into())),
+    ];
+    let result = runner
+        .run(spec, ProcessScope::new(CancellationToken::new(), TaskId(1)))
+        .await
+        .expect("ordinary native login outcome");
+    assert!(matches!(result.code(), Some(0 | 1)));
+    assert!(result.stdout_complete && result.stderr_complete);
+    assert_eq!(
+        rustix::fs::fcntl_getfl(&input).expect("unchanged original flags"),
+        flags
+    );
+    let mut remaining = [0; 17];
+    let count = rustix::io::read(&input, &mut remaining).expect("queued input remains");
+    assert_eq!(&remaining[..count], b"unread-typeahead\n");
+    runner.shutdown().await.expect("probe supervisor joined");
+}
