@@ -1,0 +1,136 @@
+{
+  "baseline": "cc40679d267165aecfa569128438bb55fe910268",
+  "status": "Reviewed original20 baseline evidence; no candidate acceptance",
+  "proposal_sha256": "575b4e118338b60746f53c1f1493860d24116cc9beef943ec6d1fc334aff6e8e",
+  "cases": {
+    "channels-bootstrap-failure.json": {
+      "sha256": "e0fc8efccf8643098fa506b063ee580b9b5a9f831f912799b3e1e8738ceff80c",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-bootstrap-failure.json",
+      "origin_sha256": "e0fc8efccf8643098fa506b063ee580b9b5a9f831f912799b3e1e8738ceff80c",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-client-failure.json": {
+      "sha256": "c3aca6cdd457134c0b19fb43acdd482dcb995609b50208ae7514861b74218309",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-client-failure.json",
+      "origin_sha256": "c3aca6cdd457134c0b19fb43acdd482dcb995609b50208ae7514861b74218309",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-comma-order.json": {
+      "sha256": "a47de17574f3698c29c1615842045047d8e6315f2e9930ac751e86533c44f520",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-comma-order.json",
+      "origin_sha256": "a47de17574f3698c29c1615842045047d8e6315f2e9930ac751e86533c44f520",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-corrupt-lock.json": {
+      "sha256": "63dde3c5f88f10604c5683ae512c2ec70c4c9c9dabbef2ab70a548afc16d371d",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-corrupt-lock.json",
+      "origin_sha256": "63dde3c5f88f10604c5683ae512c2ec70c4c9c9dabbef2ab70a548afc16d371d",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-empty-mappings.json": {
+      "sha256": "9e73b7756ae578a637dd884088775ddb1808e1407363e35159f85ab4f8d784bc",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-empty-mappings.json",
+      "origin_sha256": "9e73b7756ae578a637dd884088775ddb1808e1407363e35159f85ab4f8d784bc",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-eval-failure.json": {
+      "sha256": "d7fb3957dbe194604b28b01d7f5e51a34405a2a6613b54df41074b279fc80dec",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-eval-failure.json",
+      "origin_sha256": "d7fb3957dbe194604b28b01d7f5e51a34405a2a6613b54df41074b279fc80dec",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-explicit-order.json": {
+      "sha256": "eada4e389fcf20f4135a8896edfd6ba301e054db0add6aa1ce28f4dbf1e479c9",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-explicit-order.json",
+      "origin_sha256": "eada4e389fcf20f4135a8896edfd6ba301e054db0add6aa1ce28f4dbf1e479c9",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-glob.json": {
+      "sha256": "0af690df49c68b5da96511d2dd074c29b8e5936abe42dcbf3bab191e07c405e1",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-glob.json",
+      "origin_sha256": "0af690df49c68b5da96511d2dd074c29b8e5936abe42dcbf3bab191e07c405e1",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-mapping-array.json": {
+      "sha256": "8ac48776b0441ebc38d53e26c55901244bbeb3ddf0db77ab5025545031ccb302",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-mapping-array.json",
+      "origin_sha256": "8ac48776b0441ebc38d53e26c55901244bbeb3ddf0db77ab5025545031ccb302",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-mapping-scalar.json": {
+      "sha256": "dcc7795f5cea226f820de3a580b348d63f87e26ac2542bea69d759961e55f82c",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-mapping-scalar.json",
+      "origin_sha256": "dcc7795f5cea226f820de3a580b348d63f87e26ac2542bea69d759961e55f82c",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-missing-lock.json": {
+      "sha256": "97dacd317bd0c76eb10d31e82c85f9a34e6641b65f111936fbd6d50cafd27252",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-missing-lock.json",
+      "origin_sha256": "97dacd317bd0c76eb10d31e82c85f9a34e6641b65f111936fbd6d50cafd27252",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-no-match.json": {
+      "sha256": "9e73b7756ae578a637dd884088775ddb1808e1407363e35159f85ab4f8d784bc",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-no-match.json",
+      "origin_sha256": "9e73b7756ae578a637dd884088775ddb1808e1407363e35159f85ab4f8d784bc",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-non-object.json": {
+      "sha256": "9e73b7756ae578a637dd884088775ddb1808e1407363e35159f85ab4f8d784bc",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-non-object.json",
+      "origin_sha256": "9e73b7756ae578a637dd884088775ddb1808e1407363e35159f85ab4f8d784bc",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-non-string-inputs.json": {
+      "sha256": "a3369552b21246ccde1ac5a0c82e7f934db51a2f2beb50a0e310383d4a31793a",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-non-string-inputs.json",
+      "origin_sha256": "a3369552b21246ccde1ac5a0c82e7f934db51a2f2beb50a0e310383d4a31793a",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-null-jobs.json": {
+      "sha256": "503c7398558b1a3b92d6aeada38e75e8c121a4211ac45121950608e02f730a27",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-null-jobs.json",
+      "origin_sha256": "503c7398558b1a3b92d6aeada38e75e8c121a4211ac45121950608e02f730a27",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-settings-lifetimes.json": {
+      "sha256": "0b306a0b91275958eb81439636d846c2328c1c1e016c74e37ca452489ab59064",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-settings-lifetimes.json",
+      "origin_sha256": "0b306a0b91275958eb81439636d846c2328c1c1e016c74e37ca452489ab59064",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-sorted.json": {
+      "sha256": "526dc68df5fcd82127a1aa99e619485df72018e2ca68492c571388b7c26aae22",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-sorted.json",
+      "origin_sha256": "526dc68df5fcd82127a1aa99e619485df72018e2ca68492c571388b7c26aae22",
+      "transformation": "None; byte-exact original capture copy"
+    },
+    "channels-surplus-missing-flake.json": {
+      "sha256": "90b32490ea9608c48d7efc7dec3cf991aa491b63e9ef62249118d79919c0dcd1",
+      "origin": "evidence/m2/channels-surplus-ruby-v1/channels-surplus-missing-flake.json",
+      "origin_sha256": "5c98789a4a1ffc86477031a64c77b29ec4d8d72245f3177f7beb54463d48ce62",
+      "transformation": "Append retained_logs path/mode from exact original raw-log metadata; reuse only existing volatile log filename timestamp substitution; complete original streams/native/events/nonlog files unchanged"
+    },
+    "channels-surplus-valid.json": {
+      "sha256": "8312589e0fffb9b68ed2d53cfd2e274c5c96af0d64e4ab75c3310a07ac9ebded",
+      "origin": "evidence/m2/channels-surplus-ruby-v1/channels-surplus-valid.json",
+      "origin_sha256": "a1a42eac1c788d29c1aa78b6c600eafcb5c7094f6ef84a4e934da1dbba386720",
+      "transformation": "Append retained_logs path/mode from exact original raw-log metadata; reuse only existing volatile log filename timestamp substitution; complete original streams/native/events/nonlog files unchanged"
+    },
+    "channels-writer-held.json": {
+      "sha256": "3b012705076c7007f264a94ede31c341ccf4cf8d6fb2aa4b98e45f1a23d51051",
+      "origin": "evidence/m2/channels-ruby-v1/observations/channels-writer-held.json",
+      "origin_sha256": "3b012705076c7007f264a94ede31c341ccf4cf8d6fb2aa4b98e45f1a23d51051",
+      "transformation": "None; byte-exact original capture copy"
+    }
+  },
+  "candidate_overrides": {
+    "channels-corrupt-lock": {
+      "decision": "LOCK-JSON-01",
+      "path": "expected-channels-candidate/LOCK-JSON-01.json",
+      "sha256": "2b58ef383094e71f8e324222d37cc23313c2eba8123a0b17178b1ea4461225f4"
+    }
+  },
+  "log_scope": "Exact retained log names/modes; raw log bodies retained separately, without a log-body parity claim",
+  "unchanged_original_manifest": "coverage.json: original 372 untouched"
+}

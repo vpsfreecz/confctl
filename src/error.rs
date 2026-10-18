@@ -37,8 +37,32 @@ impl std::error::Error for NixCommandFailure {
     }
 }
 
+/// Context for the channel route's existing lock read, without exposing a
+/// configuration path or parser excerpt through general error formatting.
+pub struct FlakeLockFailure {
+    pub path: PathBuf,
+    pub source: Box<ConfctlError>,
+}
+impl fmt::Debug for FlakeLockFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("FlakeLockFailure { <redacted> }")
+    }
+}
+impl fmt::Display for FlakeLockFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("unable to load flake.lock")
+    }
+}
+impl std::error::Error for FlakeLockFailure {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.source.as_ref())
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ConfctlError {
+    #[error("{0}")]
+    FlakeLockFailure(#[source] Box<FlakeLockFailure>),
     #[error("{0}")]
     NixCommandFailure(#[source] Box<NixCommandFailure>),
     #[error("{0}")]
@@ -125,6 +149,7 @@ impl ConfctlError {
     /// disposition. A later canceled cleanup cannot replace an earlier failure.
     pub fn is_cancelled(&self) -> bool {
         match self {
+            Self::FlakeLockFailure(failure) => failure.source.is_cancelled(),
             Self::NixCommandFailure(failure) => failure.source.is_cancelled(),
             Self::Cancelled => true,
             Self::ProcessFailure { source, .. } | Self::OutputFailure { source, .. } => {
@@ -159,6 +184,65 @@ impl ConfctlError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn flake_lock_wrapper_redacts_context_and_retains_typed_source_and_cleanup_order() {
+        use std::error::Error;
+        let error = ConfctlError::FlakeLockFailure(Box::new(FlakeLockFailure {
+            path: "/private-lock-path".into(),
+            source: Box::new(ConfctlError::Io {
+                operation: "private-operation",
+                path: Some("/private-lock-path".into()),
+                source: io::Error::from_raw_os_error(nix::errno::Errno::ENOENT as i32),
+            }),
+        }))
+        .with_secondary(vec![ConfctlError::InputEof])
+        .with_secondary(vec![ConfctlError::Cancelled]);
+        for rendered in [format!("{error}"), format!("{error:?}")] {
+            assert!(!rendered.contains("private"));
+        }
+        assert!(!error.is_cancelled());
+        let ConfctlError::Cleanup { primary, secondary } = error else {
+            panic!()
+        };
+        let ConfctlError::FlakeLockFailure(failure) = primary.as_ref() else {
+            panic!()
+        };
+        assert!(
+            failure
+                .source()
+                .unwrap()
+                .downcast_ref::<ConfctlError>()
+                .is_some()
+        );
+        let ConfctlError::Io { source, .. } = failure.source.as_ref() else {
+            panic!()
+        };
+        assert_eq!(
+            source.raw_os_error(),
+            Some(nix::errno::Errno::ENOENT as i32)
+        );
+        assert!(matches!(
+            secondary.as_slice(),
+            [ConfctlError::InputEof, ConfctlError::Cancelled]
+        ));
+
+        let error = ConfctlError::FlakeLockFailure(Box::new(FlakeLockFailure {
+            path: "/private-lock-path".into(),
+            source: Box::new(crate::inputs::FlakeLock::decode(b"{private-json").unwrap_err()),
+        }));
+        assert_eq!(error.to_string(), "unable to load flake.lock");
+        assert!(!format!("{error:?}").contains("private"));
+        let ConfctlError::FlakeLockFailure(failure) = error else {
+            panic!()
+        };
+        assert!(matches!(*failure.source, ConfctlError::Decode { .. }));
+        let cancelled = ConfctlError::FlakeLockFailure(Box::new(FlakeLockFailure {
+            path: "/private-lock-path".into(),
+            source: Box::new(ConfctlError::Cancelled.with_secondary(vec![ConfctlError::InputEof])),
+        }));
+        assert!(cancelled.is_cancelled());
+    }
 
     #[test]
     fn nix_wrapper_redacts_command_and_captures_and_keeps_primary_cancellation() {

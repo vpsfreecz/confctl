@@ -1,4 +1,4 @@
-//! Explicit byte-oriented Nix diagnostics. General error Display stays redacted.
+//! Explicit byte-oriented command diagnostics. General error Display stays redacted.
 
 use crate::{
     error::{ConfctlError, NixCommandContext},
@@ -98,6 +98,9 @@ fn write_inner(
     prefix: &[u8],
 ) -> io::Result<()> {
     match error {
+        ConfctlError::FlakeLockFailure(failure) => {
+            write_lock_error(writer, &failure.source, &failure.path, prefix)
+        }
         ConfctlError::NixCommandFailure(failure) => {
             write_inner(writer, &failure.source, Some(&failure.context), prefix)
         }
@@ -137,10 +140,57 @@ fn write_inner(
             }
         }
         ConfctlError::OutputFailure { source, .. } => write_inner(writer, source, context, prefix),
+        ConfctlError::Usage(message) => {
+            writer.write_all(prefix)?;
+            writeln!(writer, "{message}\n")
+        }
         _ => {
             writer.write_all(prefix)?;
             writeln!(writer, "{error}")
         }
+    }
+}
+
+fn write_lock_error(
+    writer: &mut impl Write,
+    error: &ConfctlError,
+    path: &std::path::Path,
+    prefix: &[u8],
+) -> io::Result<()> {
+    match error {
+        ConfctlError::Cleanup { primary, secondary } => {
+            write_lock_error(writer, primary, path, prefix)?;
+            for error in secondary {
+                write_inner(writer, error, None, b"cleanup: ")?;
+            }
+            Ok(())
+        }
+        ConfctlError::ProcessFailure { source, .. }
+        | ConfctlError::OutputFailure { source, .. } => {
+            write_lock_error(writer, source, path, prefix)
+        }
+        ConfctlError::Io { source, .. }
+            if source.raw_os_error() == Some(nix::errno::Errno::ENOENT as i32) =>
+        {
+            writer.write_all(prefix)?;
+            // Ruby compatibility annotation, followed by the attempted path's
+            // native bytes. The missing leaf cannot be canonicalized again.
+            writer.write_all(b"No such file or directory @ rb_sysopen - ")?;
+            writer.write_all(path.as_os_str().as_encoded_bytes())?;
+            writer.write_all(b"\n")
+        }
+        ConfctlError::Decode { source, .. } => {
+            writer.write_all(prefix)?;
+            // LOCK-JSON-01 changes the parser-specific reason only. Coordinates
+            // come from the retained serde error, without parsing its Display.
+            writeln!(
+                writer,
+                "invalid JSON in flake.lock at line {} column {}",
+                source.line(),
+                source.column()
+            )
+        }
+        _ => write_inner(writer, error, None, prefix),
     }
 }
 
@@ -186,6 +236,7 @@ fn output(writer: &mut impl Write, bytes: &[u8]) -> io::Result<()> {
 
 pub(super) fn fatal_evidence(writer: &mut impl Write, error: &ConfctlError) -> io::Result<()> {
     match error {
+        ConfctlError::FlakeLockFailure(failure) => fatal_evidence(writer, &failure.source),
         ConfctlError::NixCommandFailure(failure) => {
             writer.write_all(b"\n[fatal Nix command] ")?;
             command(writer, &failure.context)?;
@@ -238,7 +289,7 @@ fn process_evidence(writer: &mut impl Write, evidence: &PartialProcessEvidence) 
 #[cfg(test)]
 pub(super) mod tests {
     use super::*;
-    use crate::error::NixCommandFailure;
+    use crate::error::{FlakeLockFailure, NixCommandFailure};
     use std::{
         ffi::OsString,
         os::unix::{ffi::OsStringExt, process::ExitStatusExt},
@@ -268,6 +319,96 @@ pub(super) mod tests {
                 }),
             }),
         }))
+    }
+    #[test]
+    fn channel_lock_enoent_uses_attempted_native_path_and_preserves_cleanup_order() {
+        let path = std::path::PathBuf::from(OsString::from_vec(
+            b"/config space/\xff/flake.lock".to_vec(),
+        ));
+        let error = ConfctlError::FlakeLockFailure(Box::new(FlakeLockFailure {
+            path,
+            source: Box::new(
+                ConfctlError::Io {
+                    operation: "read flake.lock",
+                    // The wrapper's attempted path is authoritative.
+                    path: Some("/unrelated-path".into()),
+                    source: io::Error::from_raw_os_error(nix::errno::Errno::ENOENT as i32),
+                }
+                .with_secondary(vec![ConfctlError::InputEof]),
+            ),
+        }))
+        .with_secondary(vec![ConfctlError::Cancelled]);
+        let mut bytes = vec![];
+        write_error(&mut bytes, &error).unwrap();
+        assert_eq!(bytes, b"error: No such file or directory @ rb_sysopen - /config space/\xff/flake.lock\ncleanup: end of input\ncleanup: operation canceled\n");
+        let mut redacted = vec![];
+        write_redacted(&mut redacted, &error).unwrap();
+        assert!(
+            !redacted
+                .windows(b"config space".len())
+                .any(|bytes| bytes == b"config space")
+        );
+        assert!(redacted.starts_with(b"error: unable to load flake.lock\n"));
+    }
+
+    #[test]
+    fn channel_lock_json_diagnostic_uses_structured_coordinates_and_keeps_source() {
+        let source = crate::inputs::FlakeLock::decode(b"{bad\n").unwrap_err();
+        let ConfctlError::Decode { source: json, .. } = &source else {
+            panic!()
+        };
+        assert_eq!((json.line(), json.column()), (1, 2));
+        let category = json.classify();
+        let error = ConfctlError::FlakeLockFailure(Box::new(FlakeLockFailure {
+            path: "/config/flake.lock".into(),
+            source: Box::new(source),
+        }));
+        let mut bytes = vec![];
+        write_error(&mut bytes, &error).unwrap();
+        assert_eq!(
+            bytes,
+            b"error: invalid JSON in flake.lock at line 1 column 2\n"
+        );
+        let ConfctlError::FlakeLockFailure(failure) = error else {
+            panic!()
+        };
+        let ConfctlError::Decode { source: json, .. } = failure.source.as_ref() else {
+            panic!()
+        };
+        assert_eq!(json.classify(), category);
+        assert_eq!((json.line(), json.column()), (1, 2));
+    }
+
+    #[test]
+    fn channel_lock_other_io_is_not_relabelled_and_writer_failures_propagate() {
+        struct Broken;
+        impl Write for Broken {
+            fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+                Err(io::ErrorKind::BrokenPipe.into())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        for errno in [nix::errno::Errno::ENOENT, nix::errno::Errno::EACCES] {
+            let error = ConfctlError::FlakeLockFailure(Box::new(FlakeLockFailure {
+                path: "/config/flake.lock".into(),
+                source: Box::new(ConfctlError::Io {
+                    operation: "read flake.lock",
+                    path: None,
+                    source: io::Error::from_raw_os_error(errno as i32),
+                }),
+            }));
+            assert_eq!(
+                write_error(&mut Broken, &error).unwrap_err().kind(),
+                io::ErrorKind::BrokenPipe
+            );
+            if errno == nix::errno::Errno::EACCES {
+                let mut bytes = vec![];
+                write_error(&mut bytes, &error).unwrap();
+                assert!(!String::from_utf8(bytes).unwrap().contains("rb_sysopen"));
+            }
+        }
     }
     #[test]
     fn exact_command_failure_uses_native_bytes_and_ruby_strip() {

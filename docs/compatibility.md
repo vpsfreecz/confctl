@@ -17,7 +17,8 @@ silently become the new parser's defaults.
 The `confctl-rust` development binary provides the Rust parser and application
 entrypoint. The default `confctl` remains Ruby during development. Typed requests
 cover the 29 original command actions and the built-in `runtime-kernels update`
-action. Operation adapters remain incomplete and return an explicit unavailable
+action. The concrete routes are `ls`, `inputs ls` and `inputs channel ls`;
+other operation adapters remain incomplete and return an explicit unavailable
 error. Help and version need no inventory, input broker or process supervisor.
 Static original help text is preserved in `src/cli/help.json`, with source
 provenance in that module; it does not load test snapshots or Ruby at runtime.
@@ -54,8 +55,33 @@ Available operations open an invocation log before constructing the command
 or reading default settings. Logs use the configuration directory and
 `.confctl/logs/YYYY-MM-DD--HH-MM-SS-confctl-<command-path>.log`, with spaces in
 the command path replaced by hyphens. Help, parser errors and unavailable
-development routes do not open a log. Successful `ls` and `inputs ls` operations
-remove their logs; failures retain them and report the path on stderr.
+development routes do not open a log. Successful listing operations remove their
+logs; failures retain them and report the path on stderr.
+
+`inputs channel ls` loads the lock snapshot before its two independent settings
+reads and channel evaluation. Invocation defaults supply the captured jobs value;
+the client's settings control evaluation impurity. Ordinary names/globs sort;
+explicit brace/comma selectors retain listed order and duplicates. Role mappings
+retain object/array iteration order and Ruby's one-level array destructuring.
+Only string inputs look up lock metadata; numeric inputs retain their display
+value without looking up a numeric-looking string key. Rows are collected before
+any table is emitted. This read-only route neither creates nor acquires the
+mutation lock, including when another writer holds it. Surplus arguments are
+operational Usage (status 64 with route help), after flake preflight and before
+lock reading or Nix construction.
+
+The focused channel oracle preserves 20 reviewed Ruby observations separately
+from the original 372 cases. Integer mapping failures and native ENOENT lock
+reads retain their original primary messages; ENOENT includes the attempted
+absolute path's native bytes. The boxed lock context has redacted Debug/Display
+and retains the typed source. **LOCK-JSON-01** intentionally changes only the
+observed corrupt first-object-key diagnostic to
+`invalid JSON in flake.lock at line {line} column {column}`, using structured
+serde coordinates. Its full candidate expectation is separate from the unchanged
+Ruby result. This one case establishes no general Ruby/serde parse acceptance,
+coordinate, other syntax, scalar or I/O diagnostic equivalence. The comparator
+checks complete streams/status, child order/argv/cwd and non-log file effects,
+plus retained log names/modes; raw log bodies remain separate evidence.
 
 Nix child failures with complete captures preserve the baseline command escaping,
 native exit or signal value and separate stdout/stderr diagnostics. Error

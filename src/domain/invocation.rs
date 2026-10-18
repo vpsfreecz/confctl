@@ -215,6 +215,7 @@ pub enum Action {
     },
     ChannelList {
         pattern: Option<String>,
+        has_extra_arguments: bool,
     },
     ChannelUpdate {
         channels: String,

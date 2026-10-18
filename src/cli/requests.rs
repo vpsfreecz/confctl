@@ -124,7 +124,10 @@ pub(super) fn build(v: &Values<'_>) -> Result<Action, CliFailure> {
             revision: v.required(1)?,
             changes: v.changes(),
         },
-        "inputs channel ls" => Action::ChannelList { pattern: v.arg(0)? },
+        "inputs channel ls" => Action::ChannelList {
+            pattern: v.arg(0)?,
+            has_extra_arguments: v.positional.len() > 1,
+        },
         "inputs channel update" => Action::ChannelUpdate {
             channels: v.required(0)?,
             role: v.arg(1)?,

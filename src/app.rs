@@ -1,6 +1,7 @@
-//! Thin invocation construction and joined shutdown. Operation adapters are
-//! deliberately absent at this milestone; no Ruby fallback is hidden here.
+//! Thin invocation construction and joined shutdown around typed operations.
 
+#[cfg(all(test, target_os = "linux"))]
+mod channel_tests;
 mod diagnostic;
 mod invocation_log;
 mod signals;
@@ -291,13 +292,25 @@ async fn execute<O: Operations>(
         Err(error) => {
             let exit = if error.is_cancelled() {
                 ExitDisposition::canceled(130)
+            } else if operational_usage(&error) {
+                ExitDisposition::failed(64)
             } else {
                 ExitDisposition::failed(1)
             };
             (exit, Some(error.with_secondary(cleanup)))
         }
     };
-    if let Some(error) = error {
+    if let Some(mut error) = error {
+        if operational_usage(&error) {
+            let help = cli::display_help(invocation.action.name());
+            if let Err(source) = write_bytes(&stdout, &help.stdout) {
+                error = error.with_secondary(vec![ConfctlError::Io {
+                    operation: "write operational usage help",
+                    path: None,
+                    source,
+                }]);
+            }
+        }
         report_error(error, Some(invocation_log), &stderr);
     } else if let Err(failure) = invocation_log.finish(None, false) {
         disposition = ExitDisposition::failed(1);
@@ -319,6 +332,18 @@ async fn execute<O: Operations>(
         }
     }
     disposition.code
+}
+
+fn operational_usage(error: &ConfctlError) -> bool {
+    match error {
+        ConfctlError::FlakeLockFailure(failure) => operational_usage(&failure.source),
+        ConfctlError::Usage(_) => true,
+        ConfctlError::NixCommandFailure(failure) => operational_usage(&failure.source),
+        ConfctlError::Cleanup { primary, .. } => operational_usage(primary),
+        ConfctlError::ProcessFailure { source, .. }
+        | ConfctlError::OutputFailure { source, .. } => operational_usage(source),
+        _ => false,
+    }
 }
 
 fn write_bytes(writer: &SharedWriter, bytes: &[u8]) -> io::Result<()> {
@@ -440,6 +465,9 @@ fn collect_evidence(
     process_covered: bool,
 ) {
     match error {
+        ConfctlError::FlakeLockFailure(failure) => {
+            collect_evidence(&mut failure.source, paths, failures, process_covered)
+        }
         ConfctlError::NixCommandFailure(failure) => {
             collect_evidence(&mut failure.source, paths, failures, process_covered)
         }
@@ -587,6 +615,120 @@ mod diagnostic_boundary_tests {
             Arc::new(Mutex::new(Box::new(output.clone()))),
             output,
         )
+    }
+
+    #[tokio::test]
+    async fn channel_surplus_usage_runs_after_flake_preflight_and_keeps_log_without_children() {
+        for flake in [true, false] {
+            let root = tempfile::tempdir().unwrap();
+            if flake {
+                // No lock: surplus usage must precede both lock reading and Nix.
+                std::fs::write(root.path().join("flake.nix"), "{}").unwrap();
+            }
+            let output = Buffer(Arc::new(Mutex::new(Vec::new())));
+            let error = Buffer(Arc::new(Mutex::new(Vec::new())));
+            let code = execute(
+                ["inputs", "channel", "ls", "base", "unexpected"]
+                    .map(Into::into)
+                    .to_vec(),
+                Timing::start(),
+                &crate::operations::CoreOperations,
+                Ok(root.path().into()),
+                Arc::new(Mutex::new(Box::new(output.clone()))),
+                Arc::new(Mutex::new(Box::new(error.clone()))),
+            )
+            .await;
+            let stdout = output.0.lock().unwrap().clone();
+            let stderr = String::from_utf8(error.0.lock().unwrap().clone()).unwrap();
+            assert_eq!(code, if flake { 64 } else { 1 });
+            if flake {
+                assert_eq!(stdout, cli::display_help("inputs channel ls").stdout);
+                assert!(
+                    stderr
+                        .ends_with("error: usage: confctl inputs channel ls [channel-pattern]\n\n")
+                );
+            } else {
+                assert!(stdout.is_empty());
+                assert!(stderr.contains("has no flake.nix"));
+                assert!(!stderr.contains("error: usage:"));
+            }
+            let locator = stderr
+                .lines()
+                .find_map(|line| line.strip_prefix("Log file: "))
+                .unwrap();
+            assert!(std::path::Path::new(locator).is_file());
+            assert_eq!(
+                std::fs::read_dir(root.path().join(".confctl/logs"))
+                    .unwrap()
+                    .count(),
+                1
+            );
+            assert!(!root.path().join(".confctl/mutation.lock").exists());
+            assert!(!stderr.contains("Timing:"));
+        }
+    }
+    #[test]
+    fn channel_lock_diagnostic_write_failure_keeps_primary_and_ordered_cleanup() {
+        struct FailPathOnce {
+            output: Buffer,
+            failed: bool,
+        }
+        impl Write for FailPathOnce {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                if !self.failed && bytes == b"/private/flake.lock" {
+                    self.failed = true;
+                    return Err(io::Error::other("injected lock diagnostic failure"));
+                }
+                self.output.write(bytes)
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let output = Buffer(Arc::new(Mutex::new(vec![])));
+        let stderr: SharedWriter = Arc::new(Mutex::new(Box::new(FailPathOnce {
+            output: output.clone(),
+            failed: false,
+        })));
+        let error = ConfctlError::FlakeLockFailure(Box::new(crate::error::FlakeLockFailure {
+            path: "/private/flake.lock".into(),
+            source: Box::new(ConfctlError::Io {
+                operation: "read flake.lock",
+                path: None,
+                source: io::Error::from_raw_os_error(nix::errno::Errno::ENOENT as i32),
+            }),
+        }))
+        .with_secondary(vec![ConfctlError::InputEof, ConfctlError::Cancelled]);
+        assert_eq!(report_error(error, None, &stderr), 1);
+        let bytes = output.0.lock().unwrap().clone();
+        assert!(bytes.ends_with(b"error: unable to load flake.lock\ncleanup: end of input\ncleanup: operation canceled\ncleanup: write failure diagnostic: injected lock diagnostic failure\n"));
+        assert!(
+            !bytes
+                .windows(b"/private".len())
+                .any(|bytes| bytes == b"/private")
+        );
+    }
+
+    #[test]
+    fn channel_lock_wrapper_retains_nested_process_evidence() {
+        let error = ConfctlError::FlakeLockFailure(Box::new(crate::error::FlakeLockFailure {
+            path: "/private/flake.lock".into(),
+            source: Box::new(ConfctlError::ProcessFailure {
+                source: Box::new(ConfctlError::Cancelled),
+                evidence: Box::new(crate::process::PartialProcessEvidence {
+                    status: None,
+                    stdout: Captured::Memory(b"nested lock evidence".to_vec()),
+                    stderr: Captured::Unavailable,
+                    stdout_complete: false,
+                    stderr_complete: false,
+                    log: None,
+                }),
+            }),
+        }));
+        let (error, paths) = retain_error_evidence(error);
+        assert!(error.is_cancelled());
+        assert_eq!(paths.len(), 1);
+        assert_eq!(std::fs::read(&paths[0]).unwrap(), b"nested lock evidence");
     }
     struct Failing;
     impl Operations for Failing {
