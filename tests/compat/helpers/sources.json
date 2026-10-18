@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "repository": "confctl",
+  "revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "sources": [
+    {
+      "path": "libexec/auto-rollback.rb",
+      "snapshot": "baseline/auto-rollback.rb.txt",
+      "sha256": "6ac4849a7bdbb34534c9a85a8a03584d320174f9c4a3779d53c0a5500a5d67e9"
+    },
+    {
+      "path": "nix/modules/confctl/carrier/carrier-env.rb",
+      "snapshot": "baseline/carrier-env.rb.txt",
+      "sha256": "daf8a2023ac403886855629f6df2ab30e6efc7cd9b65525bd2c773d8ed53a3e2"
+    },
+    {
+      "path": "nix/modules/confctl/carrier/netboot/build-netboot-server.rb",
+      "snapshot": "baseline/build-netboot-server.rb.txt",
+      "sha256": "5faf6d76fa78e732156afeca44f95b802cc62f7798e47ac7546c2ea107d7de6d"
+    },
+    {
+      "path": "nix/modules/confctl/kexec-netboot/kexec-netboot.rb",
+      "snapshot": "baseline/kexec-netboot.rb.txt",
+      "sha256": "b6f9ec347d5a8b23a97a4d9224688810b9346ba6241bfd894b28eb8894c1c517"
+    }
+  ]
+}

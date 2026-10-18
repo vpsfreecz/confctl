@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "repository": "vpsfree-cz-configuration",
+  "revision": "a4847bd6bbf2a62c107cff30b47452a60548a33e",
+  "sources": [
+    {
+      "path": "scripts/discover_netbootable.rb",
+      "snapshot": "baseline/discover_netbootable.rb.txt",
+      "sha256": "a94fe056a83d552d89051f044b61be6e5339638973f823e69f77bb05fe34f4e9"
+    },
+    {
+      "path": "scripts/runtime_kernels.rb",
+      "snapshot": "baseline/runtime_kernels.rb.txt",
+      "sha256": "62d5fadc65b202824fbc86f9bb4432116f45645f60fbda599ffd2bb5335f0c86"
+    }
+  ]
+}
