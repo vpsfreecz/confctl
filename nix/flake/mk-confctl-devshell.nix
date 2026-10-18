@@ -19,6 +19,10 @@ pkgs.mkShell {
     pkgs.less
     pkgs.nixfmt
     pkgs.nixfmt-tree
+    pkgs.rustc
+    pkgs.cargo
+    pkgs.rustfmt
+    pkgs.clippy
   ]
   ++ extraPackages;
 
