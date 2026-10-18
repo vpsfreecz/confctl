@@ -12,6 +12,29 @@ fn action(words: &[&str]) -> Action {
 }
 
 #[test]
+fn channel_list_retains_operational_surplus_arguments_and_configuration_free_help() {
+    assert_eq!(
+        action(&["inputs", "channel", "ls", "base", "unexpected"]),
+        Action::ChannelList {
+            pattern: Some("base".into()),
+            has_extra_arguments: true,
+        }
+    );
+    assert_eq!(
+        action(&["inputs", "channel", "ls"]),
+        Action::ChannelList {
+            pattern: None,
+            has_extra_arguments: false,
+        }
+    );
+    let ParseOutcome::Display(help) = parse_words(&["inputs", "channel", "ls", "--help"]).unwrap()
+    else {
+        panic!("help must not admit the operation")
+    };
+    assert_eq!(help, display_help("inputs channel ls"));
+}
+
+#[test]
 fn every_frozen_route_help_and_option_probe_matches_static_baseline() {
     let manifest: serde_json::Value =
         serde_json::from_str(include_str!("../../tests/compat/core/coverage.json")).unwrap();

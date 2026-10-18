@@ -1,0 +1,64 @@
+{
+  "decision": "LOCK-JSON-01",
+  "case": "channels-corrupt-lock",
+  "baseline_sha256": "63dde3c5f88f10604c5683ae512c2ec70c4c9c9dabbef2ab70a548afc16d371d",
+  "changed_fields": [
+    "stderr"
+  ],
+  "scope": "Only the observed corrupt first object key; no other syntax, coordinate, scalar or I/O parity claim. Full candidate frame compared without filtering.",
+  "expected": {
+    "events": "[]",
+    "exit": 1,
+    "files": {
+      ".confctl/generations/alpha/2000-01-01--00-00-00/auto_rollback": {
+        "link": "<CASE>/store/rollback"
+      },
+      ".confctl/generations/alpha/2000-01-01--00-00-00/generation.json": {
+        "mode": "0o644",
+        "text": "{\n  \"mode\": \"flakes\",\n  \"date\": \"2000-01-01T00:00:00Z\",\n  \"toplevel\": \"<CASE>/store/system\",\n  \"auto_rollback\": \"<CASE>/store/rollback\",\n  \"inputs\": {\n    \"nixpkgs\": \"<CASE>/store/input\"\n  },\n  \"inputs_info\": {\n    \"nixpkgs\": {\n      \"input\": \"nixpkgs\",\n      \"rev\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"shortRev\": \"aaaaaaaa\",\n      \"url\": \"github:fixture/nixpkgs\"\n    }\n  }\n}\n"
+      },
+      ".confctl/generations/alpha/2000-01-01--00-00-00/nixpkgs.input": {
+        "link": "<CASE>/store/input"
+      },
+      ".confctl/generations/alpha/2000-01-01--00-00-00/toplevel": {
+        "link": "<CASE>/store/system"
+      },
+      ".confctl/generations/alpha/current": {
+        "link": "2000-01-01--00-00-00"
+      },
+      "cluster/alpha/config.nix": {
+        "mode": "0o644",
+        "text": "{}\n"
+      },
+      "cluster/alpha/module.nix": {
+        "mode": "0o644",
+        "text": "{}\n"
+      },
+      "cluster/nested/beta/config.nix": {
+        "mode": "0o644",
+        "text": "{}\n"
+      },
+      "cluster/nested/beta/module.nix": {
+        "mode": "0o644",
+        "text": "{}\n"
+      },
+      "flake.lock": {
+        "mode": "0o644",
+        "text": "{bad\n"
+      },
+      "flake.nix": {
+        "mode": "0o644",
+        "text": "{ outputs = _: {}; }\n"
+      }
+    },
+    "retained_logs": [
+      {
+        "mode": "0o644",
+        "path": ".confctl/logs/<LOG-TIME>-confctl-inputs-channel-ls.log"
+      }
+    ],
+    "signal": null,
+    "stderr": "\nLog file: <CASE>/conf/.confctl/logs/<LOG-TIME>-confctl-inputs-channel-ls.log\nerror: invalid JSON in flake.lock at line 1 column 2\n",
+    "stdout": ""
+  }
+}

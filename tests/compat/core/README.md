@@ -125,3 +125,24 @@ python3 tests/compat/core/qualify_settings.py --candidate /absolute/path/to/conf
 Recording requires `--record-output` and always invokes the archived Ruby
 baseline. Review the source and raw evidence before promoting new expectations;
 the original 372-case manifest remains unchanged.
+
+`qualify_channels.py` compares 20 additional full `inputs channel ls` routes in
+`expected-channels`, bound by `channels-manifest.json`. These cover selection
+order/duplicates, empty and array mappings, typed non-string inputs, the separate
+settings lifetimes, each child failure, lock errors, operational surplus Usage
+and a held cooperating writer. It checks all child events and non-log effects;
+retained log names/modes are exact, while raw log bodies are saved separately.
+The writer fixture asserts the existing mutation lock's device/inode/content
+are unchanged; fresh roots must not create one.
+
+```sh
+python3 tests/compat/core/qualify_channels.py --candidate /absolute/path/to/confctl-rust --evidence /owned/evidence/raw
+```
+
+Only candidate comparison of `channels-corrupt-lock` selects the separate full
+`expected-channels-candidate/LOCK-JSON-01.json` frame. This named decision uses
+structured serde coordinates in the accepted diagnostic for the observed
+invalid first object key. Its baseline hash and sole changed stderr field are
+checked; actual output is never filtered. Ruby recording/replay uses the
+unchanged original expectation. No wider syntax, coordinate or other I/O/scalar
+diagnostic parity follows from this case.

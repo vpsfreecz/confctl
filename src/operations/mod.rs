@@ -14,7 +14,10 @@ use crate::{
 pub struct CoreOperations;
 impl Operations for CoreOperations {
     fn available(&self, action: &Action) -> bool {
-        matches!(action, Action::InputsList { .. } | Action::List { .. })
+        matches!(
+            action,
+            Action::InputsList { .. } | Action::List { .. } | Action::ChannelList { .. }
+        )
     }
     async fn run(
         &self,
@@ -26,6 +29,10 @@ impl Operations for CoreOperations {
             Action::InputsList { pattern } => {
                 inputs::list(&root, pattern.as_deref(), &context.events).await?
             }
+            Action::ChannelList {
+                pattern,
+                has_extra_arguments,
+            } => inputs::channels(&root, pattern.as_deref(), *has_extra_arguments, context).await?,
             Action::List { .. } => machines::list(&invocation.action, root, context).await?,
             action => {
                 return Err(ConfctlError::Configuration(format!(

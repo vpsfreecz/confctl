@@ -1,0 +1,14 @@
+{
+  "events": "[]",
+  "exit": 1,
+  "files": {},
+  "retained_logs": [
+    {
+      "mode": "0o644",
+      "path": ".confctl/logs/<LOG-TIME>-confctl-inputs-channel-ls.log"
+    }
+  ],
+  "signal": null,
+  "stderr": "\nLog file: <CASE>/conf/.confctl/logs/<LOG-TIME>-confctl-inputs-channel-ls.log\nerror: <CASE>/conf has no flake.nix; migrate software-pin configurations with confctl v3 before using this version (see docs/swpins-to-flakes.md)\n",
+  "stdout": ""
+}

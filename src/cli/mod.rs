@@ -398,7 +398,7 @@ fn help_text(path: &str) -> String {
             .collect::<String>()
     )
 }
-fn display_help(path: &str) -> CliDisplay {
+pub(crate) fn display_help(path: &str) -> CliDisplay {
     CliDisplay {
         stdout: help_text(path).into_bytes(),
         stderr: vec![],
