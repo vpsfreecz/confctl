@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 0,
+  "files": {},
+  "signal": null,
+  "stderr": "",
+  "stdout": "NAME\n    set - Set inputs referenced by channels for a role to a specific revision\n\nSYNOPSIS\n\n    confctl [global options] inputs channel set [command options] <channels> <role> <rev>\n\nCOMMAND OPTIONS\n    --[no-]allow_shared  - Allow setting inputs shared with other channels/roles\n    --[no-]changelog     - (default: enabled)\n    --[no-]commit        - \n    -d, --[no-]downgrade - \n    --[no-]editor        - (default: enabled)\n\n"
+}

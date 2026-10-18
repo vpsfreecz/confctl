@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 0,
+  "files": {},
+  "signal": null,
+  "stderr": "",
+  "stdout": "NAME\n    rediscover - Update cluster machine list with contents of cluster/\n\nSYNOPSIS\n\n    confctl [global options] rediscover \n"
+}

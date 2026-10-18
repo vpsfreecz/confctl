@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 0,
+  "files": {},
+  "signal": null,
+  "stderr": "",
+  "stdout": "NAME\n    update - Update the input used by a specific machine for a specific role\n\nSYNOPSIS\n\n    confctl [global options] inputs machine update [command options] <machine> <role>\n\nCOMMAND OPTIONS\n    --[no-]changelog     - (default: enabled)\n    --[no-]commit        - \n    -d, --[no-]downgrade - \n    --[no-]editor        - (default: enabled)\n\n"
+}

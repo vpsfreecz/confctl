@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 0,
+  "files": {},
+  "signal": null,
+  "stderr": "",
+  "stdout": "NAME\n    rm - Remove machine generations\n\nSYNOPSIS\n\n    confctl [global options] generation rm [command options] [machine-pattern [generation-pattern|old]]\n\nCOMMAND OPTIONS\n    -a, --attr=arg                    - Filter by attribute (may be used more\n                                        than once, default: none)\n    --[no-]gc, --[no-]collect-garbage - Run nix-collect-garbage to delete\n                                        unreachable store paths (default:\n                                        enabled)\n    -l, --[no-]local                  - List local build generations\n    --max-concurrent-gc=n             - Max number of concurrent\n                                        nix-collect-garbage processes (default:\n                                        5)\n    -r, --[no-]remote                 - List remote machine generations\n    -t, --tag=arg                     - Filter by tag (may be used more than\n                                        once, default: none)\n    -y, --[no-]yes                    - Assume the answer to confirmations is\n                                        yes\n\n"
+}

@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 0,
+  "files": {},
+  "signal": null,
+  "stderr": "",
+  "stdout": "NAME\n    update - Update inputs referenced by channels (optionally only a single\n             role)\n\nSYNOPSIS\n\n    confctl [global options] inputs channel update [command options] <channels> [role]\n\nCOMMAND OPTIONS\n    --[no-]changelog     - (default: enabled)\n    --[no-]commit        - \n    -d, --[no-]downgrade - \n    --[no-]editor        - (default: enabled)\n\n"
+}

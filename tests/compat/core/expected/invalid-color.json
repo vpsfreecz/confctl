@@ -1,0 +1,49 @@
+{
+  "events": "[]",
+  "exit": 64,
+  "files": {
+    ".confctl/generations/alpha/2000-01-01--00-00-00/auto_rollback": {
+      "link": "<CASE>/store/rollback"
+    },
+    ".confctl/generations/alpha/2000-01-01--00-00-00/generation.json": {
+      "mode": "0o644",
+      "text": "{\n  \"mode\": \"flakes\",\n  \"date\": \"2000-01-01T00:00:00Z\",\n  \"toplevel\": \"<CASE>/store/system\",\n  \"auto_rollback\": \"<CASE>/store/rollback\",\n  \"inputs\": {\n    \"nixpkgs\": \"<CASE>/store/input\"\n  },\n  \"inputs_info\": {\n    \"nixpkgs\": {\n      \"input\": \"nixpkgs\",\n      \"rev\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"shortRev\": \"aaaaaaaa\",\n      \"url\": \"github:fixture/nixpkgs\"\n    }\n  }\n}\n"
+    },
+    ".confctl/generations/alpha/2000-01-01--00-00-00/nixpkgs.input": {
+      "link": "<CASE>/store/input"
+    },
+    ".confctl/generations/alpha/2000-01-01--00-00-00/toplevel": {
+      "link": "<CASE>/store/system"
+    },
+    ".confctl/generations/alpha/current": {
+      "link": "2000-01-01--00-00-00"
+    },
+    "cluster/alpha/config.nix": {
+      "mode": "0o644",
+      "text": "{}\n"
+    },
+    "cluster/alpha/module.nix": {
+      "mode": "0o644",
+      "text": "{}\n"
+    },
+    "cluster/nested/beta/config.nix": {
+      "mode": "0o644",
+      "text": "{}\n"
+    },
+    "cluster/nested/beta/module.nix": {
+      "mode": "0o644",
+      "text": "{}\n"
+    },
+    "flake.lock": {
+      "mode": "0o644",
+      "text": "{\n  \"version\": 7,\n  \"root\": \"root\",\n  \"nodes\": {\n    \"root\": {\n      \"inputs\": {\n        \"nixpkgs\": \"nixpkgs\"\n      }\n    },\n    \"nixpkgs\": {\n      \"original\": {\n        \"type\": \"github\",\n        \"owner\": \"fixture\",\n        \"repo\": \"nixpkgs\",\n        \"ref\": \"main\"\n      },\n      \"locked\": {\n        \"type\": \"github\",\n        \"owner\": \"fixture\",\n        \"repo\": \"nixpkgs\",\n        \"rev\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n      }\n    }\n  }\n}\n"
+    },
+    "flake.nix": {
+      "mode": "0o644",
+      "text": "{ outputs = _: {}; }\n"
+    }
+  },
+  "signal": null,
+  "stderr": "error: invalid argument: --color rainbow\n\n",
+  "stdout": "NAME\n    confctl - Nix deployment configuration management tool\n\n\nSYNOPSIS\n    confctl [global options] command [command options] [arguments...]\n\n\nGLOBAL OPTIONS\n    -c, --color=arg - Toggle color mode (default: auto)\n    --help          - Show this message\n\n\nCOMMANDS\n    add             - Add a new machine\n    build           - Build target systems\n    changelog       - Changelog between deployed and configured input roles\n    collect-garbage - Run nix-collect-garbage to deleted unreachable store paths\n    cssh            - Open ClusterSSH\n    deploy          - Deploy target systems\n    diff            - Diff between deployed and configured input roles\n    gen-data        - Generate data files\n    generation      - Manage built machine generations\n    health-check    - Run machine health-checks\n    help            - Shows a list of commands or help for one command\n    init            - Create a new configuration\n    inputs          - Manage flake inputs\n    ls              - List configured machines\n    rediscover      - Update cluster machine list with contents of cluster/\n    rename          - Rename an existing machine\n    ssh             - Run command over SSH\n    status          - Check machine status\n    test-connection - Test SSH connection\n"
+}

@@ -1,0 +1,49 @@
+{
+  "events": "[]",
+  "exit": 64,
+  "files": {
+    ".confctl/generations/alpha/2000-01-01--00-00-00/auto_rollback": {
+      "link": "<CASE>/store/rollback"
+    },
+    ".confctl/generations/alpha/2000-01-01--00-00-00/generation.json": {
+      "mode": "0o644",
+      "text": "{\n  \"mode\": \"flakes\",\n  \"date\": \"2000-01-01T00:00:00Z\",\n  \"toplevel\": \"<CASE>/store/system\",\n  \"auto_rollback\": \"<CASE>/store/rollback\",\n  \"inputs\": {\n    \"nixpkgs\": \"<CASE>/store/input\"\n  },\n  \"inputs_info\": {\n    \"nixpkgs\": {\n      \"input\": \"nixpkgs\",\n      \"rev\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"shortRev\": \"aaaaaaaa\",\n      \"url\": \"github:fixture/nixpkgs\"\n    }\n  }\n}\n"
+    },
+    ".confctl/generations/alpha/2000-01-01--00-00-00/nixpkgs.input": {
+      "link": "<CASE>/store/input"
+    },
+    ".confctl/generations/alpha/2000-01-01--00-00-00/toplevel": {
+      "link": "<CASE>/store/system"
+    },
+    ".confctl/generations/alpha/current": {
+      "link": "2000-01-01--00-00-00"
+    },
+    "cluster/alpha/config.nix": {
+      "mode": "0o644",
+      "text": "{}\n"
+    },
+    "cluster/alpha/module.nix": {
+      "mode": "0o644",
+      "text": "{}\n"
+    },
+    "cluster/nested/beta/config.nix": {
+      "mode": "0o644",
+      "text": "{}\n"
+    },
+    "cluster/nested/beta/module.nix": {
+      "mode": "0o644",
+      "text": "{}\n"
+    },
+    "flake.lock": {
+      "mode": "0o644",
+      "text": "{\n  \"version\": 7,\n  \"root\": \"root\",\n  \"nodes\": {\n    \"root\": {\n      \"inputs\": {\n        \"nixpkgs\": \"nixpkgs\"\n      }\n    },\n    \"nixpkgs\": {\n      \"original\": {\n        \"type\": \"github\",\n        \"owner\": \"fixture\",\n        \"repo\": \"nixpkgs\",\n        \"ref\": \"main\"\n      },\n      \"locked\": {\n        \"type\": \"github\",\n        \"owner\": \"fixture\",\n        \"repo\": \"nixpkgs\",\n        \"rev\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n      }\n    }\n  }\n}\n"
+    },
+    "flake.nix": {
+      "mode": "0o644",
+      "text": "{ outputs = _: {}; }\n"
+    }
+  },
+  "signal": null,
+  "stderr": "error: invalid argument: --max-concurrent-copy many\n\n",
+  "stdout": "NAME\n    deploy - Deploy target systems\n\nSYNOPSIS\n\n    confctl [global options] deploy [command options] [machine-pattern [switch-action]]\n\nCOMMAND OPTIONS\n    -a, --attr=arg            - Filter by attribute (may be used more than once,\n                                default: none)\n    --copy-only               - Do not activate copied closures\n    --cores=number            - Number of CPU cores to be used (see nix build)\n                                (default: none)\n    --disable-auto-rollback   - Disable auto-rollback\n    --[no-]dry-activate-first - Try to dry-activate before the real switch\n    --enable-auto-rollback    - Enable auto-rollback\n    -g, --generation=arg      - Deploy selected generation (default: none)\n    --[no-]health-checks      - Toggle health checks (default: enabled)\n    -i, --[no-]interactive    - Ask for confirmation before activation\n    -j, --max-jobs=number     - Maximum number of build jobs (see nix build)\n                                (default: none)\n    --[no-]keep-going         - Do not abourt on failed health checks\n    --max-concurrent-copy=n   - Max number of concurrent nix-copy-closure\n                                processes (default: 5)\n    --[no-]one-by-one         - Copy and deploy machines one by one\n    --[no-]reboot             - Reboot target systems after deployment\n    --[no-]show-trace         - Enable traces in Nix\n    -t, --tag=arg             - Filter by tag (may be used more than once,\n                                default: none)\n    --wait-online=arg         - Wait for the machine to boot (default: 600)\n    -y, --[no-]yes            - Assume the answer to confirmations is yes\n\n"
+}

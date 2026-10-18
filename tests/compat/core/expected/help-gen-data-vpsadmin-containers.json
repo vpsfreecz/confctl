@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 0,
+  "files": {},
+  "signal": null,
+  "stderr": "",
+  "stdout": "NAME\n    containers - Generate container data files\n\nSYNOPSIS\n\n    confctl [global options] gen-data vpsadmin containers \n"
+}

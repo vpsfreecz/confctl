@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 0,
+  "files": {},
+  "signal": null,
+  "stderr": "",
+  "stdout": "NAME\n    update - Update flake inputs in flake.lock\n\nSYNOPSIS\n\n    confctl [global options] inputs update [command options] [input-name ...]\n\nCOMMAND OPTIONS\n    --[no-]all           - Update all root inputs (dangerous; normally specify\n                           names)\n    --[no-]changelog     - Include git log in the commit message (default:\n                           enabled)\n    --[no-]commit        - Commit changes to git\n    -d, --[no-]downgrade - Treat change as downgrade for changelog direction\n    --[no-]editor        - Open $EDITOR with commit message (default: enabled)\n\n"
+}

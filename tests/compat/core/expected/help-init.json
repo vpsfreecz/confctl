@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 0,
+  "files": {},
+  "signal": null,
+  "stderr": "",
+  "stdout": "NAME\n    init - Create a new configuration\n\nSYNOPSIS\n\n    confctl [global options] init \n"
+}

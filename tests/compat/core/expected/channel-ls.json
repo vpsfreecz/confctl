@@ -1,0 +1,49 @@
+{
+  "events": "[{\"argv\": [\"eval\", \"--json\", \"--no-write-lock-file\", \"--no-update-lock-file\", \"--option\", \"max-jobs\", \"auto\", \".#confctl.settings\"], \"program\": \"nix\", \"stdin_hex\": \"\"}, {\"argv\": [\"eval\", \"--json\", \"--no-write-lock-file\", \"--no-update-lock-file\", \"--option\", \"max-jobs\", \"auto\", \".#confctl.settings\"], \"program\": \"nix\", \"stdin_hex\": \"\"}, {\"argv\": [\"eval\", \"--json\", \"--no-write-lock-file\", \"--no-update-lock-file\", \"--option\", \"max-jobs\", \"auto\", \".#confctl.channels\"], \"program\": \"nix\", \"stdin_hex\": \"\"}]",
+  "exit": 0,
+  "files": {
+    ".confctl/generations/alpha/2000-01-01--00-00-00/auto_rollback": {
+      "link": "<CASE>/store/rollback"
+    },
+    ".confctl/generations/alpha/2000-01-01--00-00-00/generation.json": {
+      "mode": "0o644",
+      "text": "{\n  \"mode\": \"flakes\",\n  \"date\": \"2000-01-01T00:00:00Z\",\n  \"toplevel\": \"<CASE>/store/system\",\n  \"auto_rollback\": \"<CASE>/store/rollback\",\n  \"inputs\": {\n    \"nixpkgs\": \"<CASE>/store/input\"\n  },\n  \"inputs_info\": {\n    \"nixpkgs\": {\n      \"input\": \"nixpkgs\",\n      \"rev\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"shortRev\": \"aaaaaaaa\",\n      \"url\": \"github:fixture/nixpkgs\"\n    }\n  }\n}\n"
+    },
+    ".confctl/generations/alpha/2000-01-01--00-00-00/nixpkgs.input": {
+      "link": "<CASE>/store/input"
+    },
+    ".confctl/generations/alpha/2000-01-01--00-00-00/toplevel": {
+      "link": "<CASE>/store/system"
+    },
+    ".confctl/generations/alpha/current": {
+      "link": "2000-01-01--00-00-00"
+    },
+    "cluster/alpha/config.nix": {
+      "mode": "0o644",
+      "text": "{}\n"
+    },
+    "cluster/alpha/module.nix": {
+      "mode": "0o644",
+      "text": "{}\n"
+    },
+    "cluster/nested/beta/config.nix": {
+      "mode": "0o644",
+      "text": "{}\n"
+    },
+    "cluster/nested/beta/module.nix": {
+      "mode": "0o644",
+      "text": "{}\n"
+    },
+    "flake.lock": {
+      "mode": "0o644",
+      "text": "{\n  \"version\": 7,\n  \"root\": \"root\",\n  \"nodes\": {\n    \"root\": {\n      \"inputs\": {\n        \"nixpkgs\": \"nixpkgs\"\n      }\n    },\n    \"nixpkgs\": {\n      \"original\": {\n        \"type\": \"github\",\n        \"owner\": \"fixture\",\n        \"repo\": \"nixpkgs\",\n        \"ref\": \"main\"\n      },\n      \"locked\": {\n        \"type\": \"github\",\n        \"owner\": \"fixture\",\n        \"repo\": \"nixpkgs\",\n        \"rev\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n      }\n    }\n  }\n}\n"
+    },
+    "flake.nix": {
+      "mode": "0o644",
+      "text": "{ outputs = _: {}; }\n"
+    }
+  },
+  "signal": null,
+  "stderr": "",
+  "stdout": "CHANNEL   ROLE      INPUT     REV        URL\nbase      nixpkgs   nixpkgs   aaaaaaaa   https://github.com/fixture/nixpkgs\nother     nixpkgs   nixpkgs   aaaaaaaa   https://github.com/fixture/nixpkgs\n"
+}
