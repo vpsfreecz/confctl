@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 0,
+  "files": {},
+  "signal": null,
+  "stderr": "",
+  "stdout": "NAME\n    rename - Rename an existing machine\n\nSYNOPSIS\n\n    confctl [global options] rename <old-name> <new-name>\n"
+}

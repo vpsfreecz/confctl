@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 0,
+  "files": {},
+  "signal": null,
+  "stderr": "",
+  "stdout": "NAME\n    ls - List configured machines\n\nSYNOPSIS\n\n    confctl [global options] ls [command options] [machine-pattern]\n\nCOMMAND OPTIONS\n    -H, --[no-]hide-header - Do not show the header\n    -L, --list             - List possible attributes to output\n    -a, --attr=arg         - Filter by attribute (may be used more than once,\n                             default: none)\n    --managed=arg          - Filter (un)managed machines (default: none)\n    -o, --output=arg       - Select attributes to output (default: none)\n    --[no-]show-trace      - Enable traces in Nix\n    -t, --tag=arg          - Filter by tag (may be used more than once, default:\n                             none)\n\n"
+}

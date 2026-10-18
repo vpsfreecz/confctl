@@ -1,0 +1,5422 @@
+{
+  "baseline_defects": {
+    "GC-01": {
+      "candidate_child_failure_exit": 1,
+      "candidate_success_exit": 0,
+      "cases": [
+        "gc-baseline-line-error",
+        "gc-child-failure"
+      ]
+    }
+  },
+  "baseline_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "cases": [
+    {
+      "argv": [
+        "init",
+        "--help"
+      ],
+      "id": "help-init",
+      "mode": "normal",
+      "route": "init",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "add",
+        "--help"
+      ],
+      "id": "help-add",
+      "mode": "normal",
+      "route": "add",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "rename",
+        "--help"
+      ],
+      "id": "help-rename",
+      "mode": "normal",
+      "route": "rename",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "rediscover",
+        "--help"
+      ],
+      "id": "help-rediscover",
+      "mode": "normal",
+      "route": "rediscover",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "ls",
+        "--help"
+      ],
+      "id": "help-inputs-ls",
+      "mode": "normal",
+      "route": "inputs ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "--help"
+      ],
+      "id": "help-inputs-update",
+      "mode": "normal",
+      "route": "inputs update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "set",
+        "--help"
+      ],
+      "id": "help-inputs-set",
+      "mode": "normal",
+      "route": "inputs set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "ls",
+        "--help"
+      ],
+      "id": "help-inputs-channel-ls",
+      "mode": "normal",
+      "route": "inputs channel ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "update",
+        "--help"
+      ],
+      "id": "help-inputs-channel-update",
+      "mode": "normal",
+      "route": "inputs channel update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "set",
+        "--help"
+      ],
+      "id": "help-inputs-channel-set",
+      "mode": "normal",
+      "route": "inputs channel set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "update",
+        "--help"
+      ],
+      "id": "help-inputs-machine-update",
+      "mode": "normal",
+      "route": "inputs machine update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "set",
+        "--help"
+      ],
+      "id": "help-inputs-machine-set",
+      "mode": "normal",
+      "route": "inputs machine set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "--help"
+      ],
+      "id": "help-ls",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "--help"
+      ],
+      "id": "help-build",
+      "mode": "normal",
+      "route": "build",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--help"
+      ],
+      "id": "help-deploy",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "health-check",
+        "--help"
+      ],
+      "id": "help-health-check",
+      "mode": "normal",
+      "route": "health-check",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "status",
+        "--help"
+      ],
+      "id": "help-status",
+      "mode": "normal",
+      "route": "status",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "--help"
+      ],
+      "id": "help-changelog",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "--help"
+      ],
+      "id": "help-diff",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "test-connection",
+        "--help"
+      ],
+      "id": "help-test-connection",
+      "mode": "normal",
+      "route": "test-connection",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "--help"
+      ],
+      "id": "help-ssh",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "cssh",
+        "--help"
+      ],
+      "id": "help-cssh",
+      "mode": "normal",
+      "route": "cssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "ls",
+        "--help"
+      ],
+      "id": "help-generation-ls",
+      "mode": "normal",
+      "route": "generation ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "--help"
+      ],
+      "id": "help-generation-rm",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "--help"
+      ],
+      "id": "help-generation-rotate",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "collect-garbage",
+        "--help"
+      ],
+      "id": "help-collect-garbage",
+      "mode": "normal",
+      "route": "collect-garbage",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "gen-data",
+        "vpsadmin",
+        "all",
+        "--help"
+      ],
+      "id": "help-gen-data-vpsadmin-all",
+      "mode": "normal",
+      "route": "gen-data vpsadmin all",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "gen-data",
+        "vpsadmin",
+        "containers",
+        "--help"
+      ],
+      "id": "help-gen-data-vpsadmin-containers",
+      "mode": "normal",
+      "route": "gen-data vpsadmin containers",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "gen-data",
+        "vpsadmin",
+        "network",
+        "--help"
+      ],
+      "id": "help-gen-data-vpsadmin-network",
+      "mode": "normal",
+      "route": "gen-data vpsadmin network",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "--help"
+      ],
+      "id": "root-help",
+      "mode": "normal",
+      "route": null,
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [],
+      "id": "default-help",
+      "mode": "normal",
+      "route": null,
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "help",
+        "-c"
+      ],
+      "id": "help-completion",
+      "mode": "normal",
+      "route": null,
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "--version"
+      ],
+      "id": "version",
+      "mode": "normal",
+      "route": null,
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "unknown"
+      ],
+      "id": "unknown-command",
+      "mode": "normal",
+      "route": null,
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "c"
+      ],
+      "id": "ambiguous-prefix",
+      "mode": "normal",
+      "route": null,
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "redi"
+      ],
+      "id": "unique-prefix",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "-h"
+      ],
+      "id": "leaf-short-help",
+      "mode": "normal",
+      "route": null,
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "--color",
+        "rainbow",
+        "ls"
+      ],
+      "id": "invalid-color",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "add",
+        "alpha",
+        "--yes"
+      ],
+      "id": "options-after-args",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--max-concurrent-copy",
+        "many"
+      ],
+      "id": "integer-invalid",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--outdated"
+      ],
+      "id": "deploy-manual-only-outdated",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "set",
+        "--allow-shared",
+        "base",
+        "nixpkgs",
+        "next"
+      ],
+      "id": "channel-set-hyphen",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "set",
+        "--allow_shared",
+        "base",
+        "nixpkgs",
+        "next"
+      ],
+      "id": "channel-set-underscore",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "init"
+      ],
+      "id": "init",
+      "mode": "normal",
+      "route": "init",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "init"
+      ],
+      "id": "init-not-empty",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "add",
+        "nested/new"
+      ],
+      "id": "add",
+      "mode": "normal",
+      "route": "add",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "add"
+      ],
+      "id": "add-missing",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "rename",
+        "alpha",
+        "nested/renamed"
+      ],
+      "id": "rename",
+      "mode": "normal",
+      "route": "rename",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "rediscover"
+      ],
+      "id": "rediscover",
+      "mode": "normal",
+      "route": "rediscover",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls"
+      ],
+      "id": "ls-default",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "--managed",
+        "all"
+      ],
+      "id": "ls-all",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "-H",
+        "-o",
+        "name,host.target",
+        "-a",
+        "spin=nixos",
+        "-t",
+        "prod",
+        "a*"
+      ],
+      "id": "ls-filter",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "--no-hide-header",
+        "-a",
+        "spin!=vpsadminos",
+        "-t",
+        "^other",
+        "alpha-key"
+      ],
+      "id": "ls-negative-filters",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "-L"
+      ],
+      "id": "ls-list-attributes",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "alpha",
+        "ignored"
+      ],
+      "id": "ls-surplus",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "ls"
+      ],
+      "id": "inputs-ls",
+      "mode": "normal",
+      "route": "inputs ls",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "nixpkgs"
+      ],
+      "id": "inputs-update",
+      "mode": "normal",
+      "route": "inputs update",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "--all"
+      ],
+      "id": "inputs-update-all",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update"
+      ],
+      "id": "inputs-update-needs-name",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "nixpkgs"
+      ],
+      "id": "inputs-update-cached-warning",
+      "mode": "cached-warning",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "--commit",
+        "--no-changelog",
+        "--no-editor",
+        "nixpkgs"
+      ],
+      "id": "inputs-update-commit",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "set",
+        "--no-commit",
+        "--no-editor",
+        "nixpkgs",
+        "next"
+      ],
+      "id": "inputs-set",
+      "mode": "normal",
+      "route": "inputs set",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "ls"
+      ],
+      "id": "channel-ls",
+      "mode": "normal",
+      "route": "inputs channel ls",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "update",
+        "base",
+        "nixpkgs"
+      ],
+      "id": "channel-update",
+      "mode": "normal",
+      "route": "inputs channel update",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "set",
+        "base",
+        "nixpkgs",
+        "next"
+      ],
+      "id": "channel-set-shared-refusal",
+      "mode": "normal",
+      "route": "inputs channel set",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "update",
+        "alpha",
+        "nixpkgs"
+      ],
+      "id": "machine-update",
+      "mode": "normal",
+      "route": "inputs machine update",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "set",
+        "alpha",
+        "nixpkgs",
+        "next"
+      ],
+      "id": "machine-set",
+      "mode": "normal",
+      "route": "inputs machine set",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "--yes",
+        "--show-trace",
+        "--max-jobs",
+        "2",
+        "--cores",
+        "3",
+        "alpha"
+      ],
+      "id": "build-reuse",
+      "mode": "normal",
+      "route": "build",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "alpha"
+      ],
+      "id": "build-decline",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": "n\n"
+    },
+    {
+      "argv": [
+        "build",
+        "alpha"
+      ],
+      "id": "build-blank-then-decline",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": "\nn\n"
+    },
+    {
+      "argv": [
+        "build",
+        "alpha"
+      ],
+      "id": "build-eof",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "--no-yes",
+        "alpha"
+      ],
+      "id": "build-no-yes",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": "n\n"
+    },
+    {
+      "argv": [
+        "build",
+        "-y",
+        "alpha"
+      ],
+      "id": "build-child-failure",
+      "mode": "build-failure",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "-y",
+        "absent"
+      ],
+      "id": "build-no-machine",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "-y",
+        "-g",
+        "current",
+        "alpha"
+      ],
+      "id": "deploy-switch",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "-y",
+        "-g",
+        "current",
+        "alpha",
+        "test"
+      ],
+      "id": "deploy-test",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "-y",
+        "-g",
+        "current",
+        "alpha",
+        "dry-activate"
+      ],
+      "id": "deploy-dry",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "-y",
+        "-g",
+        "current",
+        "alpha",
+        "boot"
+      ],
+      "id": "deploy-boot",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "-y",
+        "--copy-only",
+        "-g",
+        "current",
+        "alpha"
+      ],
+      "id": "deploy-copy-only",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "-y",
+        "-g",
+        "current",
+        "alpha"
+      ],
+      "id": "deploy-current-skip",
+      "mode": "current",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "-y",
+        "alpha",
+        "invalid"
+      ],
+      "id": "deploy-invalid-action",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--reboot",
+        "alpha"
+      ],
+      "id": "deploy-invalid-reboot",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--reboot",
+        "--wait-online",
+        "bad",
+        "alpha",
+        "boot"
+      ],
+      "id": "deploy-invalid-wait",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "health-check",
+        "-y",
+        "alpha"
+      ],
+      "id": "health-success",
+      "mode": "normal",
+      "route": "health-check",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "status",
+        "-y",
+        "-g",
+        "current",
+        "alpha"
+      ],
+      "id": "status-current",
+      "mode": "normal",
+      "route": "status",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "status",
+        "-y",
+        "-g",
+        "none",
+        "alpha"
+      ],
+      "id": "status-none",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "status",
+        "-y",
+        "-g",
+        "none",
+        "alpha"
+      ],
+      "id": "status-offline",
+      "mode": "offline",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "-y",
+        "alpha"
+      ],
+      "id": "changelog-no-changes",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "-y",
+        "alpha"
+      ],
+      "id": "diff-no-changes",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "test-connection",
+        "-y",
+        "alpha"
+      ],
+      "id": "connection-success",
+      "mode": "normal",
+      "route": "test-connection",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "test-connection",
+        "-y",
+        "alpha"
+      ],
+      "id": "connection-failed-host",
+      "mode": "offline",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "-y",
+        "alpha",
+        "printf",
+        "%s",
+        "space ; $literal"
+      ],
+      "id": "ssh-success",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "-y",
+        "alpha",
+        "false"
+      ],
+      "id": "ssh-nonzero",
+      "mode": "ssh-failure",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "-y",
+        "--parallel",
+        "--aggregate",
+        "alpha",
+        "printf",
+        "same"
+      ],
+      "id": "ssh-aggregate",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "-y",
+        "--input-string",
+        "hello\n",
+        "alpha",
+        "cat"
+      ],
+      "id": "ssh-input",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "--input-string",
+        "data",
+        "--input-file",
+        "input.txt",
+        "alpha",
+        "cat"
+      ],
+      "id": "ssh-input-conflict",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "-y",
+        "alpha"
+      ],
+      "id": "ssh-interactive",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "cssh",
+        "-y",
+        "alpha"
+      ],
+      "id": "cssh",
+      "mode": "normal",
+      "route": "cssh",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "ls",
+        "alpha"
+      ],
+      "id": "generation-list",
+      "mode": "normal",
+      "route": "generation ls",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "ls",
+        "alpha",
+        "0"
+      ],
+      "id": "generation-numeric",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "ls",
+        "alpha",
+        "current"
+      ],
+      "id": "generation-invalid-current",
+      "mode": "invalid-current",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "ls",
+        "alpha",
+        "0"
+      ],
+      "id": "generation-unsupported-numeric",
+      "mode": "unsupported",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "-y",
+        "alpha",
+        "old"
+      ],
+      "id": "generation-rm-old-empty",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "-y",
+        "--remote",
+        "--no-gc",
+        "alpha",
+        "old"
+      ],
+      "id": "generation-remote-rm",
+      "mode": "normal",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "-y",
+        "alpha"
+      ],
+      "id": "generation-rotate-empty",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "collect-garbage",
+        "-y",
+        "alpha"
+      ],
+      "id": "gc-baseline-line-error",
+      "mode": "normal",
+      "route": "collect-garbage",
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "collect-garbage",
+        "-y",
+        "alpha"
+      ],
+      "id": "gc-child-failure",
+      "mode": "gc-failure",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "gen-data",
+        "vpsadmin",
+        "all"
+      ],
+      "id": "gen-data-all",
+      "mode": "api",
+      "route": "gen-data vpsadmin all",
+      "setup": "cluster",
+      "stdin": "fixture-user\nfixture-password\n123456\n"
+    },
+    {
+      "argv": [
+        "gen-data",
+        "vpsadmin",
+        "containers"
+      ],
+      "id": "gen-data-containers",
+      "mode": "api",
+      "route": "gen-data vpsadmin containers",
+      "setup": "cluster",
+      "stdin": "fixture-user\nfixture-password\n123456\n"
+    },
+    {
+      "argv": [
+        "gen-data",
+        "vpsadmin",
+        "network"
+      ],
+      "id": "gen-data-network",
+      "mode": "api",
+      "route": "gen-data vpsadmin network",
+      "setup": "cluster",
+      "stdin": "fixture-user\nfixture-password\n123456\n"
+    },
+    {
+      "argv": [
+        "gen-data",
+        "vpsadmin",
+        "network"
+      ],
+      "id": "gen-data-auth-error",
+      "mode": "api-auth-error",
+      "route": null,
+      "setup": "cluster",
+      "stdin": "fixture-user\nfixture-password\n"
+    },
+    {
+      "argv": [
+        "gen-data",
+        "vpsadmin",
+        "network"
+      ],
+      "id": "gen-data-redirect-blocked",
+      "mode": "api-redirect",
+      "route": null,
+      "setup": "cluster",
+      "stdin": "fixture-user\nfixture-password\n123456\n"
+    },
+    {
+      "argv": [
+        "--help"
+      ],
+      "id": "gen-data-http-guard",
+      "mode": "api-guard-http",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "--help"
+      ],
+      "id": "gen-data-socket-guard",
+      "mode": "api-guard-socket",
+      "route": null,
+      "setup": "cluster",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "--commit",
+        "--help"
+      ],
+      "id": "option-inputs-update-commit",
+      "mode": "normal",
+      "route": "inputs update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "--no-commit",
+        "--help"
+      ],
+      "id": "option-inputs-update-no-commit",
+      "mode": "normal",
+      "route": "inputs update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "--changelog",
+        "--help"
+      ],
+      "id": "option-inputs-update-changelog",
+      "mode": "normal",
+      "route": "inputs update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "--no-changelog",
+        "--help"
+      ],
+      "id": "option-inputs-update-no-changelog",
+      "mode": "normal",
+      "route": "inputs update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "--editor",
+        "--help"
+      ],
+      "id": "option-inputs-update-editor",
+      "mode": "normal",
+      "route": "inputs update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "--no-editor",
+        "--help"
+      ],
+      "id": "option-inputs-update-no-editor",
+      "mode": "normal",
+      "route": "inputs update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "-d",
+        "--help"
+      ],
+      "id": "option-inputs-update-d",
+      "mode": "normal",
+      "route": "inputs update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "--downgrade",
+        "--help"
+      ],
+      "id": "option-inputs-update-downgrade",
+      "mode": "normal",
+      "route": "inputs update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "--no-downgrade",
+        "--help"
+      ],
+      "id": "option-inputs-update-no-downgrade",
+      "mode": "normal",
+      "route": "inputs update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "--all",
+        "--help"
+      ],
+      "id": "option-inputs-update-all",
+      "mode": "normal",
+      "route": "inputs update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "update",
+        "--no-all",
+        "--help"
+      ],
+      "id": "option-inputs-update-no-all",
+      "mode": "normal",
+      "route": "inputs update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "set",
+        "--commit",
+        "--help"
+      ],
+      "id": "option-inputs-set-commit",
+      "mode": "normal",
+      "route": "inputs set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "set",
+        "--no-commit",
+        "--help"
+      ],
+      "id": "option-inputs-set-no-commit",
+      "mode": "normal",
+      "route": "inputs set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "set",
+        "--changelog",
+        "--help"
+      ],
+      "id": "option-inputs-set-changelog",
+      "mode": "normal",
+      "route": "inputs set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "set",
+        "--no-changelog",
+        "--help"
+      ],
+      "id": "option-inputs-set-no-changelog",
+      "mode": "normal",
+      "route": "inputs set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "set",
+        "--editor",
+        "--help"
+      ],
+      "id": "option-inputs-set-editor",
+      "mode": "normal",
+      "route": "inputs set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "set",
+        "--no-editor",
+        "--help"
+      ],
+      "id": "option-inputs-set-no-editor",
+      "mode": "normal",
+      "route": "inputs set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "set",
+        "-d",
+        "--help"
+      ],
+      "id": "option-inputs-set-d",
+      "mode": "normal",
+      "route": "inputs set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "set",
+        "--downgrade",
+        "--help"
+      ],
+      "id": "option-inputs-set-downgrade",
+      "mode": "normal",
+      "route": "inputs set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "set",
+        "--no-downgrade",
+        "--help"
+      ],
+      "id": "option-inputs-set-no-downgrade",
+      "mode": "normal",
+      "route": "inputs set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "update",
+        "--commit",
+        "--help"
+      ],
+      "id": "option-inputs-channel-update-commit",
+      "mode": "normal",
+      "route": "inputs channel update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "update",
+        "--no-commit",
+        "--help"
+      ],
+      "id": "option-inputs-channel-update-no-commit",
+      "mode": "normal",
+      "route": "inputs channel update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "update",
+        "--changelog",
+        "--help"
+      ],
+      "id": "option-inputs-channel-update-changelog",
+      "mode": "normal",
+      "route": "inputs channel update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "update",
+        "--no-changelog",
+        "--help"
+      ],
+      "id": "option-inputs-channel-update-no-changelog",
+      "mode": "normal",
+      "route": "inputs channel update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "update",
+        "--editor",
+        "--help"
+      ],
+      "id": "option-inputs-channel-update-editor",
+      "mode": "normal",
+      "route": "inputs channel update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "update",
+        "--no-editor",
+        "--help"
+      ],
+      "id": "option-inputs-channel-update-no-editor",
+      "mode": "normal",
+      "route": "inputs channel update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "update",
+        "-d",
+        "--help"
+      ],
+      "id": "option-inputs-channel-update-d",
+      "mode": "normal",
+      "route": "inputs channel update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "update",
+        "--downgrade",
+        "--help"
+      ],
+      "id": "option-inputs-channel-update-downgrade",
+      "mode": "normal",
+      "route": "inputs channel update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "update",
+        "--no-downgrade",
+        "--help"
+      ],
+      "id": "option-inputs-channel-update-no-downgrade",
+      "mode": "normal",
+      "route": "inputs channel update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "set",
+        "--commit",
+        "--help"
+      ],
+      "id": "option-inputs-channel-set-commit",
+      "mode": "normal",
+      "route": "inputs channel set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "set",
+        "--no-commit",
+        "--help"
+      ],
+      "id": "option-inputs-channel-set-no-commit",
+      "mode": "normal",
+      "route": "inputs channel set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "set",
+        "--changelog",
+        "--help"
+      ],
+      "id": "option-inputs-channel-set-changelog",
+      "mode": "normal",
+      "route": "inputs channel set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "set",
+        "--no-changelog",
+        "--help"
+      ],
+      "id": "option-inputs-channel-set-no-changelog",
+      "mode": "normal",
+      "route": "inputs channel set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "set",
+        "--editor",
+        "--help"
+      ],
+      "id": "option-inputs-channel-set-editor",
+      "mode": "normal",
+      "route": "inputs channel set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "set",
+        "--no-editor",
+        "--help"
+      ],
+      "id": "option-inputs-channel-set-no-editor",
+      "mode": "normal",
+      "route": "inputs channel set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "set",
+        "-d",
+        "--help"
+      ],
+      "id": "option-inputs-channel-set-d",
+      "mode": "normal",
+      "route": "inputs channel set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "set",
+        "--downgrade",
+        "--help"
+      ],
+      "id": "option-inputs-channel-set-downgrade",
+      "mode": "normal",
+      "route": "inputs channel set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "set",
+        "--no-downgrade",
+        "--help"
+      ],
+      "id": "option-inputs-channel-set-no-downgrade",
+      "mode": "normal",
+      "route": "inputs channel set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "set",
+        "--allow_shared",
+        "--help"
+      ],
+      "id": "option-inputs-channel-set-allow_shared",
+      "mode": "normal",
+      "route": "inputs channel set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "channel",
+        "set",
+        "--no-allow_shared",
+        "--help"
+      ],
+      "id": "option-inputs-channel-set-no-allow_shared",
+      "mode": "normal",
+      "route": "inputs channel set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "update",
+        "--commit",
+        "--help"
+      ],
+      "id": "option-inputs-machine-update-commit",
+      "mode": "normal",
+      "route": "inputs machine update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "update",
+        "--no-commit",
+        "--help"
+      ],
+      "id": "option-inputs-machine-update-no-commit",
+      "mode": "normal",
+      "route": "inputs machine update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "update",
+        "--changelog",
+        "--help"
+      ],
+      "id": "option-inputs-machine-update-changelog",
+      "mode": "normal",
+      "route": "inputs machine update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "update",
+        "--no-changelog",
+        "--help"
+      ],
+      "id": "option-inputs-machine-update-no-changelog",
+      "mode": "normal",
+      "route": "inputs machine update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "update",
+        "--editor",
+        "--help"
+      ],
+      "id": "option-inputs-machine-update-editor",
+      "mode": "normal",
+      "route": "inputs machine update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "update",
+        "--no-editor",
+        "--help"
+      ],
+      "id": "option-inputs-machine-update-no-editor",
+      "mode": "normal",
+      "route": "inputs machine update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "update",
+        "-d",
+        "--help"
+      ],
+      "id": "option-inputs-machine-update-d",
+      "mode": "normal",
+      "route": "inputs machine update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "update",
+        "--downgrade",
+        "--help"
+      ],
+      "id": "option-inputs-machine-update-downgrade",
+      "mode": "normal",
+      "route": "inputs machine update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "update",
+        "--no-downgrade",
+        "--help"
+      ],
+      "id": "option-inputs-machine-update-no-downgrade",
+      "mode": "normal",
+      "route": "inputs machine update",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "set",
+        "--commit",
+        "--help"
+      ],
+      "id": "option-inputs-machine-set-commit",
+      "mode": "normal",
+      "route": "inputs machine set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "set",
+        "--no-commit",
+        "--help"
+      ],
+      "id": "option-inputs-machine-set-no-commit",
+      "mode": "normal",
+      "route": "inputs machine set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "set",
+        "--changelog",
+        "--help"
+      ],
+      "id": "option-inputs-machine-set-changelog",
+      "mode": "normal",
+      "route": "inputs machine set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "set",
+        "--no-changelog",
+        "--help"
+      ],
+      "id": "option-inputs-machine-set-no-changelog",
+      "mode": "normal",
+      "route": "inputs machine set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "set",
+        "--editor",
+        "--help"
+      ],
+      "id": "option-inputs-machine-set-editor",
+      "mode": "normal",
+      "route": "inputs machine set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "set",
+        "--no-editor",
+        "--help"
+      ],
+      "id": "option-inputs-machine-set-no-editor",
+      "mode": "normal",
+      "route": "inputs machine set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "set",
+        "-d",
+        "--help"
+      ],
+      "id": "option-inputs-machine-set-d",
+      "mode": "normal",
+      "route": "inputs machine set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "set",
+        "--downgrade",
+        "--help"
+      ],
+      "id": "option-inputs-machine-set-downgrade",
+      "mode": "normal",
+      "route": "inputs machine set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "inputs",
+        "machine",
+        "set",
+        "--no-downgrade",
+        "--help"
+      ],
+      "id": "option-inputs-machine-set-no-downgrade",
+      "mode": "normal",
+      "route": "inputs machine set",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "-a",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-ls-a",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "--attr",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-ls-attr",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "-t",
+        "prod",
+        "--help"
+      ],
+      "id": "option-ls-t",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "--tag",
+        "prod",
+        "--help"
+      ],
+      "id": "option-ls-tag",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "--managed",
+        "all",
+        "--help"
+      ],
+      "id": "option-ls-managed",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "--show-trace",
+        "--help"
+      ],
+      "id": "option-ls-show-trace",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "--no-show-trace",
+        "--help"
+      ],
+      "id": "option-ls-no-show-trace",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "-L",
+        "--help"
+      ],
+      "id": "option-ls-L",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "--list",
+        "--help"
+      ],
+      "id": "option-ls-list",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "-o",
+        "name",
+        "--help"
+      ],
+      "id": "option-ls-o",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "--output",
+        "name",
+        "--help"
+      ],
+      "id": "option-ls-output",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "-H",
+        "--help"
+      ],
+      "id": "option-ls-H",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "--hide-header",
+        "--help"
+      ],
+      "id": "option-ls-hide-header",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ls",
+        "--no-hide-header",
+        "--help"
+      ],
+      "id": "option-ls-no-hide-header",
+      "mode": "normal",
+      "route": "ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "-a",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-build-a",
+      "mode": "normal",
+      "route": "build",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "--attr",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-build-attr",
+      "mode": "normal",
+      "route": "build",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "-t",
+        "prod",
+        "--help"
+      ],
+      "id": "option-build-t",
+      "mode": "normal",
+      "route": "build",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "--tag",
+        "prod",
+        "--help"
+      ],
+      "id": "option-build-tag",
+      "mode": "normal",
+      "route": "build",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "-y",
+        "--help"
+      ],
+      "id": "option-build-y",
+      "mode": "normal",
+      "route": "build",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "--yes",
+        "--help"
+      ],
+      "id": "option-build-yes",
+      "mode": "normal",
+      "route": "build",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "--no-yes",
+        "--help"
+      ],
+      "id": "option-build-no-yes",
+      "mode": "normal",
+      "route": "build",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "-j",
+        "2",
+        "--help"
+      ],
+      "id": "option-build-j",
+      "mode": "normal",
+      "route": "build",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "--max-jobs",
+        "2",
+        "--help"
+      ],
+      "id": "option-build-max-jobs",
+      "mode": "normal",
+      "route": "build",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "--cores",
+        "3",
+        "--help"
+      ],
+      "id": "option-build-cores",
+      "mode": "normal",
+      "route": "build",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "--show-trace",
+        "--help"
+      ],
+      "id": "option-build-show-trace",
+      "mode": "normal",
+      "route": "build",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "build",
+        "--no-show-trace",
+        "--help"
+      ],
+      "id": "option-build-no-show-trace",
+      "mode": "normal",
+      "route": "build",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "-a",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-deploy-a",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--attr",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-deploy-attr",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "-t",
+        "prod",
+        "--help"
+      ],
+      "id": "option-deploy-t",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--tag",
+        "prod",
+        "--help"
+      ],
+      "id": "option-deploy-tag",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "-y",
+        "--help"
+      ],
+      "id": "option-deploy-y",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--yes",
+        "--help"
+      ],
+      "id": "option-deploy-yes",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--no-yes",
+        "--help"
+      ],
+      "id": "option-deploy-no-yes",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "-j",
+        "2",
+        "--help"
+      ],
+      "id": "option-deploy-j",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--max-jobs",
+        "2",
+        "--help"
+      ],
+      "id": "option-deploy-max-jobs",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--cores",
+        "3",
+        "--help"
+      ],
+      "id": "option-deploy-cores",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--show-trace",
+        "--help"
+      ],
+      "id": "option-deploy-show-trace",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--no-show-trace",
+        "--help"
+      ],
+      "id": "option-deploy-no-show-trace",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "-g",
+        "current",
+        "--help"
+      ],
+      "id": "option-deploy-g",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--generation",
+        "current",
+        "--help"
+      ],
+      "id": "option-deploy-generation",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "-i",
+        "--help"
+      ],
+      "id": "option-deploy-i",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--interactive",
+        "--help"
+      ],
+      "id": "option-deploy-interactive",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--no-interactive",
+        "--help"
+      ],
+      "id": "option-deploy-no-interactive",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--dry-activate-first",
+        "--help"
+      ],
+      "id": "option-deploy-dry-activate-first",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--no-dry-activate-first",
+        "--help"
+      ],
+      "id": "option-deploy-no-dry-activate-first",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--one-by-one",
+        "--help"
+      ],
+      "id": "option-deploy-one-by-one",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--no-one-by-one",
+        "--help"
+      ],
+      "id": "option-deploy-no-one-by-one",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--max-concurrent-copy",
+        "1",
+        "--help"
+      ],
+      "id": "option-deploy-max-concurrent-copy",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--copy-only",
+        "--help"
+      ],
+      "id": "option-deploy-copy-only",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--enable-auto-rollback",
+        "--help"
+      ],
+      "id": "option-deploy-enable-auto-rollback",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--disable-auto-rollback",
+        "--help"
+      ],
+      "id": "option-deploy-disable-auto-rollback",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--reboot",
+        "--help"
+      ],
+      "id": "option-deploy-reboot",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--no-reboot",
+        "--help"
+      ],
+      "id": "option-deploy-no-reboot",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--wait-online",
+        "nowait",
+        "--help"
+      ],
+      "id": "option-deploy-wait-online",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--health-checks",
+        "--help"
+      ],
+      "id": "option-deploy-health-checks",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--no-health-checks",
+        "--help"
+      ],
+      "id": "option-deploy-no-health-checks",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--keep-going",
+        "--help"
+      ],
+      "id": "option-deploy-keep-going",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "deploy",
+        "--no-keep-going",
+        "--help"
+      ],
+      "id": "option-deploy-no-keep-going",
+      "mode": "normal",
+      "route": "deploy",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "health-check",
+        "-a",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-health-check-a",
+      "mode": "normal",
+      "route": "health-check",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "health-check",
+        "--attr",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-health-check-attr",
+      "mode": "normal",
+      "route": "health-check",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "health-check",
+        "-t",
+        "prod",
+        "--help"
+      ],
+      "id": "option-health-check-t",
+      "mode": "normal",
+      "route": "health-check",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "health-check",
+        "--tag",
+        "prod",
+        "--help"
+      ],
+      "id": "option-health-check-tag",
+      "mode": "normal",
+      "route": "health-check",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "health-check",
+        "-y",
+        "--help"
+      ],
+      "id": "option-health-check-y",
+      "mode": "normal",
+      "route": "health-check",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "health-check",
+        "--yes",
+        "--help"
+      ],
+      "id": "option-health-check-yes",
+      "mode": "normal",
+      "route": "health-check",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "health-check",
+        "--no-yes",
+        "--help"
+      ],
+      "id": "option-health-check-no-yes",
+      "mode": "normal",
+      "route": "health-check",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "health-check",
+        "-j",
+        "2",
+        "--help"
+      ],
+      "id": "option-health-check-j",
+      "mode": "normal",
+      "route": "health-check",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "health-check",
+        "--max-jobs",
+        "2",
+        "--help"
+      ],
+      "id": "option-health-check-max-jobs",
+      "mode": "normal",
+      "route": "health-check",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "status",
+        "-a",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-status-a",
+      "mode": "normal",
+      "route": "status",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "status",
+        "--attr",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-status-attr",
+      "mode": "normal",
+      "route": "status",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "status",
+        "-t",
+        "prod",
+        "--help"
+      ],
+      "id": "option-status-t",
+      "mode": "normal",
+      "route": "status",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "status",
+        "--tag",
+        "prod",
+        "--help"
+      ],
+      "id": "option-status-tag",
+      "mode": "normal",
+      "route": "status",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "status",
+        "-y",
+        "--help"
+      ],
+      "id": "option-status-y",
+      "mode": "normal",
+      "route": "status",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "status",
+        "--yes",
+        "--help"
+      ],
+      "id": "option-status-yes",
+      "mode": "normal",
+      "route": "status",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "status",
+        "--no-yes",
+        "--help"
+      ],
+      "id": "option-status-no-yes",
+      "mode": "normal",
+      "route": "status",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "status",
+        "-g",
+        "current",
+        "--help"
+      ],
+      "id": "option-status-g",
+      "mode": "normal",
+      "route": "status",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "status",
+        "--generation",
+        "current",
+        "--help"
+      ],
+      "id": "option-status-generation",
+      "mode": "normal",
+      "route": "status",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "-a",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-changelog-a",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "--attr",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-changelog-attr",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "-t",
+        "prod",
+        "--help"
+      ],
+      "id": "option-changelog-t",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "--tag",
+        "prod",
+        "--help"
+      ],
+      "id": "option-changelog-tag",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "-y",
+        "--help"
+      ],
+      "id": "option-changelog-y",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "--yes",
+        "--help"
+      ],
+      "id": "option-changelog-yes",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "--no-yes",
+        "--help"
+      ],
+      "id": "option-changelog-no-yes",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "-j",
+        "2",
+        "--help"
+      ],
+      "id": "option-changelog-j",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "--max-jobs",
+        "2",
+        "--help"
+      ],
+      "id": "option-changelog-max-jobs",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "--cores",
+        "3",
+        "--help"
+      ],
+      "id": "option-changelog-cores",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "-g",
+        "current",
+        "--help"
+      ],
+      "id": "option-changelog-g",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "--generation",
+        "current",
+        "--help"
+      ],
+      "id": "option-changelog-generation",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "-d",
+        "--help"
+      ],
+      "id": "option-changelog-d",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "--downgrade",
+        "--help"
+      ],
+      "id": "option-changelog-downgrade",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "--no-downgrade",
+        "--help"
+      ],
+      "id": "option-changelog-no-downgrade",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "-v",
+        "--help"
+      ],
+      "id": "option-changelog-v",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "--verbose",
+        "--help"
+      ],
+      "id": "option-changelog-verbose",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "--no-verbose",
+        "--help"
+      ],
+      "id": "option-changelog-no-verbose",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "-p",
+        "--help"
+      ],
+      "id": "option-changelog-p",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "--patch",
+        "--help"
+      ],
+      "id": "option-changelog-patch",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "changelog",
+        "--no-patch",
+        "--help"
+      ],
+      "id": "option-changelog-no-patch",
+      "mode": "normal",
+      "route": "changelog",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "-a",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-diff-a",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "--attr",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-diff-attr",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "-t",
+        "prod",
+        "--help"
+      ],
+      "id": "option-diff-t",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "--tag",
+        "prod",
+        "--help"
+      ],
+      "id": "option-diff-tag",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "-y",
+        "--help"
+      ],
+      "id": "option-diff-y",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "--yes",
+        "--help"
+      ],
+      "id": "option-diff-yes",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "--no-yes",
+        "--help"
+      ],
+      "id": "option-diff-no-yes",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "-j",
+        "2",
+        "--help"
+      ],
+      "id": "option-diff-j",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "--max-jobs",
+        "2",
+        "--help"
+      ],
+      "id": "option-diff-max-jobs",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "--cores",
+        "3",
+        "--help"
+      ],
+      "id": "option-diff-cores",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "-g",
+        "current",
+        "--help"
+      ],
+      "id": "option-diff-g",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "--generation",
+        "current",
+        "--help"
+      ],
+      "id": "option-diff-generation",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "-d",
+        "--help"
+      ],
+      "id": "option-diff-d",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "--downgrade",
+        "--help"
+      ],
+      "id": "option-diff-downgrade",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "diff",
+        "--no-downgrade",
+        "--help"
+      ],
+      "id": "option-diff-no-downgrade",
+      "mode": "normal",
+      "route": "diff",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "test-connection",
+        "-a",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-test-connection-a",
+      "mode": "normal",
+      "route": "test-connection",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "test-connection",
+        "--attr",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-test-connection-attr",
+      "mode": "normal",
+      "route": "test-connection",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "test-connection",
+        "-t",
+        "prod",
+        "--help"
+      ],
+      "id": "option-test-connection-t",
+      "mode": "normal",
+      "route": "test-connection",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "test-connection",
+        "--tag",
+        "prod",
+        "--help"
+      ],
+      "id": "option-test-connection-tag",
+      "mode": "normal",
+      "route": "test-connection",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "test-connection",
+        "--managed",
+        "all",
+        "--help"
+      ],
+      "id": "option-test-connection-managed",
+      "mode": "normal",
+      "route": "test-connection",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "test-connection",
+        "-y",
+        "--help"
+      ],
+      "id": "option-test-connection-y",
+      "mode": "normal",
+      "route": "test-connection",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "test-connection",
+        "--yes",
+        "--help"
+      ],
+      "id": "option-test-connection-yes",
+      "mode": "normal",
+      "route": "test-connection",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "test-connection",
+        "--no-yes",
+        "--help"
+      ],
+      "id": "option-test-connection-no-yes",
+      "mode": "normal",
+      "route": "test-connection",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "-a",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-ssh-a",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "--attr",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-ssh-attr",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "-t",
+        "prod",
+        "--help"
+      ],
+      "id": "option-ssh-t",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "--tag",
+        "prod",
+        "--help"
+      ],
+      "id": "option-ssh-tag",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "--managed",
+        "all",
+        "--help"
+      ],
+      "id": "option-ssh-managed",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "-y",
+        "--help"
+      ],
+      "id": "option-ssh-y",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "--yes",
+        "--help"
+      ],
+      "id": "option-ssh-yes",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "--no-yes",
+        "--help"
+      ],
+      "id": "option-ssh-no-yes",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "-p",
+        "--help"
+      ],
+      "id": "option-ssh-p",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "--parallel",
+        "--help"
+      ],
+      "id": "option-ssh-parallel",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "--no-parallel",
+        "--help"
+      ],
+      "id": "option-ssh-no-parallel",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "-g",
+        "--help"
+      ],
+      "id": "option-ssh-g",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "--aggregate",
+        "--help"
+      ],
+      "id": "option-ssh-aggregate",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "--no-aggregate",
+        "--help"
+      ],
+      "id": "option-ssh-no-aggregate",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "-i",
+        "data",
+        "--help"
+      ],
+      "id": "option-ssh-i",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "--input-string",
+        "data",
+        "--help"
+      ],
+      "id": "option-ssh-input-string",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "-f",
+        "fixture.txt",
+        "--help"
+      ],
+      "id": "option-ssh-f",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "ssh",
+        "--input-file",
+        "fixture.txt",
+        "--help"
+      ],
+      "id": "option-ssh-input-file",
+      "mode": "normal",
+      "route": "ssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "cssh",
+        "-a",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-cssh-a",
+      "mode": "normal",
+      "route": "cssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "cssh",
+        "--attr",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-cssh-attr",
+      "mode": "normal",
+      "route": "cssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "cssh",
+        "-t",
+        "prod",
+        "--help"
+      ],
+      "id": "option-cssh-t",
+      "mode": "normal",
+      "route": "cssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "cssh",
+        "--tag",
+        "prod",
+        "--help"
+      ],
+      "id": "option-cssh-tag",
+      "mode": "normal",
+      "route": "cssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "cssh",
+        "--managed",
+        "all",
+        "--help"
+      ],
+      "id": "option-cssh-managed",
+      "mode": "normal",
+      "route": "cssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "cssh",
+        "-y",
+        "--help"
+      ],
+      "id": "option-cssh-y",
+      "mode": "normal",
+      "route": "cssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "cssh",
+        "--yes",
+        "--help"
+      ],
+      "id": "option-cssh-yes",
+      "mode": "normal",
+      "route": "cssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "cssh",
+        "--no-yes",
+        "--help"
+      ],
+      "id": "option-cssh-no-yes",
+      "mode": "normal",
+      "route": "cssh",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "ls",
+        "-a",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-generation-ls-a",
+      "mode": "normal",
+      "route": "generation ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "ls",
+        "--attr",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-generation-ls-attr",
+      "mode": "normal",
+      "route": "generation ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "ls",
+        "-t",
+        "prod",
+        "--help"
+      ],
+      "id": "option-generation-ls-t",
+      "mode": "normal",
+      "route": "generation ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "ls",
+        "--tag",
+        "prod",
+        "--help"
+      ],
+      "id": "option-generation-ls-tag",
+      "mode": "normal",
+      "route": "generation ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "ls",
+        "-l",
+        "--help"
+      ],
+      "id": "option-generation-ls-l",
+      "mode": "normal",
+      "route": "generation ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "ls",
+        "--local",
+        "--help"
+      ],
+      "id": "option-generation-ls-local",
+      "mode": "normal",
+      "route": "generation ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "ls",
+        "--no-local",
+        "--help"
+      ],
+      "id": "option-generation-ls-no-local",
+      "mode": "normal",
+      "route": "generation ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "ls",
+        "-r",
+        "--help"
+      ],
+      "id": "option-generation-ls-r",
+      "mode": "normal",
+      "route": "generation ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "ls",
+        "--remote",
+        "--help"
+      ],
+      "id": "option-generation-ls-remote",
+      "mode": "normal",
+      "route": "generation ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "ls",
+        "--no-remote",
+        "--help"
+      ],
+      "id": "option-generation-ls-no-remote",
+      "mode": "normal",
+      "route": "generation ls",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "-a",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-generation-rm-a",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "--attr",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-generation-rm-attr",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "-t",
+        "prod",
+        "--help"
+      ],
+      "id": "option-generation-rm-t",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "--tag",
+        "prod",
+        "--help"
+      ],
+      "id": "option-generation-rm-tag",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "-l",
+        "--help"
+      ],
+      "id": "option-generation-rm-l",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "--local",
+        "--help"
+      ],
+      "id": "option-generation-rm-local",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "--no-local",
+        "--help"
+      ],
+      "id": "option-generation-rm-no-local",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "-r",
+        "--help"
+      ],
+      "id": "option-generation-rm-r",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "--remote",
+        "--help"
+      ],
+      "id": "option-generation-rm-remote",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "--no-remote",
+        "--help"
+      ],
+      "id": "option-generation-rm-no-remote",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "--gc",
+        "--help"
+      ],
+      "id": "option-generation-rm-gc",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "--no-gc",
+        "--help"
+      ],
+      "id": "option-generation-rm-no-gc",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "--collect-garbage",
+        "--help"
+      ],
+      "id": "option-generation-rm-collect-garbage",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "--no-collect-garbage",
+        "--help"
+      ],
+      "id": "option-generation-rm-no-collect-garbage",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "--max-concurrent-gc",
+        "1",
+        "--help"
+      ],
+      "id": "option-generation-rm-max-concurrent-gc",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "-y",
+        "--help"
+      ],
+      "id": "option-generation-rm-y",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "--yes",
+        "--help"
+      ],
+      "id": "option-generation-rm-yes",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rm",
+        "--no-yes",
+        "--help"
+      ],
+      "id": "option-generation-rm-no-yes",
+      "mode": "normal",
+      "route": "generation rm",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "-a",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-generation-rotate-a",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "--attr",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-generation-rotate-attr",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "-t",
+        "prod",
+        "--help"
+      ],
+      "id": "option-generation-rotate-t",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "--tag",
+        "prod",
+        "--help"
+      ],
+      "id": "option-generation-rotate-tag",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "-l",
+        "--help"
+      ],
+      "id": "option-generation-rotate-l",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "--local",
+        "--help"
+      ],
+      "id": "option-generation-rotate-local",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "--no-local",
+        "--help"
+      ],
+      "id": "option-generation-rotate-no-local",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "-r",
+        "--help"
+      ],
+      "id": "option-generation-rotate-r",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "--remote",
+        "--help"
+      ],
+      "id": "option-generation-rotate-remote",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "--no-remote",
+        "--help"
+      ],
+      "id": "option-generation-rotate-no-remote",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "--gc",
+        "--help"
+      ],
+      "id": "option-generation-rotate-gc",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "--no-gc",
+        "--help"
+      ],
+      "id": "option-generation-rotate-no-gc",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "--collect-garbage",
+        "--help"
+      ],
+      "id": "option-generation-rotate-collect-garbage",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "--no-collect-garbage",
+        "--help"
+      ],
+      "id": "option-generation-rotate-no-collect-garbage",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "--max-concurrent-gc",
+        "1",
+        "--help"
+      ],
+      "id": "option-generation-rotate-max-concurrent-gc",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "-y",
+        "--help"
+      ],
+      "id": "option-generation-rotate-y",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "--yes",
+        "--help"
+      ],
+      "id": "option-generation-rotate-yes",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "generation",
+        "rotate",
+        "--no-yes",
+        "--help"
+      ],
+      "id": "option-generation-rotate-no-yes",
+      "mode": "normal",
+      "route": "generation rotate",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "collect-garbage",
+        "-a",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-collect-garbage-a",
+      "mode": "normal",
+      "route": "collect-garbage",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "collect-garbage",
+        "--attr",
+        "spin=nixos",
+        "--help"
+      ],
+      "id": "option-collect-garbage-attr",
+      "mode": "normal",
+      "route": "collect-garbage",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "collect-garbage",
+        "-t",
+        "prod",
+        "--help"
+      ],
+      "id": "option-collect-garbage-t",
+      "mode": "normal",
+      "route": "collect-garbage",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "collect-garbage",
+        "--tag",
+        "prod",
+        "--help"
+      ],
+      "id": "option-collect-garbage-tag",
+      "mode": "normal",
+      "route": "collect-garbage",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "collect-garbage",
+        "-y",
+        "--help"
+      ],
+      "id": "option-collect-garbage-y",
+      "mode": "normal",
+      "route": "collect-garbage",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "collect-garbage",
+        "--yes",
+        "--help"
+      ],
+      "id": "option-collect-garbage-yes",
+      "mode": "normal",
+      "route": "collect-garbage",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "collect-garbage",
+        "--no-yes",
+        "--help"
+      ],
+      "id": "option-collect-garbage-no-yes",
+      "mode": "normal",
+      "route": "collect-garbage",
+      "setup": "empty",
+      "stdin": ""
+    },
+    {
+      "argv": [
+        "collect-garbage",
+        "--max-concurrent-gc",
+        "1",
+        "--help"
+      ],
+      "id": "option-collect-garbage-max-concurrent-gc",
+      "mode": "normal",
+      "route": "collect-garbage",
+      "setup": "empty",
+      "stdin": ""
+    }
+  ],
+  "globals": {
+    "color": {
+      "aliases": [
+        "c"
+      ],
+      "default": "auto",
+      "values": [
+        "always",
+        "never",
+        "auto"
+      ]
+    }
+  },
+  "groups": {
+    "F": [
+      "a/attr:repeatable",
+      "t/tag:repeatable"
+    ],
+    "GC": [
+      "gc/collect-garbage=true",
+      "max-concurrent-gc=5:Integer"
+    ],
+    "I": [
+      "commit=false",
+      "changelog=true",
+      "editor=true",
+      "d/downgrade=false"
+    ],
+    "L/R": [
+      "l/local=false",
+      "r/remote=false",
+      "neither-means-local"
+    ],
+    "M": [
+      "managed=y|yes|n|no|a|all:default-managed"
+    ],
+    "N": [
+      "j/max-jobs:string",
+      "cores:string"
+    ],
+    "Y": [
+      "y/yes=false"
+    ]
+  },
+  "routes": [
+    {
+      "arguments": "",
+      "cases": [
+        "help-init",
+        "init"
+      ],
+      "options": [],
+      "path": "init"
+    },
+    {
+      "arguments": "name",
+      "cases": [
+        "help-add",
+        "add"
+      ],
+      "options": [],
+      "path": "add"
+    },
+    {
+      "arguments": "old-name new-name",
+      "cases": [
+        "help-rename",
+        "rename"
+      ],
+      "options": [],
+      "path": "rename"
+    },
+    {
+      "arguments": "",
+      "cases": [
+        "help-rediscover",
+        "rediscover"
+      ],
+      "options": [],
+      "path": "rediscover"
+    },
+    {
+      "arguments": "[input-pattern]",
+      "cases": [
+        "help-inputs-ls",
+        "inputs-ls"
+      ],
+      "options": [],
+      "path": "inputs ls"
+    },
+    {
+      "arguments": "[input-name ...]",
+      "cases": [
+        "help-inputs-update",
+        "inputs-update",
+        "option-inputs-update-commit",
+        "option-inputs-update-no-commit",
+        "option-inputs-update-changelog",
+        "option-inputs-update-no-changelog",
+        "option-inputs-update-editor",
+        "option-inputs-update-no-editor",
+        "option-inputs-update-d",
+        "option-inputs-update-downgrade",
+        "option-inputs-update-no-downgrade",
+        "option-inputs-update-all",
+        "option-inputs-update-no-all"
+      ],
+      "options": [
+        "I",
+        "all=false"
+      ],
+      "path": "inputs update"
+    },
+    {
+      "arguments": "input-name rev",
+      "cases": [
+        "help-inputs-set",
+        "inputs-set",
+        "option-inputs-set-commit",
+        "option-inputs-set-no-commit",
+        "option-inputs-set-changelog",
+        "option-inputs-set-no-changelog",
+        "option-inputs-set-editor",
+        "option-inputs-set-no-editor",
+        "option-inputs-set-d",
+        "option-inputs-set-downgrade",
+        "option-inputs-set-no-downgrade"
+      ],
+      "options": [
+        "I"
+      ],
+      "path": "inputs set"
+    },
+    {
+      "arguments": "[channel-pattern]",
+      "cases": [
+        "help-inputs-channel-ls",
+        "channel-ls"
+      ],
+      "options": [],
+      "path": "inputs channel ls"
+    },
+    {
+      "arguments": "channels [role]",
+      "cases": [
+        "help-inputs-channel-update",
+        "channel-update",
+        "option-inputs-channel-update-commit",
+        "option-inputs-channel-update-no-commit",
+        "option-inputs-channel-update-changelog",
+        "option-inputs-channel-update-no-changelog",
+        "option-inputs-channel-update-editor",
+        "option-inputs-channel-update-no-editor",
+        "option-inputs-channel-update-d",
+        "option-inputs-channel-update-downgrade",
+        "option-inputs-channel-update-no-downgrade"
+      ],
+      "options": [
+        "I"
+      ],
+      "path": "inputs channel update"
+    },
+    {
+      "arguments": "channels role rev",
+      "cases": [
+        "help-inputs-channel-set",
+        "channel-set-shared-refusal",
+        "option-inputs-channel-set-commit",
+        "option-inputs-channel-set-no-commit",
+        "option-inputs-channel-set-changelog",
+        "option-inputs-channel-set-no-changelog",
+        "option-inputs-channel-set-editor",
+        "option-inputs-channel-set-no-editor",
+        "option-inputs-channel-set-d",
+        "option-inputs-channel-set-downgrade",
+        "option-inputs-channel-set-no-downgrade",
+        "option-inputs-channel-set-allow_shared",
+        "option-inputs-channel-set-no-allow_shared"
+      ],
+      "options": [
+        "I",
+        "allow_shared=false"
+      ],
+      "path": "inputs channel set"
+    },
+    {
+      "arguments": "machine role",
+      "cases": [
+        "help-inputs-machine-update",
+        "machine-update",
+        "option-inputs-machine-update-commit",
+        "option-inputs-machine-update-no-commit",
+        "option-inputs-machine-update-changelog",
+        "option-inputs-machine-update-no-changelog",
+        "option-inputs-machine-update-editor",
+        "option-inputs-machine-update-no-editor",
+        "option-inputs-machine-update-d",
+        "option-inputs-machine-update-downgrade",
+        "option-inputs-machine-update-no-downgrade"
+      ],
+      "options": [
+        "I"
+      ],
+      "path": "inputs machine update"
+    },
+    {
+      "arguments": "machine role rev",
+      "cases": [
+        "help-inputs-machine-set",
+        "machine-set",
+        "option-inputs-machine-set-commit",
+        "option-inputs-machine-set-no-commit",
+        "option-inputs-machine-set-changelog",
+        "option-inputs-machine-set-no-changelog",
+        "option-inputs-machine-set-editor",
+        "option-inputs-machine-set-no-editor",
+        "option-inputs-machine-set-d",
+        "option-inputs-machine-set-downgrade",
+        "option-inputs-machine-set-no-downgrade"
+      ],
+      "options": [
+        "I"
+      ],
+      "path": "inputs machine set"
+    },
+    {
+      "arguments": "[machine-pattern]",
+      "cases": [
+        "help-ls",
+        "ls-default",
+        "option-ls-a",
+        "option-ls-attr",
+        "option-ls-t",
+        "option-ls-tag",
+        "option-ls-managed",
+        "option-ls-show-trace",
+        "option-ls-no-show-trace",
+        "option-ls-L",
+        "option-ls-list",
+        "option-ls-o",
+        "option-ls-output",
+        "option-ls-H",
+        "option-ls-hide-header",
+        "option-ls-no-hide-header"
+      ],
+      "options": [
+        "F",
+        "M",
+        "show-trace",
+        "L/list",
+        "o/output",
+        "H/hide-header"
+      ],
+      "path": "ls"
+    },
+    {
+      "arguments": "[machine-pattern]",
+      "cases": [
+        "help-build",
+        "build-reuse",
+        "option-build-a",
+        "option-build-attr",
+        "option-build-t",
+        "option-build-tag",
+        "option-build-y",
+        "option-build-yes",
+        "option-build-no-yes",
+        "option-build-j",
+        "option-build-max-jobs",
+        "option-build-cores",
+        "option-build-show-trace",
+        "option-build-no-show-trace"
+      ],
+      "options": [
+        "F",
+        "Y",
+        "N",
+        "show-trace"
+      ],
+      "path": "build"
+    },
+    {
+      "arguments": "[machine-pattern [switch-action]]",
+      "cases": [
+        "help-deploy",
+        "deploy-switch",
+        "option-deploy-a",
+        "option-deploy-attr",
+        "option-deploy-t",
+        "option-deploy-tag",
+        "option-deploy-y",
+        "option-deploy-yes",
+        "option-deploy-no-yes",
+        "option-deploy-j",
+        "option-deploy-max-jobs",
+        "option-deploy-cores",
+        "option-deploy-show-trace",
+        "option-deploy-no-show-trace",
+        "option-deploy-g",
+        "option-deploy-generation",
+        "option-deploy-i",
+        "option-deploy-interactive",
+        "option-deploy-no-interactive",
+        "option-deploy-dry-activate-first",
+        "option-deploy-no-dry-activate-first",
+        "option-deploy-one-by-one",
+        "option-deploy-no-one-by-one",
+        "option-deploy-max-concurrent-copy",
+        "option-deploy-copy-only",
+        "option-deploy-enable-auto-rollback",
+        "option-deploy-disable-auto-rollback",
+        "option-deploy-reboot",
+        "option-deploy-no-reboot",
+        "option-deploy-wait-online",
+        "option-deploy-health-checks",
+        "option-deploy-no-health-checks",
+        "option-deploy-keep-going",
+        "option-deploy-no-keep-going"
+      ],
+      "options": [
+        "F",
+        "Y",
+        "N",
+        "show-trace",
+        "g/generation",
+        "i/interactive",
+        "dry-activate-first",
+        "one-by-one",
+        "max-concurrent-copy=5:Integer",
+        "copy-only",
+        "enable-auto-rollback",
+        "disable-auto-rollback",
+        "reboot",
+        "wait-online=600",
+        "health-checks=true",
+        "keep-going=false"
+      ],
+      "path": "deploy"
+    },
+    {
+      "arguments": "[machine-pattern]",
+      "cases": [
+        "help-health-check",
+        "health-success",
+        "option-health-check-a",
+        "option-health-check-attr",
+        "option-health-check-t",
+        "option-health-check-tag",
+        "option-health-check-y",
+        "option-health-check-yes",
+        "option-health-check-no-yes",
+        "option-health-check-j",
+        "option-health-check-max-jobs"
+      ],
+      "options": [
+        "F",
+        "Y",
+        "j/max-jobs=5:Integer"
+      ],
+      "path": "health-check"
+    },
+    {
+      "arguments": "[machine-pattern]",
+      "cases": [
+        "help-status",
+        "status-current",
+        "option-status-a",
+        "option-status-attr",
+        "option-status-t",
+        "option-status-tag",
+        "option-status-y",
+        "option-status-yes",
+        "option-status-no-yes",
+        "option-status-g",
+        "option-status-generation"
+      ],
+      "options": [
+        "F",
+        "Y",
+        "g/generation"
+      ],
+      "path": "status"
+    },
+    {
+      "arguments": "[machine-pattern [role-pattern]]",
+      "cases": [
+        "help-changelog",
+        "changelog-no-changes",
+        "option-changelog-a",
+        "option-changelog-attr",
+        "option-changelog-t",
+        "option-changelog-tag",
+        "option-changelog-y",
+        "option-changelog-yes",
+        "option-changelog-no-yes",
+        "option-changelog-j",
+        "option-changelog-max-jobs",
+        "option-changelog-cores",
+        "option-changelog-g",
+        "option-changelog-generation",
+        "option-changelog-d",
+        "option-changelog-downgrade",
+        "option-changelog-no-downgrade",
+        "option-changelog-v",
+        "option-changelog-verbose",
+        "option-changelog-no-verbose",
+        "option-changelog-p",
+        "option-changelog-patch",
+        "option-changelog-no-patch"
+      ],
+      "options": [
+        "F",
+        "Y",
+        "N",
+        "g/generation",
+        "d/downgrade",
+        "v/verbose",
+        "p/patch"
+      ],
+      "path": "changelog"
+    },
+    {
+      "arguments": "[machine-pattern [role-pattern]]",
+      "cases": [
+        "help-diff",
+        "diff-no-changes",
+        "option-diff-a",
+        "option-diff-attr",
+        "option-diff-t",
+        "option-diff-tag",
+        "option-diff-y",
+        "option-diff-yes",
+        "option-diff-no-yes",
+        "option-diff-j",
+        "option-diff-max-jobs",
+        "option-diff-cores",
+        "option-diff-g",
+        "option-diff-generation",
+        "option-diff-d",
+        "option-diff-downgrade",
+        "option-diff-no-downgrade"
+      ],
+      "options": [
+        "F",
+        "Y",
+        "N",
+        "g/generation",
+        "d/downgrade"
+      ],
+      "path": "diff"
+    },
+    {
+      "arguments": "[machine-pattern]",
+      "cases": [
+        "help-test-connection",
+        "connection-success",
+        "option-test-connection-a",
+        "option-test-connection-attr",
+        "option-test-connection-t",
+        "option-test-connection-tag",
+        "option-test-connection-managed",
+        "option-test-connection-y",
+        "option-test-connection-yes",
+        "option-test-connection-no-yes"
+      ],
+      "options": [
+        "F",
+        "M",
+        "Y"
+      ],
+      "path": "test-connection"
+    },
+    {
+      "arguments": "[machine-pattern [command [arguments...]]]",
+      "cases": [
+        "help-ssh",
+        "ssh-success",
+        "option-ssh-a",
+        "option-ssh-attr",
+        "option-ssh-t",
+        "option-ssh-tag",
+        "option-ssh-managed",
+        "option-ssh-y",
+        "option-ssh-yes",
+        "option-ssh-no-yes",
+        "option-ssh-p",
+        "option-ssh-parallel",
+        "option-ssh-no-parallel",
+        "option-ssh-g",
+        "option-ssh-aggregate",
+        "option-ssh-no-aggregate",
+        "option-ssh-i",
+        "option-ssh-input-string",
+        "option-ssh-f",
+        "option-ssh-input-file"
+      ],
+      "options": [
+        "F",
+        "M",
+        "Y",
+        "p/parallel",
+        "g/aggregate",
+        "i/input-string",
+        "f/input-file"
+      ],
+      "path": "ssh"
+    },
+    {
+      "arguments": "[machine-pattern]",
+      "cases": [
+        "help-cssh",
+        "cssh",
+        "option-cssh-a",
+        "option-cssh-attr",
+        "option-cssh-t",
+        "option-cssh-tag",
+        "option-cssh-managed",
+        "option-cssh-y",
+        "option-cssh-yes",
+        "option-cssh-no-yes"
+      ],
+      "options": [
+        "F",
+        "M",
+        "Y"
+      ],
+      "path": "cssh"
+    },
+    {
+      "arguments": "[machine-pattern [generation-pattern]]",
+      "cases": [
+        "help-generation-ls",
+        "generation-list",
+        "option-generation-ls-a",
+        "option-generation-ls-attr",
+        "option-generation-ls-t",
+        "option-generation-ls-tag",
+        "option-generation-ls-l",
+        "option-generation-ls-local",
+        "option-generation-ls-no-local",
+        "option-generation-ls-r",
+        "option-generation-ls-remote",
+        "option-generation-ls-no-remote"
+      ],
+      "options": [
+        "F",
+        "L/R"
+      ],
+      "path": "generation ls"
+    },
+    {
+      "arguments": "[machine-pattern [generation-pattern|old]]",
+      "cases": [
+        "help-generation-rm",
+        "generation-rm-old-empty",
+        "option-generation-rm-a",
+        "option-generation-rm-attr",
+        "option-generation-rm-t",
+        "option-generation-rm-tag",
+        "option-generation-rm-l",
+        "option-generation-rm-local",
+        "option-generation-rm-no-local",
+        "option-generation-rm-r",
+        "option-generation-rm-remote",
+        "option-generation-rm-no-remote",
+        "option-generation-rm-gc",
+        "option-generation-rm-no-gc",
+        "option-generation-rm-collect-garbage",
+        "option-generation-rm-no-collect-garbage",
+        "option-generation-rm-max-concurrent-gc",
+        "option-generation-rm-y",
+        "option-generation-rm-yes",
+        "option-generation-rm-no-yes"
+      ],
+      "options": [
+        "F",
+        "L/R",
+        "GC",
+        "Y"
+      ],
+      "path": "generation rm"
+    },
+    {
+      "arguments": "[machine-pattern]",
+      "cases": [
+        "help-generation-rotate",
+        "generation-rotate-empty",
+        "option-generation-rotate-a",
+        "option-generation-rotate-attr",
+        "option-generation-rotate-t",
+        "option-generation-rotate-tag",
+        "option-generation-rotate-l",
+        "option-generation-rotate-local",
+        "option-generation-rotate-no-local",
+        "option-generation-rotate-r",
+        "option-generation-rotate-remote",
+        "option-generation-rotate-no-remote",
+        "option-generation-rotate-gc",
+        "option-generation-rotate-no-gc",
+        "option-generation-rotate-collect-garbage",
+        "option-generation-rotate-no-collect-garbage",
+        "option-generation-rotate-max-concurrent-gc",
+        "option-generation-rotate-y",
+        "option-generation-rotate-yes",
+        "option-generation-rotate-no-yes"
+      ],
+      "options": [
+        "F",
+        "L/R",
+        "GC",
+        "Y"
+      ],
+      "path": "generation rotate"
+    },
+    {
+      "arguments": "[machine-pattern]",
+      "cases": [
+        "help-collect-garbage",
+        "gc-baseline-line-error",
+        "option-collect-garbage-a",
+        "option-collect-garbage-attr",
+        "option-collect-garbage-t",
+        "option-collect-garbage-tag",
+        "option-collect-garbage-y",
+        "option-collect-garbage-yes",
+        "option-collect-garbage-no-yes",
+        "option-collect-garbage-max-concurrent-gc"
+      ],
+      "options": [
+        "F",
+        "Y",
+        "max-concurrent-gc=5:Integer"
+      ],
+      "path": "collect-garbage"
+    },
+    {
+      "arguments": "",
+      "cases": [
+        "help-gen-data-vpsadmin-all",
+        "gen-data-all"
+      ],
+      "options": [],
+      "path": "gen-data vpsadmin all"
+    },
+    {
+      "arguments": "",
+      "cases": [
+        "help-gen-data-vpsadmin-containers",
+        "gen-data-containers"
+      ],
+      "options": [],
+      "path": "gen-data vpsadmin containers"
+    },
+    {
+      "arguments": "",
+      "cases": [
+        "help-gen-data-vpsadmin-network",
+        "gen-data-network"
+      ],
+      "options": [],
+      "path": "gen-data vpsadmin network"
+    }
+  ]
+}

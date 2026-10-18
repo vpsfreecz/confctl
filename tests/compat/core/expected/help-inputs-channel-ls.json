@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 0,
+  "files": {},
+  "signal": null,
+  "stderr": "",
+  "stdout": "NAME\n    ls - List channels and their role->input mapping (with locked revisions)\n\nSYNOPSIS\n\n    confctl [global options] inputs channel ls [channel-pattern]\n"
+}

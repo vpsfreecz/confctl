@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 0,
+  "files": {},
+  "signal": null,
+  "stderr": "",
+  "stdout": "_doc\nadd\nbuild\nchangelog\ncollect-garbage\ncssh\ndeploy\ndiff\ngen-data\ngeneration\nhealth-check\nhelp\ninit\ninputs\nls\nrediscover\nrename\nssh\nstatus\ntest-connection\n"
+}

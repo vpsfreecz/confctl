@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 1,
+  "files": {},
+  "signal": null,
+  "stderr": "confctl: version unknown\nerror: confctl: version unknown\n",
+  "stdout": ""
+}

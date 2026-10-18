@@ -1,0 +1,6 @@
+{
+  "revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "sha256": "2b77eb8634e27e08a2eeea4e0c43de19918c906b40cb5c0a4b0583964e9189b5",
+  "tree": "08f33e1fe5613f7634ba69b38535fb3c35a3c0c9",
+  "description": "Complete immutable Ruby executable/library/docs/test source; replay requires baseline Gemfile.lock dependencies."
+}

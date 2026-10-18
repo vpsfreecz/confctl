@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 0,
+  "files": {},
+  "signal": null,
+  "stderr": "",
+  "stdout": "NAME\n    ls - List root-level flake inputs and their locked revisions\n\nSYNOPSIS\n\n    confctl [global options] inputs ls [input-pattern]\n"
+}

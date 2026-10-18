@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 64,
+  "files": {},
+  "signal": null,
+  "stderr": "error: Unknown command 'unknown'\n\n",
+  "stdout": "NAME\n    confctl - Nix deployment configuration management tool\n\n\nSYNOPSIS\n    confctl [global options] command [command options] [arguments...]\n\n\nGLOBAL OPTIONS\n    -c, --color=arg - Toggle color mode (default: auto)\n    --help          - Show this message\n\n\nCOMMANDS\n    add             - Add a new machine\n    build           - Build target systems\n    changelog       - Changelog between deployed and configured input roles\n    collect-garbage - Run nix-collect-garbage to deleted unreachable store paths\n    cssh            - Open ClusterSSH\n    deploy          - Deploy target systems\n    diff            - Diff between deployed and configured input roles\n    gen-data        - Generate data files\n    generation      - Manage built machine generations\n    health-check    - Run machine health-checks\n    help            - Shows a list of commands or help for one command\n    init            - Create a new configuration\n    inputs          - Manage flake inputs\n    ls              - List configured machines\n    rediscover      - Update cluster machine list with contents of cluster/\n    rename          - Rename an existing machine\n    ssh             - Run command over SSH\n    status          - Check machine status\n    test-connection - Test SSH connection\n"
+}

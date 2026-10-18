@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 0,
+  "files": {},
+  "signal": null,
+  "stderr": "",
+  "stdout": "NAME\n    set - Set a flake input to a specific revision\n\nSYNOPSIS\n\n    confctl [global options] inputs set [command options] <input-name> <rev>\n\nCOMMAND OPTIONS\n    --[no-]changelog     - Include git log in the commit message (default:\n                           enabled)\n    --[no-]commit        - Commit changes to git\n    -d, --[no-]downgrade - Treat change as downgrade for changelog direction\n    --[no-]editor        - Open $EDITOR with commit message (default: enabled)\n\n"
+}

@@ -1,0 +1,8 @@
+{
+  "events": "[]",
+  "exit": 0,
+  "files": {},
+  "signal": null,
+  "stderr": "",
+  "stdout": "NAME\n    changelog - Changelog between deployed and configured input roles\n\nSYNOPSIS\n\n    confctl [global options] changelog [command options] [machine-pattern [role-pattern]]\n\nCOMMAND OPTIONS\n    -a, --attr=arg        - Filter by attribute (may be used more than once,\n                            default: none)\n    --cores=number        - Number of CPU cores to be used (see nix build)\n                            (default: none)\n    -d, --[no-]downgrade  - Show a changelog for downgrade\n    -g, --generation=arg  - Show changelog against input roles from selected\n                            generation (default: none)\n    -j, --max-jobs=number - Maximum number of build jobs (see nix build)\n                            (default: none)\n    -p, --[no-]patch      - Show patches\n    -t, --tag=arg         - Filter by tag (may be used more than once, default:\n                            none)\n    -v, --[no-]verbose    - Show full-length changelog descriptions\n    -y, --[no-]yes        - Assume the answer to confirmations is yes\n\n"
+}
