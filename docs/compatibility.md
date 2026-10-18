@@ -14,6 +14,22 @@ extension support are explicit changes. Exact parser quirks or baseline defects
 must be decided from captured evidence before changing behavior; they must not
 silently become the new parser's defaults.
 
+The `confctl-rust` development binary provides the Rust parser and application
+entrypoint. The default `confctl` remains Ruby during development. Typed requests
+cover the 29 original command actions and the built-in `runtime-kernels update`
+action. Operation adapters remain incomplete and return an explicit unavailable
+error. Help and version need no inventory, input broker or process supervisor.
+Static original help text is preserved in `src/cli/help.json`, with source
+provenance in that module; it does not load test snapshots or Ruby at runtime.
+The immutable M0 archive and expectations remain the differential oracle.
+
+`cargo test --locked cli::tests` checks the parser against the frozen help,
+option and usage cases without executing operations. `cargo test --locked
+domain::selection::tests` checks ordered name/key/filter selection and the Ruby
+pattern adapter. Command side effects require separate differential checks.
+The declared development shell provides the pinned Rust tools alongside the
+Ruby tools and hooks while both implementations are under development.
+
 ## Observable CLI contract
 
 | Surface | Contract and high-value executable cases |
