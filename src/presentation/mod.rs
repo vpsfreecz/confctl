@@ -768,11 +768,10 @@ impl Presentation {
     }
     fn frame(&self) -> ratatui::buffer::Buffer {
         let (columns, rows) = self.dimensions();
-        let log = self
-            .model
-            .logs()
-            .last()
-            .map(|(_, path)| path.to_string_lossy());
+        let log =
+            self.model.logs().last().map(|(task, path)| {
+                format!("{}: {}", model::source_label(*task), display_path(path))
+            });
         let info = live::FrameInfo {
             command: &self.config.command,
             operation: &self.config.operation,
@@ -811,9 +810,8 @@ impl Presentation {
             return Ok(());
         }
         self.paint()?;
-        let frame = self.frame();
-        let painted: String = frame.content().iter().map(|cell| cell.symbol()).collect();
-        let (_, rows) = self.dimensions();
+        let (columns, rows) = self.dimensions();
+        let columns = usize::from(columns.saturating_sub(1));
         let height = rows.saturating_sub(2);
         let headers = usize::from(height.saturating_sub(1)).min(3);
         let minimum_tail = if height >= 8 { 3 } else { 0 };
@@ -835,14 +833,8 @@ impl Presentation {
             .model
             .rows()
             .iter()
-            .filter(|row| !visible.contains(&row.id))
-            .map(|row| {
-                format!(
-                    "{}: {}\n",
-                    row.description.replace(['\n', '\r'], " "),
-                    row.state.map(live::state_label).unwrap_or("incomplete")
-                )
-            })
+            .filter(|row| !visible.contains(&row.id) || live::task_label(row, columns).1)
+            .map(live::task_summary)
             .collect();
         // Leave final panel in scrollback without destroying the painter object.
         if !self.parked()
@@ -856,22 +848,52 @@ impl Presentation {
         if !omitted.is_empty() {
             self.required(
                 OutputStream::Stdout,
-                format!("{} tasks not shown\n", omitted.len()).into_bytes(),
+                format!("{} tasks not shown in full\n", omitted.len()).into_bytes(),
             )?;
         }
         for line in omitted {
             self.required(OutputStream::Stdout, line.into_bytes())?;
         }
-        let missing_logs: Vec<_> = self
+        // Output may precede registration; retain its source without inventing a task.
+        let mut sources_seen = HashSet::new();
+        let sources: Vec<_> = self
+            .model
+            .tail_sources()
+            .filter(|(task, stream)| {
+                !self.model.rows().iter().any(|row| row.id == *task)
+                    && sources_seen.insert((*task, *stream == OutputStream::Stderr))
+            })
+            .map(|(task, stream)| {
+                format!(
+                    "Output source {}/{} (task {}, {}): no registered task description\n",
+                    model::source_label(task),
+                    if stream == OutputStream::Stderr {
+                        "e"
+                    } else {
+                        "o"
+                    },
+                    task.0,
+                    stream.name()
+                )
+            })
+            .collect();
+        for source in sources {
+            self.required(OutputStream::Stdout, source.into_bytes())?;
+        }
+        let logs: Vec<_> = self
             .model
             .logs()
             .iter()
-            .filter_map(|(_, path)| {
-                let path = model::sanitize_text(&path.to_string_lossy());
-                (!painted.contains(&path)).then(|| format!("Log: {path}\n"))
+            .map(|(task, path)| {
+                format!(
+                    "Log: {} (task {}): {}\n",
+                    model::source_label(*task),
+                    task.0,
+                    display_path(path)
+                )
             })
             .collect();
-        for log in missing_logs {
+        for log in logs {
             self.required(OutputStream::Stdout, log.into_bytes())?;
         }
         Ok(())
@@ -886,6 +908,52 @@ impl Presentation {
             unspooled: self.unspooled.take(),
         }
     }
+}
+
+/// A display locator only: native path bytes remain in the model unchanged.
+fn display_path(path: &Path) -> String {
+    use std::os::unix::ffi::OsStrExt;
+    let mut display = String::from("\"");
+    let mut bytes = path.as_os_str().as_bytes();
+    while !bytes.is_empty() {
+        let (text, invalid) = match std::str::from_utf8(bytes) {
+            Ok(text) => (text, 0),
+            Err(error) => (
+                std::str::from_utf8(&bytes[..error.valid_up_to()])
+                    .expect("validated path UTF-8 prefix"),
+                error
+                    .error_len()
+                    .unwrap_or(bytes.len() - error.valid_up_to()),
+            ),
+        };
+        for character in text.chars() {
+            match character {
+                '"' => display.push_str("\\\""),
+                '\\' => display.push_str("\\\\"),
+                '\n' => display.push_str("\\n"),
+                '\r' => display.push_str("\\r"),
+                '\t' => display.push_str("\\t"),
+                character if character.is_ascii_control() => {
+                    display.push_str(&format!("\\x{:02x}", u32::from(character)));
+                }
+                character
+                    if character.is_control()
+                        || matches!(character, '\u{061c}' | '\u{200e}' | '\u{200f}'
+                            | '\u{2028}'..='\u{202e}' | '\u{2066}'..='\u{2069}') =>
+                {
+                    display.extend(character.escape_unicode());
+                }
+                character => display.push(character),
+            }
+        }
+        bytes = &bytes[text.len()..];
+        for byte in &bytes[..invalid] {
+            display.push_str(&format!("\\x{byte:02x}"));
+        }
+        bytes = &bytes[invalid..];
+    }
+    display.push('"');
+    display
 }
 
 impl Drop for Presentation {

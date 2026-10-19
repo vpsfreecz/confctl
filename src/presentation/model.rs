@@ -65,6 +65,13 @@ impl Model {
     pub fn current_tail_line(&self) -> &str {
         &self.tail.current
     }
+    pub(super) fn tail_sources(&self) -> impl Iterator<Item = (TaskId, OutputStream)> + '_ {
+        self.tail
+            .sources
+            .iter()
+            .copied()
+            .chain(self.tail.source.filter(|_| !self.tail.current.is_empty()))
+    }
 
     pub fn apply(&mut self, event: &UiEvent) -> Result<(), ConfctlError> {
         match event {
@@ -134,7 +141,7 @@ impl Model {
             .entry((task.0, stream == OutputStream::Stderr))
             .or_default()
             .feed(bytes);
-        self.tail.append(&text);
+        self.tail.append(task, stream, &text);
         text
     }
 
@@ -240,9 +247,29 @@ pub fn sanitize_text(text: &str) -> String {
     Sanitizer::default().feed(text.as_bytes())
 }
 
+/// A reversible, group-independent display key, not a host or registry lookup.
+pub(super) fn source_label(task: TaskId) -> String {
+    let mut value = task.0;
+    let mut digits = Vec::with_capacity(13);
+    loop {
+        digits.push(char::from(
+            b"0123456789abcdefghijklmnopqrstuvwxyz"[(value % 36) as usize],
+        ));
+        value /= 36;
+        if value == 0 {
+            break;
+        }
+    }
+    format!("@{}", digits.into_iter().rev().collect::<String>())
+}
+
 struct Tail {
     lines: VecDeque<String>,
+    sources: VecDeque<(TaskId, OutputStream)>,
     current: String,
+    content: String,
+    source: Option<(TaskId, OutputStream)>,
+    prefix: String,
     rows: usize,
     line_bytes: usize,
 }
@@ -250,34 +277,67 @@ impl Tail {
     fn new(rows: usize, line_bytes: usize) -> Self {
         Self {
             lines: VecDeque::new(),
+            sources: VecDeque::new(),
             current: String::new(),
+            content: String::new(),
+            source: None,
+            prefix: String::new(),
             rows,
             line_bytes,
         }
     }
-    fn append(&mut self, text: &str) {
+    fn append(&mut self, task: TaskId, stream: OutputStream, text: &str) {
+        if text.is_empty() {
+            return;
+        }
+        if self.source != Some((task, stream)) {
+            // Keep interleaved partial lines distinct without changing output bytes.
+            if !self.current.is_empty() {
+                self.finish_line();
+            }
+            self.source = Some((task, stream));
+            self.prefix = format!(
+                "{}/{} ",
+                source_label(task),
+                if stream == OutputStream::Stderr {
+                    "e"
+                } else {
+                    "o"
+                }
+            );
+        }
         for part in text.split_inclusive(['\n', '\r']) {
             let (value, ending) = part
                 .strip_suffix(['\n', '\r'])
                 .map_or((part, None), |value| {
                     (value, part.as_bytes().last().copied())
                 });
-            self.current.push_str(value);
-            trim_front(&mut self.current, self.line_bytes);
+            self.content.push_str(value);
+            trim_front(&mut self.content, self.line_bytes);
+            self.current.clone_from(&self.prefix);
+            self.current.push_str(&self.content);
             match ending {
-                Some(b'\n') => {
-                    if self.rows > 0 {
-                        self.lines.push_back(std::mem::take(&mut self.current));
-                    } else {
-                        self.current.clear();
-                    }
-                    while self.lines.len() > self.rows {
-                        self.lines.pop_front();
-                    }
+                Some(b'\n') => self.finish_line(),
+                Some(b'\r') => {
+                    self.current.clear();
+                    self.content.clear();
                 }
-                Some(b'\r') => self.current.clear(),
                 _ => {}
             }
+        }
+    }
+    fn finish_line(&mut self) {
+        if self.rows > 0 {
+            self.lines.push_back(std::mem::take(&mut self.current));
+            self.sources
+                .push_back(self.source.expect("display fragment has a source"));
+        } else {
+            self.current.clear();
+        }
+        self.content.clear();
+        while self.lines.len() > self.rows {
+            self.lines.pop_front();
+            self.sources.pop_front();
         }
     }
 }
@@ -405,7 +465,7 @@ mod tests {
         }
         assert_eq!(
             model.tail().iter().map(String::as_str).collect::<Vec<_>>(),
-            ["red 界", "last"]
+            ["@1/o red 界", "@1/o last"]
         );
         assert_eq!(bytes[4], 0x1b, "raw source is unchanged");
         model
@@ -415,7 +475,67 @@ mod tests {
                 bytes: vec![b'x'; 10_000],
             })
             .expect("long line");
-        assert_eq!(model.current_tail_line().len(), 16);
+        assert_eq!(model.current_tail_line(), "@1/o xxxxxxxxxxxxxxxx");
+    }
+    #[test]
+    fn interleaved_partial_lines_keep_task_and_stream_without_changing_output() {
+        let mut model = Model::new(3, 16);
+        for (task, stream, bytes, returned) in [
+            (1, OutputStream::Stdout, &b"node-a "[..], "node-a "),
+            (2, OutputStream::Stderr, &b"\x1b[31mfailed"[..], "failed"),
+            (1, OutputStream::Stderr, &b"warn\n"[..], "warn\n"),
+            (1, OutputStream::Stdout, &b"continued"[..], "continued"),
+        ] {
+            assert_eq!(model.output(TaskId(task), stream, bytes), returned);
+        }
+        assert_eq!(
+            model.tail().iter().map(String::as_str).collect::<Vec<_>>(),
+            ["@1/o node-a ", "@2/e failed", "@1/e warn",]
+        );
+        assert_eq!(model.current_tail_line(), "@1/o continued");
+        assert_eq!(
+            model.tail_sources().collect::<Vec<_>>(),
+            [
+                (TaskId(1), OutputStream::Stdout),
+                (TaskId(2), OutputStream::Stderr),
+                (TaskId(1), OutputStream::Stderr),
+                (TaskId(1), OutputStream::Stdout),
+            ]
+        );
+        assert_eq!(
+            model.output(TaskId(2), OutputStream::Stderr, b"\x1b[0m"),
+            ""
+        );
+        assert_eq!(model.current_tail_line(), "@1/o continued");
+        assert_eq!(
+            model.output(TaskId(1), OutputStream::Stdout, b"\rreplacement\n"),
+            "\rreplacement\n"
+        );
+        assert_eq!(model.tail().len(), 3);
+        assert_eq!(
+            model.tail().back().map(String::as_str),
+            Some("@1/o replacement")
+        );
+        assert_eq!(
+            model.tail_sources().collect::<Vec<_>>(),
+            [
+                (TaskId(2), OutputStream::Stderr),
+                (TaskId(1), OutputStream::Stderr),
+                (TaskId(1), OutputStream::Stdout),
+            ]
+        );
+    }
+    #[test]
+    fn compact_source_keys_retain_the_entire_u64_identity() {
+        for (id, key) in [
+            (0, "@0"),
+            (35, "@z"),
+            (36, "@10"),
+            (u64::MAX - 1, "@3w5e11264sgse"),
+            (u64::MAX, "@3w5e11264sgsf"),
+        ] {
+            assert_eq!(source_label(TaskId(id)), key);
+        }
     }
     #[test]
     fn narrow_clipping_keeps_graphemes_and_display_width() {
