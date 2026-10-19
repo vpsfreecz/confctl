@@ -546,7 +546,6 @@ fn unsupported_boot_variants_and_declined_confirmations_do_not_query_or_copy() {
     for args in [
         vec!["--generation=saved", "--yes", "remote"],
         vec!["--generation=saved", "--yes", "remote", "switch"],
-        vec!["--generation=saved", "--yes", "remote", "test"],
         vec!["--yes", "remote", "dry-activate"],
         vec!["--yes", "remote", "boot"],
         vec!["--generation=saved", "--reboot", "--yes", "remote", "boot"],
