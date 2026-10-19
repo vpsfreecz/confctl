@@ -50,7 +50,7 @@ impl Fixture {
                 r#"#!/bin/sh
 printf 'effect %s %s\n' "$1" "$BOOT_HOST" >> "$BOOT_ROOT/sequence"
 printf 'native %s on %s\n' "$1" "$BOOT_HOST"
-if [ "$BOOT_MODE" = slow-boot ] && [ "$1" = boot ]; then
+if { [ "$BOOT_MODE" = slow-boot ] && [ "$1" = boot ]; } || { [ "$BOOT_MODE" = slow-dry ] && [ "$1" = dry-activate ]; }; then
  printf '%s' "$$" > "$BOOT_ROOT/pid"
  exec /run/current-system/sw/bin/sleep 60
 fi
@@ -547,7 +547,7 @@ fn unsupported_boot_variants_and_declined_confirmations_do_not_query_or_copy() {
         vec!["--generation=saved", "--yes", "remote"],
         vec!["--generation=saved", "--yes", "remote", "switch"],
         vec!["--generation=saved", "--yes", "remote", "test"],
-        vec!["--generation=saved", "--yes", "remote", "dry-activate"],
+        vec!["--yes", "remote", "dry-activate"],
         vec!["--yes", "remote", "boot"],
         vec!["--generation=saved", "--reboot", "--yes", "remote", "boot"],
     ] {
@@ -610,6 +610,292 @@ fn cancellation_joins_active_boot_and_prevents_profile_or_later_host_entry() {
         f.effects(),
         ["effect copy root@remote.invalid", "effect boot remote"]
     );
+    assert!(!Path::new("/proc").join(pid.to_string()).exists());
+    f.unchanged();
+}
+
+#[test]
+fn saved_dry_argv_has_no_profile_and_skip_uses_known_running_only() {
+    for mode in [
+        "known",
+        "running-only",
+        "status-profile-fail",
+        "empty-profile",
+        "profile-only",
+        "unknown",
+        "uptime-fail",
+    ] {
+        let f = Fixture::new();
+        let out = f.run(
+            &["--generation=saved", "--yes", "remote", "dry-activate"],
+            mode,
+            b"",
+        );
+        assert_eq!(out.status.code(), Some(0), "{mode}: {out:?}");
+        let skip = [
+            "known",
+            "running-only",
+            "status-profile-fail",
+            "empty-profile",
+        ]
+        .contains(&mode);
+        assert_eq!(
+            f.effects(),
+            if skip {
+                vec![]
+            } else {
+                vec![
+                    "effect copy root@remote.invalid",
+                    "effect dry-activate remote",
+                ]
+            },
+            "{mode}"
+        );
+        if mode == "status-profile-fail" {
+            assert!(
+                String::from_utf8_lossy(&out.stderr).contains("Unable to read profile generations")
+            );
+        }
+        assert!(!f.root.join("profile-args").exists());
+        assert!(!f.root.join("booted-remote").exists());
+        f.unchanged();
+    }
+    let f = Fixture::new();
+    let out = f.run(
+        &[
+            "--generation=saved",
+            "--yes",
+            "--health-checks",
+            "--enable-auto-rollback",
+            "*",
+            "dry-activate",
+        ],
+        "",
+        b"",
+    );
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    let effects = f.effects();
+    assert_eq!(effects.len(), 4, "{effects:?}");
+    assert!(
+        effects[..2]
+            .iter()
+            .all(|line| line.starts_with("effect copy "))
+    );
+    assert_eq!(
+        &effects[2..],
+        ["effect dry-activate remote", "effect dry-activate local"]
+    );
+    assert!(!f.root.join("profile-args").exists());
+    assert!(
+        String::from_utf8_lossy(&out.stdout)
+            .contains("carried dry-activate copies store paths only")
+    );
+    f.unchanged();
+    let f = Fixture::new();
+    let out = f.run(
+        &[
+            "--generation=saved",
+            "--yes",
+            "--reboot",
+            "remote",
+            "dry-activate",
+        ],
+        "",
+        b"",
+    );
+    assert!(!out.status.success(), "{out:?}");
+    assert!(!f.root.join("sequence").exists());
+    f.unchanged();
+}
+
+#[test]
+fn saved_dry_first_continue_retry_skip_and_abort_keep_exact_native_attempts() {
+    for (input, count, status) in [
+        (b"y\ny\ny\n".as_slice(), 2, 0),
+        (b"y\ny\nr\ny\n".as_slice(), 3, 0),
+        (b"y\ny\ns\n".as_slice(), 1, 0),
+        (b"y\ny\na\n".as_slice(), 1, 1),
+    ] {
+        let f = Fixture::new();
+        let out = f.run(
+            &[
+                "--generation=saved",
+                "--yes",
+                "--interactive",
+                "--dry-activate-first",
+                "remote",
+                "dry-activate",
+            ],
+            "",
+            input,
+        );
+        assert_eq!(out.status.code(), Some(status), "{out:?}");
+        let effects = f.effects();
+        assert_eq!(effects[0], "effect copy root@remote.invalid");
+        assert_eq!(effects.len(), 1 + count, "{effects:?}");
+        assert!(
+            effects[1..]
+                .iter()
+                .all(|s| s == "effect dry-activate remote")
+        );
+        assert!(!f.root.join("profile-args").exists());
+        f.unchanged();
+    }
+    let f = Fixture::new();
+    let out = f.run(
+        &[
+            "--generation=saved",
+            "--yes",
+            "--interactive",
+            "remote",
+            "dry-activate",
+        ],
+        "",
+        b"y\ny\n\nr\ny\n",
+    );
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert_eq!(
+        f.effects(),
+        [
+            "effect copy root@remote.invalid",
+            "effect dry-activate remote"
+        ]
+    );
+    let f = Fixture::new();
+    let out = f.run(
+        &[
+            "--generation=saved",
+            "--yes",
+            "--interactive",
+            "remote",
+            "dry-activate",
+        ],
+        "",
+        b"y\nn\n",
+    );
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert!(f.effects().is_empty());
+    f.unchanged();
+    // Carried targets have no activation prompt or preliminary dry command.
+    let f = Fixture::new();
+    let out = f.run(
+        &[
+            "--generation=saved",
+            "--yes",
+            "--interactive",
+            "--dry-activate-first",
+            "carrier#guest",
+            "dry-activate",
+        ],
+        "unknown",
+        b"y\ny\n",
+    );
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert_eq!(f.effects(), ["effect copy root@carrier.invalid"]);
+    f.unchanged();
+}
+
+#[test]
+fn saved_dry_bulk_barrier_one_by_one_and_native_failure_keep_partial_effects() {
+    for (mode, one, expected) in [
+        (
+            "copy-fail",
+            false,
+            vec![
+                "effect copy root@remote.invalid",
+                "effect copy root@carrier.invalid",
+            ],
+        ),
+        (
+            "copy-fail",
+            true,
+            vec![
+                "effect copy root@remote.invalid",
+                "effect dry-activate remote",
+                "effect copy root@carrier.invalid",
+            ],
+        ),
+        (
+            "dry-fail",
+            false,
+            vec![
+                "effect copy root@remote.invalid",
+                "effect copy root@carrier.invalid",
+                "effect dry-activate remote",
+            ],
+        ),
+        (
+            "dry-fail",
+            true,
+            vec![
+                "effect copy root@remote.invalid",
+                "effect dry-activate remote",
+            ],
+        ),
+    ] {
+        let f = Fixture::new();
+        let mut args = vec![
+            "--generation=saved",
+            "--yes",
+            "--max-concurrent-copy=1",
+            "*",
+            "dry-activate",
+        ];
+        if one {
+            args.insert(0, "--one-by-one");
+        }
+        let out = f.run(&args, mode, b"");
+        assert_eq!(out.status.code(), Some(1), "{out:?}");
+        assert_eq!(f.effects(), expected);
+        assert!(!f.root.join("profile-args").exists());
+        assert!(String::from_utf8_lossy(&out.stderr).contains("retained"));
+        f.unchanged();
+    }
+}
+
+#[test]
+fn saved_dry_cancellation_joins_entered_script_before_later_host_entry() {
+    let f = Fixture::new();
+    let mut child = f
+        .command(
+            &[
+                "--generation=saved",
+                "--yes",
+                "--one-by-one",
+                "*",
+                "dry-activate",
+            ],
+            "slow-dry",
+        )
+        .spawn()
+        .unwrap();
+    drop(child.stdin.take());
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let pid = loop {
+        if let Ok(text) = fs::read_to_string(f.root.join("pid"))
+            && let Ok(pid) = text.trim().parse::<u32>()
+            && pid > 0
+        {
+            break pid;
+        }
+        assert!(Instant::now() < deadline);
+        thread::sleep(Duration::from_millis(5));
+    };
+    rustix::process::kill_process(
+        rustix::process::Pid::from_raw(child.id() as i32).unwrap(),
+        rustix::process::Signal::INT,
+    )
+    .unwrap();
+    let out = wait(child);
+    assert_eq!(out.status.code(), Some(130), "{out:?}");
+    assert_eq!(
+        f.effects(),
+        [
+            "effect copy root@remote.invalid",
+            "effect dry-activate remote"
+        ]
+    );
+    assert!(!f.root.join("profile-args").exists());
     assert!(!Path::new("/proc").join(pid.to_string()).exists());
     f.unchanged();
 }

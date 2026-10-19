@@ -66,6 +66,8 @@ remote or combined local/remote records.
 [`deploy --copy-only --generation <selector>`](deploy.md) copies saved generations.
 Saved-generation `deploy --generation <selector> <pattern> boot` also prepares
 standalone hosts for boot without reboot; carried hosts only receive copies.
+The same route with action `dry-activate` runs standalone dry activation without
+setting profiles; carried hosts again only receive copies.
 Other deploy modes and operation adapters remain unavailable. Help and version
 need no inventory, input broker or process supervisor.
 Static original help text is preserved in `src/cli/help.json`, with source

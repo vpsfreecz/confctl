@@ -327,32 +327,92 @@ fn boot_skip_requires_both_known_standalone_paths_but_retains_carrier_partial_cu
         }]
     };
     let mut status = HostStatus::default();
-    assert!(!already_booted(&inv.machines[0], &desired, &status));
+    assert!(!already_current(
+        &inv.machines[0],
+        &desired,
+        &status,
+        SwitchAction::Boot
+    ));
     status.generations = Some(records(true));
-    assert!(!already_booted(&inv.machines[0], &desired, &status));
+    assert!(!already_current(
+        &inv.machines[0],
+        &desired,
+        &status,
+        SwitchAction::Boot
+    ));
     status.current_toplevel = Some(desired.toplevel.clone());
-    assert!(already_booted(&inv.machines[0], &desired, &status));
+    assert!(already_current(
+        &inv.machines[0],
+        &desired,
+        &status,
+        SwitchAction::Boot
+    ));
     status.generations = Some(records(false));
-    assert!(!already_booted(&inv.machines[0], &desired, &status));
+    assert!(!already_current(
+        &inv.machines[0],
+        &desired,
+        &status,
+        SwitchAction::Boot
+    ));
     status.generations = Some(vec![]);
-    assert!(!already_booted(&inv.machines[0], &desired, &status));
+    assert!(!already_current(
+        &inv.machines[0],
+        &desired,
+        &status,
+        SwitchAction::Boot
+    ));
     status.generations = None;
-    assert!(!already_booted(&inv.machines[0], &desired, &status));
-    assert!(already_booted(&inv.machines[2], &desired, &status));
+    assert!(!already_current(
+        &inv.machines[0],
+        &desired,
+        &status,
+        SwitchAction::Boot
+    ));
+    assert!(already_current(
+        &inv.machines[2],
+        &desired,
+        &status,
+        SwitchAction::Boot
+    ));
     status.current_toplevel = None;
-    assert!(!already_booted(&inv.machines[2], &desired, &status));
+    assert!(!already_current(
+        &inv.machines[2],
+        &desired,
+        &status,
+        SwitchAction::Boot
+    ));
 
     for spelling in ["/store//system", "/store/./system"] {
         status.current_toplevel = Some(spelling.into());
         status.generations = Some(records(true));
-        assert!(!already_booted(&inv.machines[0], &desired, &status));
-        assert!(!already_booted(&inv.machines[2], &desired, &status));
+        assert!(!already_current(
+            &inv.machines[0],
+            &desired,
+            &status,
+            SwitchAction::Boot
+        ));
+        assert!(!already_current(
+            &inv.machines[2],
+            &desired,
+            &status,
+            SwitchAction::Boot
+        ));
 
         status.current_toplevel = Some(desired.toplevel.clone());
         status.generations.as_mut().unwrap()[0].toplevel = spelling.into();
-        assert!(!already_booted(&inv.machines[0], &desired, &status));
+        assert!(!already_current(
+            &inv.machines[0],
+            &desired,
+            &status,
+            SwitchAction::Boot
+        ));
         // Carried boot only needs its exact current-profile path observation.
-        assert!(already_booted(&inv.machines[2], &desired, &status));
+        assert!(already_current(
+            &inv.machines[2],
+            &desired,
+            &status,
+            SwitchAction::Boot
+        ));
     }
 }
 
@@ -394,9 +454,15 @@ impl ProcessRunner for ActivationRunner {
 }
 
 #[tokio::test]
-async fn boot_profile_failure_and_final_ack_cancellation_preserve_actual_effects_and_primary_errors()
+async fn activation_profile_failure_and_final_ack_cancellation_preserve_actual_effects_and_primary_errors()
  {
-    for (fail_profile, reject_final) in [(true, false), (false, false), (false, true)] {
+    for (action, fail_profile, reject_final) in [
+        (SwitchAction::Boot, true, false),
+        (SwitchAction::Boot, false, false),
+        (SwitchAction::Boot, false, true),
+        (SwitchAction::DryActivate, false, false),
+        (SwitchAction::DryActivate, false, true),
+    ] {
         let tmp = tempfile::tempdir().unwrap();
         let root = ConfigRoot::new(tmp.path()).unwrap();
         let inv = inventory();
@@ -417,7 +483,7 @@ async fn boot_profile_failure_and_final_ack_cancellation_preserve_actual_effects
                         token.cancel();
                     }
                     if reject_final {
-                        ack.acknowledge(Err("controlled boot final delivery".into()));
+                        ack.acknowledge(Err("controlled activation final delivery".into()));
                         continue;
                     }
                 }
@@ -447,6 +513,7 @@ async fn boot_profile_failure_and_final_ack_cancellation_preserve_actual_effects
             ssh_config: None,
             interactive: false,
             dry_first: true,
+            action,
             log: tmp.path(),
         };
         let job = Job {
@@ -464,25 +531,38 @@ async fn boot_profile_failure_and_final_ack_cancellation_preserve_actual_effects
                 if evidence.status.unwrap().code()==Some(9) && evidence.stdout_complete && evidence.stderr_complete)
             );
         } else if reject_final {
-            assert!(error.to_string().contains("controlled boot final delivery"));
+            assert!(
+                error
+                    .to_string()
+                    .contains("controlled activation final delivery")
+            );
         } else {
             assert!(error.is_cancelled());
         }
         {
             let calls = runner.calls.lock().unwrap();
-            assert_eq!(calls.len(), 3);
             assert_eq!(calls[0].args, ["dry-activate"]);
-            assert_eq!(calls[1].args, ["boot"]);
-            assert_eq!(calls[2].program, std::path::Path::new("nix-env"));
-            assert_eq!(
-                calls[2].args,
-                [
-                    "-p",
-                    "/nix/var/nix/profiles/system",
-                    "--set",
-                    "/store/system"
-                ]
-            );
+            assert_eq!(calls[1].args, [action_name(action)]);
+            if action == SwitchAction::Boot {
+                assert_eq!(calls.len(), 3);
+                assert_eq!(calls[2].program, std::path::Path::new("nix-env"));
+                assert_eq!(
+                    calls[2].args,
+                    [
+                        "-p",
+                        "/nix/var/nix/profiles/system",
+                        "--set",
+                        "/store/system"
+                    ]
+                );
+            } else {
+                assert_eq!(calls.len(), 2);
+                assert!(
+                    calls
+                        .iter()
+                        .all(|spec| spec.program != std::path::Path::new("nix-env"))
+                );
+            }
             assert!(
                 calls
                     .iter()
@@ -615,7 +695,7 @@ async fn boot_status_queries_are_bounded_and_join_before_error_or_cancellation_r
                 task: TaskId(i as u64 + 1),
             })
             .collect::<Vec<_>>();
-        let result = boot_statuses(&copies, &jobs, None).await;
+        let result = target_statuses(&copies, &jobs, None, SwitchAction::Boot).await;
         if fail || reject {
             let text = result.unwrap_err().to_string();
             assert!(
@@ -629,10 +709,11 @@ async fn boot_status_queries_are_bounded_and_join_before_error_or_cancellation_r
         } else {
             let statuses = result.unwrap();
             assert_eq!(statuses.len(), 8);
-            assert!(statuses.iter().all(|s| already_booted(
+            assert!(statuses.iter().all(|s| already_current(
                 &inv.machines[0],
                 &generation("saved"),
-                s
+                s,
+                SwitchAction::Boot
             )));
             assert_eq!(runner.peak.load(std::sync::atomic::Ordering::SeqCst), 5);
         }
@@ -646,5 +727,54 @@ async fn boot_status_queries_are_bounded_and_join_before_error_or_cancellation_r
             assert!(finals.len() <= 5);
             assert!(finals.iter().any(|(_, state)| *state == TaskState::Failed));
         }
+    }
+}
+
+#[test]
+fn dry_skip_needs_only_exact_known_running_path_including_after_profile_failure() {
+    use super::super::host_status::HostStatus;
+    let inv = inventory();
+    let desired = generation("saved");
+    let mut status = HostStatus::default();
+    assert!(!already_current(
+        &inv.machines[0],
+        &desired,
+        &status,
+        SwitchAction::DryActivate
+    ));
+    status.current_toplevel = Some(desired.toplevel.clone());
+    assert!(already_current(
+        &inv.machines[0],
+        &desired,
+        &status,
+        SwitchAction::DryActivate
+    ));
+    assert!(!already_current(
+        &inv.machines[0],
+        &desired,
+        &status,
+        SwitchAction::Boot
+    ));
+    status.generations = Some(vec![]);
+    assert!(already_current(
+        &inv.machines[0],
+        &desired,
+        &status,
+        SwitchAction::DryActivate
+    ));
+    for spelling in ["/store//system", "/store/./system"] {
+        status.current_toplevel = Some(spelling.into());
+        assert!(!already_current(
+            &inv.machines[0],
+            &desired,
+            &status,
+            SwitchAction::DryActivate
+        ));
+        assert!(!already_current(
+            &inv.machines[2],
+            &desired,
+            &status,
+            SwitchAction::DryActivate
+        ));
     }
 }

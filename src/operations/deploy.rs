@@ -1,4 +1,4 @@
-//! Copy saved generations or prepare standalone hosts for boot without reboot.
+//! Copy saved generations, prepare boot without reboot or run dry activation.
 //! Earlier copies, kernel refreshes and activation effects survive later failure.
 use crate::{
     app::Context,
@@ -112,7 +112,7 @@ pub(super) async fn run(
     confirm_resolved(ctx, request, inventory, selector, &jobs, &missing).await?;
     check_cancel(&ctx.cancellation)?;
     if !request.copy_only {
-        return boot(ctx, request, inventory, &root, jobs, first_task, limit).await;
+        return activate_saved(ctx, request, inventory, &root, jobs, first_task, limit).await;
     }
     if !serial {
         jobs = copy_order(inventory, jobs);
@@ -161,12 +161,7 @@ async fn confirm_targets(
     columns: &[String],
     selector: &GenerationSelector,
 ) -> Result<(), ConfctlError> {
-    let action = match request.action {
-        SwitchAction::Switch => "switch",
-        SwitchAction::Boot => "boot",
-        SwitchAction::Test => "test",
-        SwitchAction::DryActivate => "dry-activate",
-    };
+    let action = action_name(request.action);
     if !ctx
         .ui
         .confirm(ConfirmPrompt {
@@ -174,7 +169,7 @@ async fn confirm_targets(
                 diagnostic(if request.copy_only {
                     "The following machines will have saved generations copied:\n"
                 } else {
-                    "The following machines will receive saved generations for boot:\n"
+                    "The following machines will receive saved generations for activation:\n"
                 }),
                 super::machines::table(inventory, selected, columns, true),
                 diagnostic(&format!(
@@ -302,6 +297,14 @@ struct Job {
     machine: MachineId,
     generation: BuildGeneration,
     task: TaskId,
+}
+fn action_name(action: SwitchAction) -> &'static str {
+    match action {
+        SwitchAction::Switch => "switch",
+        SwitchAction::Boot => "boot",
+        SwitchAction::Test => "test",
+        SwitchAction::DryActivate => "dry-activate",
+    }
 }
 fn selector_text(selector: &GenerationSelector) -> &str {
     match selector {
@@ -835,7 +838,7 @@ async fn bulk_copy<P: ProcessRunner>(
     Ok(())
 }
 
-async fn boot(
+async fn activate_saved(
     ctx: &Context,
     request: &DeployRequest,
     inventory: &Inventory,
@@ -858,11 +861,16 @@ async fn boot(
     for (index, job) in jobs.iter_mut().enumerate() {
         job.task = TaskId(first_task + index as u64);
     }
-    let statuses = boot_statuses(&copies, &jobs, ssh_config.as_deref()).await?;
+    let statuses = target_statuses(&copies, &jobs, ssh_config.as_deref(), request.action).await?;
     let first_copy = first_task + jobs.len() as u64;
     let mut remaining = Vec::new();
     for (job, status) in jobs.into_iter().zip(&statuses) {
-        if already_booted(inventory.get(job.machine), &job.generation, status) {
+        if already_current(
+            inventory.get(job.machine),
+            &job.generation,
+            status,
+            request.action,
+        ) {
             checked(
                 &ctx.events,
                 &ctx.cancellation,
@@ -886,6 +894,7 @@ async fn boot(
         ssh_config: ssh_config.as_deref(),
         interactive: request.interactive,
         dry_first: request.dry_activate_first,
+        action: request.action,
         log: ctx.log_path(),
     };
     let result = async {
@@ -921,23 +930,24 @@ async fn boot(
             }
         }
         checked(&ctx.events, &ctx.cancellation, diagnostic(
-            "Saved-generation boot preparation completed; carried hosts were copied only. No reboot or health check was performed.\n"
+            &format!("Saved-generation {} completed; carried hosts were copied only. No reboot or health check was performed.\n", action_name(request.action))
         )).await
     }.await;
     if let Err(error) = result {
         let later = ctx.events.emit(UiEvent::Diagnostic {
             stream: OutputStream::Stderr, style: Style::Failure,
-            text: "Boot preparation stopped; earlier copies, runtime-kernel state, bootloader changes and profile updates are retained. Inspect target state before retrying; no rollback or reboot was performed.\n".into(),
+            text: format!("Saved-generation {} stopped; earlier copies, runtime-kernel state and script effects{} are retained. Inspect target state before retrying; no rollback or reboot was performed.\n", action_name(request.action), if request.action == SwitchAction::Boot { ", including bootloader changes and profile updates," } else { "" }),
         }).await;
         return Err(error.with_secondary(later.err().into_iter().collect()));
     }
     Ok(())
 }
 
-fn already_booted(
+fn already_current(
     machine: &Machine,
     generation: &BuildGeneration,
     status: &super::host_status::HostStatus,
+    action: SwitchAction,
 ) -> bool {
     if status
         .current_toplevel
@@ -949,6 +959,7 @@ fn already_booted(
     }
     // Ruby uses the carrier profile observation alone, even after a later read failure.
     machine.carrier.is_some()
+        || action == SwitchAction::DryActivate
         || status.generations.as_ref().is_some_and(|records| {
             records.iter().any(|record| {
                 record.current && record.toplevel.as_os_str() == generation.toplevel.as_os_str()
@@ -956,10 +967,11 @@ fn already_booted(
         })
 }
 
-async fn boot_statuses<P: ProcessRunner>(
+async fn target_statuses<P: ProcessRunner>(
     copies: &Copies<'_, P>,
     jobs: &[Job],
     ssh_config: Option<&OsStr>,
+    action: SwitchAction,
 ) -> Result<Vec<super::host_status::HostStatus>, ConfctlError> {
     let token = copies.cancellation.child_token();
     let mut next = 0;
@@ -970,7 +982,13 @@ async fn boot_statuses<P: ProcessRunner>(
         while active.len() < 5 && next < jobs.len() && !token.is_cancelled() {
             active.push((
                 next,
-                Box::pin(boot_status(copies, &jobs[next], &token, ssh_config)),
+                Box::pin(target_status(
+                    copies,
+                    &jobs[next],
+                    &token,
+                    ssh_config,
+                    action,
+                )),
             ));
             next += 1;
         }
@@ -1006,18 +1024,19 @@ async fn boot_statuses<P: ProcessRunner>(
     check_cancel(copies.cancellation)?;
     Ok(statuses
         .into_iter()
-        .map(|status| status.expect("joined boot status"))
+        .map(|status| status.expect("joined deployment status"))
         .collect())
 }
 
-async fn boot_status<P: ProcessRunner>(
+async fn target_status<P: ProcessRunner>(
     copies: &Copies<'_, P>,
     job: &Job,
     token: &CancellationToken,
     ssh_config: Option<&OsStr>,
+    action: SwitchAction,
 ) -> Result<super::host_status::HostStatus, ConfctlError> {
     let host = &copies.inventory.get(job.machine).name;
-    let description = format!("query boot state on {host}");
+    let description = format!("query {} state on {host}", action_name(action));
     copies
         .events
         .emit(UiEvent::TaskPending {
@@ -1102,6 +1121,7 @@ struct Activation<'a, P> {
     ssh_config: Option<&'a OsStr>,
     interactive: bool,
     dry_first: bool,
+    action: SwitchAction,
     log: &'a std::path::Path,
 }
 
@@ -1154,12 +1174,13 @@ async fn activate_one<P: ProcessRunner>(
             copies.events,
             copies.cancellation,
             diagnostic(&format!(
-                "{host}: carried boot copies store paths only; no activation or profile change.\n"
+                "{host}: carried {} copies store paths only; no activation or profile change.\n",
+                action_name(activation.action)
             )),
         )
         .await;
     }
-    let description = format!("prepare boot on {host}");
+    let description = format!("{} on {host}", action_name(activation.action));
     copies
         .events
         .emit(UiEvent::TaskPending {
@@ -1180,7 +1201,7 @@ async fn activate_one<P: ProcessRunner>(
         let mut entered = false;
         loop {
             if activation.dry_first {
-                boot_command(
+                activation_command(
                     activation,
                     job,
                     task,
@@ -1195,7 +1216,8 @@ async fn activate_one<P: ProcessRunner>(
                     copies.events,
                     copies.cancellation,
                     diagnostic(&format!(
-                        "Prepare generation {} for boot on {host}\n",
+                        "Run {} for generation {} on {host}\n",
+                        action_name(activation.action),
                         job.generation.name
                     )),
                 )
@@ -1204,21 +1226,34 @@ async fn activate_one<P: ProcessRunner>(
                     BootChoice::Retry => continue,
                     BootChoice::Skip => return Ok(TaskState::Skipped),
                     BootChoice::Abort => {
-                        return Err(ConfctlError::State("Aborting boot preparation".into()));
+                        return Err(ConfctlError::State(format!(
+                            "Aborting {}",
+                            action_name(activation.action)
+                        )));
                     }
                     BootChoice::Continue => {}
                 }
             }
-            boot_command(activation, job, task, &description, &mut entered, "boot").await?;
-            boot_command(
+            activation_command(
                 activation,
                 job,
                 task,
                 &description,
                 &mut entered,
-                "set profile after boot",
+                action_name(activation.action),
             )
             .await?;
+            if activation.action == SwitchAction::Boot {
+                activation_command(
+                    activation,
+                    job,
+                    task,
+                    &description,
+                    &mut entered,
+                    "set profile after boot",
+                )
+                .await?;
+            }
             return Ok(TaskState::Succeeded);
         }
     }
@@ -1239,7 +1274,7 @@ async fn activate_one<P: ProcessRunner>(
     }
 }
 
-async fn boot_command<P: ProcessRunner>(
+async fn activation_command<P: ProcessRunner>(
     activation: &Activation<'_, P>,
     job: &Job,
     task: TaskId,
