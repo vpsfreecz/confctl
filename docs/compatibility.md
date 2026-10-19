@@ -68,6 +68,8 @@ Saved-generation `deploy --generation <selector> <pattern> boot` also prepares
 standalone hosts for boot without reboot; carried hosts only receive copies.
 The same route with action `dry-activate` runs standalone dry activation without
 setting profiles; carried hosts again only receive copies.
+[`health-check`](health-checks.md) runs configured builder, machine and systemd
+checks with per-check retry budgets.
 Other deploy modes and operation adapters remain unavailable. Help and version
 need no inventory, input broker or process supervisor.
 Static original help text is preserved in `src/cli/help.json`, with source

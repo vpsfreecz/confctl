@@ -26,7 +26,10 @@ use std::{
     future::Future,
     io::{self, Write},
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 use tokio_util::sync::CancellationToken;
@@ -69,11 +72,17 @@ pub struct Context {
     pub ui: Ui,
     pub timing: Timing,
     log_path: PathBuf,
+    keep_log: AtomicBool,
 }
 
 impl Context {
     pub fn log_path(&self) -> &std::path::Path {
         &self.log_path
+    }
+
+    /// Request retention at checked finalization. This performs no log I/O.
+    pub fn keep_log(&self) {
+        self.keep_log.store(true, Ordering::Relaxed);
     }
 }
 
@@ -227,6 +236,7 @@ async fn execute<O: Operations>(
         ui,
         timing: timing.clone(),
         log_path: invocation_log.path().into(),
+        keep_log: AtomicBool::new(false),
     };
     let mut renderer = tokio::spawn(presentation.run());
     let signal_cancel = cancellation.clone();
@@ -264,6 +274,7 @@ async fn execute<O: Operations>(
     if let Err(error) = context.ui.shutdown() {
         cleanup.push(error);
     }
+    let keep_requested = context.keep_log.load(Ordering::Relaxed);
     drop(context);
     let early = renderer_early.is_some();
     let (finished, joined) = if let Some(joined) = renderer_early {
@@ -324,7 +335,7 @@ async fn execute<O: Operations>(
             }
         }
         report_error(error, Some(invocation_log), &stderr);
-    } else if let Err(failure) = invocation_log.finish(None, false) {
+    } else if let Err(failure) = invocation_log.finish(None, keep_requested) {
         disposition = ExitDisposition::failed(1);
         report_retained_error(failure.source, failure.locator, false, &stderr);
     }
@@ -803,6 +814,8 @@ mod diagnostic_boundary_tests {
                 .unwrap()
                 .path();
             invocation_log::fail_finalization_once(path);
+            context.keep_log();
+            context.keep_log();
             Ok(ExitDisposition::completed())
         }
     }
