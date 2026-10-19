@@ -6,7 +6,7 @@ use std::{
     os::unix::process::ExitStatusExt,
     process::ExitStatus,
     sync::{
-        Mutex,
+        Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
     },
     time::Instant,
@@ -16,7 +16,7 @@ type ProbeReply = (i32, Vec<u8>, Vec<u8>);
 
 struct Probe {
     replies: Mutex<VecDeque<ProbeReply>>,
-    calls: Mutex<Vec<ProcessSpec>>,
+    calls: Mutex<Vec<(ProcessSpec, TaskId)>>,
 }
 impl Probe {
     fn new(replies: Vec<ProbeReply>) -> Self {
@@ -42,9 +42,9 @@ impl ProcessRunner for Probe {
     async fn run(
         &self,
         spec: ProcessSpec,
-        _: ProcessScope,
+        scope: ProcessScope,
     ) -> Result<ProcessOutcome, ConfctlError> {
-        self.calls.lock().unwrap().push(spec);
+        self.calls.lock().unwrap().push((spec, scope.task));
         let (code, out, err) = self
             .replies
             .lock()
@@ -57,26 +57,63 @@ impl ProcessRunner for Probe {
 fn machine(name: &str, carrier: Option<&str>) -> Machine {
     Machine::from_value(json!({"name":name,"carrier":carrier,"metaConfig":{"spin":"vpsadminos","managed":false,"host":{"target":format!("{name}.invalid"),"port":22}}})).unwrap()
 }
-fn events() -> (EventSink, tokio::task::JoinHandle<String>) {
+type Lifecycle = Arc<Mutex<Vec<UiEvent>>>;
+
+fn assert_task_events(events: &[UiEvent], expected: &[(u64, &str, TaskState)]) {
+    for (id, host, state) in expected {
+        let task = TaskId(*id);
+        let description = format!("query runtime kernel on {host}");
+        let actual = events
+            .iter()
+            .filter(|event| match event {
+                UiEvent::TaskPending { task: id, .. }
+                | UiEvent::TaskStarted { task: id, .. }
+                | UiEvent::TaskFinished { task: id, .. } => *id == task,
+                _ => false,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            actual,
+            [
+                &UiEvent::TaskPending {
+                    task,
+                    description: description.clone()
+                },
+                &UiEvent::TaskStarted { task, description },
+                &UiEvent::TaskFinished {
+                    task,
+                    state: *state
+                },
+            ]
+        );
+    }
+    assert_eq!(events.len(), expected.len() * 3);
+}
+
+fn events() -> (EventSink, tokio::task::JoinHandle<String>, Lifecycle) {
     let (events, mut receiver) = EventSink::channel(1);
+    let lifecycle = Arc::new(Mutex::new(Vec::new()));
+    let recorded = lifecycle.clone();
     let task = tokio::spawn(async move {
         let mut output = String::new();
         while let Some(delivery) = receiver.receive().await {
             let (event, ack) = delivery.into_parts();
-            let UiEvent::Diagnostic {
-                stream: OutputStream::Stdout,
-                text,
-                ..
-            } = event
-            else {
-                panic!("feature output remains on original stdout")
-            };
-            output.push_str(&text);
+            match event {
+                UiEvent::Diagnostic {
+                    stream: OutputStream::Stdout,
+                    text,
+                    ..
+                } => output.push_str(&text),
+                event @ (UiEvent::TaskPending { .. }
+                | UiEvent::TaskStarted { .. }
+                | UiEvent::TaskFinished { .. }) => recorded.lock().unwrap().push(event),
+                _ => panic!("unexpected feature event"),
+            }
             ack.acknowledge(Ok(()));
         }
         output
     });
-    (events, task)
+    (events, task, lifecycle)
 }
 struct Fixture {
     dir: tempfile::TempDir,
@@ -138,7 +175,6 @@ impl Fixture {
             cancellation: cancel,
             mutation: guard,
             ssh_config: None,
-            task: TaskId(1),
         }
     }
 }
@@ -162,10 +198,15 @@ async fn normalization_and_insertion_order_match_preserved_ruby_site_capture() {
     ]);
     let cancel = CancellationToken::new();
     let guard = MutationLock::acquire(&fixture.root, &cancel).await.unwrap();
-    let (events, output) = events();
+    let (events, output, lifecycle) = events();
     let report = refresh(
         &fixture.context(&runner, &events, &cancel, &guard),
-        &[MachineId(0), MachineId(1), MachineId(2), MachineId(3)],
+        &[
+            (MachineId(0), TaskId(1)),
+            (MachineId(1), TaskId(2)),
+            (MachineId(2), TaskId(3)),
+            (MachineId(3), TaskId(4)),
+        ],
     )
     .await
     .unwrap();
@@ -181,10 +222,29 @@ async fn normalization_and_insertion_order_match_preserved_ruby_site_capture() {
         4,
         "unmanaged/carried are not silently filtered"
     );
+    assert_eq!(
+        runner
+            .calls
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(_, task)| *task)
+            .collect::<Vec<_>>(),
+        [TaskId(1), TaskId(2), TaskId(3), TaskId(4)]
+    );
     drop(events);
     let output = output.await.unwrap();
     assert!(output.starts_with(&format!("{:<50} KERNEL\n", "HOST")));
     assert!(!output.contains("ignored stderr"));
+    assert_task_events(
+        &lifecycle.lock().unwrap(),
+        &[
+            (1, "nodes/a", TaskState::Succeeded),
+            (2, "nodes/b", TaskState::Succeeded),
+            (3, "carrier#b", TaskState::Succeeded),
+            (4, "nodes/off", TaskState::Succeeded),
+        ],
+    );
 }
 
 #[tokio::test]
@@ -199,10 +259,10 @@ async fn nonfatal_hosts_delete_only_selected_keys_and_keep_unknown_values_ordere
     ]);
     let cancel = CancellationToken::new();
     let guard = MutationLock::acquire(&fixture.root, &cancel).await.unwrap();
-    let (events, output) = events();
+    let (events, output, lifecycle) = events();
     let report = refresh(
         &fixture.context(&runner, &events, &cancel, &guard),
-        &[MachineId(0), MachineId(1)],
+        &[(MachineId(0), TaskId(1)), (MachineId(1), TaskId(2))],
     )
     .await
     .unwrap();
@@ -221,6 +281,13 @@ async fn nonfatal_hosts_delete_only_selected_keys_and_keep_unknown_values_ordere
     );
     drop(events);
     assert!(output.await.unwrap().contains("Error on nodes/a:"));
+    assert_task_events(
+        &lifecycle.lock().unwrap(),
+        &[
+            (1, "nodes/a", TaskState::Failed),
+            (2, "nodes/b", TaskState::Succeeded),
+        ],
+    );
 }
 
 #[tokio::test]
@@ -229,7 +296,7 @@ async fn zero_selected_preserves_scalar_and_literal_error_keeps_old_state() {
     let runner = Probe::new(vec![]);
     let cancel = CancellationToken::new();
     let guard = MutationLock::acquire(&fixture.root, &cancel).await.unwrap();
-    let (events, output) = events();
+    let (events, output, _) = events();
     let report = refresh(&fixture.context(&runner, &events, &cancel, &guard), &[])
         .await
         .unwrap();
@@ -258,11 +325,11 @@ async fn malformed_state_disabled_and_wrong_guard_fail_before_any_probe_or_outpu
     let runner = Probe::new(vec![]);
     let cancel = CancellationToken::new();
     let guard = MutationLock::acquire(&fixture.root, &cancel).await.unwrap();
-    let (events, output) = events();
+    let (events, output, _) = events();
     assert!(
         refresh(
             &fixture.context(&runner, &events, &cancel, &guard),
-            &[MachineId(0)]
+            &[(MachineId(0), TaskId(1))]
         )
         .await
         .is_err()
@@ -293,6 +360,7 @@ async fn malformed_state_disabled_and_wrong_guard_fail_before_any_probe_or_outpu
 struct FailingAndBlocked {
     started: AtomicUsize,
     joined: AtomicUsize,
+    entered: tokio::sync::Barrier,
 }
 impl ProcessRunner for FailingAndBlocked {
     async fn run(
@@ -301,6 +369,7 @@ impl ProcessRunner for FailingAndBlocked {
         scope: ProcessScope,
     ) -> Result<ProcessOutcome, ConfctlError> {
         let index = self.started.fetch_add(1, Ordering::SeqCst);
+        self.entered.wait().await;
         let result = if index == 0 {
             Err(ConfctlError::Io {
                 operation: "fixture spawn fault",
@@ -321,13 +390,14 @@ async fn infrastructure_failure_cancels_and_joins_every_probe_without_publicatio
     let runner = FailingAndBlocked {
         started: AtomicUsize::new(0),
         joined: AtomicUsize::new(0),
+        entered: tokio::sync::Barrier::new(2),
     };
     let cancel = CancellationToken::new();
     let guard = MutationLock::acquire(&fixture.root, &cancel).await.unwrap();
-    let (events, output) = events();
+    let (events, output, _) = events();
     let error = refresh(
         &fixture.context(&runner, &events, &cancel, &guard),
-        &[MachineId(0), MachineId(1)],
+        &[(MachineId(0), TaskId(1)), (MachineId(1), TaskId(2))],
     )
     .await
     .unwrap_err();
@@ -347,16 +417,22 @@ async fn failed_output_ack_never_publishes_a_completed_merge() {
     let guard = MutationLock::acquire(&fixture.root, &cancel).await.unwrap();
     let (events, mut receiver) = EventSink::channel(1);
     let consumer = tokio::spawn(async move {
-        receiver
-            .receive()
-            .await
-            .unwrap()
-            .acknowledge(Err("output fault".into()));
+        while let Some(delivery) = receiver.receive().await {
+            let reject = matches!(delivery.event, UiEvent::Diagnostic { .. });
+            delivery.acknowledge(if reject {
+                Err("output fault".into())
+            } else {
+                Ok(())
+            });
+            if reject {
+                break;
+            }
+        }
     });
     assert!(
         refresh(
             &fixture.context(&runner, &events, &cancel, &guard),
-            &[MachineId(0)]
+            &[(MachineId(0), TaskId(1))]
         )
         .await
         .is_err()
@@ -365,8 +441,218 @@ async fn failed_output_ack_never_publishes_a_completed_merge() {
     assert_eq!(fixture.state().as_deref(), Some("{\"a\":\"old\"}"));
 }
 
+struct BlockedProbes {
+    entered: tokio::sync::Barrier,
+    joined: AtomicUsize,
+    second_succeeds: bool,
+}
+impl ProcessRunner for BlockedProbes {
+    async fn run(
+        &self,
+        _: ProcessSpec,
+        scope: ProcessScope,
+    ) -> Result<ProcessOutcome, ConfctlError> {
+        self.entered.wait().await;
+        let result = if self.second_succeeds && scope.task == TaskId(2) {
+            Ok(outcome(0, b"6.12.3\n".to_vec(), Vec::new()))
+        } else {
+            scope.cancellation.cancelled().await;
+            Err(ConfctlError::Cancelled)
+        };
+        self.joined.fetch_add(1, Ordering::SeqCst);
+        result
+    }
+}
+
+#[tokio::test]
+async fn cancellation_joins_running_probes_and_reports_canceled_without_publication() {
+    let fixture = Fixture::new(&["a", "b"], Some("{\"old\":true}"));
+    let runner = BlockedProbes {
+        entered: tokio::sync::Barrier::new(3),
+        joined: AtomicUsize::new(0),
+        second_succeeds: false,
+    };
+    let cancel = CancellationToken::new();
+    let guard = MutationLock::acquire(&fixture.root, &cancel).await.unwrap();
+    let (events, output, lifecycle) = events();
+    let context = fixture.context(&runner, &events, &cancel, &guard);
+    let (result, ()) = tokio::join!(
+        refresh(
+            &context,
+            &[(MachineId(0), TaskId(1)), (MachineId(1), TaskId(2))]
+        ),
+        async {
+            runner.entered.wait().await;
+            cancel.cancel();
+        },
+    );
+    assert!(result.unwrap_err().is_cancelled());
+    assert_eq!(runner.joined.load(Ordering::SeqCst), 2);
+    assert_eq!(fixture.state().as_deref(), Some("{\"old\":true}"));
+    drop(events);
+    assert!(output.await.unwrap().is_empty());
+    assert_task_events(
+        &lifecycle.lock().unwrap(),
+        &[(1, "a", TaskState::Canceled), (2, "b", TaskState::Canceled)],
+    );
+}
+
+#[tokio::test]
+async fn cancellation_after_admission_does_not_invent_probe_entry_or_success() {
+    let fixture = Fixture::new(&["a", "b"], Some("{}"));
+    let runner = Probe::new(vec![]);
+    let cancel = CancellationToken::new();
+    let guard = MutationLock::acquire(&fixture.root, &cancel).await.unwrap();
+    let (events, mut receiver) = EventSink::channel(1);
+    let cancellation = cancel.clone();
+    let consumer = tokio::spawn(async move {
+        let mut recorded = Vec::new();
+        while let Some(delivery) = receiver.receive().await {
+            if matches!(
+                delivery.event,
+                UiEvent::TaskPending {
+                    task: TaskId(2),
+                    ..
+                }
+            ) {
+                cancellation.cancel();
+            }
+            let (event, ack) = delivery.into_parts();
+            recorded.push(event);
+            ack.acknowledge(Ok(()));
+        }
+        recorded
+    });
+    let error = refresh(
+        &fixture.context(&runner, &events, &cancel, &guard),
+        &[(MachineId(0), TaskId(1)), (MachineId(1), TaskId(2))],
+    )
+    .await
+    .unwrap_err();
+    assert!(error.is_cancelled());
+    assert!(runner.calls.lock().unwrap().is_empty());
+    assert_eq!(fixture.state().as_deref(), Some("{}"));
+    drop(events);
+    assert_eq!(
+        consumer.await.unwrap(),
+        [
+            UiEvent::TaskPending {
+                task: TaskId(1),
+                description: "query runtime kernel on a".into()
+            },
+            UiEvent::TaskPending {
+                task: TaskId(2),
+                description: "query runtime kernel on b".into()
+            },
+            UiEvent::TaskFinished {
+                task: TaskId(1),
+                state: TaskState::Canceled
+            },
+            UiEvent::TaskFinished {
+                task: TaskId(2),
+                state: TaskState::Canceled
+            },
+        ]
+    );
+}
+
+#[tokio::test]
+async fn rejected_final_cancels_and_joins_peer_without_publishing() {
+    let fixture = Fixture::new(&["a", "b"], Some("{\"old\":true}"));
+    let runner = BlockedProbes {
+        entered: tokio::sync::Barrier::new(2),
+        joined: AtomicUsize::new(0),
+        second_succeeds: true,
+    };
+    let cancel = CancellationToken::new();
+    let guard = MutationLock::acquire(&fixture.root, &cancel).await.unwrap();
+    let (events, mut receiver) = EventSink::channel(1);
+    let consumer = tokio::spawn(async move {
+        let mut finals = Vec::new();
+        while let Some(delivery) = receiver.receive().await {
+            let reject = matches!(
+                delivery.event,
+                UiEvent::TaskFinished {
+                    task: TaskId(2),
+                    ..
+                }
+            );
+            if let UiEvent::TaskFinished { task, state } = &delivery.event {
+                finals.push((*task, *state));
+            }
+            delivery.acknowledge(if reject {
+                Err("final output fault".into())
+            } else {
+                Ok(())
+            });
+        }
+        finals
+    });
+    let error = refresh(
+        &fixture.context(&runner, &events, &cancel, &guard),
+        &[(MachineId(0), TaskId(1)), (MachineId(1), TaskId(2))],
+    )
+    .await
+    .unwrap_err();
+    assert!(error.to_string().contains("final output fault"));
+    assert_eq!(runner.joined.load(Ordering::SeqCst), 2);
+    assert_eq!(fixture.state().as_deref(), Some("{\"old\":true}"));
+    drop(events);
+    assert_eq!(
+        consumer.await.unwrap(),
+        [
+            (TaskId(2), TaskState::Succeeded),
+            (TaskId(1), TaskState::Canceled)
+        ]
+    );
+}
+
+#[tokio::test]
+async fn duplicate_host_or_task_and_invalid_specs_fail_before_admission() {
+    let mut fixture = Fixture::new(&["a", "b"], Some("{}"));
+    let runner = Probe::new(vec![]);
+    let cancel = CancellationToken::new();
+    let guard = MutationLock::acquire(&fixture.root, &cancel).await.unwrap();
+    let (events, output, lifecycle) = events();
+    for tasks in [
+        vec![(MachineId(0), TaskId(1)), (MachineId(0), TaskId(2))],
+        vec![(MachineId(0), TaskId(1)), (MachineId(1), TaskId(1))],
+        vec![(MachineId(0), TaskId(0))],
+        vec![(MachineId(99), TaskId(1))],
+    ] {
+        assert!(
+            refresh(&fixture.context(&runner, &events, &cancel, &guard), &tasks)
+                .await
+                .is_err()
+        );
+    }
+    fixture.inventory.machines[1].name = "a".into();
+    assert!(
+        refresh(
+            &fixture.context(&runner, &events, &cancel, &guard),
+            &[(MachineId(0), TaskId(1)), (MachineId(1), TaskId(2))]
+        )
+        .await
+        .is_err()
+    );
+    fixture.inventory.machines[0].metadata["host"]["target"] = Value::Null;
+    assert!(
+        refresh(
+            &fixture.context(&runner, &events, &cancel, &guard),
+            &[(MachineId(0), TaskId(1))]
+        )
+        .await
+        .is_err()
+    );
+    assert!(runner.calls.lock().unwrap().is_empty());
+    drop(events);
+    assert!(output.await.unwrap().is_empty());
+    assert!(lifecycle.lock().unwrap().is_empty());
+    assert_eq!(fixture.state().as_deref(), Some("{}"));
+}
+
 struct ReverseProbe {
-    second: tokio::sync::Notify,
+    second: Arc<tokio::sync::Notify>,
     completed: Mutex<Vec<String>>,
 }
 impl ProcessRunner for ReverseProbe {
@@ -378,8 +664,6 @@ impl ProcessRunner for ReverseProbe {
         let name = spec.args[2].to_str().unwrap();
         if name == "a.invalid" {
             self.second.notified().await;
-        } else {
-            self.second.notify_one();
         }
         self.completed.lock().unwrap().push(name.into());
         Ok(outcome(0, b"6.12.3\n".to_vec(), Vec::new()))
@@ -389,15 +673,40 @@ impl ProcessRunner for ReverseProbe {
 async fn concurrent_reverse_completion_still_renders_and_saves_selection_order() {
     let fixture = Fixture::new(&["a", "b"], None);
     let runner = ReverseProbe {
-        second: tokio::sync::Notify::new(),
+        second: Arc::new(tokio::sync::Notify::new()),
         completed: Mutex::new(Vec::new()),
     };
     let cancel = CancellationToken::new();
     let guard = MutationLock::acquire(&fixture.root, &cancel).await.unwrap();
-    let (events, output) = events();
+    let (events, mut receiver) = EventSink::channel(1);
+    let release = runner.second.clone();
+    let state = fixture.dir.path().join("configs/node/kernels.json");
+    let output = tokio::spawn(async move {
+        let mut output = String::new();
+        let mut lifecycle = Vec::new();
+        while let Some(delivery) = receiver.receive().await {
+            let (event, ack) = delivery.into_parts();
+            if let UiEvent::Diagnostic { text, .. } = event {
+                output.push_str(&text);
+            } else {
+                if event
+                    == (UiEvent::TaskFinished {
+                        task: TaskId(2),
+                        state: TaskState::Succeeded,
+                    })
+                {
+                    assert!(!state.exists(), "a completed probe is not a saved refresh");
+                    release.notify_one(); // First runner cannot finish before this final is delivered.
+                }
+                lifecycle.push(event);
+            }
+            ack.acknowledge(Ok(()));
+        }
+        (output, lifecycle)
+    });
     let report = refresh(
         &fixture.context(&runner, &events, &cancel, &guard),
-        &[MachineId(0), MachineId(1)],
+        &[(MachineId(0), TaskId(1)), (MachineId(1), TaskId(2))],
     )
     .await
     .unwrap();
@@ -418,10 +727,24 @@ async fn concurrent_reverse_completion_still_renders_and_saves_selection_order()
         "{\n  \"a\": \"6.12.3\",\n  \"b\": \"6.12.3\"\n}"
     );
     drop(events);
+    let (output, lifecycle) = output.await.unwrap();
+    let finals = lifecycle
+        .iter()
+        .filter_map(|event| match event {
+            UiEvent::TaskFinished { task, .. } => Some(*task),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(finals, [TaskId(2), TaskId(1)]);
+    assert_task_events(
+        &lifecycle,
+        &[
+            (1, "a", TaskState::Succeeded),
+            (2, "b", TaskState::Succeeded),
+        ],
+    );
     assert_eq!(
         output
-            .await
-            .unwrap()
             .lines()
             .skip(1)
             .map(|line| line.split_whitespace().next().unwrap().to_string())
@@ -509,10 +832,10 @@ async fn refresh_keeps_unselected_huge_integers_float_bytes_nested_empties_and_o
     let runner = Probe::new(vec![(0, b"6.12.3\n".to_vec(), Vec::new())]);
     let cancel = CancellationToken::new();
     let guard = MutationLock::acquire(&fixture.root, &cancel).await.unwrap();
-    let (events, output) = events();
+    let (events, output, _) = events();
     refresh(
         &fixture.context(&runner, &events, &cancel, &guard),
-        &[MachineId(0)],
+        &[(MachineId(0), TaskId(1))],
     )
     .await
     .unwrap();
@@ -542,8 +865,12 @@ async fn encoding_failure_after_joined_probe_or_empty_selection_never_publishes(
         });
         let cancel = CancellationToken::new();
         let guard = MutationLock::acquire(&fixture.root, &cancel).await.unwrap();
-        let (events, output) = events();
-        let ids = if selected { &[MachineId(0)][..] } else { &[] };
+        let (events, output, _) = events();
+        let ids = if selected {
+            &[(MachineId(0), TaskId(1))][..]
+        } else {
+            &[]
+        };
         let error = refresh(&fixture.context(&runner, &events, &cancel, &guard), ids)
             .await
             .unwrap_err();
