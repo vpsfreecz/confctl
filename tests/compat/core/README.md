@@ -1,5 +1,28 @@
 # Core compatibility oracle
 
+## Candidate comparison
+
+The [behavioral contract](../../../docs/compatibility.md#candidate-acceptance-by-consumer)
+preserves actions/effects, status and useful information without Ruby human-frame
+byte parity. Core candidates return MATCH, DIFFERENT or UNQUALIFIED.
+Ordered OS child calls, paths/modes/link targets, typed outcomes and persisted
+JSON values remain checked. Closed table/diagnostic profiles allow documented
+presentation differences; unrecognized prose or changed file-reader semantics
+stay UNQUALIFIED. Known operational field/header/list output keeps complete record meaning.
+Help/usage stays separate; unknown reflow is UNQUALIFIED. Parser refusal never
+falls back to token equality, and only LF/CRLF records are interpreted.
+JSON conversion/depth limits are UNQUALIFIED with an explicit reader-limit reason.
+Baseline replay and LOCK-JSON-01 provenance remain unchanged.
+
+Raw captures never change. Mixed SSH display/child bytes and opaque boot/wire
+payloads need their separate raw consumer evidence; changed normalized text is
+insufficient. Timing/live TUI, all helper/site adapters and native/monitoring
+limits retain their own gates. The new focused comparator cases exercise
+presentation differences and rejection of wrong targets/effects/statuses,
+typed values, missing information and broken field records; they do not qualify
+a product or run the fixed compiler batch.
+
+
 `baseline.tar.gz` preserves the complete Ruby source at the revision in
 `baseline.json`. The runner verifies its SHA256 before extracting it. It does
 not resolve a moving Git branch, use the candidate library, or require the
@@ -60,10 +83,10 @@ an inferred application timeout contract.
 Normalization replaces only the per-case directory, extracted source directory,
 logger filename timestamp and explicit temporary-file nonces. Fixed generation
 names and saved timestamps remain compared. Child calls and side effects retain
-order. No timing-footer exception is implemented here yet: the Rust timing
-package must add a strict suffix parser with its own assertions before the
-accepted stderr appendix can pass. Do not discard stderr or change the Ruby
-oracle to accommodate candidate output.
+order. No timing-appendix information contract is implemented here yet. An
+uninterpreted changed appendix stays UNQUALIFIED; timing meaning and live
+behavior need their owning checks, not a Ruby punctuation requirement. Do not
+discard stderr or change the Ruby oracle to accommodate candidate output.
 
 GC-01 is a separate adjudicated baseline defect: Ruby crashes on `.line` after
 successful child progress and on the empty-stream flush after a failed child.

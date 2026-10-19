@@ -93,7 +93,12 @@ wait-error termination and driver containment still need native evidence. These 
 review/acceptance gates. No signal disposition or product cancellation policy
 is altered to make a fixture pass.
 
-All original/helper candidate stderr comparisons remain exact per their named
-rows. The 27 unobserved error groups in the bounded inventory are unqualified.
+The frozen driver keeps exact comparisons for its named historical stderr
+rows and remains unchanged. Prospective acceptance preserves actionable
+condition/context, stream role, status and effects under the
+[behavioral contract](../../../../docs/compatibility.md#candidate-acceptance-by-consumer);
+human wording/coordinates may differ only with an adequate information rule.
+Core comparator changes do not supply a helper adapter, broader parser/codec
+evidence or native custody. The 27 unobserved error groups remain unqualified.
 Do not filter traceback-looking output, append inferred expectations, regenerate
 frozen data or extend CARRIER-01/KEXEC-02/HELPER-DIAG-01/KEXEC-03 by error class.

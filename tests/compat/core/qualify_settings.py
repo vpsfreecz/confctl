@@ -71,7 +71,7 @@ def validate(actual, case):
         return
     if case["id"] == "settings-build-declined":
         assert actual["exit"] == 1 and len(events) == 3
-        assert actual["stderr"].endswith("error: Aborted\n")
+        # Candidate diagnostic information is checked by compare_frame, not Ruby prose.
         assert all("--show-trace" not in event["argv"] and "cores" not in event["argv"] for event in events)
         return
     assert actual["exit"] == 0
@@ -85,7 +85,7 @@ def validate(actual, case):
     else:
         assert all("--show-trace" not in event["argv"] and "cores" not in event["argv"] for event in events)
     if case["id"] in ("settings-two-read", "settings-selection-trace-ignored"):
-        assert actual["stdout"] == "NAME\nalpha\nno-target\n"
+        # Candidate field/host information is checked by compare_frame.
         assert "--impure" in events[-1]["argv"]
         assert "9" not in events[-1]["argv"]
     if case["id"] == "settings-null-jobs":
@@ -110,7 +110,7 @@ def main():
         parser.error("unknown case ID")
     core.seed = seed
     executed = []
-    failures = []
+    failures, unqualified_cases = [], []
     with tempfile.TemporaryDirectory(prefix="confctl-settings-oracle-") as scratch:
         oracle = core.export_baseline(Path(scratch))
         command = [str(args.candidate.resolve())] if args.candidate else [shutil.which("ruby"), str(oracle / "bin/confctl")]
@@ -127,15 +127,22 @@ def main():
             if args.record_output:
                 core.write_json(target, actual)
             else:
-                if actual != json.loads(target.read_text()):
+                comparison = core.compare_frame(case, json.loads(target.read_text()), actual,
+                                                candidate=bool(args.candidate))
+                if comparison["outcome"] == "DIFFERENT":
                     failures.append(case["id"])
-            print(("FAIL " if case["id"] in failures else "PASS ") + case["id"], flush=True)
+                elif comparison["outcome"] == "UNQUALIFIED":
+                    unqualified_cases.append(case["id"])
+                if comparison["observations"] or comparison["outcome"] != "MATCH":
+                    print("DETAIL " + case["id"] + ": " + json.dumps(comparison, sort_keys=True), flush=True)
+            label = "FAIL " if case["id"] in failures else "UNQUALIFIED " if case["id"] in unqualified_cases else "PASS "
+            print(label + case["id"], flush=True)
             executed.append(case["id"])
     core.write_json(args.evidence / "qualification.json", dict(
         baseline=core.BASELINE, candidate=str(args.candidate) if args.candidate else None,
-        cases=executed, failures=failures, sources={name: hashlib.sha256((HERE / name).read_bytes()).hexdigest()
+        cases=executed, failures=failures, unqualified=unqualified_cases, sources={name: hashlib.sha256((HERE / name).read_bytes()).hexdigest()
                                 for name in ("baseline.tar.gz", "qualify_settings.py", "child_settings.py")}))
-    return bool(failures)
+    return bool(failures or unqualified_cases)
 
 
 if __name__ == "__main__":

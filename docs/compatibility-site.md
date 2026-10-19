@@ -1,5 +1,28 @@
 # Site and remote-helper compatibility oracle
 
+## Behavioral acceptance and retained observations
+
+The original Ruby sources, oracle assertions and captures below remain
+immutable historical evidence. Candidate acceptance preserves invocation,
+consent, targets, ordered actions, native outcomes, state, supported-reader
+meaning and useful information on its correct stream. Human wording, table
+padding and diagnostic coordinates may improve. See the
+[consumer-specific contract](compatibility.md#candidate-acceptance-by-consumer).
+
+Every exact-byte predicate needs its consumer: OS argv/stdin/path spelling,
+helper state tokens, boot loaders and opaque downloaded content retain their
+specified bytes. JSON/Nix data need typed value/reader and filesystem evidence;
+a lexical difference alone does not establish a different effect. A changed
+human diagnostic still needs a supported condition/context comparison, and an
+unknown interpretation stays unqualified. No arbitrary stderr line is filtered.
+
+The core comparator proposal does not modify these Ruby helper/site oracles
+or the frozen diagnostic driver. Their required candidate adapters and native
+evidence remain separate dependencies. In particular it does not repair codec
+infrastructure/custody/monitoring failures, accept all helper parser groups,
+or turn historical fake-service captures into current product qualification.
+
+
 The two site scripts and four installed helpers have executable Ruby oracles
 under `tests/compat/site/` and `tests/compat/helpers/`. They complement the
 [main CLI contract](compatibility.md). These are test dependencies; no Ruby
@@ -65,7 +88,7 @@ are confined to the disposable root.
 
 | Surface | Assertions |
 | --- | --- |
-| Runtime kernel command | CLI/help, argument failure, exact-name/key/brace selection, repeated attr/tag filters, managed/carried distinction, yes/no/blank/EOF, ordering, stdout normalization, permissive state and nonfatal host failures |
+| Runtime kernel command | CLI/help, argument failure, exact-name/key/brace selection, repeated attr/tag filters, managed/carried distinction, yes/no/blank/EOF, effect ordering, useful stdout information, permissive state and nonfatal host failures |
 | Deployment refresh | Confirmed managed scope narrowed to non-carried vpsAdminOS; four actions; generation lookup/build ordering; copy-only/one-by-one and later already-current handling; empty subset and standalone build exclusion |
 | Netboot inventory | Rediscover/add/rename stage, fresh core list, spin/managed/carried selection, exact generated data, empty list and partial failure |
 | Auto rollback | CLI/help/errors; `switching` → `switched` → external `confirmed`, removal on confirmation, timeout rollback to captured old system with same action |

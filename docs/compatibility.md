@@ -1,5 +1,47 @@
 # CLI and state compatibility during the Rust replacement
 
+## Candidate acceptance by consumer
+
+Candidate acceptance preserves command meaning, selection, consent, effects,
+native outcome and useful information. Human sentences, padding, table geometry
+and diagnostic source coordinates need not reproduce Ruby. Live TUI/progress is
+required by the product contract; a pipe snapshot cannot prove it.
+
+The core candidate comparator distinguishes MATCH, DIFFERENT and UNQUALIFIED.
+It preserves ordered child argv/stdin/cwd, path sets/modes/link targets, typed
+outcomes and persisted JSON values. JSON comparison rejects ambiguous duplicate
+keys/nonfinite values and preserves integer/decimal, boolean, string, null and
+absence distinctions without float or context rounding. Reader conversion/depth
+limits return reasoned UNQUALIFIED outcomes, distinct from malformed content. Unknown changed Nix or other
+file contents require their named reader; they are not silently normalized.
+
+Closed fixture table profiles compare fields, values, host association and
+duplicate rows while allowing display row order, header aliases and whitespace
+layout under a complete declared LF/CRLF record grammar. Operational
+output/header/list profiles bind the known invocation and preserve record order;
+help/usage never inherits them merely from an option token. Two named stderr conditions interpret invalid flake.lock JSON and
+declined build confirmation, retaining severity, resource and log locator.
+Observed coordinates remain in the comparison detail and faithful raw capture;
+there is no generic coordinate deletion or traceback filter. A selected profile
+must interpret the complete stream; parser refusal never falls through to a
+lexical MATCH. Proven condition/locator/severity or record loss is DIFFERENT.
+Unsupported syntax, help reflow and other changed prose remain UNQUALIFIED
+without a supported information contract.
+
+A missing host result, changed status/effect/value or lost/moved error is a
+difference. An unqualified case returns a nonzero harness result separately
+from a demonstrated difference; neither is a new product exit policy. Mixed
+SSH child data/display and boot/wire/opaque payloads still require actual raw
+byte evidence for their consumers. The existing normalized core frame cannot
+supply that proof for arbitrary changed payloads.
+
+Original Ruby replay remains an immutable-observation integrity check. Recording
+cannot use a candidate, original expected payloads never change, and
+LOCK-JSON-01 keeps its baseline/override hashes and full historical frame.
+This comparator does not accept new parser syntax, helper native behavior,
+codec/custody/monitoring gaps, every TUI transition or unimplemented routes.
+
+
 The Ruby compatibility baseline is
 `cc40679d267165aecfa569128438bb55fe910268`. Its executable and library are
 preserved in `tests/compat/core/baseline.tar.gz`, bound by a SHA256 and tree ID in
@@ -79,12 +121,16 @@ observed corrupt first-object-key diagnostic to
 `invalid JSON in flake.lock at line {line} column {column}`, using structured
 serde coordinates. Its full candidate expectation is separate from the unchanged
 Ruby result. This one case establishes no general Ruby/serde parse acceptance,
-coordinate, other syntax, scalar or I/O diagnostic equivalence. The comparator
-checks complete streams/status, child order/argv/cwd and non-log file effects,
-plus retained log names/modes; raw log bodies remain separate evidence.
+coordinate, other syntax, scalar or I/O diagnostic equivalence. That historical expectation retains complete streams/status and effects. The
+successor candidate comparator checks stream-role information, native outcome,
+child order/argv/cwd, non-log file meaning and retained log names/modes. Raw
+streams and log bodies remain separate faithful evidence; an uninterpreted
+change is unqualified, not an inferred broader parser match.
 
-Nix child failures with complete captures preserve the baseline command escaping,
-native exit or signal value and separate stdout/stderr diagnostics. Error
+Nix child failures with complete captures preserve actual OS argv/stdin,
+native exit or signal value and faithful separate stdout/stderr. Human command
+escaping may differ while retaining accurate actionable context; it is never
+reparsed to execute a command. Error
 `Debug` and `Display` keep command arguments and captured bytes redacted. After
 process owners have joined, the app appends labeled fatal captures, including
 incomplete prefixes, to the invocation log. It verifies the appended bytes,
@@ -94,8 +140,9 @@ the log error after the original failure. A log filename alone does not prove
 capture retention; partial captures do not establish a complete stream.
 Presentation replay offsets and pending bytes retain their separate evidence path.
 
-Confirmation displays `Continue? [y/N]: ` but only explicit `y`/`n` terminates
-the loop; blank input loops, EOF errors. `--yes` bypasses the confirmation's
+Confirmation historically displays `Continue? [y/N]: `. Its input meaning
+remains: only explicit `y`/`n` terminates the loop; blank input loops, EOF errors.
+The wording may improve while preserving the preview, safe default and choice. `--yes` bypasses the confirmation's
 selection-description block too. Interactive per-host questions may override
 yes. Redirected output never grants consent. Preserve explicit input ownership
 when switching between live display, prompts and interactive SSH.
@@ -190,14 +237,18 @@ omit synthetic credential values. It does not contact production, execute actual
 SSH, activate systems, collect host garbage or build closures. It must preserve
 separate raw streams, native status, child order/argv/input and final file/link
 effects. Temporary paths/logger times
-and bounded file nonces may be normalized; machine values, fixed generation
-dates, exits, diagnostics and result ordering may not be broadly normalized.
+and bounded file nonces retain their existing normalization. Machine values,
+fixed generation dates, native exits and effects must not be normalized away.
+Human diagnostics/result layout use their named information contracts; raw
+captures are retained, and no generic output filter can establish meaning.
 
 Before replacing Ruby, require independently checked candidate comparison,
 focused domain/state/process tests, real PTY cases, candidate API authentication
 and data-generation equivalence, package closure/platform checks and disposable
 mixed-version VM acceptance. A complete route manifest or successful `--help` run does not
-satisfy operational acceptance. The intended timing footer requires a strict
-validated terminal suffix splitter and direct timing assertions, while retaining
-the rest of stderr. Help/list/input/comparison/data routes must not accidentally
-acquire a timing report.
+satisfy operational acceptance. Timing acceptance requires bounded separation
+of an actual appendix from diagnostics plus direct timing/accounting assertions;
+it does not require historical punctuation or decimal layout. Existing frozen
+strict suffix adapters remain historical source until separately changed, and
+uninterpreted appendices cannot simply be dropped. Help/list/input/comparison/
+data routes must not accidentally acquire a timing report.

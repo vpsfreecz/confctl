@@ -127,9 +127,18 @@ decoder defaults and a checked transport drain alone do not establish parity.
 
 ## Compatibility evidence
 
-[Bounded diagnostic exceptions](helper-diagnostics.md) identify the only approved
-ordinary diagnostic changes. Other unobserved parser/I/O groups do not inherit
-those exceptions. Original raw captures, classes and byte expectations remain
+Candidate acceptance preserves command effects, status and useful human
+information under the [behavioral consumer contract](compatibility.md#candidate-acceptance-by-consumer).
+Human presentation changes do not alter the required helper state tokens,
+OS argv/stdin/path semantics, boot payload bytes, supported-reader values or
+publication/rollback ordering. Uninterpreted diagnostics and missing native
+proof remain unqualified. Live activity/progress is a product requirement,
+with its own route/terminal evidence.
+
+
+[Bounded diagnostic observations](helper-diagnostics.md) retain the exact named
+historical changes and their provenance. They do not qualify other unobserved
+parser/I/O groups, and the newer presentation policy does not fill their gaps. Original raw captures, classes and byte expectations remain
 immutable, including the full 52-entry first-publication failure result.
 
 [Qualification support](../tests/compat/helpers/qualification/README.md) records

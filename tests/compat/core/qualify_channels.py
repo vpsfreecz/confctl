@@ -175,7 +175,7 @@ def main():
         args.record_output.mkdir(parents=True, exist_ok=True)
     core.seed = seed
     core.snapshot = snapshot
-    failures = []
+    failures, unqualified_cases = [], []
     overrides = {}
     with tempfile.TemporaryDirectory(prefix="confctl-channels-oracle-") as scratch:
         oracle = core.export_baseline(Path(scratch))
@@ -194,8 +194,13 @@ def main():
                     expected, decision = expected_frame(args.expected_dir, case, args.candidate)
                     if decision:
                         overrides[case["id"]] = decision
-                    if actual != expected:
+                    comparison = core.compare_frame(case, expected, actual, candidate=bool(args.candidate))
+                    if comparison["outcome"] == "DIFFERENT":
                         failures.append(case["id"])
+                    elif comparison["outcome"] == "UNQUALIFIED":
+                        unqualified_cases.append(case["id"])
+                    if comparison["observations"] or comparison["outcome"] != "MATCH":
+                        print("DETAIL " + case["id"] + ": " + json.dumps(comparison, sort_keys=True), flush=True)
             except (AssertionError, RuntimeError) as error:
                 failures.append(case["id"])
                 print(f"FAIL {case['id']}: {error}", flush=True)
@@ -204,14 +209,15 @@ def main():
                     held_writer.close()
                     held_writer = None
                     writer_identity = None
-            print(("FAIL " if case["id"] in failures else "PASS ") + case["id"], flush=True)
+            label = "FAIL " if case["id"] in failures else "UNQUALIFIED " if case["id"] in unqualified_cases else "PASS "
+            print(label + case["id"], flush=True)
     core.write_json(args.evidence / "qualification.json", dict(baseline=core.BASELINE,
-        cases=[case["id"] for case in selected], failures=failures, candidate=str(args.candidate) if args.candidate else None,
+        cases=[case["id"] for case in selected], failures=failures, unqualified=unqualified_cases, candidate=str(args.candidate) if args.candidate else None,
         candidate_overrides=overrides,
         sources={name: hashlib.sha256((HERE / name).read_bytes()).hexdigest()
                  for name in ["baseline.tar.gz", "qualify_channels.py", "child_channels.py"]},
         log_scope="Exact retained log names/modes; original raw log contents kept separately, without content normalization/parity claim"))
-    return bool(failures)
+    return bool(failures or unqualified_cases)
 
 
 if __name__ == "__main__":
