@@ -44,6 +44,162 @@ async fn nonzero_status_keeps_independent_binary_streams() {
 }
 
 #[tokio::test]
+async fn merged_native_writes_keep_one_ordered_capture_relay_and_log() {
+    for limit in [32, 65_536] {
+        let directory = tempfile::tempdir().unwrap();
+        let log_path = directory.path().join("command.log");
+        let log = ProcessLog::new(File::create(&log_path).await.unwrap());
+        let (runner, mut receiver) = owner(directory.path(), limit, Some(log));
+        let mut spec = shell(
+            "test /proc/self/fd/1 -ef /proc/self/fd/2 || exit 91; i=0; while [ $i -lt 256 ]; do printf 'out\\000'; printf 'err\\377' >&2; i=$((i+1)); done; exit 7",
+        );
+        spec.stdout = StreamPolicy::CaptureAndForward;
+        spec.stderr = StreamPolicy::MergeToStdout;
+        let consumer = tokio::spawn(async move {
+            let mut bytes = Vec::new();
+            while let Some(delivery) = receiver.receive().await {
+                let (event, ack) = delivery.into_parts();
+                let UiEvent::Output {
+                    task,
+                    stream,
+                    bytes: chunk,
+                } = event
+                else {
+                    panic!("only merged output expected");
+                };
+                assert_eq!(task, TaskId(6));
+                assert_eq!(stream, OutputStream::Stdout);
+                bytes.extend(chunk);
+                ack.acknowledge(Ok(()));
+            }
+            bytes
+        });
+        let outcome = tokio::time::timeout(
+            Duration::from_secs(5),
+            runner.run(spec, ProcessScope::new(CancellationToken::new(), TaskId(6))),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let expected = b"out\0err\xff".repeat(256);
+        assert_eq!(outcome.code(), Some(7));
+        assert_eq!(capture_bytes(&outcome.stdout), expected);
+        assert!(outcome.stdout_complete);
+        assert_eq!(outcome.stdout.spool_path().is_some(), limit == 32);
+        assert!(matches!(outcome.stderr, Captured::Unavailable));
+        assert!(!outcome.stderr_complete);
+        runner.shutdown().await.unwrap();
+        drop(runner);
+        assert_eq!(consumer.await.unwrap(), expected);
+        assert_eq!(std::fs::read(log_path).unwrap(), expected);
+    }
+}
+
+#[tokio::test]
+async fn merged_delivery_failure_and_cancellation_join_and_retain_the_single_prefix() {
+    for reject in [false, true] {
+        let directory = tempfile::tempdir().unwrap();
+        let spools = directory.path().join("spools");
+        std::fs::create_dir(&spools).unwrap();
+        let marker = directory.path().join("leader");
+        let (runner, mut receiver) = owner(&spools, 0, None);
+        let mut spec = leader_fixture(
+            &marker,
+            "printf '%s' $$ > \"$1\"; printf out; printf err >&2; exec sleep 60",
+        );
+        // A failed forward-only delivery must retain its capture too.
+        spec.stdout = if reject {
+            StreamPolicy::Forward
+        } else {
+            StreamPolicy::CaptureAndForward
+        };
+        spec.stderr = StreamPolicy::MergeToStdout;
+        let cancel = CancellationToken::new();
+        let child_cancel = cancel.clone();
+        let running = runner.clone();
+        let run = tokio::spawn(async move {
+            running
+                .run(spec, ProcessScope::new(child_cancel, TaskId(7)))
+                .await
+        });
+        let delivery = tokio::time::timeout(Duration::from_secs(5), receiver.receive())
+            .await
+            .unwrap()
+            .unwrap();
+        // Hold the UI ack until both writes are captured by the single drain.
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let files = std::fs::read_dir(&spools)
+                    .unwrap()
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap();
+                assert_eq!(files.len(), 1);
+                if files[0].metadata().unwrap().len() == 6 {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .unwrap();
+        if reject {
+            delivery.acknowledge(Err("merged delivery failed".into()));
+        } else {
+            cancel.cancel();
+            delivery.acknowledge(Ok(()));
+        }
+        let result = tokio::time::timeout(Duration::from_secs(5), run)
+            .await
+            .unwrap()
+            .unwrap();
+        drop(receiver);
+        if reject {
+            let error = result.unwrap_err();
+            assert!(error.to_string().contains("merged delivery failed"));
+            let evidence = failure_evidence(&error);
+            assert!(evidence.status.is_some());
+            assert_eq!(capture_bytes(&evidence.stdout), b"outerr");
+            assert!(!evidence.stdout_complete);
+            assert!(matches!(evidence.stderr, Captured::Unavailable));
+            assert!(!evidence.stderr_complete);
+        } else {
+            let outcome = result.unwrap();
+            assert_eq!(outcome.termination, TerminationCause::Canceled);
+            assert_eq!(capture_bytes(&outcome.stdout), b"outerr");
+            assert!(!outcome.stdout_complete);
+            assert!(matches!(outcome.stderr, Captured::Unavailable));
+            assert!(!outcome.stderr_complete);
+        }
+        let pid = std::fs::read_to_string(marker).unwrap();
+        assert!(
+            !Path::new("/proc").join(pid).exists(),
+            "leader must be reaped"
+        );
+        runner.shutdown().await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn invalid_merged_output_policies_fail_before_spawn() {
+    let directory = tempfile::tempdir().unwrap();
+    let marker = directory.path().join("effect");
+    let (runner, _receiver) = owner(directory.path(), 128, None);
+    for stdout in [StreamPolicy::MergeToStdout, StreamPolicy::Foreground] {
+        let mut spec = leader_fixture(&marker, "touch \"$1\"");
+        spec.stdout = stdout;
+        spec.stderr = StreamPolicy::MergeToStdout;
+        assert!(matches!(
+            runner
+                .run(spec, ProcessScope::new(CancellationToken::new(), TaskId(8)))
+                .await,
+            Err(ConfctlError::Configuration(_))
+        ));
+        assert!(!marker.exists());
+    }
+    runner.shutdown().await.unwrap();
+}
+
+#[tokio::test]
 async fn both_pipes_spool_while_terminal_acknowledgement_is_held() {
     let directory = tempfile::tempdir().expect("spool directory");
     let (runner, mut receiver) = owner(directory.path(), 128, None);
