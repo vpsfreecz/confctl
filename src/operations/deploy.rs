@@ -29,6 +29,8 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 
+mod rollback;
+
 pub(super) async fn run(
     request: &DeployRequest,
     root: ConfigRoot,
@@ -548,7 +550,15 @@ fn copy_paths(
     rollback: AutoRollback,
 ) -> Result<Vec<OsString>, ConfctlError> {
     let mut paths = vec![generation.toplevel.as_os_str().into()];
-    let enabled = match rollback {
+    if rollback_enabled(machine, rollback)?
+        && let Some(path) = &generation.auto_rollback
+    {
+        paths.push(path.as_os_str().into());
+    }
+    Ok(paths)
+}
+fn rollback_enabled(machine: &Machine, rollback: AutoRollback) -> Result<bool, ConfctlError> {
+    Ok(match rollback {
         AutoRollback::Disabled => false,
         AutoRollback::Enabled => true,
         AutoRollback::Configured => match machine.metadata.get("autoRollback") {
@@ -563,11 +573,7 @@ fn copy_paths(
                 ));
             }
         },
-    };
-    if enabled && let Some(path) = &generation.auto_rollback {
-        paths.push(path.as_os_str().into());
-    }
-    Ok(paths)
+    })
 }
 struct Copies<'a, P> {
     runner: &'a P,
@@ -1180,7 +1186,18 @@ async fn activate_one<P: ProcessRunner>(
         )
         .await;
     }
-    let description = format!("{} on {host}", action_name(activation.action));
+    let description = format!(
+        "{}{} on {host}",
+        action_name(activation.action),
+        if matches!(activation.action, SwitchAction::Test | SwitchAction::Switch)
+            && rollback_enabled(copies.inventory.get(job.machine), copies.rollback)?
+            && job.generation.auto_rollback.is_some()
+        {
+            " rollback-helper protocol"
+        } else {
+            ""
+        }
+    );
     copies
         .events
         .emit(UiEvent::TaskPending {
@@ -1303,6 +1320,18 @@ async fn activation_command<P: ProcessRunner>(
         diagnostic(&format!("{}: {phase}\n", machine.name)),
     )
     .await?;
+    if matches!(activation.action, SwitchAction::Test | SwitchAction::Switch)
+        && phase == action_name(activation.action)
+        && rollback_enabled(machine, copies.rollback)?
+    {
+        if let Some(helper) = &job.generation.auto_rollback {
+            return rollback::run(activation, job, task, helper).await;
+        }
+        checked(copies.events, copies.cancellation, diagnostic(&format!(
+            "{}: saved rollback helper unavailable; running direct {phase} without rollback protection.\n",
+            machine.name
+        ))).await?;
+    }
     let argv = if phase == "set profile after boot" {
         vec![
             "nix-env".into(),

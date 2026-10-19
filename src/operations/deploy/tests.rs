@@ -587,6 +587,125 @@ async fn activation_profile_failure_and_final_ack_cancellation_preserve_actual_e
     }
 }
 
+#[tokio::test]
+async fn private_test_activation_uses_shared_rollback_policy_without_opening_cli_admission() {
+    for (policy, helper) in [
+        (AutoRollback::Disabled, true),
+        (AutoRollback::Enabled, false),
+        (AutoRollback::Configured, true),
+    ] {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = ConfigRoot::new(tmp.path()).unwrap();
+        let inv = Inventory::from_value(json!({"local":{"name":"local","metaConfig":{"host":{"target":"localhost"},"autoRollback":{"enable":true,"timeout":-11}}}})).unwrap();
+        let runner = ActivationRunner {
+            calls: Mutex::new(Vec::new()),
+            fail_profile: false,
+        };
+        let cancel = CancellationToken::new();
+        let (events, mut receiver) = EventSink::channel(1);
+        let consumer = tokio::spawn(async move {
+            let mut seen = Vec::new();
+            while let Some(delivery) = receiver.receive().await {
+                let (event, ack) = delivery.into_parts();
+                seen.push(event);
+                ack.acknowledge(Ok(()));
+            }
+            seen
+        });
+        let copies = Copies {
+            runner: &runner,
+            events: &events,
+            cancellation: &cancel,
+            inventory: &inv,
+            root: &root,
+            rollback: policy,
+            ssh_opts: None,
+        };
+        let ui = crate::terminal::Ui::new(
+            std::fs::File::open("/dev/null").unwrap(),
+            events.clone(),
+            cancel.clone(),
+            None,
+        )
+        .unwrap();
+        let activation = Activation {
+            copies: &copies,
+            ui: &ui,
+            ssh_config: None,
+            interactive: false,
+            dry_first: false,
+            action: SwitchAction::Test,
+            log: std::path::Path::new("log"),
+        };
+        let mut generation = generation("saved");
+        if !helper {
+            generation.auto_rollback = None;
+        }
+        let job = Job {
+            machine: MachineId(0),
+            generation,
+            task: TaskId(1),
+        };
+        assert_eq!(
+            copy_paths(&inv.machines[0], &job.generation, policy)
+                .unwrap()
+                .len(),
+            if policy == AutoRollback::Configured {
+                2
+            } else {
+                1
+            }
+        );
+        let result = activate_one(&activation, &job, TaskId(10)).await;
+        let uses_helper = policy == AutoRollback::Configured;
+        if uses_helper {
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("without successful confirmation")
+            );
+        } else {
+            result.unwrap();
+        }
+        {
+            let calls = runner.calls.lock().unwrap();
+            assert_eq!(calls.len(), 1);
+            assert_eq!(
+                calls[0].program,
+                std::path::Path::new(if uses_helper {
+                    "/store/rollback"
+                } else {
+                    "/store/system/bin/switch-to-configuration"
+                })
+            );
+            if uses_helper {
+                assert_eq!(&calls[0].args[..4], ["-t", "-11", "/store/system", "test"]);
+                let path = calls[0].args[4]
+                    .to_str()
+                    .unwrap()
+                    .strip_prefix("/run/confctl-confirm-")
+                    .unwrap();
+                assert_eq!(path.len(), 6);
+                assert!(path.bytes().all(|c| c.is_ascii_hexdigit()));
+            } else {
+                assert_eq!(calls[0].args, ["test"]);
+            }
+        }
+        ui.shutdown().unwrap();
+        drop(ui);
+        drop(events);
+        let seen = consumer.await.unwrap();
+        assert!(seen.iter().any(|e| matches!(e, UiEvent::TaskFinished { task: TaskId(10), state } if *state == if uses_helper { TaskState::Failed } else { TaskState::Succeeded })));
+        if uses_helper {
+            assert!(seen.iter().any(|e| matches!(e, UiEvent::TaskStarted { description, .. } if description.contains("rollback-helper protocol"))));
+        }
+        if !helper {
+            assert!(seen.iter().any(|e| matches!(e, UiEvent::Diagnostic { text, .. } if text.contains("without rollback protection"))));
+        }
+    }
+}
+
 struct StatusRunner {
     active: std::sync::atomic::AtomicUsize,
     peak: std::sync::atomic::AtomicUsize,
