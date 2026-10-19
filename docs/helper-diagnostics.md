@@ -1,6 +1,21 @@
 # Helper diagnostic compatibility
 
-The Rust helper backend has two bounded diagnostic exceptions to the retained
+The tables below describe exact frozen observations and their provenance.
+Prospective candidate acceptance follows the
+[consumer-specific behavioral contract](compatibility.md#candidate-acceptance-by-consumer):
+preserve the failure condition, relevant target/path, severity, native status,
+ordered effects and useful log locator; human wording and source coordinates
+need not copy Ruby. This policy does not rewrite a historical expectation or
+supply missing semantic/native evidence. Unknown groups remain unqualified.
+
+The current frozen diagnostic driver still compares its named rows literally.
+It is unchanged by the core comparator proposal. Any later successor must retain
+raw streams and give each interpreted condition a bounded information contract;
+no generic traceback removal, coordinate deletion or candidate-truth recording
+is permitted. Boot/wire/opaque payload consumers keep their actual required bytes.
+
+
+The retained source construction recorded two bounded diagnostic exceptions to the
 Ruby helper behavior. They preserve the helper's exit status, preceding stdout,
 child and HTTP order, and filesystem effects. They change only the stderr rows
 listed below. They do not authorize removing traceback lines from comparisons
@@ -70,7 +85,7 @@ file effect. The error retains the structured parser source privately. Rendering
 uses its raw `line()` and `column()` values without clamping or reproducing
 Ruby's parser implementation.
 
-Only this bad-object expectation is qualified. Empty, whitespace-only, EOF,
+Only this named bad-object expectation has its recorded bounded qualification. Empty, whitespace-only, EOF,
 truncated, multiline and non-ASCII input require their own original/candidate
 table before broader acceptance. The input-only list in
 [json-syntax-cases.json](../tests/compat/helpers/candidate/json-syntax-cases.json)
