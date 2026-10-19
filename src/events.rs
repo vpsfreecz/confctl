@@ -106,6 +106,12 @@ pub enum UiEvent {
         cell_styles: Vec<Vec<Style>>,
         format: TableFormat,
     },
+    /// Admitted logical work whose execution body has not been entered.
+    TaskPending {
+        task: TaskId,
+        description: String,
+    },
+    /// Logical execution has begun; this does not assert native child liveness.
     TaskStarted {
         task: TaskId,
         description: String,

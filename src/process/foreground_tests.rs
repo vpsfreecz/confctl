@@ -543,8 +543,26 @@ fn supervisor_foreground_relay_fault_retains_evidence_and_restores_terminal() {
             let (events, mut receiver) = EventSink::channel(1);
             let consumer = tokio::spawn(async move {
                 let mut rejected = false;
+                let prefix = b"FAULT_CAPTURE_PRIVATE\0\xff";
+                let mut observed = Vec::new();
                 while let Some(delivery) = receiver.receive().await {
-                    let fail = matches!(&delivery.event, UiEvent::Output { .. });
+                    // libtest can emit its banner in an earlier pipe chunk.
+                    // Inject only after the asserted capture prefix is real.
+                    let fail = if let UiEvent::Output {
+                        stream: OutputStream::Stdout,
+                        bytes,
+                        ..
+                    } = &delivery.event
+                    {
+                        observed.extend_from_slice(bytes);
+                        let present = observed.windows(prefix.len()).any(|bytes| bytes == prefix);
+                        if observed.len() > prefix.len() {
+                            observed.drain(..observed.len() - prefix.len());
+                        }
+                        present
+                    } else {
+                        false
+                    };
                     if fail {
                         rejected = true;
                     }

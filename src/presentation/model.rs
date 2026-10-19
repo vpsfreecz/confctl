@@ -10,6 +10,17 @@ use std::{
     path::PathBuf,
 };
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TaskPhase {
+    Pending,
+    Executing,
+    /// The display scope ended. None retains a missing authoritative result.
+    Final {
+        state: Option<TaskState>,
+        entered: bool,
+    },
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TaskRow {
     pub id: TaskId,
@@ -17,7 +28,8 @@ pub struct TaskRow {
     pub completed: u64,
     pub total: Option<u64>,
     pub detail: String,
-    pub state: Option<TaskState>,
+    pub phase: TaskPhase,
+    original_description: String,
 }
 
 impl TaskRow {
@@ -28,11 +40,20 @@ impl TaskRow {
             .map(|total| self.completed.min(total) as f64 / total as f64)
     }
     fn priority(&self) -> u8 {
-        match self.state {
-            Some(TaskState::Failed | TaskState::Incomplete | TaskState::Canceled) => 0,
-            None => 1,
-            Some(TaskState::Skipped) => 2,
-            Some(TaskState::Succeeded) => 3,
+        match self.phase {
+            TaskPhase::Final {
+                state: None | Some(TaskState::Failed | TaskState::Incomplete | TaskState::Canceled),
+                ..
+            } => 0,
+            TaskPhase::Pending | TaskPhase::Executing => 1,
+            TaskPhase::Final {
+                state: Some(TaskState::Skipped),
+                ..
+            } => 2,
+            TaskPhase::Final {
+                state: Some(TaskState::Succeeded),
+                ..
+            } => 3,
         }
     }
 }
@@ -75,18 +96,21 @@ impl Model {
 
     pub fn apply(&mut self, event: &UiEvent) -> Result<(), ConfctlError> {
         match event {
-            UiEvent::TaskStarted { task, description } => {
+            UiEvent::TaskPending { task, description } => {
                 if self.rows.iter().any(|row| row.id == *task) {
                     return Err(invalid("task registered twice"));
                 }
-                self.rows.push(TaskRow {
-                    id: *task,
-                    description: sanitize_text(description),
-                    completed: 0,
-                    total: None,
-                    detail: String::new(),
-                    state: None,
-                });
+                self.register(*task, description, TaskPhase::Pending);
+            }
+            UiEvent::TaskStarted { task, description } => {
+                if let Some(row) = self.rows.iter_mut().find(|row| row.id == *task) {
+                    if row.phase != TaskPhase::Pending || row.original_description != *description {
+                        return Err(invalid("task start does not match pending work"));
+                    }
+                    row.phase = TaskPhase::Executing;
+                } else {
+                    self.register(*task, description, TaskPhase::Executing);
+                }
             }
             UiEvent::TaskProgress {
                 task,
@@ -99,6 +123,9 @@ impl Model {
                     .iter_mut()
                     .find(|row| row.id == *task)
                     .ok_or_else(|| invalid("progress for unregistered task"))?;
+                if row.phase != TaskPhase::Executing {
+                    return Err(invalid("progress requires an executing task"));
+                }
                 row.completed = *completed;
                 row.total = *total;
                 row.detail = sanitize_text(detail);
@@ -109,10 +136,26 @@ impl Model {
                     .iter_mut()
                     .find(|row| row.id == *task)
                     .ok_or_else(|| invalid("result for unregistered task"))?;
-                if row.state.is_some_and(|previous| previous != *state) {
-                    return Err(invalid("task has conflicting final results"));
-                }
-                row.state = Some(*state);
+                let entered = match row.phase {
+                    TaskPhase::Pending if *state == TaskState::Succeeded => {
+                        return Err(invalid("pending task cannot succeed before execution"));
+                    }
+                    TaskPhase::Pending => false,
+                    TaskPhase::Executing => true,
+                    TaskPhase::Final {
+                        state: Some(previous),
+                        ..
+                    } if previous == *state => {
+                        return Ok(());
+                    }
+                    TaskPhase::Final { .. } => {
+                        return Err(invalid("task has conflicting final results"));
+                    }
+                };
+                row.phase = TaskPhase::Final {
+                    state: Some(*state),
+                    entered,
+                };
             }
             UiEvent::Output {
                 task,
@@ -131,6 +174,33 @@ impl Model {
             _ => {}
         }
         Ok(())
+    }
+
+    fn register(&mut self, id: TaskId, description: &str, phase: TaskPhase) {
+        self.rows.push(TaskRow {
+            id,
+            description: sanitize_text(description),
+            original_description: description.to_owned(),
+            completed: 0,
+            total: None,
+            detail: String::new(),
+            phase,
+        });
+    }
+
+    /// End only the observation scope; a missing result stays unknown.
+    pub fn finalize(&mut self) {
+        for row in &mut self.rows {
+            let entered = match row.phase {
+                TaskPhase::Pending => false,
+                TaskPhase::Executing => true,
+                TaskPhase::Final { .. } => continue,
+            };
+            row.phase = TaskPhase::Final {
+                state: None,
+                entered,
+            };
+        }
     }
 
     /// The same incremental sanitizer feeds reliable live output and the tail.
@@ -388,6 +458,153 @@ mod tests {
             description: format!("task{id}"),
         }
     }
+    fn pending(id: u64) -> UiEvent {
+        UiEvent::TaskPending {
+            task: TaskId(id),
+            description: format!("task{id}"),
+        }
+    }
+    #[test]
+    fn pending_promotion_keeps_identity_and_order_beside_direct_execution() {
+        let mut model = Model::new(2, 40);
+        model.apply(&pending(9)).unwrap();
+        model.apply(&start(2)).unwrap();
+        assert_eq!(model.rows()[0].phase, TaskPhase::Pending);
+        assert_eq!(model.rows()[1].phase, TaskPhase::Executing);
+        assert_eq!(model.rows()[0].fraction(), None);
+        model.output(TaskId(9), OutputStream::Stderr, b"notice\n");
+        assert_eq!(model.rows()[0].phase, TaskPhase::Pending);
+        model.apply(&start(9)).unwrap();
+        assert_eq!(model.rows()[0].phase, TaskPhase::Executing);
+        assert_eq!(model.rows()[0].id, TaskId(9));
+        assert_eq!(model.rows()[1].id, TaskId(2));
+    }
+    #[test]
+    fn preentry_results_are_explicit_and_identical_results_are_idempotent() {
+        for state in [
+            TaskState::Skipped,
+            TaskState::Canceled,
+            TaskState::Failed,
+            TaskState::Incomplete,
+        ] {
+            let mut model = Model::new(2, 40);
+            model.apply(&pending(1)).unwrap();
+            let result = UiEvent::TaskFinished {
+                task: TaskId(1),
+                state,
+            };
+            model.apply(&result).unwrap();
+            model.apply(&result).unwrap();
+            assert_eq!(model.rows().len(), 1);
+            assert_eq!(
+                model.rows()[0].phase,
+                TaskPhase::Final {
+                    state: Some(state),
+                    entered: false
+                }
+            );
+        }
+        let mut model = Model::new(2, 40);
+        model.apply(&start(1)).unwrap();
+        let result = UiEvent::TaskFinished {
+            task: TaskId(1),
+            state: TaskState::Succeeded,
+        };
+        model.apply(&result).unwrap();
+        model.apply(&result).unwrap();
+        assert_eq!(
+            model.rows()[0].phase,
+            TaskPhase::Final {
+                state: Some(TaskState::Succeeded),
+                entered: true
+            }
+        );
+    }
+    #[test]
+    fn invalid_lifecycle_events_do_not_reset_or_advance_a_task() {
+        let mut model = Model::new(2, 40);
+        model.apply(&pending(1)).unwrap();
+        let before = model.rows().to_vec();
+        for event in [
+            pending(1),
+            UiEvent::TaskStarted {
+                task: TaskId(1),
+                description: "\x1b[31mtask1".into(),
+            },
+            UiEvent::TaskProgress {
+                task: TaskId(1),
+                completed: 0,
+                total: Some(5),
+                detail: "waiting".into(),
+            },
+            UiEvent::TaskFinished {
+                task: TaskId(1),
+                state: TaskState::Succeeded,
+            },
+        ] {
+            assert!(model.apply(&event).is_err(), "{event:?}");
+            assert_eq!(model.rows(), before);
+        }
+        model.apply(&start(1)).unwrap();
+        assert!(model.apply(&start(1)).is_err());
+        assert!(model.apply(&pending(1)).is_err());
+        model
+            .apply(&UiEvent::TaskFinished {
+                task: TaskId(1),
+                state: TaskState::Failed,
+            })
+            .unwrap();
+        let final_row = model.rows().to_vec();
+        for event in [
+            start(1),
+            pending(1),
+            UiEvent::TaskProgress {
+                task: TaskId(1),
+                completed: 5,
+                total: Some(5),
+                detail: "done".into(),
+            },
+            UiEvent::TaskFinished {
+                task: TaskId(1),
+                state: TaskState::Succeeded,
+            },
+        ] {
+            assert!(model.apply(&event).is_err(), "{event:?}");
+            assert_eq!(model.rows(), final_row);
+        }
+    }
+    #[test]
+    fn scope_end_keeps_missing_results_unknown_with_observed_entry_phase() {
+        let mut model = Model::new(2, 40);
+        model.apply(&pending(1)).unwrap();
+        model.apply(&start(2)).unwrap();
+        model.finalize();
+        assert_eq!(
+            model.rows()[0].phase,
+            TaskPhase::Final {
+                state: None,
+                entered: false
+            }
+        );
+        assert_eq!(
+            model.rows()[1].phase,
+            TaskPhase::Final {
+                state: None,
+                entered: true
+            }
+        );
+        let final_rows = model.rows().to_vec();
+        model.finalize();
+        assert_eq!(model.rows(), final_rows);
+        assert!(
+            model
+                .apply(&UiEvent::TaskFinished {
+                    task: TaskId(2),
+                    state: TaskState::Succeeded
+                })
+                .is_err()
+        );
+    }
     #[test]
     fn registered_order_and_explicit_results_survive_priority_selection() {
         let mut model = Model::new(2, 40);
@@ -421,7 +638,7 @@ mod tests {
             [TaskId(1), TaskId(2), TaskId(4)]
         );
         assert!(
-            model.rows()[1].state.is_none(),
+            model.rows()[1].phase == TaskPhase::Executing,
             "zero activity cannot imply success"
         );
         assert!(
