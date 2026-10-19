@@ -256,6 +256,32 @@ pub(super) fn command_spec(
     ssh_config: Option<&OsStr>,
     argv: &[OsString],
 ) -> Result<ProcessSpec, ConfctlError> {
+    let target = target_host(machine)?;
+    if target == "localhost" {
+        let (program, args) = argv.split_first().ok_or_else(|| {
+            ConfctlError::Configuration("local command requires an executable".into())
+        })?;
+        let mut spec = ProcessSpec::new(program, format!("command on {}", machine.name));
+        spec.args = args.to_vec();
+        return Ok(spec);
+    }
+    let mut spec = ProcessSpec::new("ssh", format!("command on {}", machine.name));
+    if let Some(config) = ssh_config.filter(|path| !path.is_empty()) {
+        spec.args.extend(["-F".into(), config.into()]);
+    }
+    spec.args.extend(["-l".into(), "root".into()]);
+    let port = target_port(machine)?;
+    if port != "22" {
+        spec.args.extend(["-p".into(), port.into()]);
+    }
+    spec.args.push(target.into());
+    if !argv.is_empty() {
+        spec.args.push(shell_join(argv));
+    }
+    Ok(spec)
+}
+
+pub(super) fn target_host(machine: &Machine) -> Result<&str, ConfctlError> {
     let host = match machine.metadata.get("host") {
         None => None,
         Some(Value::Object(host)) => Some(host),
@@ -275,32 +301,17 @@ pub(super) fn command_spec(
             )));
         }
     };
-    if target == "localhost" {
-        let (program, args) = argv.split_first().ok_or_else(|| {
-            ConfctlError::Configuration("local command requires an executable".into())
-        })?;
-        let mut spec = ProcessSpec::new(program, format!("command on {}", machine.name));
-        spec.args = args.to_vec();
-        return Ok(spec);
-    }
-    let mut spec = ProcessSpec::new("ssh", format!("command on {}", machine.name));
-    if let Some(config) = ssh_config.filter(|path| !path.is_empty()) {
-        spec.args.extend(["-F".into(), config.into()]);
-    }
-    spec.args.extend(["-l".into(), "root".into()]);
-    let port = host
+    Ok(target)
+}
+
+pub(super) fn target_port(machine: &Machine) -> Result<String, ConfctlError> {
+    machine
+        .metadata
+        .get("host")
         .and_then(|host| host.get("port"))
         .map(ruby_port)
-        .transpose()?
-        .unwrap_or_else(|| "22".into());
-    if port != "22" {
-        spec.args.extend(["-p".into(), port.into()]);
-    }
-    spec.args.push(target.into());
-    if !argv.is_empty() {
-        spec.args.push(shell_join(argv));
-    }
-    Ok(spec)
+        .transpose()
+        .map(|port| port.unwrap_or_else(|| "22".into()))
 }
 
 /// Native-byte Shellwords escaping: a newline needs quoted literal content,

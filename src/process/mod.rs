@@ -125,7 +125,7 @@ pub struct ProcessScope {
     pub task: TaskId,
     pub phase: Option<Phase>,
     pub foreground: Option<ForegroundLease>,
-    pub(crate) nix_progress: bool,
+    pub(crate) nix_progress: Option<crate::nix::progress::Kind>,
 }
 
 impl ProcessScope {
@@ -135,7 +135,7 @@ impl ProcessScope {
             task,
             phase: None,
             foreground: None,
-            nix_progress: false,
+            nix_progress: None,
         }
     }
 }
@@ -885,7 +885,7 @@ async fn execute(
             prepared,
             stdout,
             (OutputStream::Stdout, scope.task),
-            false,
+            None,
             cancel.clone(),
             errors.clone(),
         );
@@ -1207,7 +1207,7 @@ fn start_stream(
     prepared: PreparedStream,
     mut reader: impl AsyncRead + Send + Unpin + 'static,
     source: (OutputStream, TaskId),
-    nix_progress: bool,
+    nix_progress: Option<crate::nix::progress::Kind>,
     cancel: CancellationToken,
     errors: mpsc::UnboundedSender<ConfctlError>,
 ) -> (Pump, Option<Relay>) {
@@ -1289,12 +1289,12 @@ async fn relay_stream(
     mut published: watch::Receiver<Published>,
     events: EventSink,
     source: (TaskId, OutputStream),
-    nix_progress: bool,
+    nix_progress: Option<crate::nix::progress::Kind>,
     cancel: CancellationToken,
     errors: mpsc::UnboundedSender<ConfctlError>,
 ) {
     let (task, stream) = source;
-    let mut progress = nix_progress.then(crate::nix::progress::Progress::default);
+    let mut progress = nix_progress.map(crate::nix::progress::Progress::new);
     let mut offset = 0;
     loop {
         let state = *published.borrow_and_update();
@@ -1315,6 +1315,13 @@ async fn relay_stream(
                 result = events.emit(UiEvent::Output { task, stream, bytes }) => if let Err(error) = result { let _ = errors.send(error); return; },
                 _ = cancel.cancelled() => return,
             }
+            let updates = updates.into_iter().flat_map(|event| {
+                progress
+                    .as_ref()
+                    .and_then(|decoder| decoder.copy_line(&event))
+                    .into_iter()
+                    .chain(std::iter::once(event))
+            });
             for event in updates {
                 tokio::select! {
                     result = events.emit(event) => if let Err(error) = result { let _ = errors.send(error); return; },
@@ -1324,9 +1331,14 @@ async fn relay_stream(
         }
         if state.finished {
             if let Some(event) = progress.as_mut().and_then(|decoder| decoder.flush(task)) {
-                tokio::select! {
-                    result = events.emit(event) => if let Err(error) = result { let _ = errors.send(error); },
-                    _ = cancel.cancelled() => {},
+                let line = progress
+                    .as_ref()
+                    .and_then(|decoder| decoder.copy_line(&event));
+                for event in line.into_iter().chain(std::iter::once(event)) {
+                    tokio::select! {
+                        result = events.emit(event) => if let Err(error) = result { let _ = errors.send(error); return; },
+                        _ = cancel.cancelled() => return,
+                    }
                 }
             }
             return;

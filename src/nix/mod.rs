@@ -370,7 +370,7 @@ impl<P: ProcessRunner> NixClient<P> {
                 ProcessScope::new(self.cancellation.clone(), build_task.unwrap_or(TaskId(0)));
             if build_task.is_some() {
                 spec.stderr = crate::process::StreamPolicy::CaptureAndForward;
-                scope.nix_progress = true;
+                scope.nix_progress = Some(crate::nix::progress::Kind::Build);
             }
             scope.phase = Some(if build {
                 Phase::Build
