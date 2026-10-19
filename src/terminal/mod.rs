@@ -246,6 +246,19 @@ impl Ui {
         }
     }
 
+    /// Read an unparsed line with normal echo after the prompt is acknowledged.
+    /// The caller owns choice parsing; secret input belongs in `protected_line`.
+    pub async fn line(&self, prompt: String) -> Result<Vec<u8>, ConfctlError> {
+        let _lease = self.acquire(TerminalState::Prompt).await?;
+        self.emit(UiEvent::PromptFrame {
+            preview: Vec::new(),
+            text: prompt,
+        })
+        .await?;
+        let _wait = self.timing.as_ref().map(Timing::prompt);
+        self.session.broker.line(false, &self.cancellation).await
+    }
+
     pub async fn protected_line(&self, prompt: String) -> Result<Vec<u8>, ConfctlError> {
         let _lease = self.acquire(TerminalState::Prompt).await?;
         self.emit(UiEvent::PromptFrame {
