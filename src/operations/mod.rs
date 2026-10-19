@@ -3,6 +3,7 @@
 
 mod build;
 mod connection;
+mod generation_list;
 mod inputs;
 mod machines;
 mod runtime_kernels;
@@ -17,15 +18,16 @@ use crate::{
 pub struct CoreOperations;
 impl Operations for CoreOperations {
     fn available(&self, action: &Action) -> bool {
-        matches!(
-            action,
-            Action::InputsList { .. }
-                | Action::List { .. }
-                | Action::ChannelList { .. }
-                | Action::RuntimeKernelsUpdate { .. }
-                | Action::Build(_)
-                | Action::TestConnection { .. }
-        )
+        matches!(action, Action::GenerationList { locations, .. } if !locations.remote)
+            || matches!(
+                action,
+                Action::InputsList { .. }
+                    | Action::List { .. }
+                    | Action::ChannelList { .. }
+                    | Action::RuntimeKernelsUpdate { .. }
+                    | Action::Build(_)
+                    | Action::TestConnection { .. }
+            )
     }
     async fn run(
         &self,
@@ -45,6 +47,9 @@ impl Operations for CoreOperations {
             Action::Build(request) => build::run(request, root, context).await?,
             Action::TestConnection { .. } => {
                 connection::test(&invocation.action, root, context).await?
+            }
+            Action::GenerationList { .. } => {
+                generation_list::list(&invocation.action, root, context).await?
             }
             Action::RuntimeKernelsUpdate { .. } => {
                 runtime_kernels::update(&invocation.action, root, context).await?

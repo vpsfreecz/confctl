@@ -48,6 +48,11 @@ save of combined state; successful tasks do not promise that save succeeded.
 Declining confirmation admits no probes. Controlled command-route tests do not
 establish live progress, quiet elapsed updates, resize or full terminal qualification.
 
+`test-connection` admits one task per confirmed runnable host. Each serial uptime
+probe starts and finishes its own task. Ordinary host failures fail those tasks
+while allowing the completed command to exit 0. Local generation listing emits
+a result table without host-probe tasks.
+
 `build` registers one task per actual build group after consent and planning.
 Groups run serially; a shared Nix build does not prove that each host executed
 separately. Stderr streams through the existing checked output relay while stdout
