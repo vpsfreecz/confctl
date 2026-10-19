@@ -8,6 +8,7 @@ mod generation_list;
 mod inputs;
 mod machines;
 mod runtime_kernels;
+mod ssh;
 
 use crate::{
     app::{Context, Operations},
@@ -29,6 +30,7 @@ impl Operations for CoreOperations {
                     | Action::RuntimeKernelsUpdate { .. }
                     | Action::Build(_)
                     | Action::TestConnection { .. }
+                    | Action::Ssh(_)
             )
     }
     async fn run(
@@ -54,6 +56,7 @@ impl Operations for CoreOperations {
             Action::GenerationList { .. } => {
                 generation_list::list(&invocation.action, root, context).await?
             }
+            Action::Ssh(_) => ssh::run(&invocation.action, root, context).await?,
             Action::RuntimeKernelsUpdate { .. } => {
                 runtime_kernels::update(&invocation.action, root, context).await?
             }
