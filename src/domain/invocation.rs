@@ -67,7 +67,7 @@ impl Default for InputChanges {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum GenerationSelector {
     Current,
-    Offset(i64),
+    Offset(String),
     Name(String),
 }
 
@@ -75,8 +75,14 @@ impl GenerationSelector {
     pub fn parse(value: String) -> Self {
         if value == "current" {
             Self::Current
-        } else if let Ok(number) = value.parse() {
-            Self::Offset(number)
+        } else if !value.strip_prefix('-').unwrap_or(&value).is_empty()
+            && value
+                .strip_prefix('-')
+                .unwrap_or(&value)
+                .bytes()
+                .all(|b| b.is_ascii_digit())
+        {
+            Self::Offset(value)
         } else {
             Self::Name(value)
         }

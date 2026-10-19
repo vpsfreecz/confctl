@@ -3,6 +3,7 @@
 
 mod build;
 mod connection;
+mod deploy;
 mod generation_list;
 mod inputs;
 mod machines;
@@ -18,7 +19,8 @@ use crate::{
 pub struct CoreOperations;
 impl Operations for CoreOperations {
     fn available(&self, action: &Action) -> bool {
-        matches!(action, Action::GenerationList { locations, .. } if !locations.remote)
+        matches!(action, Action::Deploy(request) if request.copy_only && request.generation.is_some())
+            || matches!(action, Action::GenerationList { locations, .. } if !locations.remote)
             || matches!(
                 action,
                 Action::InputsList { .. }
@@ -45,6 +47,7 @@ impl Operations for CoreOperations {
             } => inputs::channels(&root, pattern.as_deref(), *has_extra_arguments, context).await?,
             Action::List { .. } => machines::list(&invocation.action, root, context).await?,
             Action::Build(request) => build::run(request, root, context).await?,
+            Action::Deploy(request) => deploy::run(request, root, context).await?,
             Action::TestConnection { .. } => {
                 connection::test(&invocation.action, root, context).await?
             }

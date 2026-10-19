@@ -63,8 +63,13 @@ until both totals are known, and reset for each native attempt. A successful
 group includes generation reuse/publication. On failure, later groups are skipped
 or canceled and earlier saved generations and partial roots remain in place.
 Task log locators refer to the app-owned invocation log. Successful finalization
-removes that log; failures retain it under the existing policy. Deployment and
-other operation producers are not wired to this lifecycle yet.
+removes that log; failures retain it under the existing policy.
+
+Saved-generation copy-only deploys admit one task per resolved host, with bounded
+copying-count/path progress from native stderr and unknown totals when absent.
+Optional runtime-kernel refresh uses distinct preceding task IDs. Copy results do
+not claim activation. Other deploy modes and operation producers are not wired
+to this lifecycle yet.
 
 Live tail fragments and task rows share a compact source key: @ followed by
 the complete TaskId in base 36. Tail suffixes /o and /e identify stdout and

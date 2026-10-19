@@ -596,7 +596,7 @@ async fn spool_write_fault_retains_confirmed_prefix_and_marks_incomplete() {
         prepared,
         &b"unwritten"[..],
         (OutputStream::Stdout, TaskId(16)),
-        false,
+        None,
         CancellationToken::new(),
         errors,
     );
@@ -744,7 +744,7 @@ async fn canceled_open_reader_retains_incomplete_prefix_without_waiting_for_eof(
         prepared,
         reader,
         (OutputStream::Stdout, TaskId(18)),
-        false,
+        None,
         cancel.clone(),
         errors,
     );
@@ -924,7 +924,7 @@ async fn drain_fault_retains_prefix_and_marks_incomplete() {
         prepared,
         PrefixThenDrainFault(false),
         (OutputStream::Stdout, TaskId(22)),
-        false,
+        None,
         CancellationToken::new(),
         errors,
     );
@@ -1199,7 +1199,7 @@ async fn nix_build_progress_uses_existing_relay_before_child_exit_and_retains_ra
         .extend(["fixture".into(), release.as_os_str().into()]);
     spec.stderr = StreamPolicy::CaptureAndForward;
     let mut scope = ProcessScope::new(CancellationToken::new(), TaskId(9));
-    scope.nix_progress = true;
+    scope.nix_progress = Some(crate::nix::progress::Kind::Build);
     let running = runner.clone();
     let child = tokio::spawn(async move { running.run(spec, scope).await });
     let mut raw = Vec::new();
@@ -1262,7 +1262,7 @@ async fn nix_build_progress_rejection_joins_child_and_retains_raw_stderr() {
     let mut spec = shell("printf \"building '/nix/store/a.drv'...\\n\" >&2; exec sleep 120");
     spec.stderr = StreamPolicy::CaptureAndForward;
     let mut scope = ProcessScope::new(CancellationToken::new(), TaskId(10));
-    scope.nix_progress = true;
+    scope.nix_progress = Some(crate::nix::progress::Kind::Build);
     let consumer = tokio::spawn(async move {
         while let Some(delivery) = receiver.receive().await {
             let reject = matches!(delivery.event, UiEvent::TaskProgress { .. });
@@ -1293,4 +1293,68 @@ async fn nix_build_progress_rejection_joins_child_and_retains_raw_stderr() {
     runner.shutdown().await.unwrap();
     drop(runner);
     consumer.await.unwrap();
+}
+
+#[tokio::test]
+async fn copy_progress_arrives_before_child_exit_and_failure_joins_it() {
+    for reject_line in [false, true] {
+        let directory = tempfile::tempdir().unwrap();
+        let (runner, mut receiver) = owner(directory.path(), 1024, None);
+        let mut spec = shell(
+            "printf \"copying 2 paths...\\ncopying path '/store/one'...\\n\" >&2; exec sleep 60",
+        );
+        spec.stderr = StreamPolicy::CaptureAndForward;
+        let mut scope = ProcessScope::new(CancellationToken::new(), TaskId(13));
+        scope.nix_progress = Some(crate::nix::progress::Kind::Copy {
+            host: "logical-host".into(),
+        });
+        let running = runner.clone();
+        let run = tokio::spawn(async move { running.run(spec, scope).await });
+        let mut saw_copy_line = false;
+        loop {
+            let d = tokio::time::timeout(Duration::from_secs(5), receiver.receive())
+                .await
+                .unwrap()
+                .unwrap();
+            if matches!(&d.event, UiEvent::Diagnostic {text,..} if text.contains("[logical-host] [1/2]"))
+            {
+                saw_copy_line = true;
+            }
+            let task_update = matches!(
+                d.event,
+                UiEvent::TaskProgress {
+                    completed: 1,
+                    total: Some(2),
+                    ..
+                }
+            );
+            let plain_line = matches!(&d.event, UiEvent::Diagnostic {text,..} if text.contains("[logical-host] [1/2]"));
+            if (reject_line && plain_line) || (!reject_line && task_update) {
+                assert!(
+                    saw_copy_line,
+                    "host-attributed plain progress precedes the task update"
+                );
+                assert!(
+                    !run.is_finished(),
+                    "progress is observed while the child remains running"
+                );
+                d.acknowledge(Err("copy progress rejected".into()));
+                break;
+            }
+            d.acknowledge(Ok(()));
+        }
+        let error = tokio::time::timeout(Duration::from_secs(5), run)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap_err();
+        assert!(error.to_string().contains("copy progress rejected"));
+        let evidence = failure_evidence(&error);
+        assert!(evidence.status.is_some());
+        assert_eq!(
+            capture_bytes(&evidence.stderr),
+            b"copying 2 paths...\ncopying path '/store/one'...\n"
+        );
+        runner.shutdown().await.unwrap();
+    }
 }

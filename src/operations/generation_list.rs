@@ -251,7 +251,7 @@ fn table(mut entries: Vec<Entry<'_>>) -> UiEvent {
     }
 }
 
-fn input_revision(value: Option<&Value>) -> String {
+pub(super) fn input_revision(value: Option<&Value>) -> String {
     let (short, rev) = match value {
         Some(Value::String(rev)) => (None, Some(Value::String(rev.clone()))),
         Some(Value::Object(info)) => {
@@ -274,7 +274,7 @@ fn input_revision(value: Option<&Value>) -> String {
     }
 }
 
-fn kernel_version(toplevel: &Path) -> Result<Option<String>, ConfctlError> {
+pub(super) fn kernel_version(toplevel: &Path) -> Result<Option<String>, ConfctlError> {
     for name in ["kernel", "bzImage"] {
         let path = toplevel.join(name);
         let link = match fs::read_link(&path) {
