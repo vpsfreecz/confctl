@@ -56,8 +56,13 @@ impl Values<'_> {
             None => UnifiedGenerationSelector::All,
             Some("current") => UnifiedGenerationSelector::Current,
             Some("old") => UnifiedGenerationSelector::Old,
-            Some(s) if s.parse::<i64>().is_ok() => {
-                UnifiedGenerationSelector::Offset(s.parse().expect("checked integer"))
+            Some(s)
+                if {
+                    let digits = s.strip_prefix('-').unwrap_or(s);
+                    !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit())
+                } =>
+            {
+                UnifiedGenerationSelector::Offset(s.into())
             }
             Some(s)
                 if s.strip_suffix('d').is_some_and(|days| {

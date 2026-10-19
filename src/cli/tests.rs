@@ -219,3 +219,30 @@ fn frozen_non_help_cases_classify_parser_usage_without_running_operations() {
         }
     }
 }
+
+#[test]
+fn unified_generation_offsets_preserve_exact_ruby_integer_spelling() {
+    for value in [
+        "0",
+        "01",
+        "-00",
+        "-007",
+        "9223372036854775808",
+        "-99999999999999999999999999999999999999",
+    ] {
+        let Action::GenerationList { selector, .. } =
+            action(&["generation", "ls", "--", "*", value])
+        else {
+            panic!("generation list")
+        };
+        assert_eq!(selector, UnifiedGenerationSelector::Offset(value.into()));
+    }
+    for value in ["+1", "-", "1.0", "1e3", "--1", "１２"] {
+        let Action::GenerationList { selector, .. } =
+            action(&["generation", "ls", "--", "*", value])
+        else {
+            panic!("generation list")
+        };
+        assert_eq!(selector, UnifiedGenerationSelector::Pattern(value.into()));
+    }
+}

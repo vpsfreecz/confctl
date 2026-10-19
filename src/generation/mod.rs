@@ -105,6 +105,109 @@ pub struct GenerationInventory {
     pub diagnostics: Vec<String>,
 }
 impl GenerationInventory {
+    pub fn load_local(root: &ConfigRoot, host: &str) -> Result<GenerationInventory, ConfctlError> {
+        let directory = local_host_directory(root, host)?;
+        let mut inventory = GenerationInventory::default();
+        let entries = match fs::read_dir(&directory) {
+            Ok(entries) => entries,
+            Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(inventory),
+            Err(source) => return Err(io("list generation directory", &directory, source)),
+        };
+        for entry in entries {
+            let entry = entry
+                .map_err(|source| io("read generation directory entry", &directory, source))?;
+            if !entry
+                .file_type()
+                .map_err(|source| io("inspect generation entry", &entry.path(), source))?
+                .is_dir()
+            {
+                continue;
+            }
+            let name = entry
+                .file_name()
+                .into_string()
+                .map_err(|_| ConfctlError::State("generation name is not UTF-8".into()))?;
+            let path = entry.path().join("generation.json");
+            let parsed = fs::read(&path)
+                .map_err(|source| io("read generation record", &path, source))
+                .and_then(|bytes| {
+                    serde_json::from_slice(&bytes).map_err(|source| ConfctlError::Decode {
+                        context: path.display().to_string(),
+                        source,
+                    })
+                })
+                .and_then(|value| BuildGeneration::decode(&name, value));
+            match parsed {
+                Ok(generation) => inventory.generations.push(generation),
+                Err(error) => {
+                    let reason = format!("{}: {error}", path.display());
+                    inventory.diagnostics.push(format!("Skipping generation {}: {reason}. Records and GC roots were left untouched; use confctl v3 for old software-pin generations.",entry.path().display()));
+                    inventory.rejected.insert(
+                        name,
+                        RejectedGeneration {
+                            path: entry.path(),
+                            reason,
+                        },
+                    );
+                }
+            }
+        }
+        inventory
+            .generations
+            .sort_by_key(|generation| generation.date);
+        let current = directory.join("current");
+        match fs::symlink_metadata(&current) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                let target = fs::read_link(&current)
+                    .map_err(|source| io("read current generation link", &current, source))?;
+                let name = target.file_name().and_then(OsStr::to_str).unwrap_or("");
+                if inventory
+                    .generations
+                    .iter()
+                    .any(|generation| generation.name == name)
+                {
+                    match (current.canonicalize(), directory.join(name).canonicalize()) {
+                        (Ok(actual), Ok(expected)) if actual == expected => {
+                            inventory.current = Some(name.into())
+                        }
+                        _ => {
+                            inventory.current_error = Some(format!(
+                                "{}: target does not resolve to local generation {name}",
+                                current.display()
+                            ))
+                        }
+                    }
+                } else {
+                    inventory.current_error = Some(
+                        inventory
+                            .rejected
+                            .get(name)
+                            .map(|record| record.reason.clone())
+                            .unwrap_or_else(|| {
+                                format!("{}: missing generation {name}", current.display())
+                            }),
+                    );
+                }
+            }
+            Ok(_) => {
+                inventory.current_error = Some(format!("{}: expected a symlink", current.display()))
+            }
+            Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
+                inventory.current = inventory
+                    .generations
+                    .last()
+                    .map(|generation| generation.name.clone());
+                if !inventory.rejected.is_empty()
+                    && let Some(name) = &inventory.current
+                {
+                    inventory.diagnostics.push(format!("No current link for {host}; selecting newest supported generation {name}. Excluded records and GC roots were left untouched."));
+                }
+            }
+            Err(source) => return Err(io("inspect current generation", &current, source)),
+        }
+        Ok(inventory)
+    }
+
     pub fn require_resolved_current(&self, host: &str) -> Result<(), ConfctlError> {
         if let Some(error) = &self.current_error {
             Err(ConfctlError::State(format!(
@@ -222,6 +325,13 @@ fn login_directory(base: &OsStr, login: &OsStr, suffix: &str) -> PathBuf {
     PathBuf::from(OsString::from_vec(joined))
 }
 
+fn local_host_directory(root: &ConfigRoot, host: &str) -> Result<PathBuf, ConfctlError> {
+    Ok(root
+        .path()
+        .join(".confctl/generations")
+        .join(safe_host(host)?))
+}
+
 pub struct GenerationStore {
     root: ConfigRoot,
     roots: GcRoots,
@@ -231,110 +341,10 @@ impl GenerationStore {
         Self { root, roots }
     }
     pub fn host_directory(&self, host: &str) -> Result<PathBuf, ConfctlError> {
-        let host = safe_host(host)?;
-        Ok(self.root.path().join(".confctl/generations").join(host))
+        local_host_directory(&self.root, host)
     }
     pub fn load(&self, host: &str) -> Result<GenerationInventory, ConfctlError> {
-        let directory = self.host_directory(host)?;
-        let mut inventory = GenerationInventory::default();
-        let entries = match fs::read_dir(&directory) {
-            Ok(entries) => entries,
-            Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(inventory),
-            Err(source) => return Err(io("list generation directory", &directory, source)),
-        };
-        for entry in entries {
-            let entry = entry
-                .map_err(|source| io("read generation directory entry", &directory, source))?;
-            if !entry
-                .file_type()
-                .map_err(|source| io("inspect generation entry", &entry.path(), source))?
-                .is_dir()
-            {
-                continue;
-            }
-            let name = entry
-                .file_name()
-                .into_string()
-                .map_err(|_| ConfctlError::State("generation name is not UTF-8".into()))?;
-            let path = entry.path().join("generation.json");
-            let parsed = fs::read(&path)
-                .map_err(|source| io("read generation record", &path, source))
-                .and_then(|bytes| {
-                    serde_json::from_slice(&bytes).map_err(|source| ConfctlError::Decode {
-                        context: path.display().to_string(),
-                        source,
-                    })
-                })
-                .and_then(|value| BuildGeneration::decode(&name, value));
-            match parsed {
-                Ok(generation) => inventory.generations.push(generation),
-                Err(error) => {
-                    let reason = format!("{}: {error}", path.display());
-                    inventory.diagnostics.push(format!("Skipping generation {}: {reason}. Records and GC roots were left untouched; use confctl v3 for old software-pin generations.",entry.path().display()));
-                    inventory.rejected.insert(
-                        name,
-                        RejectedGeneration {
-                            path: entry.path(),
-                            reason,
-                        },
-                    );
-                }
-            }
-        }
-        inventory
-            .generations
-            .sort_by_key(|generation| generation.date);
-        let current = directory.join("current");
-        match fs::symlink_metadata(&current) {
-            Ok(metadata) if metadata.file_type().is_symlink() => {
-                let target = fs::read_link(&current)
-                    .map_err(|source| io("read current generation link", &current, source))?;
-                let name = target.file_name().and_then(OsStr::to_str).unwrap_or("");
-                if inventory
-                    .generations
-                    .iter()
-                    .any(|generation| generation.name == name)
-                {
-                    match (current.canonicalize(), directory.join(name).canonicalize()) {
-                        (Ok(actual), Ok(expected)) if actual == expected => {
-                            inventory.current = Some(name.into())
-                        }
-                        _ => {
-                            inventory.current_error = Some(format!(
-                                "{}: target does not resolve to local generation {name}",
-                                current.display()
-                            ))
-                        }
-                    }
-                } else {
-                    inventory.current_error = Some(
-                        inventory
-                            .rejected
-                            .get(name)
-                            .map(|record| record.reason.clone())
-                            .unwrap_or_else(|| {
-                                format!("{}: missing generation {name}", current.display())
-                            }),
-                    );
-                }
-            }
-            Ok(_) => {
-                inventory.current_error = Some(format!("{}: expected a symlink", current.display()))
-            }
-            Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
-                inventory.current = inventory
-                    .generations
-                    .last()
-                    .map(|generation| generation.name.clone());
-                if !inventory.rejected.is_empty()
-                    && let Some(name) = &inventory.current
-                {
-                    inventory.diagnostics.push(format!("No current link for {host}; selecting newest supported generation {name}. Excluded records and GC roots were left untouched."));
-                }
-            }
-            Err(source) => return Err(io("inspect current generation", &current, source)),
-        }
-        Ok(inventory)
+        GenerationInventory::load_local(&self.root, host)
     }
     pub fn publish(
         &self,

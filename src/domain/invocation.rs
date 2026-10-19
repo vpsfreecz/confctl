@@ -89,7 +89,7 @@ pub enum UnifiedGenerationSelector {
     All,
     Current,
     Old,
-    Offset(i64),
+    Offset(String),
     OlderThanDays(String),
     Pattern(String),
 }
