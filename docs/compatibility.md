@@ -60,12 +60,12 @@ The `confctl-rust` development binary provides the Rust parser and application
 entrypoint. The default `confctl` remains Ruby during development. Typed requests
 cover the 29 original command actions and the built-in `runtime-kernels update`
 action. The concrete routes are `ls`, `inputs ls`, `inputs channel ls`,
-`runtime-kernels update`, `build`, [`test-connection`](connection-check.md) and
-[`generation ls`](generation-listing.md) for default or explicitly local records.
+`runtime-kernels update`, `build`, [`test-connection`](connection-check.md),
+[`ssh`](ssh.md) and [`generation ls`](generation-listing.md) for default/local,
+remote or combined local/remote records.
 [`deploy --copy-only --generation <selector>`](deploy.md) copies saved generations.
-Remote generation listing, combined local/remote listing, other deploy modes and
-other operation adapters remain unavailable. Help and version need no inventory, input broker or
-process supervisor.
+Other deploy modes and operation adapters remain unavailable. Help and version
+need no inventory, input broker or process supervisor.
 Static original help text is preserved in `src/cli/help.json`, with source
 provenance in that module; it does not load test snapshots or Ruby at runtime.
 The immutable M0 archive and expectations remain the differential oracle.

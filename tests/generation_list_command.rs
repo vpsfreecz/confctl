@@ -27,8 +27,9 @@ impl Fixture {
                 "managed":true,"spin":"nixos","host":{"target":"localhost"},"tags":["chosen"]}},
             "b": {"name":"beta","key":"b-key","metaConfig":{
                 "managed":false,"spin":"nixos","host":{"target":"beta.invalid"},"tags":["chosen"]}},
-            "c": {"name":"carrier#guest","key":"c-key","carrier":"carrier","metaConfig":{
-                "managed":true,"spin":"vpsadminos","host":{"target":null},"tags":["other"]}}
+            "c": {"name":"carrier#guest","key":"c-key","carrier":"carrier","clusterName":"nested/guest","alias":"alias/guest 'literal'","metaConfig":{
+                "managed":true,"spin":"vpsadminos","host":{"target":null},"tags":["other"]}},
+            "d": {"name":"carrier","metaConfig":{"managed":true,"spin":"nixos","host":{"target":"carrier.invalid","port":2222},"tags":["carrier"]}}
         })).unwrap()).unwrap();
         executable(
             &bin.join("nix"),
@@ -117,6 +118,62 @@ esac
         );
         f
     }
+    fn enable_remote(&self) {
+        let cat = std::env::split_paths(&std::env::var_os("PATH").unwrap())
+            .map(|p| p.join("cat"))
+            .find(|p| p.is_file())
+            .unwrap();
+        fs::create_dir(self.root.join("native-tools")).unwrap();
+        symlink(cat, self.root.join("native-tools/cat")).unwrap();
+        executable(
+            &self.bin.join("cat"),
+            r#"#!/bin/sh
+[ "$*" = '/proc/uptime' ] || exit 97
+printf '123.5 0\n'
+"#,
+        );
+        executable(
+            &self.bin.join("bash"),
+            r#"#!/bin/sh
+printf '%s\n' "$*" >> "$GENERATION_FIXTURE_ROOT/bash-args"
+[ "$*" = '--norc' ] || exit 97
+"$GENERATION_FIXTURE_ROOT/native-tools/cat" > "$GENERATION_FIXTURE_ROOT/local-script"
+exec "$GENERATION_FIXTURE_ROOT/native-tools/cat" "$GENERATION_FIXTURE_ROOT/local-profile"
+"#,
+        );
+        executable(
+            &self.bin.join("ssh"),
+            r#"#!/bin/sh
+last=
+for arg do
+  printf '%s\n' "$arg" >> "$GENERATION_FIXTURE_ROOT/ssh-args"
+  last="$arg"
+done
+if [ -e "$GENERATION_FIXTURE_ROOT/ssh-unavailable" ]; then
+  printf 'fixture SSH unavailable\n' >&2
+  exit 255
+fi
+case "$last" in
+  'cat /proc/uptime') printf '456.5 0\n' ;;
+  'bash --norc')
+    "$GENERATION_FIXTURE_ROOT/native-tools/cat" > "$GENERATION_FIXTURE_ROOT/remote-script"
+    if [ -e "$GENERATION_FIXTURE_ROOT/ssh-profile-failure" ]; then
+      printf 'profile is missing\n' >&2
+      exit 1
+    fi
+    if [ -e "$GENERATION_FIXTURE_ROOT/ssh-profile-wait" ]; then
+      : > "$GENERATION_FIXTURE_ROOT/profile-started"
+      exec sleep 30
+    fi
+    exec "$GENERATION_FIXTURE_ROOT/native-tools/cat" "$GENERATION_FIXTURE_ROOT/remote-profile"
+    ;;
+  *) printf 'unexpected remote command\n' >&2; exit 97 ;;
+esac
+"#,
+        );
+        fs::write(self.root.join("local-profile"),"/remote/local\n/nix/var/nix/profiles/system-3-link;/remote/local;1700000000;/nix/store/hash-linux-6.12/bzImage\n").unwrap();
+        fs::write(self.root.join("remote-profile"),"/remote/beta\n/nix/var/nix/profiles/system-8-link;/remote/beta;1700000000;/nix/store/hash-linux-6.13/bzImage\n").unwrap();
+    }
     fn command(&self, args: &[&str]) -> Command {
         let inherited = std::env::var_os("PATH").unwrap_or_default();
         let path = std::env::join_paths(
@@ -131,6 +188,7 @@ esac
             .env("PATH", path)
             .env("GENERATION_FIXTURE_ROOT", &self.root)
             .env("CONFCTL_LOGNAME", self.bin.join("logname"))
+            .env("CONFCTL_SSH_CONFIG", self.root.join("ssh config"))
             .env_remove("GENERATION_FIXTURE_WAIT")
             .env("TZ", "UTC")
             .env("NO_COLOR", "1")
@@ -201,6 +259,7 @@ fn success(output: &Output) -> String {
 fn names(output: &Output) -> Vec<String> {
     success(output)
         .lines()
+        .skip_while(|line| !line.starts_with("HOST"))
         .skip(1)
         .filter(|line| !line.trim().is_empty())
         .map(|line| line.split_whitespace().nth(1).unwrap().to_owned())
@@ -339,20 +398,208 @@ fn exclusions_and_unresolved_current_are_read_only_and_fail_unsafe_selections() 
 }
 
 #[test]
-fn empty_success_and_remote_refusal_before_any_setup() {
+fn empty_local_success_does_not_create_generation_storage() {
     let f = Fixture::new();
     assert!(names(&f.list(&[])).is_empty());
     assert!(names(&f.list(&["absent*"])).is_empty());
     assert!(!f.root.join(".confctl/generations").exists());
-    for locations in [vec!["--remote"], vec!["--local", "--remote"]] {
-        let f = Fixture::new();
-        fs::remove_file(f.root.join("flake.nix")).unwrap();
-        let output = f.list(&locations);
-        assert!(!output.status.success());
-        assert!(String::from_utf8_lossy(&output.stderr).contains("not implemented yet"));
-        assert!(!f.root.join(".confctl").exists());
-        assert!(!f.root.join("nix-calls").exists());
+}
+
+#[test]
+fn actual_remote_profiles_use_local_or_root_ssh_without_local_record_reads() {
+    let f = Fixture::new();
+    f.enable_remote();
+    // A remote-only request must never attempt the local generation reader.
+    fs::create_dir_all(f.root.join(".confctl/generations")).unwrap();
+    fs::write(f.host("beta"), "invalid local path").unwrap();
+    let before = snapshot(&f.root.join(".confctl/generations"));
+    for host in ["a-key", "b-key"] {
+        let output = f.list(&["--remote", host]);
+        let text = success(&output);
+        assert_eq!(
+            names(&output),
+            ["2023-11-14--22-13-20"],
+            "stdout={text}\nstderr={}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(text.contains("host") && text.contains("6.1"));
     }
+    assert_eq!(
+        fs::read_to_string(f.root.join("bash-args")).unwrap(),
+        "--norc\n"
+    );
+    let args = fs::read_to_string(f.root.join("ssh-args")).unwrap();
+    assert!(args.contains("-F\n") && args.contains("ssh config\n") && args.contains("-l\nroot\n"));
+    assert!(
+        args.contains("beta.invalid\ncat /proc/uptime\n")
+            && args.contains("beta.invalid\nbash --norc\n")
+    );
+    assert!(!args.contains("Timeout") && !args.contains("realpath"));
+    let script = fs::read_to_string(f.root.join("remote-script")).unwrap();
+    assert!(script.contains("realpath -e --") && script.contains("/nix/var/nix/profiles/system"));
+    assert!(!script.contains("chmod") && !script.contains("nix-env"));
+    // Queries may finish in any order; selectors still see host selection order.
+    assert_eq!(
+        names(&f.list(&["--remote", "--tag=chosen", "*", "1"])),
+        ["2023-11-14--22-13-20"]
+    );
+    let output = f.list(&["--remote", "--tag=chosen", "*", "0"]);
+    assert!(
+        success(&output)
+            .lines()
+            .any(|line| line.starts_with("beta ") && line.contains("2023-11-14"))
+    );
+    f.preserved(&before);
+}
+
+#[test]
+fn carried_remote_profiles_use_exact_carrier_target_port_and_quoted_alias() {
+    let f = Fixture::new();
+    f.enable_remote();
+    let profile = "/nix/var/nix/profiles/confctl-alias:guest 'literal'";
+    fs::write(f.root.join("remote-profile"),format!("/remote/guest\n{profile}-2-link;/remote/guest;1700000000;/nix/store/hash-linux-6.14/bzImage\nwrong-link;/ignore;0;\n")).unwrap();
+    let output = f.list(&["--remote", "c-key"]);
+    let text = success(&output);
+    assert!(
+        text.contains("carrier#guest") && text.contains("6.14"),
+        "stdout={text}\nstderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("Invalid profile generation link 'wrong-link'")
+    );
+    let args = fs::read_to_string(f.root.join("ssh-args")).unwrap();
+    assert!(args.contains("-p\n2222\ncarrier.invalid\n"));
+    assert!(!args.contains("guest\n"));
+    let script = fs::read_to_string(f.root.join("remote-script")).unwrap();
+    assert!(script.contains("confctl-alias:guest"));
+    assert!(script.contains("\\'") || script.contains("'\\''"));
+    assert!(!f.root.join(".confctl/generations").exists());
+}
+
+#[test]
+fn combined_remote_first_unification_keeps_local_names_metadata_and_distinct_builds() {
+    let f = Fixture::populated();
+    f.enable_remote();
+    let record = f.host("nodes/alpha").join("a-current/generation.json");
+    let value: Value = serde_json::from_slice(&fs::read(record).unwrap()).unwrap();
+    let top = value["toplevel"].as_str().unwrap();
+    fs::write(f.root.join("local-profile"),format!("{top}\n/nix/var/nix/profiles/system-8-link;{top};1700000000;/nix/store/hash-linux-remote-first/bzImage\n/nix/var/nix/profiles/system-10-link;{top};1700000001;/nix/store/hash-linux-remote-later/bzImage\n")).unwrap();
+    let before = snapshot(&f.root.join(".confctl/generations"));
+    let output = f.list(&["--local", "--remote", "a-key"]);
+    let text = success(&output);
+    assert_eq!(names(&output), ["a-current", "z-old"]);
+    let merged = text
+        .lines()
+        .find(|line| line.contains("a-current"))
+        .unwrap();
+    assert!(
+        merged.contains("10")
+            && merged.contains("build+host")
+            && merged.contains("remote-first")
+            && merged.contains("abcdef01"),
+        "stdout={text}\nstderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        names(&f.list(&["--local", "--remote", "a-key", "1"])),
+        ["a-current"]
+    );
+    assert_eq!(
+        names(&f.list(&["--local", "--remote", "a-key", "0"])),
+        ["z-old"]
+    );
+    f.preserved(&before);
+}
+
+#[test]
+fn unavailable_profiles_have_failed_tasks_and_diagnostics_but_listing_succeeds() {
+    let f = Fixture::new();
+    f.enable_remote();
+    fs::write(f.root.join("ssh-unavailable"), "").unwrap();
+    let output = f.list(&["--remote", "b-key"]);
+    assert!(names(&output).is_empty());
+    let diagnostic = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        diagnostic.contains("uptime for beta")
+            && diagnostic.contains("255")
+            && diagnostic.contains("fixture SSH unavailable")
+    );
+    assert!(!f.root.join("remote-script").exists());
+    fs::remove_file(f.root.join("ssh-unavailable")).unwrap();
+    fs::write(f.root.join("ssh-profile-failure"), "").unwrap();
+    let output = f.list(&["--remote", "b-key"]);
+    assert!(names(&output).is_empty());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("profile generations for beta"));
+    assert!(!f.root.join(".confctl/generations").exists());
+}
+
+#[test]
+fn remote_profile_cancellation_joins_active_query_without_touching_local_records() {
+    use nix::{
+        sys::signal::{Signal, kill},
+        unistd::Pid,
+    };
+    let f = Fixture::populated();
+    f.enable_remote();
+    fs::write(f.root.join("ssh-profile-wait"), "").unwrap();
+    let before = snapshot(&f.root.join(".confctl/generations"));
+    let mut child = f
+        .command(&["generation", "ls", "--remote", "b-key"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !f.root.join("profile-started").exists() {
+        if Instant::now() >= deadline {
+            child.kill().unwrap();
+            let _ = child.wait();
+            panic!("profile query did not start");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    kill(
+        Pid::from_raw(child.id().try_into().unwrap()),
+        Signal::SIGINT,
+    )
+    .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while child.try_wait().unwrap().is_none() {
+        if Instant::now() >= deadline {
+            child.kill().unwrap();
+            let _ = child.wait();
+            panic!("profile query did not join after cancellation");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let output = child.wait_with_output().unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("canceled"));
+    f.preserved(&before);
+}
+
+#[test]
+fn remote_output_failure_and_missing_carrier_are_not_successful_empty_lists() {
+    let f = Fixture::populated();
+    f.enable_remote();
+    let before = snapshot(&f.root.join(".confctl/generations"));
+    let output = f
+        .command(&["generation", "ls", "--remote", "b-key"])
+        .stdout(fs::File::create("/dev/full").unwrap())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    f.preserved(&before);
+    let path = f.root.join("machines.json");
+    let mut machines: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    machines.as_object_mut().unwrap().remove("d");
+    fs::write(path, serde_json::to_vec(&machines).unwrap()).unwrap();
+    let output = f.list(&["--remote", "c-key"]);
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Carrier carrier not found"));
+    f.preserved(&before);
 }
 
 #[test]
