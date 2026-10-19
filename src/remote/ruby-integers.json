@@ -1,0 +1,126 @@
+{
+  "ruby": "3.4.9",
+  "json": "2.21.2",
+  "cases": [
+    {
+      "input": "0",
+      "integer": "0",
+      "timeout": "0"
+    },
+    {
+      "input": "60",
+      "integer": "60",
+      "timeout": "60"
+    },
+    {
+      "input": "-1",
+      "integer": "-1",
+      "timeout": "-1"
+    },
+    {
+      "input": "+0",
+      "integer": "0",
+      "timeout": "0"
+    },
+    {
+      "input": "-0",
+      "integer": "0",
+      "timeout": "0"
+    },
+    {
+      "input": "010",
+      "integer": "8",
+      "timeout": "8"
+    },
+    {
+      "input": "08",
+      "integer_error": "ArgumentError",
+      "timeout_error": "OptionParser::InvalidArgument"
+    },
+    {
+      "input": "0x10",
+      "integer": "16",
+      "timeout": "16"
+    },
+    {
+      "input": "0XFF",
+      "integer": "255",
+      "timeout": "255"
+    },
+    {
+      "input": "0x_1",
+      "integer_error": "ArgumentError",
+      "timeout_error": "OptionParser::InvalidArgument"
+    },
+    {
+      "input": "0b11",
+      "integer": "3",
+      "timeout": "3"
+    },
+    {
+      "input": "0o17",
+      "integer": "15",
+      "timeout_error": "OptionParser::InvalidArgument"
+    },
+    {
+      "input": "0d12",
+      "integer": "12",
+      "timeout_error": "OptionParser::InvalidArgument"
+    },
+    {
+      "input": "1_000",
+      "integer": "1000",
+      "timeout": "1000"
+    },
+    {
+      "input": "1__2",
+      "integer_error": "ArgumentError",
+      "timeout_error": "OptionParser::InvalidArgument"
+    },
+    {
+      "input": "_1",
+      "integer_error": "ArgumentError",
+      "timeout_error": "OptionParser::InvalidArgument"
+    },
+    {
+      "input": "1_",
+      "integer_error": "ArgumentError",
+      "timeout_error": "OptionParser::InvalidArgument"
+    },
+    {
+      "input": " 2 ",
+      "integer": "2",
+      "timeout_error": "OptionParser::InvalidArgument"
+    },
+    {
+      "input": "\u000b22",
+      "integer": "22",
+      "timeout_error": "OptionParser::InvalidArgument"
+    },
+    {
+      "input": "\u000022",
+      "integer_error": "ArgumentError",
+      "timeout_error": "OptionParser::InvalidArgument"
+    },
+    {
+      "input": "184467440737095516160001",
+      "integer": "184467440737095516160001",
+      "timeout": "184467440737095516160001"
+    },
+    {
+      "input": "-184467440737095516160001",
+      "integer": "-184467440737095516160001",
+      "timeout": "-184467440737095516160001"
+    },
+    {
+      "input": "1.2",
+      "integer_error": "ArgumentError",
+      "timeout_error": "OptionParser::InvalidArgument"
+    },
+    {
+      "input": "",
+      "integer_error": "ArgumentError",
+      "timeout_error": "OptionParser::InvalidArgument"
+    }
+  ]
+}

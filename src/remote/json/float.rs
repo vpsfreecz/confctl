@@ -36,6 +36,7 @@ const HIDDEN: u64 = 1 << 52;
 
 // Cached powers are copied mechanically from the qualified source; the full
 // source SHA256 is retained with the Ruby semantic probe evidence.
+#[path = "float/powers.rs"]
 mod powers;
 use powers::POWERS;
 
