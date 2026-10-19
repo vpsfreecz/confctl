@@ -1,6 +1,6 @@
 //! Ratatui widgets render a bounded frame; native painting has no input reader.
 
-use super::model::{Model, clip, sanitize_text};
+use super::model::{Model, TaskRow, clip, sanitize_text, source_label};
 use crate::{events::TaskState, timing::format_elapsed};
 use ratatui::{
     buffer::Buffer,
@@ -39,6 +39,22 @@ pub fn render(model: &Model, info: &FrameInfo<'_>, width: u16, height: u16) -> B
         .min(model.rows().len())
         .min(usize::from(height).saturating_sub(header_count + tail_minimum));
     let tail_height = usize::from(height).saturating_sub(header_count + task_count);
+    let operation = format!("Operation: {}", single_line(info.operation));
+    let operation = if let Some(log) = info.log {
+        let complete = format!("{operation}  Log: {}", single_line(log));
+        if Span::raw(&complete).width() <= usize::from(width) {
+            complete
+        } else {
+            let omitted = format!("{operation}  Log: …");
+            if Span::raw(&omitted).width() <= usize::from(width) {
+                omitted
+            } else {
+                "Log: …".into()
+            }
+        }
+    } else {
+        operation
+    };
     let headers = [
         format!("Command: {}", info.command),
         format!(
@@ -46,16 +62,10 @@ pub fn render(model: &Model, info: &FrameInfo<'_>, width: u16, height: u16) -> B
             info.started,
             format_elapsed(info.elapsed)
         ),
-        format!(
-            "Operation: {}{}",
-            info.operation,
-            info.log
-                .map(|path| format!("  Log: {path}"))
-                .unwrap_or_default()
-        ),
+        operation,
     ];
     for (index, text) in headers.iter().take(header_count).enumerate() {
-        Line::styled(clip(&single_line(text), usize::from(width)), heading)
+        Line::styled(clipped(&single_line(text), usize::from(width)), heading)
             .render(Rect::new(0, index as u16, width, 1), &mut buffer);
     }
     if tail_height > 0 {
@@ -71,7 +81,7 @@ pub fn render(model: &Model, info: &FrameInfo<'_>, width: u16, height: u16) -> B
         let lines: Vec<Line<'_>> = lines[start..]
             .iter()
             .map(|line| {
-                Line::raw(clip(
+                Line::raw(tail_line(
                     line,
                     usize::from(width.saturating_sub(if bordered { 2 } else { 0 })),
                 ))
@@ -93,21 +103,7 @@ pub fn render(model: &Model, info: &FrameInfo<'_>, width: u16, height: u16) -> B
     for (index, row) in model.visible_rows(task_count).iter().enumerate() {
         let y = header_count + tail_height + index;
         let row_area = Rect::new(0, y as u16, width, 1);
-        let state = row.state.map(state_label).unwrap_or("running");
-        let counts = row
-            .total
-            .map(|total| format!("{}/{total}", row.completed))
-            .unwrap_or_else(|| row.completed.to_string());
-        // Drop the bar before clipping; keep explicit outcome before long labels.
-        let label = format!(
-            "{state} {counts} {}{}",
-            single_line(&row.description),
-            if row.detail.is_empty() {
-                String::new()
-            } else {
-                format!(" {}", single_line(&row.detail))
-            }
-        );
+        let (label, _) = task_label(row, usize::from(width));
         let color = match row.state {
             Some(TaskState::Succeeded) => Color::Green,
             Some(TaskState::Failed) => Color::Red,
@@ -131,6 +127,89 @@ pub fn render(model: &Model, info: &FrameInfo<'_>, width: u16, height: u16) -> B
         }
     }
     buffer
+}
+
+fn clipped(text: &str, columns: usize) -> String {
+    if Span::raw(text).width() <= columns {
+        text.to_owned()
+    } else if columns == 0 {
+        String::new()
+    } else {
+        format!("{}…", clip(text, columns - 1))
+    }
+}
+
+fn tail_line(line: &str, columns: usize) -> String {
+    // Split only the prefix made by Tail, never interpret child text as an ID.
+    let Some((source, content)) = line.split_once(' ') else {
+        return clipped(line, columns);
+    };
+    let message_space = Span::raw(content).width().min(6);
+    if source.len() + 1 + message_space <= columns {
+        format!("{source} {}", clipped(content, columns - source.len() - 1))
+    } else {
+        // No partial source key: final task/log summaries retain the association.
+        clipped(&format!("… {content}"), columns)
+    }
+}
+
+fn task_counts(row: &TaskRow) -> String {
+    row.total
+        .map(|total| format!("{}/{total}", row.completed))
+        .unwrap_or_else(|| row.completed.to_string())
+}
+
+fn task_description(row: &TaskRow) -> String {
+    format!(
+        "{}{}",
+        single_line(&row.description),
+        if row.detail.is_empty() {
+            String::new()
+        } else {
+            format!(" {}", single_line(&row.detail))
+        }
+    )
+}
+
+/// The boolean marks a shortened view, which needs a full final task summary.
+pub(super) fn task_label(row: &TaskRow, columns: usize) -> (String, bool) {
+    let state = row.state.map(state_label).unwrap_or("running");
+    let source = source_label(row.id);
+    let description = task_description(row);
+    let prefix = format!("{state} {source} {} ", task_counts(row));
+    let complete = format!("{prefix}{description}");
+    if Span::raw(&complete).width() <= columns {
+        return (complete, false);
+    }
+    let message_space = Span::raw(&description).width().min(6);
+    if prefix.len() + message_space <= columns {
+        return (
+            format!("{prefix}{}", clipped(&description, columns - prefix.len())),
+            true,
+        );
+    }
+    let prefix = format!("{state} {source} ");
+    if prefix.len() + message_space.max(1) <= columns {
+        return (
+            format!(
+                "{prefix}{}…",
+                clip(&description, columns - prefix.len() - 1)
+            ),
+            true,
+        );
+    }
+    (clipped(&format!("{state} … {description}"), columns), true)
+}
+
+pub(super) fn task_summary(row: &TaskRow) -> String {
+    format!(
+        "{} (task {}): {}: {} {}\n",
+        source_label(row.id),
+        row.id.0,
+        task_description(row),
+        row.state.map(state_label).unwrap_or("incomplete"),
+        task_counts(row)
+    )
 }
 
 fn single_line(text: &str) -> String {
@@ -434,8 +513,112 @@ mod tests {
             .expect("result");
         let buffer = render(&model, &info(), 12, 4);
         let output = text(&buffer);
-        assert!(output.contains("failed 0 ver"));
+        assert!(output.contains("failed"));
+        assert!(output.contains('…'));
+        assert!(!output.contains('@'), "no partial source key in a tiny row");
         assert!(!output.contains(['\n', '\r']));
+    }
+
+    #[test]
+    fn tail_source_id_matches_task_description_without_color() {
+        let mut model = Model::new(2, 80);
+        model
+            .apply(&UiEvent::TaskStarted {
+                task: TaskId(7),
+                description: "node-a activation".into(),
+            })
+            .expect("start");
+        model.output(
+            TaskId(7),
+            crate::events::OutputStream::Stderr,
+            b"failed to switch\n",
+        );
+        model
+            .apply(&UiEvent::TaskFinished {
+                task: TaskId(7),
+                state: TaskState::Failed,
+            })
+            .expect("result");
+        let output = text(&render(&model, &info(), 80, 12));
+        assert!(output.contains("@7/e failed to switch"));
+        assert!(output.contains("failed @7 0 node-a activation"));
+    }
+
+    #[test]
+    fn narrow_two_task_frames_keep_large_keys_outcomes_and_messages_without_color() {
+        let mut model = Model::new(4, 80);
+        for (id, description, message) in [
+            (u64::MAX - 1, "node-a activation", "failed to switch\n"),
+            (u64::MAX, "node-b activation", "failed to copy\n"),
+        ] {
+            model
+                .apply(&UiEvent::TaskStarted {
+                    task: TaskId(id),
+                    description: description.into(),
+                })
+                .expect("start");
+            model.output(
+                TaskId(id),
+                crate::events::OutputStream::Stderr,
+                message.as_bytes(),
+            );
+            model
+                .apply(&UiEvent::TaskFinished {
+                    task: TaskId(id),
+                    state: TaskState::Failed,
+                })
+                .expect("result");
+        }
+        for width in [32, 39, 40] {
+            let output = text(&render(&model, &info(), width, 14));
+            for key in ["@3w5e11264sgse", "@3w5e11264sgsf"] {
+                assert!(output.matches(key).count() >= 2, "row and tail keep {key}");
+            }
+            assert!(output.contains("node-a"));
+            assert!(output.contains("node-b"));
+            assert!(output.matches("failed to").count() >= 2);
+            assert!(output.matches("failed @").count() >= 2);
+        }
+    }
+
+    #[test]
+    fn tiny_layout_omits_whole_keys_and_retains_full_summary_identity() {
+        let mut model = Model::new(2, 80);
+        model
+            .apply(&UiEvent::TaskStarted {
+                task: TaskId(u64::MAX),
+                description: "node-a activation".into(),
+            })
+            .expect("start");
+        model.output(
+            TaskId(u64::MAX),
+            crate::events::OutputStream::Stderr,
+            b"failed to switch\n",
+        );
+        let row = &model.rows()[0];
+        for columns in [0, 1, 2, 8, 12, 20] {
+            let (label, shortened) = task_label(row, columns);
+            assert!(shortened);
+            assert!(!label.contains('@'));
+            assert!(Span::raw(&label).width() <= columns);
+        }
+        let mut sparse = row.clone();
+        sparse.description.clear();
+        sparse.completed = u64::MAX;
+        sparse.total = Some(u64::MAX);
+        for columns in [0, 1, 14, 23, 24, 25, 26, 32, 39, 40] {
+            let (label, _) = task_label(&sparse, columns);
+            assert!(Span::raw(&label).width() <= columns);
+            if label.contains('@') {
+                assert!(label.contains("@3w5e11264sgsf"));
+            }
+        }
+        let output = text(&render(&model, &info(), 20, 8));
+        assert!(!output.contains('@'));
+        assert!(output.contains('…'));
+        let summary = task_summary(row);
+        assert!(summary.contains("@3w5e11264sgsf (task 18446744073709551615)"));
+        assert!(summary.contains("node-a activation: incomplete"));
     }
 
     #[test]

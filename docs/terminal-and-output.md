@@ -27,6 +27,31 @@ totals show counts; positive totals permit a clamped progress bar. Narrow rows
 keep the result before a clipped description. Rendering reads elapsed time
 without freezing the timing ledger.
 
+Live tail fragments and task rows share a compact source key: @ followed by
+the complete TaskId in base 36. Tail suffixes /o and /e identify stdout and
+stderr. A source change starts a separate displayed fragment, so partial lines
+from different sources do not merge. Keys encode the supplied ID directly;
+host and stage descriptions still come from the operation.
+
+Narrow views keep complete keys when they can fit beside useful message text.
+An ellipsis marks shortened text or omitted fields. Tiny views omit a whole
+key rather than showing an ambiguous prefix. Final summaries retain the key,
+full decimal TaskId, description, outcome and counts for tasks omitted or
+shortened by the final layout. Retained output without a registered task gets
+a source association with an explicit missing description, without inventing a
+task state. Tail content and its source metadata remain bounded.
+
+Each retained task/log locator is also summarized at group finalization, even
+if its header was visible. Paths use one quoted, single-line display encoding:
+backslashes and quotes are escaped; LF, CR and tab use visible escapes; other
+ASCII controls and non-UTF8 bytes use two-digit byte escapes. Unicode controls,
+line separators and directional controls are escaped, while printable Unicode,
+including wide and combining text, remains readable. A header locator that
+cannot fit is replaced by an ellipsis; the final summary retains it in full.
+Native PathBuf values remain unchanged. Display labels affect only the view.
+Returned sanitized child output and original captures retain their existing
+bytes and stream roles.
+
 Both output streams must be usable terminals for live mode. `CONFCTL_TTY=0` or a
 redirected stream selects plain mode. Color policy is separate: `always` forces
 confctl styling, `never` disables it, and `auto` follows the destination and

@@ -573,6 +573,229 @@ async fn live_stream_sanitization_is_incremental_and_final_panel_does_not_replay
     assert!(!rendered.windows(8).any(|bytes| bytes == b"\x1b[?1049h"));
 }
 
+#[test]
+fn path_display_escapes_native_bytes_without_losing_printable_unicode() {
+    use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+    for (native, expected) in [
+        (b"/logs/a\\n".to_vec(), r"/logs/a\\n"),
+        (b"/logs/a\n".to_vec(), r"/logs/a\n"),
+        (b"/logs/a\"b".to_vec(), r#"/logs/a\"b"#),
+        (
+            b"/logs/a\nb\rc\td\x1be\\f\xff".to_vec(),
+            r"/logs/a\nb\rc\td\x1be\\f\xff",
+        ),
+        (b"/logs/\0\x7f\xfe".to_vec(), r"/logs/\x00\x7f\xfe"),
+        ("/logs/界e\u{301}".as_bytes().to_vec(), "/logs/界e\u{301}"),
+        ("/logs/�".as_bytes().to_vec(), "/logs/�"),
+        (
+            "/logs/\u{85}\u{2028}\u{202e}".as_bytes().to_vec(),
+            r"/logs/\u{85}\u{2028}\u{202e}",
+        ),
+    ] {
+        let path = PathBuf::from(OsString::from_vec(native));
+        let escaped = display_path(&path);
+        assert_eq!(escaped, format!("\"{expected}\""));
+        assert!(!escaped.chars().any(char::is_control));
+    }
+}
+
+#[tokio::test]
+async fn live_log_locators_keep_task_ids_for_shared_and_clipped_paths() {
+    use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+    let long = format!("/logs/{}", "long".repeat(30));
+    for (path, escaped, clipped) in [
+        (
+            PathBuf::from("/logs/shared"),
+            "/logs/shared".to_owned(),
+            false,
+        ),
+        (PathBuf::from(long.clone()), long, true),
+        (
+            PathBuf::from("/logs/界e\u{301}\n\r\t\u{1b}\\tail"),
+            concat!("/logs/界e\u{301}", r"\n\r\t\x1b\\tail").to_owned(),
+            false,
+        ),
+        (
+            PathBuf::from(OsString::from_vec(b"/logs/\xff\\tail".to_vec())),
+            r"/logs/\xff\\tail".to_owned(),
+            false,
+        ),
+    ] {
+        let directory = tempfile::tempdir().expect("directory");
+        let (stdout, out) = writer(None, false);
+        let (stderr, _) = writer(None, false);
+        let (sink, receiver) = EventSink::channel(1);
+        let (_state, observe) = watch::channel(TerminalState::Idle);
+        let (control, presentation) = Presentation::new(
+            receiver,
+            observe,
+            OutputTargets { stdout, stderr },
+            config(directory.path(), true),
+            None,
+        )
+        .expect("presentation");
+        let running = tokio::spawn(presentation.run());
+        for id in [1, 2] {
+            sink.emit(UiEvent::TaskStarted {
+                task: TaskId(id),
+                description: format!("node-{id} build"),
+            })
+            .await
+            .expect("task");
+            sink.emit(UiEvent::LogAvailable {
+                task: TaskId(id),
+                path: path.clone(),
+            })
+            .await
+            .expect("log");
+        }
+        control.finish().await.expect("finish");
+        running.await.expect("join").expect("run");
+        let rendered = String::from_utf8(out.lock().expect("stdout").clone()).expect("UTF-8");
+        for id in [1, 2] {
+            let summary = format!("Log: @{id} (task {id}): \"{escaped}\"\n");
+            assert_eq!(rendered.matches(&summary).count(), 1);
+        }
+        if clipped {
+            assert!(rendered.contains("Log: …"));
+        } else {
+            assert!(rendered.contains(&format!("Log: @2: \"{escaped}\"")));
+        }
+    }
+}
+
+#[tokio::test]
+async fn unrelated_prefix_text_cannot_suppress_a_final_log_locator() {
+    let directory = tempfile::tempdir().expect("directory");
+    let (stdout, out) = writer(None, false);
+    let (stderr, _) = writer(None, false);
+    let (sink, receiver) = EventSink::channel(1);
+    let (_state, observe) = watch::channel(TerminalState::Idle);
+    let (control, presentation) = Presentation::new(
+        receiver,
+        observe,
+        OutputTargets { stdout, stderr },
+        config(directory.path(), true),
+        None,
+    )
+    .expect("presentation");
+    let running = tokio::spawn(presentation.run());
+    sink.emit(UiEvent::TaskStarted {
+        task: TaskId(2),
+        description: "task 1: /logs/a.more @1: \"/logs/a\"".into(),
+    })
+    .await
+    .expect("misleading description");
+    sink.emit(UiEvent::Output {
+        task: TaskId(2),
+        stream: OutputStream::Stdout,
+        bytes: b"task 1: /logs/a.more @1: \"/logs/a\"\n".to_vec(),
+    })
+    .await
+    .expect("unrelated tail");
+    for (id, path) in [(1, "/logs/a"), (2, "/logs/b")] {
+        sink.emit(UiEvent::LogAvailable {
+            task: TaskId(id),
+            path: path.into(),
+        })
+        .await
+        .expect("log");
+    }
+    control.finish().await.expect("finish");
+    running.await.expect("join").expect("run");
+    let rendered = String::from_utf8(out.lock().expect("stdout").clone()).expect("UTF-8");
+    for expected in [
+        "Log: @1 (task 1): \"/logs/a\"\n",
+        "Log: @2 (task 2): \"/logs/b\"\n",
+    ] {
+        assert_eq!(rendered.matches(expected).count(), 1);
+    }
+}
+
+#[tokio::test]
+async fn omitted_and_shortened_task_rows_keep_full_final_source_associations() {
+    let directory = tempfile::tempdir().expect("directory");
+    let (stdout, out) = writer(None, false);
+    let (stderr, _) = writer(None, false);
+    let (sink, receiver) = EventSink::channel(1);
+    let (_state, observe) = watch::channel(TerminalState::Idle);
+    let mut settings = config(directory.path(), true);
+    settings.initial_size = (33, 12);
+    settings.max_tasks = 1;
+    let (control, presentation) = Presentation::new(
+        receiver,
+        observe,
+        OutputTargets { stdout, stderr },
+        settings,
+        None,
+    )
+    .expect("presentation");
+    let running = tokio::spawn(presentation.run());
+    for (id, description) in [
+        (u64::MAX - 1, "node-a activation with detailed error"),
+        (u64::MAX, "node-b activation with detailed error"),
+    ] {
+        sink.emit(UiEvent::TaskStarted {
+            task: TaskId(id),
+            description: description.into(),
+        })
+        .await
+        .expect("task");
+        sink.emit(UiEvent::TaskFinished {
+            task: TaskId(id),
+            state: crate::events::TaskState::Failed,
+        })
+        .await
+        .expect("result");
+    }
+    control.finish().await.expect("finish");
+    running.await.expect("join").expect("run");
+    let rendered = String::from_utf8(out.lock().expect("stdout").clone()).expect("UTF-8");
+    assert!(rendered.contains("2 tasks not shown in full\n"));
+    assert!(rendered.contains(
+        "@3w5e11264sgse (task 18446744073709551614): node-a activation with detailed error: failed 0\n"
+    ));
+    assert!(rendered.contains(
+        "@3w5e11264sgsf (task 18446744073709551615): node-b activation with detailed error: failed 0\n"
+    ));
+}
+
+#[tokio::test]
+async fn tiny_unregistered_output_retains_source_without_inventing_task_state() {
+    let directory = tempfile::tempdir().expect("directory");
+    let (stdout, out) = writer(None, false);
+    let (stderr, err) = writer(None, false);
+    let (sink, receiver) = EventSink::channel(1);
+    let (_state, observe) = watch::channel(TerminalState::Idle);
+    let mut settings = config(directory.path(), true);
+    settings.initial_size = (9, 8);
+    let (control, presentation) = Presentation::new(
+        receiver,
+        observe,
+        OutputTargets { stdout, stderr },
+        settings,
+        None,
+    )
+    .expect("presentation");
+    let running = tokio::spawn(presentation.run());
+    sink.emit(UiEvent::Output {
+        task: TaskId(u64::MAX),
+        stream: OutputStream::Stderr,
+        bytes: b"failure\n".to_vec(),
+    })
+    .await
+    .expect("output without registration");
+    control.finish().await.expect("finish");
+    running.await.expect("join").expect("run");
+    assert_eq!(*err.lock().expect("stderr"), b"failure\n");
+    let rendered = String::from_utf8(out.lock().expect("stdout").clone()).expect("UTF-8");
+    assert!(rendered.contains(
+        "Output source @3w5e11264sgsf/e (task 18446744073709551615, stderr): no registered task description\n"
+    ));
+    assert!(!rendered.contains("tasks not shown"));
+    assert!(!rendered.contains("succeeded"));
+}
+
 #[tokio::test]
 async fn prompt_frame_requires_lease_and_cancelled_prompt_releases_deferred_output() {
     let directory = tempfile::tempdir().expect("directory");
