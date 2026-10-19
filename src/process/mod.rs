@@ -121,6 +121,7 @@ pub struct ProcessScope {
     pub task: TaskId,
     pub phase: Option<Phase>,
     pub foreground: Option<ForegroundLease>,
+    pub(crate) nix_progress: bool,
 }
 
 impl ProcessScope {
@@ -130,6 +131,7 @@ impl ProcessScope {
             task,
             phase: None,
             foreground: None,
+            nix_progress: false,
         }
     }
 }
@@ -850,8 +852,8 @@ async fn execute(
             owner,
             prepared,
             stdout,
-            OutputStream::Stdout,
-            scope.task,
+            (OutputStream::Stdout, scope.task),
+            false,
             cancel.clone(),
             errors.clone(),
         );
@@ -865,8 +867,8 @@ async fn execute(
             owner,
             prepared,
             stderr,
-            OutputStream::Stderr,
-            scope.task,
+            (OutputStream::Stderr, scope.task),
+            scope.nix_progress,
             cancel.clone(),
             errors.clone(),
         );
@@ -1172,11 +1174,12 @@ fn start_stream(
     owner: &Owner,
     prepared: PreparedStream,
     mut reader: impl AsyncRead + Send + Unpin + 'static,
-    stream: OutputStream,
-    task: TaskId,
+    source: (OutputStream, TaskId),
+    nix_progress: bool,
     cancel: CancellationToken,
     errors: mpsc::UnboundedSender<ConfctlError>,
 ) -> (Pump, Option<Relay>) {
+    let (stream, task) = source;
     let PreparedStream {
         spool,
         writer,
@@ -1238,8 +1241,8 @@ fn start_stream(
                 File::from_std(file),
                 observe,
                 events,
-                task,
-                stream,
+                (task, stream),
+                nix_progress,
                 cancel,
                 errors,
             )
@@ -1253,11 +1256,13 @@ async fn relay_stream(
     mut file: File,
     mut published: watch::Receiver<Published>,
     events: EventSink,
-    task: TaskId,
-    stream: OutputStream,
+    source: (TaskId, OutputStream),
+    nix_progress: bool,
     cancel: CancellationToken,
     errors: mpsc::UnboundedSender<ConfctlError>,
 ) {
+    let (task, stream) = source;
+    let mut progress = nix_progress.then(crate::nix::progress::Progress::default);
     let mut offset = 0;
     loop {
         let state = *published.borrow_and_update();
@@ -1270,12 +1275,28 @@ async fn relay_stream(
                 return;
             }
             offset += length as u64;
+            let updates = progress
+                .as_mut()
+                .map(|decoder| decoder.feed(&bytes, task))
+                .unwrap_or_default();
             tokio::select! {
                 result = events.emit(UiEvent::Output { task, stream, bytes }) => if let Err(error) = result { let _ = errors.send(error); return; },
                 _ = cancel.cancelled() => return,
             }
+            for event in updates {
+                tokio::select! {
+                    result = events.emit(event) => if let Err(error) = result { let _ = errors.send(error); return; },
+                    _ = cancel.cancelled() => return,
+                }
+            }
         }
         if state.finished {
+            if let Some(event) = progress.as_mut().and_then(|decoder| decoder.flush(task)) {
+                tokio::select! {
+                    result = events.emit(event) => if let Err(error) = result { let _ = errors.send(error); },
+                    _ = cancel.cancelled() => {},
+                }
+            }
             return;
         }
         tokio::select! {
