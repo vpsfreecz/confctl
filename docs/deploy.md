@@ -145,3 +145,50 @@ before an explicit rerun. Success means that the requested dry command completed
 it does not guarantee that a future switch or reboot will succeed. This route
 runs no rollback helper, profile change, reboot or health check and leaves local
 saved records, current links and GC roots unchanged.
+
+## Rollback caller prerequisite
+
+The private activation caller implements the existing saved rollback-helper
+protocol. Saved `test` and `switch` remain unavailable through the Rust CLI until
+deployment health checks are composed. The supported copy, boot and dry-activate
+routes do not start this helper.
+
+Copying and activation share the same rollback policy: disable wins, otherwise
+explicit enable or the configured policy selects protection when a saved helper
+exists. An absent saved helper falls back to direct activation with a notice.
+The enabled caller requires the configured signed integer `autoRollback.timeout`;
+missing or malformed values fail rather than receiving a default. Each invocation
+uses a fresh `/run/confctl-confirm-<six random hex digits>` path and passes the
+saved helper native arguments `-t <timeout> <toplevel> <action> <check-file>`.
+Local commands run as the invoking user; remote commands use the existing root
+SSH, port and nonempty `CONFCTL_SSH_CONFIG` behavior. Carried hosts never activate.
+
+One owned helper runs alongside serial marker reads and confirmation commands.
+Reads compare complete captured bytes after removing ASCII whitespace and NUL
+only at the edges. The caller polls immediately and then at interruptible
+one-second intervals. `switched` permits confirmation; `switching` keeps waiting.
+For unavailable or other markers, elapsed timeout plus ten seconds permits the
+legacy fallback, with a diagnostic that `switched` was not observed. This
+monotonic threshold is not a deadline that kills the helper or an SSH request.
+Negative timeouts remain signed.
+
+The caller attempts confirmation at most ten times, retrying only complete
+native failures and retaining failed-attempt diagnostics. Success requires a
+successful confirmation command and a complete helper exit of zero. This
+deliberately differs from Ruby, which can accept helper zero after all ten
+confirmations fail. Early helper completion without confirmation also fails.
+On exhaustion, the caller stops writing and awaits the helper's natural result.
+An entered control request is settled before return, and helper completion stops
+new requests.
+
+Neither a marker nor helper zero proves the hidden switch or rollback exit
+status: the existing helper ignores those child statuses. The result describes
+the rollback-helper protocol only. Infrastructure, capture, delivery and
+cancellation failures stop new control work and join owned local requests.
+The remote watchdog can outlive its SSH transport; a local join does not prove
+remote rollback or closure. Failure sends no compensating confirmation, deletes
+no check file, retries no activation and sets no profile. Inspect the target and
+partial effects before an explicit later deployment. Saved records, current
+links, roots, helper bytes and the remote protocol remain unchanged. Confined
+Supervisor tests do not qualify this caller against real hosts or open CLI
+admission.
