@@ -30,6 +30,10 @@ impl Operations for CoreOperations {
                 action,
                 Action::GenerationList { .. }
                     | Action::Status {
+                        generation: Some(_),
+                        ..
+                    }
+                    | Action::Status {
                         skip_toplevel: true,
                         ..
                     }

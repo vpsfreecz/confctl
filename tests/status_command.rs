@@ -1,4 +1,4 @@
-//! Actual no-build status route, using only temporary files and fake tools.
+//! Actual status routes, using only temporary files and fake tools.
 use serde_json::json;
 use std::{
     fs,
@@ -95,10 +95,16 @@ printf '/remote/current\n'
             &bin.join("ssh"),
             r#"#!/bin/sh
 last=
-for arg do last="$arg"; printf '%s\n' "$arg" >> "$STATUS_ROOT/ssh-args"; done
+printf '%s\0' "$@" > "$STATUS_ROOT/ssh-args-$$"
+for arg do last="$arg"; done
 case "$*" in *offline.invalid*) printf 'fixture offline\n' >&2; exit 255 ;; esac
 case "$last" in
   'cat /proc/uptime') printf '0 0\n' ;;
+  'realpath -e -- /run/current-system'|'realpath -e -- /nix/var/nix/profiles/confctl-guest:one')
+    if [ -e "$STATUS_ROOT/current-fail" ]; then printf 'missing current\n' >&2; exit 1; fi
+    case "$*" in *carrier.invalid*) file=running-guest ;; *) file=running-remote ;; esac
+    exec "$STATUS_ROOT/native-tools/cat" "$STATUS_ROOT/$file"
+    ;;
   'bash --norc')
     "$STATUS_ROOT/native-tools/cat" > "$STATUS_ROOT/remote-script"
     if [ -e "$STATUS_ROOT/profile-wait" ]; then : > "$STATUS_ROOT/profile-started"; exec sleep 30; fi
@@ -118,8 +124,23 @@ case "$last" in
 esac
 "#,
         );
+        executable(
+            &bin.join("realpath"),
+            r#"#!/bin/sh
+printf '%s\n' "$*" >> "$STATUS_ROOT/local-calls"
+[ "$*" = '-e -- /run/current-system' ] || exit 97
+if [ -e "$STATUS_ROOT/current-fail" ]; then printf 'missing current\n' >&2; exit 1; fi
+exec "$STATUS_ROOT/native-tools/cat" "$STATUS_ROOT/running-local"
+"#,
+        );
+        for (name, path) in [
+            ("local", "/saved/local"),
+            ("guest", "/saved/guest"),
+            ("remote", "/saved/remote"),
+        ] {
+            fs::write(root.join(format!("running-{name}")), format!("{path}\n")).unwrap();
+        }
         for tool in [
-            "realpath",
             "logname",
             "nix-env",
             "nix-store",
@@ -130,7 +151,7 @@ esac
         ] {
             executable(
                 &bin.join(tool),
-                "#!/bin/sh\nprintf 'forbidden command\n' >&2\nexit 98\n",
+                "#!/bin/sh\n: > \"$STATUS_ROOT/forbidden-called\"\nprintf 'forbidden command\n' >&2\nexit 98\n",
             );
         }
         Self {
@@ -164,14 +185,71 @@ esac
         child.stdin.take().unwrap().write_all(answer).unwrap();
         child.wait_with_output().unwrap()
     }
+    fn ssh_records(&self, output: &Output) -> Vec<(PathBuf, Vec<u8>)> {
+        let records = fs::read_dir(&self.root)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| {
+                path.file_name()
+                    .unwrap()
+                    .as_encoded_bytes()
+                    .starts_with(b"ssh-args-")
+            })
+            .map(|path| {
+                let bytes = fs::read(&path).unwrap();
+                (path, bytes)
+            })
+            .collect::<Vec<_>>();
+        assert!(
+            records.iter().all(|(_, bytes)| bytes.ends_with(&[0])),
+            "unterminated SSH argv: {records:?}; {output:?}"
+        );
+        records
+    }
     fn status(&self, args: &[&str]) -> Output {
         let mut all = vec!["status", "--generation", "none", "--yes"];
         all.extend_from_slice(args);
         self.run(&all, &[])
     }
+    fn save(
+        &self,
+        host: &str,
+        name: &str,
+        day: u32,
+        toplevel: &str,
+        inputs: serde_json::Value,
+    ) -> Vec<u8> {
+        let path = self
+            .root
+            .join(".confctl/generations")
+            .join(host.replace('/', ":"))
+            .join(name);
+        fs::create_dir_all(&path).unwrap();
+        let bytes = serde_json::to_vec(&json!({"mode":"flakes", "date":format!("2000-01-{day:02}T00:00:00Z"), "toplevel":toplevel, "inputs_info":inputs})).unwrap();
+        fs::write(path.join("generation.json"), &bytes).unwrap();
+        bytes
+    }
+    fn saved_status(&self, selector: &str, args: &[&str]) -> Output {
+        let mut all = vec!["status", "--generation", selector, "--yes"];
+        all.extend_from_slice(args);
+        self.run(&all, &[])
+    }
+    fn no_target_eval(&self) {
+        assert!(!self.root.join("input-evals").exists());
+        let calls = fs::read_to_string(self.root.join("nix-args")).unwrap();
+        assert!(
+            !calls.contains("toplevel")
+                && !calls.contains("buildPlan")
+                && !calls.contains("flake.lock")
+        );
+    }
     fn readonly(&self) {
-        assert!(!self.root.join(".confctl/mutation.lock").exists());
         assert!(!self.root.join(".confctl/generations").exists());
+        self.no_mutation();
+    }
+    fn no_mutation(&self) {
+        assert!(!self.root.join("forbidden-called").exists());
+        assert!(!self.root.join(".confctl/mutation.lock").exists());
         for name in ["gcroots", "roots", "result"] {
             assert!(!self.root.join(name).exists());
         }
@@ -226,10 +304,46 @@ fn actual_none_status_reads_per_host_inputs_and_preserves_comparison_without_col
     let calls = fs::read_to_string(f.root.join("input-evals")).unwrap();
     assert!(calls.contains(r#".#confctl.inputsInfo."guest.key/\${literal}""#));
     assert!(calls.contains(".#confctl.inputsInfo.local-key"));
-    let ssh = fs::read_to_string(f.root.join("ssh-args")).unwrap();
-    assert!(ssh.contains("-p\n2222\ncarrier.invalid\n"));
-    assert!(ssh.contains("confctl-guest:one/machine.json"));
-    assert!(!ssh.contains("/run/current-system"));
+    let ssh = f.ssh_records(&output);
+    let config = f.root.join("ssh config");
+    let prefix = [
+        b"-F".as_slice(),
+        config.as_os_str().as_encoded_bytes(),
+        b"-l",
+        b"root",
+        b"-p",
+        b"2222",
+        b"carrier.invalid",
+    ];
+    let fields = ssh
+        .iter()
+        .map(|(_, bytes)| {
+            bytes
+                .strip_suffix(&[0])
+                .unwrap()
+                .split(|b| *b == 0)
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        fields
+            .iter()
+            .any(|args| args.len() == prefix.len() + 1 && args.starts_with(&prefix)),
+        "{ssh:?}; {output:?}"
+    );
+    assert!(
+        fields.iter().any(|args| args
+            .last()
+            .unwrap()
+            .ends_with(b"confctl-guest:one/machine.json")),
+        "{ssh:?}; {output:?}"
+    );
+    assert!(
+        !ssh.iter().any(|(_, bytes)| bytes
+            .windows(b"/run/current-system".len())
+            .any(|b| b == b"/run/current-system")),
+        "{ssh:?}; {output:?}"
+    );
     let nix = fs::read_to_string(f.root.join("nix-args")).unwrap();
     assert!(!nix.contains("toplevel") && !nix.contains("buildPlan") && !nix.contains("flake.lock"));
     f.readonly();
@@ -242,7 +356,8 @@ fn selection_consent_and_unavailable_routes_stop_before_observations() {
         let out = f.status(&[pattern]);
         assert!(!out.status.success());
         assert!(!f.root.join("input-evals").exists());
-        assert!(!f.root.join("ssh-args").exists());
+        let ssh = f.ssh_records(&out);
+        assert!(ssh.is_empty(), "{ssh:?}; {out:?}");
         f.readonly();
     }
     let f = Fixture::new();
@@ -250,14 +365,12 @@ fn selection_consent_and_unavailable_routes_stop_before_observations() {
     assert!(!out.status.success());
     assert!(!f.root.join("input-evals").exists());
     assert!(!f.root.join("local-calls").exists());
-    for args in [vec!["status"], vec!["status", "--generation=current"]] {
-        let f = Fixture::new();
-        fs::remove_file(f.root.join("flake.nix")).unwrap();
-        let out = f.run(&args, &[]);
-        assert!(!out.status.success());
-        assert!(!f.root.join(".confctl").exists());
-        assert!(!f.root.join("nix-args").exists());
-    }
+    let f = Fixture::new();
+    fs::remove_file(f.root.join("flake.nix")).unwrap();
+    let out = f.run(&["status"], &[]);
+    assert!(!out.status.success());
+    assert!(!f.root.join(".confctl").exists());
+    assert!(!f.root.join("nix-args").exists());
 }
 
 #[test]
@@ -345,40 +458,66 @@ fn cancellation_joins_the_profile_child_and_output_failure_is_not_success() {
         sys::signal::{Signal, kill},
         unistd::Pid,
     };
-    let f = Fixture::new();
-    fs::write(f.root.join("profile-wait"), "").unwrap();
-    let mut child = f
-        .command(&["status", "--generation=none", "--yes", "remote"])
-        .spawn()
+    for generation in ["none", "saved"] {
+        let f = Fixture::new();
+        let bytes = if generation == "saved" {
+            Some(f.save(
+                "remote",
+                "saved",
+                1,
+                "/saved/remote",
+                json!({"nixpkgs":"full-remote"}),
+            ))
+        } else {
+            None
+        };
+        fs::write(f.root.join("profile-wait"), "").unwrap();
+        let mut child = f
+            .command(&["status", "--generation", generation, "--yes", "remote"])
+            .spawn()
+            .unwrap();
+        drop(child.stdin.take());
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !f.root.join("profile-started").exists() {
+            if Instant::now() >= deadline {
+                child.kill().unwrap();
+                let _ = child.wait();
+                panic!("profile child did not start");
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        kill(
+            Pid::from_raw(child.id().try_into().unwrap()),
+            Signal::SIGINT,
+        )
         .unwrap();
-    drop(child.stdin.take());
-    let deadline = Instant::now() + Duration::from_secs(5);
-    while !f.root.join("profile-started").exists() {
-        if Instant::now() >= deadline {
-            child.kill().unwrap();
-            let _ = child.wait();
-            panic!("profile child did not start");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while child.try_wait().unwrap().is_none() {
+            if Instant::now() >= deadline {
+                child.kill().unwrap();
+                let _ = child.wait();
+                panic!("profile child did not join");
+            }
+            std::thread::sleep(Duration::from_millis(10));
         }
-        std::thread::sleep(Duration::from_millis(10));
-    }
-    kill(
-        Pid::from_raw(child.id().try_into().unwrap()),
-        Signal::SIGINT,
-    )
-    .unwrap();
-    let deadline = Instant::now() + Duration::from_secs(5);
-    while child.try_wait().unwrap().is_none() {
-        if Instant::now() >= deadline {
-            child.kill().unwrap();
-            let _ = child.wait();
-            panic!("profile child did not join");
+        let out = child.wait_with_output().unwrap();
+        assert!(!out.status.success());
+        assert!(String::from_utf8_lossy(&out.stderr).contains("canceled"));
+        if let Some(bytes) = bytes {
+            assert_eq!(
+                fs::read(
+                    f.root
+                        .join(".confctl/generations/remote/saved/generation.json")
+                )
+                .unwrap(),
+                bytes
+            );
+            f.no_target_eval();
+            f.no_mutation();
+        } else {
+            f.readonly();
         }
-        std::thread::sleep(Duration::from_millis(10));
     }
-    let out = child.wait_with_output().unwrap();
-    assert!(!out.status.success());
-    assert!(String::from_utf8_lossy(&out.stderr).contains("canceled"));
-    f.readonly();
     let f = Fixture::new();
     let out = f
         .command(&["status", "--generation=none", "--yes", "local"])
@@ -417,4 +556,291 @@ fn local_counts_report_exclusions_without_resolving_or_rewriting_current() {
         Path::new("missing-current")
     );
     assert!(!f.root.join(".confctl/mutation.lock").exists());
+}
+
+#[test]
+fn saved_selectors_use_saved_inputs_without_evaluating_current_configuration() {
+    for (selector, expected) in [
+        ("current", "old"),
+        ("old", "old"),
+        ("0", "+1"),
+        ("-0", "+1"),
+        ("0001", "old"),
+        ("2", "middle"),
+        ("-1", "middle"),
+        ("+1", "+1"),
+    ] {
+        let f = Fixture::new();
+        let mut snapshots = Vec::new();
+        for (name, day) in [("old", 1), ("middle", 2), ("+1", 3)] {
+            let bytes = f.save(
+                "local",
+                name,
+                day,
+                "/saved/local",
+                json!({"nixpkgs":"full-local"}),
+            );
+            snapshots.push((name, bytes));
+        }
+        let host = f.root.join(".confctl/generations/local");
+        symlink("old", host.join("current")).unwrap();
+        // Today's configured target deliberately disagrees with the saved one.
+        fs::write(
+            f.root.join("target-local"),
+            r#"{"nixpkgs":"today-different"}"#,
+        )
+        .unwrap();
+        let out = f.saved_status(selector, &["local"]);
+        let text = success(&out);
+        assert!(
+            text.lines().any(|line| line.starts_with("local")
+                && line.split_whitespace().nth(1) == Some(expected)),
+            "{text}"
+        );
+        let rows = status_rows(&text);
+        assert_eq!(rows.len(), 1);
+        assert!(
+            rows[0].contains("ok") && rows[0].contains("same") && rows[0].contains("3:0"),
+            "{text}"
+        );
+        assert_eq!(
+            fs::read_link(host.join("current")).unwrap(),
+            Path::new("old")
+        );
+        for (name, bytes) in snapshots {
+            assert_eq!(
+                fs::read(host.join(name).join("generation.json")).unwrap(),
+                bytes
+            );
+        }
+        let calls = fs::read_to_string(f.root.join("local-calls")).unwrap();
+        assert!(
+            calls.find("/proc/uptime").unwrap() < calls.find("-e -- /run/current-system").unwrap()
+        );
+        f.no_target_eval();
+        f.no_mutation();
+    }
+}
+
+#[test]
+fn saved_resolution_missing_and_consent_stop_before_any_remote_observation() {
+    for selector in ["absent", "4", "-3", "99999999999999999999999999999"] {
+        let f = Fixture::new();
+        // A numerically named record must not turn an out-of-range offset into a name.
+        f.save(
+            "local",
+            "99999999999999999999999999999",
+            1,
+            "/saved/local",
+            json!({}),
+        );
+        let out = f.saved_status(selector, &["local"]);
+        assert!(!out.status.success());
+        assert!(String::from_utf8_lossy(&out.stdout).contains("not found"));
+        assert!(!f.root.join("local-calls").exists());
+        f.no_target_eval();
+        f.no_mutation();
+    }
+    for (answer, yes, succeeds) in [
+        (b"n\n".as_slice(), false, false),
+        (b"y\nn\n", false, false),
+        (b"y\ny\n", false, true),
+        (b"", true, true),
+    ] {
+        let f = Fixture::new();
+        let bytes = f.save(
+            "local",
+            "saved",
+            1,
+            "/saved/local",
+            json!({"nixpkgs":"full-local"}),
+        );
+        let mut args = vec!["status", "--generation=saved", "--tag=chosen"];
+        if yes {
+            args.push("--yes");
+        }
+        let out = f.run(&args, answer);
+        assert_eq!(
+            out.status.success(),
+            succeeds,
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        if succeeds {
+            let text = String::from_utf8_lossy(&out.stdout);
+            assert_eq!(status_rows(&text).len(), 1);
+            assert!(text.contains("not found"));
+            if !yes {
+                assert!(text.contains("ignored"));
+            }
+        } else {
+            assert!(!f.root.join("local-calls").exists());
+        }
+        let ssh = f.ssh_records(&out);
+        assert!(ssh.is_empty(), "{ssh:?}; {out:?}");
+        assert_eq!(
+            fs::read(
+                f.root
+                    .join(".confctl/generations/local/saved/generation.json")
+            )
+            .unwrap(),
+            bytes
+        );
+        f.no_target_eval();
+        f.no_mutation();
+    }
+}
+
+#[test]
+fn saved_rejected_records_and_broken_current_refuse_without_repair() {
+    for selector in ["bad", "0", "current"] {
+        let f = Fixture::new();
+        f.save(
+            "local",
+            "good",
+            1,
+            "/saved/local",
+            json!({"nixpkgs":"full-local"}),
+        );
+        let host = f.root.join(".confctl/generations/local");
+        fs::create_dir(host.join("bad")).unwrap();
+        fs::write(host.join("bad/generation.json"), b"{invalid").unwrap();
+        symlink("missing", host.join("current")).unwrap();
+        let out = f.saved_status(selector, &["local"]);
+        assert!(!out.status.success());
+        assert!(String::from_utf8_lossy(&out.stderr).contains("Skipping generation"));
+        assert!(!f.root.join("local-calls").exists());
+        assert_eq!(
+            fs::read(host.join("bad/generation.json")).unwrap(),
+            b"{invalid"
+        );
+        assert_eq!(
+            fs::read_link(host.join("current")).unwrap(),
+            Path::new("missing")
+        );
+        f.no_target_eval();
+        f.no_mutation();
+    }
+}
+
+#[test]
+fn saved_exact_running_path_unknown_and_empty_metadata_affect_comparison_only() {
+    for (running, inputs, expected) in [
+        (Some("/saved/local"), json!({"nixpkgs":"full-local"}), "ok"),
+        (
+            Some("/saved/./local"),
+            json!({"nixpkgs":"full-local"}),
+            "outdated",
+        ),
+        (
+            Some("/saved/other/../local"),
+            json!({"nixpkgs":"full-local"}),
+            "outdated",
+        ),
+        (None, json!({"nixpkgs":"full-local"}), "outdated"),
+        (Some("/saved/local"), json!({}), "outdated"),
+    ] {
+        let f = Fixture::new();
+        f.save("local", "saved", 1, "/saved/local", inputs);
+        if let Some(path) = running {
+            fs::write(f.root.join("running-local"), format!("{path}\n")).unwrap();
+        } else {
+            fs::write(f.root.join("current-fail"), "").unwrap();
+        }
+        let out = f.saved_status("saved", &["local"]);
+        assert!(status_rows(&success(&out))[0].contains(expected));
+        if running.is_none() {
+            assert!(String::from_utf8_lossy(&out.stderr).contains("current toplevel"));
+            assert!(!f.root.join("local-script").exists());
+        }
+        f.no_target_eval();
+        f.no_mutation();
+    }
+}
+
+#[test]
+fn saved_carried_fallback_and_offline_hosts_keep_routing_and_known_counts() {
+    let f = Fixture::new();
+    let toplevel = f.root.join("guest-system");
+    fs::create_dir(&toplevel).unwrap();
+    symlink(
+        "/nix/store/hash-linux-6.12/bzImage",
+        toplevel.join("kernel"),
+    )
+    .unwrap();
+    fs::write(
+        f.root.join("running-guest"),
+        format!("{}\n", toplevel.display()),
+    )
+    .unwrap();
+    f.save(
+        "carrier#guest",
+        "saved",
+        1,
+        toplevel.to_str().unwrap(),
+        json!({"nixpkgs":"full-guest"}),
+    );
+    f.save(
+        "offline",
+        "saved",
+        1,
+        "/saved/offline",
+        json!({"nixpkgs":"full-offline"}),
+    );
+    fs::write(f.root.join("machine-fail"), "").unwrap();
+    let out = f.saved_status("saved", &[]);
+    let text = success(&out);
+    let rows = status_rows(&text);
+    assert_eq!(rows.len(), 2, "{text}");
+    assert!(
+        rows[0].starts_with("carrier#guest") && rows[0].contains("ok") && rows[0].contains("1:0")
+    );
+    assert!(
+        rows[1].starts_with("offline")
+            && rows[1].contains("outdated")
+            && rows[1].contains("1:unknown")
+    );
+    assert!(text.contains("6.12") && text.contains("full-gue"));
+    let ssh = f.ssh_records(&out);
+    let config = f.root.join("ssh config");
+    let prefix = [
+        b"-F".as_slice(),
+        config.as_os_str().as_encoded_bytes(),
+        b"-l",
+        b"root",
+        b"-p",
+        b"2222",
+        b"carrier.invalid",
+    ];
+    let fields = ssh
+        .iter()
+        .map(|(_, bytes)| {
+            bytes
+                .strip_suffix(&[0])
+                .unwrap()
+                .split(|b| *b == 0)
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        fields
+            .iter()
+            .any(|args| args.len() == prefix.len() + 1 && args.starts_with(&prefix)),
+        "{ssh:?}; {out:?}"
+    );
+    assert!(
+        fields.iter().any(|args| args.last()
+            == Some(&b"realpath -e -- /nix/var/nix/profiles/confctl-guest:one".as_slice())),
+        "{ssh:?}; {out:?}"
+    );
+    assert!(
+        !fields
+            .iter()
+            .any(|args| args.last() == Some(&b"realpath -e -- /run/current-system".as_slice())),
+        "{ssh:?}; {out:?}"
+    );
+    assert!(String::from_utf8_lossy(&out.stderr).contains("profile fallback"));
+    assert!(f.root.join("fallback-read").exists());
+    f.no_target_eval();
+    f.no_mutation();
 }

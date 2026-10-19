@@ -3,6 +3,7 @@
 
 use crate::{
     configuration::{ConfigRoot, MutationGuard},
+    domain::GenerationSelector,
     error::ConfctlError,
 };
 mod login;
@@ -218,43 +219,54 @@ impl GenerationInventory {
         }
     }
     pub fn select(&self, host: &str, name: &str) -> Result<Option<&BuildGeneration>, ConfctlError> {
-        let numeric = name.parse::<i64>().ok();
-        if numeric.is_some() && !self.rejected.is_empty() {
-            return Err(ConfctlError::State(format!(
-                "Numeric generation selection for {host} is ambiguous because records were excluded; select an explicit supported generation name"
-            )));
-        }
-        if name == "current" {
-            self.require_resolved_current(host)?;
-            return Ok(self.current.as_ref().and_then(|current| {
-                self.generations
-                    .iter()
-                    .find(|generation| generation.name == *current)
-            }));
-        }
-        if let Some(rejected) = self.rejected.get(name) {
+        self.select_saved(host, &GenerationSelector::parse(name.into()))
+    }
+
+    pub fn select_saved(
+        &self,
+        host: &str,
+        selector: &GenerationSelector,
+    ) -> Result<Option<&BuildGeneration>, ConfctlError> {
+        let name = match selector {
+            GenerationSelector::Current => {
+                self.require_resolved_current(host)?;
+                self.current.as_deref()
+            }
+            GenerationSelector::Offset(text) => {
+                if !self.rejected.is_empty() {
+                    return Err(ConfctlError::State(format!(
+                        "Numeric generation selection for {host} is ambiguous because records were excluded; select an explicit supported generation name"
+                    )));
+                }
+                let negative = text.starts_with('-');
+                let digits = text.trim_start_matches('-').trim_start_matches('0');
+                let magnitude = if digits.is_empty() {
+                    Some(0)
+                } else {
+                    digits.parse::<usize>().ok()
+                };
+                let index = magnitude.and_then(|n| {
+                    if n == 0 {
+                        self.generations.len().checked_sub(1)
+                    } else if negative {
+                        self.generations.len().checked_sub(n)?.checked_sub(1)
+                    } else {
+                        Some(n - 1)
+                    }
+                });
+                return Ok(index.and_then(|i| self.generations.get(i)));
+            }
+            GenerationSelector::Name(text) => Some(text.as_str()),
+        };
+        if let Some(name) = name
+            && let Some(rejected) = self.rejected.get(name)
+        {
             return Err(ConfctlError::State(format!(
                 "Cannot select generation {name} for {host}: {}",
                 rejected.reason
             )));
         }
-        if let Some(offset) = numeric {
-            let len = self.generations.len() as i64;
-            let index = if offset == 0 {
-                len - 1
-            } else if offset > 0 {
-                offset - 1
-            } else {
-                len + offset - 1
-            };
-            return Ok(usize::try_from(index)
-                .ok()
-                .and_then(|index| self.generations.get(index)));
-        }
-        Ok(self
-            .generations
-            .iter()
-            .find(|generation| generation.name == name))
+        Ok(name.and_then(|name| self.generations.iter().find(|g| g.name == name)))
     }
 }
 

@@ -55,12 +55,15 @@ a result table without host-probe tasks. Remote or combined generation listing
 admits a task for each selected host query; unavailable hosts fail their tasks
 while ordinary host failures still allow the listing to exit 0.
 
-`status --generation none` admits one task per confirmed host observation,
-covering target input evaluation and deployed uptime, profile and input reads.
+`status` with an explicit generation admits one task per confirmed, resolved
+host observation. Saved status compares the saved toplevel and input metadata
+with deployed state; `--generation none` evaluates current target inputs instead.
+Both modes read deployed uptime, profiles and inputs; saved status also reads
+the running system or carried profile path. Missing saved targets admit no task.
 Failed host observations fail their tasks and leave offline or unknown table
-cells; ordinary host failures still allow the completed command to exit 0. Cancellation and
-delivery failures join entered observations. Default and saved-generation status
-remain unavailable.
+cells; ordinary host failures still allow the completed command to exit 0.
+Cancellation and delivery failures join entered observations. Status with an
+omitted generation remains unavailable.
 
 `ssh` admits per-host tasks and reports actual completed and failed host counts
 for commands. Command stdout and stderr share one native pipe and capture.

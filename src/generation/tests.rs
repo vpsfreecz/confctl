@@ -197,3 +197,76 @@ fn local_inventory_reader_needs_no_gc_roots_or_mutation_and_keeps_rejected_bytes
     );
     assert!(GenerationInventory::load_local(&root, "..").is_err());
 }
+
+#[test]
+fn saved_selector_owns_typed_offsets_names_and_exclusion_refusals() {
+    let mut saved = GenerationInventory {
+        generations: ["old", "middle", "+1", "99999999999999999999999999999"]
+            .map(generation)
+            .to_vec(),
+        current: Some("old".into()),
+        ..Default::default()
+    };
+    for (text, expected) in [
+        ("current", Some("old")),
+        ("0", Some("99999999999999999999999999999")),
+        ("-0", Some("99999999999999999999999999999")),
+        ("0001", Some("old")),
+        ("2", Some("middle")),
+        ("-1", Some("+1")),
+        ("-0002", Some("middle")),
+        ("+1", Some("+1")),
+        ("middle", Some("middle")),
+        ("5", None),
+        ("-4", None),
+        ("99999999999999999999999999999", None),
+        ("-99999999999999999999999999999", None),
+        ("missing", None),
+    ] {
+        assert_eq!(
+            saved
+                .select_saved("host", &GenerationSelector::parse(text.into()))
+                .unwrap()
+                .map(|g| g.name.as_str()),
+            expected,
+            "{text}"
+        );
+        assert_eq!(
+            saved.select("host", text).unwrap().map(|g| g.name.as_str()),
+            expected,
+            "string {text}"
+        );
+    }
+    saved.rejected.insert(
+        "bad".into(),
+        RejectedGeneration {
+            path: "bad".into(),
+            reason: "unsupported".into(),
+        },
+    );
+    for text in ["bad", "0", "-0", "0001", "99999999999999999999999999999"] {
+        assert!(
+            saved
+                .select_saved("host", &GenerationSelector::parse(text.into()))
+                .is_err(),
+            "{text}"
+        );
+    }
+    assert_eq!(saved.select("host", "+1").unwrap().unwrap().name, "+1");
+    saved.current_error = Some("broken current".into());
+    assert!(
+        saved
+            .select_saved("host", &GenerationSelector::Current)
+            .is_err()
+    );
+    assert_eq!(
+        saved.select("host", "middle").unwrap().unwrap().name,
+        "middle"
+    );
+    assert!(
+        GenerationInventory::default()
+            .select("host", "0")
+            .unwrap()
+            .is_none()
+    );
+}

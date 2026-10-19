@@ -386,46 +386,7 @@ fn saved_generation<'a>(
     saved: &'a GenerationInventory,
     selector: &GenerationSelector,
 ) -> Result<Option<&'a BuildGeneration>, ConfctlError> {
-    let name = match selector {
-        GenerationSelector::Current => {
-            saved.require_resolved_current(host)?;
-            saved.current.as_deref()
-        }
-        GenerationSelector::Offset(text) => {
-            if !saved.rejected.is_empty() {
-                return Err(ConfctlError::State(format!(
-                    "Numeric generation selection for {host} is ambiguous because records were excluded; select an explicit supported generation name"
-                )));
-            }
-            let negative = text.starts_with('-');
-            let digits = text.trim_start_matches('-').trim_start_matches('0');
-            let magnitude = if digits.is_empty() {
-                Some(0)
-            } else {
-                digits.parse::<usize>().ok()
-            };
-            let index = magnitude.and_then(|n| {
-                if n == 0 {
-                    saved.generations.len().checked_sub(1)
-                } else if negative {
-                    saved.generations.len().checked_sub(n)?.checked_sub(1)
-                } else {
-                    Some(n - 1)
-                }
-            });
-            return Ok(index.and_then(|i| saved.generations.get(i)));
-        }
-        GenerationSelector::Name(text) => Some(text.as_str()),
-    };
-    if let Some(name) = name
-        && let Some(rejected) = saved.rejected.get(name)
-    {
-        return Err(ConfctlError::State(format!(
-            "Cannot select generation {name} for {host}: {}",
-            rejected.reason
-        )));
-    }
-    Ok(name.and_then(|name| saved.generations.iter().find(|g| g.name == name)))
+    saved.select_saved(host, selector)
 }
 fn resolved_table(
     inventory: &Inventory,
