@@ -392,7 +392,10 @@ pub(super) fn from_metadata(machine: &Machine) -> Result<Vec<Check>, ConfctlErro
     Ok(checks)
 }
 impl Check {
-    fn description(&self) -> String {
+    pub(super) fn host_name(&self) -> &str {
+        &self.machine.name
+    }
+    pub(super) fn description(&self) -> String {
         match &self.kind {
             Kind::Command(c) if c.description.is_empty() => super::connection::shell_join(&c.argv)
                 .to_string_lossy()
@@ -587,6 +590,14 @@ pub(super) async fn run_checks<P: ProcessRunner>(
     max_jobs: usize,
     first: TaskId,
 ) -> Result<Vec<Failure>, ConfctlError> {
+    run_check_refs(ctx, &checks.iter().collect::<Vec<_>>(), max_jobs, first).await
+}
+pub(super) async fn run_check_refs<P: ProcessRunner>(
+    ctx: &CheckContext<'_, P>,
+    checks: &[&Check],
+    max_jobs: usize,
+    first: TaskId,
+) -> Result<Vec<Failure>, ConfctlError> {
     if max_jobs == 0 {
         return Err(ConfctlError::Usage("max-jobs must be positive".into()));
     }
@@ -639,7 +650,7 @@ pub(super) async fn run_checks<P: ProcessRunner>(
                 next,
                 Box::pin(run_one(
                     ctx,
-                    &checks[next],
+                    checks[next],
                     TaskId(first.0 + next as u64),
                     &token,
                 )),

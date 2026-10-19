@@ -9,6 +9,97 @@ use std::{
     },
 };
 
+struct RefRunner {
+    seen: Mutex<Vec<(Vec<OsString>, TaskId)>>,
+}
+impl ProcessRunner for RefRunner {
+    async fn run(
+        &self,
+        spec: ProcessSpec,
+        scope: ProcessScope,
+    ) -> Result<ProcessOutcome, ConfctlError> {
+        assert_eq!(scope.phase, Some(Phase::HealthChecks));
+        let mut seen = self.seen.lock().unwrap();
+        let count = seen.iter().filter(|(argv, _)| *argv == spec.args).count() + 1;
+        let label = spec.args[0].to_str().unwrap();
+        let failed = (label == "1" && count == 1) || (label == "3" && count <= 2);
+        seen.push((spec.args, scope.task));
+        Ok(outcome(if failed { 5 << 8 } else { 0 }, b"", b""))
+    }
+}
+#[tokio::test]
+async fn borrowed_subsets_keep_original_arguments_slice_indices_and_fresh_task_ids() {
+    let all=from_metadata(&machine(json!({"builderCommands":(0..4).map(|_|json!({"command":["tool","{checks}"],"timeout":0,"cooldown":0})).collect::<Vec<_>>()}))).unwrap();
+    let runner = RefRunner {
+        seen: Mutex::new(Vec::new()),
+    };
+    let tmp = tempfile::tempdir().unwrap();
+    let cancel = CancellationToken::new();
+    let (events, mut rx) = EventSink::channel(2);
+    let consumer = tokio::spawn(async move {
+        let mut ids = Vec::new();
+        let mut finals = Vec::new();
+        while let Some(d) = rx.receive().await {
+            let (e, a) = d.into_parts();
+            match e {
+                UiEvent::TaskPending { task, .. } => ids.push(task),
+                UiEvent::TaskFinished { task, state } => finals.push((task, state)),
+                _ => {}
+            }
+            a.acknowledge(Ok(()));
+        }
+        (ids, finals)
+    });
+    let ctx = CheckContext {
+        runner: &runner,
+        events: &events,
+        cancellation: &cancel,
+        root: tmp.path(),
+        ssh_config: None,
+        log: tmp.path(),
+        invocation: None,
+    };
+    let mut active = all.iter().collect::<Vec<_>>();
+    assert!(
+        run_check_refs(&ctx, &active, 5, TaskId(u64::MAX - 1))
+            .await
+            .is_err()
+    );
+    assert!(runner.seen.lock().unwrap().is_empty());
+    let failed = run_check_refs(&ctx, &active, 5, TaskId(40)).await.unwrap();
+    assert_eq!(failed.iter().map(|f| f.index).collect::<Vec<_>>(), [1, 3]);
+    active = failed.iter().map(|f| active[f.index]).collect();
+    let failed = run_check_refs(&ctx, &active, 5, TaskId(44)).await.unwrap();
+    assert_eq!(failed.iter().map(|f| f.index).collect::<Vec<_>>(), [1]);
+    active = failed.iter().map(|f| active[f.index]).collect();
+    assert!(
+        run_check_refs(&ctx, &active, 5, TaskId(46))
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    {
+        let seen = runner.seen.lock().unwrap();
+        assert_eq!(
+            seen.iter()
+                .map(|(argv, _)| argv[0].to_str().unwrap())
+                .collect::<Vec<_>>(),
+            ["0", "1", "2", "3", "1", "3", "3"]
+        );
+        assert_eq!(
+            seen.iter().map(|(_, task)| *task).collect::<Vec<_>>(),
+            (40..47).map(TaskId).collect::<Vec<_>>()
+        );
+    }
+    drop(events);
+    let (ids, finals) = consumer.await.unwrap();
+    assert_eq!(ids, (40..47).map(TaskId).collect::<Vec<_>>());
+    for id in [41, 43, 45] {
+        assert!(finals.contains(&(TaskId(id), TaskState::Failed)));
+    }
+    assert!(finals.contains(&(TaskId(46), TaskState::Succeeded)));
+}
+
 fn machine(checks: Value) -> Machine {
     Machine::from_value(json!({"name":"host","key":"flake-key","metaConfig":{
         "spin":"nixos","managed":true,"host":{"target":"localhost","port":2222},

@@ -71,6 +71,8 @@ Inventory evaluation/materialization and invocation logging still occur.
 Existing metadata and target tools remain the interface without a format
 migration or installed helper. After correcting a service or configuration,
 run health-check explicitly again. Passing checks do not establish deployment
-or rollback safety. Saved test activation and its deployment retry policy remain
-unavailable; the default `confctl` entrypoint remains Ruby. Fake-tool command
+or rollback safety. [Saved test deployment](deploy.md#test-a-saved-generation)
+uses this same compiler and runner, with five workers and borrowed subsets for
+deployment-level retries. Its failed assessments use the same raw-log retention.
+The default `confctl` entrypoint remains Ruby. Fake-tool command
 tests do not qualify real services, hosts or full live-terminal behavior.

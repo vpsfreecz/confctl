@@ -588,7 +588,7 @@ async fn activation_profile_failure_and_final_ack_cancellation_preserve_actual_e
 }
 
 #[tokio::test]
-async fn private_test_activation_uses_shared_rollback_policy_without_opening_cli_admission() {
+async fn test_activation_uses_shared_rollback_policy_without_inventing_helper_success() {
     for (policy, helper) in [
         (AutoRollback::Disabled, true),
         (AutoRollback::Enabled, false),
@@ -850,50 +850,42 @@ async fn boot_status_queries_are_bounded_and_join_before_error_or_cancellation_r
 }
 
 #[test]
-fn dry_skip_needs_only_exact_known_running_path_including_after_profile_failure() {
-    use super::super::host_status::HostStatus;
-    let inv = inventory();
-    let desired = generation("saved");
-    let mut status = HostStatus::default();
-    assert!(!already_current(
-        &inv.machines[0],
-        &desired,
-        &status,
-        SwitchAction::DryActivate
-    ));
-    status.current_toplevel = Some(desired.toplevel.clone());
-    assert!(already_current(
-        &inv.machines[0],
-        &desired,
-        &status,
-        SwitchAction::DryActivate
-    ));
-    assert!(!already_current(
-        &inv.machines[0],
-        &desired,
-        &status,
-        SwitchAction::Boot
-    ));
-    status.generations = Some(vec![]);
-    assert!(already_current(
-        &inv.machines[0],
-        &desired,
-        &status,
-        SwitchAction::DryActivate
-    ));
-    for spelling in ["/store//system", "/store/./system"] {
-        status.current_toplevel = Some(spelling.into());
+fn dry_and_test_skip_need_only_exact_known_running_path_including_after_profile_failure() {
+    for action in [SwitchAction::DryActivate, SwitchAction::Test] {
+        use super::super::host_status::HostStatus;
+        let inv = inventory();
+        let desired = generation("saved");
+        let mut status = HostStatus::default();
         assert!(!already_current(
             &inv.machines[0],
             &desired,
             &status,
-            SwitchAction::DryActivate
+            action
         ));
+        status.current_toplevel = Some(desired.toplevel.clone());
+        assert!(already_current(&inv.machines[0], &desired, &status, action));
         assert!(!already_current(
-            &inv.machines[2],
+            &inv.machines[0],
             &desired,
             &status,
-            SwitchAction::DryActivate
+            SwitchAction::Boot
         ));
+        status.generations = Some(vec![]);
+        assert!(already_current(&inv.machines[0], &desired, &status, action));
+        for spelling in ["/store//system", "/store/./system"] {
+            status.current_toplevel = Some(spelling.into());
+            assert!(!already_current(
+                &inv.machines[0],
+                &desired,
+                &status,
+                action
+            ));
+            assert!(!already_current(
+                &inv.machines[2],
+                &desired,
+                &status,
+                action
+            ));
+        }
     }
 }

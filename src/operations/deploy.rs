@@ -1,4 +1,4 @@
-//! Copy saved generations, prepare boot without reboot or run dry activation.
+//! Copy saved generations or run saved boot, dry activation and test actions.
 //! Earlier copies, kernel refreshes and activation effects survive later failure.
 use crate::{
     app::Context,
@@ -29,6 +29,7 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 
+mod health;
 mod rollback;
 
 pub(super) async fn run(
@@ -825,11 +826,11 @@ async fn activate_saved(
         rollback: request.auto_rollback,
         ssh_opts: ssh_opts.as_deref(),
     };
+    let first_copy = task_end(first_task, jobs.len())?;
     for (index, job) in jobs.iter_mut().enumerate() {
         job.task = TaskId(first_task + index as u64);
     }
     let statuses = target_statuses(&copies, &jobs, ssh_config.as_deref(), request.action).await?;
-    let first_copy = first_task + jobs.len() as u64;
     let mut remaining = Vec::new();
     for (job, status) in jobs.into_iter().zip(&statuses) {
         if already_current(
@@ -852,6 +853,8 @@ async fn activate_saved(
             remaining.push(job);
         }
     }
+    let first_activation = task_end(first_copy, remaining.len())?;
+    let mut next_health_id = task_end(first_activation, remaining.len())?;
     for (index, job) in remaining.iter_mut().enumerate() {
         job.task = TaskId(first_copy + index as u64);
     }
@@ -866,14 +869,18 @@ async fn activate_saved(
     };
     let result = async {
         admit(&copies, &remaining, ctx.log_path()).await?;
-        let first_activation = first_copy + remaining.len() as u64;
+        let mut completed = Vec::new();
+        let mut health_outcomes = Vec::new();
         if request.one_by_one {
             for (index, job) in remaining.iter().enumerate() {
                 let result = async {
                     let copied = serial_copy(&copies, std::slice::from_ref(job),
                         request.interactive.then_some(&ctx.ui)).await?;
-                    if !copied.is_empty() {
-                        activate_one(&activation, job, TaskId(first_activation + index as u64)).await?;
+                    if !copied.is_empty() && activate_one(&activation, job, TaskId(first_activation + index as u64)).await? {
+                        completed.push(job);
+                        if request.action == SwitchAction::Test {
+                            health_outcomes.push(health::run(ctx, request, inventory, root, &[job.machine], &mut next_health_id).await?);
+                        }
                     }
                     Ok(())
                 }.await;
@@ -891,23 +898,43 @@ async fn activate_saved(
                 remaining.iter().map(|job| job.machine).collect()
             };
             for (index, job) in remaining.iter().enumerate() {
-                if copied.contains(&job.machine) {
-                    activate_one(&activation, job, TaskId(first_activation + index as u64)).await?;
+                if copied.contains(&job.machine) && activate_one(&activation, job, TaskId(first_activation + index as u64)).await? {
+                    completed.push(job);
                 }
             }
+            if request.action == SwitchAction::Test {
+                let hosts = completed.iter().map(|job| job.machine).collect::<Vec<_>>();
+                health_outcomes.push(health::run(ctx, request, inventory, root, &hosts, &mut next_health_id).await?);
+            }
         }
-        checked(&ctx.events, &ctx.cancellation, diagnostic(
-            &format!("Saved-generation {} completed; carried hosts were copied only. No reboot or health check was performed.\n", action_name(request.action))
-        )).await
+        let summary = if request.action == SwitchAction::Test {
+            let mut helpers = 0;
+            for job in &completed {
+                if rollback_enabled(inventory.get(job.machine), request.auto_rollback)? && job.generation.auto_rollback.is_some() { helpers += 1; }
+            }
+            format!("Saved-generation test completed: {} direct test actions, {helpers} confirmed rollback-helper protocols. {} Carried hosts were copied only; no profile setting or reboot. Helper protocols and health do not witness hidden switch or rollback status.\n", completed.len() - helpers, health::summary(&health_outcomes))
+        } else {
+            format!("Saved-generation {} completed; carried hosts were copied only. No reboot or health check was performed.\n", action_name(request.action))
+        };
+        checked(&ctx.events, &ctx.cancellation, diagnostic(&summary)).await
     }.await;
     if let Err(error) = result {
         let later = ctx.events.emit(UiEvent::Diagnostic {
             stream: OutputStream::Stderr, style: Style::Failure,
-            text: format!("Saved-generation {} stopped; earlier copies, runtime-kernel state and script effects{} are retained. Inspect target state before retrying; no rollback or reboot was performed.\n", action_name(request.action), if request.action == SwitchAction::Boot { ", including bootloader changes and profile updates," } else { "" }),
+            text: if request.action == SwitchAction::Test {
+                "Saved-generation test stopped; earlier refreshes, copies, script and health-program effects are retained. Remote watchdog state and hidden switch/rollback status may be unknown. Inspect the target before an explicit rerun; no compensating activation, confirmation or profile setting was requested.\n".into()
+            } else { format!("Saved-generation {} stopped; earlier copies, runtime-kernel state and script effects{} are retained. Inspect target state before retrying; no rollback or reboot was performed.\n", action_name(request.action), if request.action == SwitchAction::Boot { ", including bootloader changes and profile updates," } else { "" }) },
         }).await;
         return Err(error.with_secondary(later.err().into_iter().collect()));
     }
     Ok(())
+}
+
+fn task_end(first: u64, count: usize) -> Result<u64, ConfctlError> {
+    u64::try_from(count)
+        .ok()
+        .and_then(|count| first.checked_add(count))
+        .ok_or_else(|| ConfctlError::State("Deployment task IDs overflow".into()))
 }
 
 fn already_current(
@@ -926,7 +953,7 @@ fn already_current(
     }
     // Ruby uses the carrier profile observation alone, even after a later read failure.
     machine.carrier.is_some()
-        || action == SwitchAction::DryActivate
+        || matches!(action, SwitchAction::DryActivate | SwitchAction::Test)
         || status.generations.as_ref().is_some_and(|records| {
             records.iter().any(|record| {
                 record.current && record.toplevel.as_os_str() == generation.toplevel.as_os_str()
@@ -1133,11 +1160,11 @@ async fn activate_one<P: ProcessRunner>(
     activation: &Activation<'_, P>,
     job: &Job,
     task: TaskId,
-) -> Result<(), ConfctlError> {
+) -> Result<bool, ConfctlError> {
     let copies = activation.copies;
     let host = &copies.inventory.get(job.machine).name;
     if copies.inventory.get(job.machine).carrier.is_some() {
-        return checked(
+        checked(
             copies.events,
             copies.cancellation,
             diagnostic(&format!(
@@ -1145,7 +1172,8 @@ async fn activate_one<P: ProcessRunner>(
                 action_name(activation.action)
             )),
         )
-        .await;
+        .await?;
+        return Ok(false);
     }
     let description = format!(
         "{}{} on {host}",
@@ -1248,7 +1276,10 @@ async fn activate_one<P: ProcessRunner>(
     match (result, delivery) {
         (Err(error), Err(later)) => Err(error.with_secondary(vec![later])),
         (_, Err(error)) | (Err(error), _) => Err(error),
-        (Ok(_), Ok(())) => check_cancel(copies.cancellation),
+        (Ok(state), Ok(())) => {
+            check_cancel(copies.cancellation)?;
+            Ok(state == TaskState::Succeeded)
+        }
     }
 }
 

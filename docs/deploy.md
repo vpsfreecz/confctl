@@ -5,7 +5,7 @@ The Rust development binary supports `confctl-rust deploy --copy-only
 Ruby. This route copies existing store paths only, even when reboot, activation
 or health-check options are supplied. The non-copy-only route also supports
 `confctl-rust deploy --generation <selector> [machine-pattern] boot` without
-`--reboot`, and the same command with action `dry-activate`. Other actions, the
+`--reboot`, and the same command with action `dry-activate` or `test`. Other actions, the
 default switch action, new builds and rebooting remain unavailable before
 application setup.
 
@@ -146,12 +146,56 @@ it does not guarantee that a future switch or reboot will succeed. This route
 runs no rollback helper, profile change, reboot or health check and leaves local
 saved records, current links and GC roots unchanged.
 
-## Rollback caller prerequisite
+## Test a saved generation
 
-The private activation caller implements the existing saved rollback-helper
-protocol. Saved `test` and `switch` remain unavailable through the Rust CLI until
-deployment health checks are composed. The supported copy, boot and dry-activate
-routes do not start this helper.
+`confctl-rust deploy --generation <selector> [machine-pattern] test` uses the
+configured rollback policy and health checks by default. Known running paths
+skip using the same exact native-byte predicate as dry activation; unknown
+state does not skip. Carried hosts receive copies only. Test sets no profile
+and performs no reboot or new build.
+
+Bulk mode finishes all copies, then activates standalone hosts sequentially,
+then checks the successfully activated, unskipped hosts in selection order.
+One-by-one mode finishes each host's activation and health policy before the
+next copy. Declined copies, known-current hosts and skipped activations receive
+no health checks. Activation failure stops before the later bulk health phase.
+
+Enabled rollback with a saved helper requires successful confirmation and its
+joined successful result before health starts. Disabled rollback, a configured
+off policy or a missing saved helper uses direct native test; missing protection
+is reported. Health neither proves the helper's hidden inner switch result nor
+triggers rollback on failure. The helper protocol is described below.
+
+Health compilation includes every configured kind on completed runnable hosts;
+carried and null-target machines are excluded. Active malformed metadata fails
+with earlier effects retained. Empty checks are a no-op. `--no-health-checks`
+bypasses compilation, prompts and execution. Deploy health uses five workers;
+`--max-jobs` remains a Nix build option, deliberately replacing Ruby's use of
+that build-option value as a health worker count. The standalone health-check
+command keeps its own concurrency option.
+
+Interactive health consent is mandatory even with `--yes`. Decline continues
+with an explicit unverified result. Failed batches offer `c` Continue, `r` Retry
+all, `f` Retry failed or `a` Abort. Empty input aborts, making the advertised Abort
+default effective; invalid input repeats, and EOF fails. Retries borrow the
+original compiled checks and arguments, with fresh task IDs, and perform health
+only. Failed tasks and raw logs remain retained after eventual success or
+Continue. `--keep-going` accepts ordinary comparison failures only in
+noninteractive mode; it cannot bypass interactive choices or configuration,
+process, capture, delivery or cancellation errors.
+
+Summaries distinguish passed, declined and continued-after-failure rounds.
+Refreshes, copies, scripts and check programs can leave effects after any later
+failure or cancellation. The existing guard spans the prompts and checks, while
+local saved records, current links, roots and remote formats remain unchanged.
+No compensating confirmation, rollback or profile command is sent on health
+failure. Inspect results and target state before an explicit rerun. Controlled
+fake-tool tests do not qualify real hosts or full live-terminal behavior.
+
+## Rollback helper protocol
+
+Saved test uses the existing rollback-helper protocol. Switch remains unavailable
+through the Rust CLI. Copy, boot and dry-activate do not start this helper.
 
 Copying and activation share the same rollback policy: disable wins, otherwise
 explicit enable or the configured policy selects protection when a saved helper
@@ -190,5 +234,5 @@ remote rollback or closure. Failure sends no compensating confirmation, deletes
 no check file, retries no activation and sets no profile. Inspect the target and
 partial effects before an explicit later deployment. Saved records, current
 links, roots, helper bytes and the remote protocol remain unchanged. Confined
-Supervisor tests do not qualify this caller against real hosts or open CLI
-admission.
+Supervisor tests do not qualify the protocol against real hosts or establish
+full terminal behavior.
