@@ -15,7 +15,12 @@ use crate::{
     timing::Phase,
 };
 use serde_json::Value;
-use std::{ffi::OsStr, io, path::Path};
+use std::{
+    ffi::{OsStr, OsString},
+    io,
+    os::unix::ffi::{OsStrExt, OsStringExt},
+    path::Path,
+};
 use tokio_util::sync::CancellationToken;
 
 pub(super) async fn test(
@@ -222,6 +227,35 @@ fn description(machine: &Machine) -> String {
 }
 
 fn probe_spec(machine: &Machine, ssh_config: Option<&OsStr>) -> Result<ProcessSpec, ConfctlError> {
+    let mut spec = command_spec(machine, ssh_config, &["cat".into(), "/proc/uptime".into()])?;
+    spec.redacted_description = description(machine);
+    if spec.program == Path::new("ssh") {
+        // Target and the one remote command follow these probe-only options.
+        let before_target = spec.args.len() - 2;
+        spec.args.splice(
+            before_target..before_target,
+            [
+                "-o",
+                "ConnectTimeout=3",
+                "-o",
+                "ServerAliveInterval=3",
+                "-o",
+                "ServerAliveCountMax=1",
+            ]
+            .map(OsString::from),
+        );
+    }
+    Ok(spec)
+}
+
+/// Build only the supplied machine's route; callers choose any carrier first.
+/// Remote argv becomes one Shellwords command argument. Empty remote argv
+/// requests an interactive SSH session; localhost requires an executable.
+pub(super) fn command_spec(
+    machine: &Machine,
+    ssh_config: Option<&OsStr>,
+    argv: &[OsString],
+) -> Result<ProcessSpec, ConfctlError> {
     let host = match machine.metadata.get("host") {
         None => None,
         Some(Value::Object(host)) => Some(host),
@@ -242,11 +276,14 @@ fn probe_spec(machine: &Machine, ssh_config: Option<&OsStr>) -> Result<ProcessSp
         }
     };
     if target == "localhost" {
-        let mut spec = ProcessSpec::new("cat", description(machine));
-        spec.args.push("/proc/uptime".into());
+        let (program, args) = argv.split_first().ok_or_else(|| {
+            ConfctlError::Configuration("local command requires an executable".into())
+        })?;
+        let mut spec = ProcessSpec::new(program, format!("command on {}", machine.name));
+        spec.args = args.to_vec();
         return Ok(spec);
     }
-    let mut spec = ProcessSpec::new("ssh", description(machine));
+    let mut spec = ProcessSpec::new("ssh", format!("command on {}", machine.name));
     if let Some(config) = ssh_config.filter(|path| !path.is_empty()) {
         spec.args.extend(["-F".into(), config.into()]);
     }
@@ -259,17 +296,47 @@ fn probe_spec(machine: &Machine, ssh_config: Option<&OsStr>) -> Result<ProcessSp
     if port != "22" {
         spec.args.extend(["-p".into(), port.into()]);
     }
-    spec.args.extend([
-        "-o".into(),
-        "ConnectTimeout=3".into(),
-        "-o".into(),
-        "ServerAliveInterval=3".into(),
-        "-o".into(),
-        "ServerAliveCountMax=1".into(),
-        target.into(),
-        "cat /proc/uptime".into(),
-    ]);
+    spec.args.push(target.into());
+    if !argv.is_empty() {
+        spec.args.push(shell_join(argv));
+    }
     Ok(spec)
+}
+
+/// Native-byte Shellwords escaping: a newline needs quoted literal content,
+/// since a backslash followed by LF would remove it in the remote shell.
+pub(super) fn shell_quote(value: &OsStr) -> OsString {
+    if value.is_empty() {
+        return "''".into();
+    }
+    let mut escaped = Vec::new();
+    for chunk in value.as_bytes().utf8_chunks() {
+        for c in chunk.valid().chars() {
+            if c == '\n' {
+                escaped.extend_from_slice(b"'\n'");
+            } else {
+                if !c.is_ascii_alphanumeric() && !"_-.,:+/@".contains(c) {
+                    escaped.push(b'\\');
+                }
+                escaped.extend_from_slice(c.encode_utf8(&mut [0; 4]).as_bytes());
+            }
+        }
+        for byte in chunk.invalid() {
+            escaped.extend_from_slice(&[b'\\', *byte]);
+        }
+    }
+    OsString::from_vec(escaped)
+}
+
+pub(super) fn shell_join(argv: &[OsString]) -> OsString {
+    let mut joined = OsString::new();
+    for (index, arg) in argv.iter().enumerate() {
+        if index != 0 {
+            joined.push(" ");
+        }
+        joined.push(shell_quote(arg));
+    }
+    joined
 }
 
 // Machine#target_port uses Ruby to_i, including decimal prefixes and floats.
