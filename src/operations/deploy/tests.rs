@@ -311,3 +311,340 @@ async fn bounded_bulk_joins_reverse_completions_and_reports_each_actual_final() 
     drop(events);
     assert_eq!(consumer.await.unwrap(), [TaskId(2), TaskId(3), TaskId(1)]);
 }
+
+#[test]
+fn boot_skip_requires_both_known_standalone_paths_but_retains_carrier_partial_current() {
+    use super::super::host_status::{HostGeneration, HostStatus};
+    let inv = inventory();
+    let desired = generation("saved");
+    let records = |current| {
+        vec![HostGeneration {
+            id: "1".into(),
+            toplevel: desired.toplevel.clone(),
+            date: chrono::Local::now(),
+            kernel: None,
+            current,
+        }]
+    };
+    let mut status = HostStatus::default();
+    assert!(!already_booted(&inv.machines[0], &desired, &status));
+    status.generations = Some(records(true));
+    assert!(!already_booted(&inv.machines[0], &desired, &status));
+    status.current_toplevel = Some(desired.toplevel.clone());
+    assert!(already_booted(&inv.machines[0], &desired, &status));
+    status.generations = Some(records(false));
+    assert!(!already_booted(&inv.machines[0], &desired, &status));
+    status.generations = Some(vec![]);
+    assert!(!already_booted(&inv.machines[0], &desired, &status));
+    status.generations = None;
+    assert!(!already_booted(&inv.machines[0], &desired, &status));
+    assert!(already_booted(&inv.machines[2], &desired, &status));
+    status.current_toplevel = None;
+    assert!(!already_booted(&inv.machines[2], &desired, &status));
+
+    for spelling in ["/store//system", "/store/./system"] {
+        status.current_toplevel = Some(spelling.into());
+        status.generations = Some(records(true));
+        assert!(!already_booted(&inv.machines[0], &desired, &status));
+        assert!(!already_booted(&inv.machines[2], &desired, &status));
+
+        status.current_toplevel = Some(desired.toplevel.clone());
+        status.generations.as_mut().unwrap()[0].toplevel = spelling.into();
+        assert!(!already_booted(&inv.machines[0], &desired, &status));
+        // Carried boot only needs its exact current-profile path observation.
+        assert!(already_booted(&inv.machines[2], &desired, &status));
+    }
+}
+
+#[test]
+fn boot_choices_have_no_default_or_retry_without_dry_first() {
+    for text in [b"".as_slice(), b"\n", b"yes", b"continue", b"?", b"\xff"] {
+        assert_eq!(boot_choice(text, true), None);
+    }
+    assert_eq!(boot_choice(b" r \n", false), None);
+    assert_eq!(boot_choice(b" R\r\n", true), Some(BootChoice::Retry));
+    assert_eq!(boot_choice(b"Y\n", false), Some(BootChoice::Continue));
+    assert_eq!(boot_choice(b"s", true), Some(BootChoice::Skip));
+    assert_eq!(boot_choice(b"a", false), Some(BootChoice::Abort));
+}
+
+struct ActivationRunner {
+    calls: Mutex<Vec<ProcessSpec>>,
+    fail_profile: bool,
+}
+impl ProcessRunner for ActivationRunner {
+    async fn run(
+        &self,
+        spec: ProcessSpec,
+        _: ProcessScope,
+    ) -> Result<ProcessOutcome, ConfctlError> {
+        let failed = self.fail_profile && spec.program == std::path::Path::new("nix-env");
+        self.calls.lock().unwrap().push(spec);
+        Ok(ProcessOutcome {
+            status: std::process::ExitStatus::from_raw(if failed { 9 << 8 } else { 0 }),
+            stdout: Captured::Memory(b"native output".to_vec()),
+            stderr: Captured::Memory(b"native stderr".to_vec()),
+            stdout_complete: true,
+            stderr_complete: true,
+            started: Instant::now(),
+            ended: Instant::now(),
+            termination: TerminationCause::Exited,
+        })
+    }
+}
+
+#[tokio::test]
+async fn boot_profile_failure_and_final_ack_cancellation_preserve_actual_effects_and_primary_errors()
+ {
+    for (fail_profile, reject_final) in [(true, false), (false, false), (false, true)] {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = ConfigRoot::new(tmp.path()).unwrap();
+        let inv = inventory();
+        let runner = ActivationRunner {
+            calls: Mutex::new(Vec::new()),
+            fail_profile,
+        };
+        let cancel = CancellationToken::new();
+        let (events, mut rx) = EventSink::channel(1);
+        let token = cancel.clone();
+        let consumer = tokio::spawn(async move {
+            let mut finals = Vec::new();
+            while let Some(d) = rx.receive().await {
+                let (event, ack) = d.into_parts();
+                if let UiEvent::TaskFinished { task, state } = event {
+                    finals.push((task, state));
+                    if !fail_profile {
+                        token.cancel();
+                    }
+                    if reject_final {
+                        ack.acknowledge(Err("controlled boot final delivery".into()));
+                        continue;
+                    }
+                }
+                ack.acknowledge(Ok(()));
+            }
+            finals
+        });
+        let copies = Copies {
+            runner: &runner,
+            events: &events,
+            cancellation: &cancel,
+            inventory: &inv,
+            root: &root,
+            rollback: AutoRollback::Configured,
+            ssh_opts: None,
+        };
+        let ui = crate::terminal::Ui::new(
+            std::fs::File::open("/dev/null").unwrap(),
+            events.clone(),
+            cancel.clone(),
+            None,
+        )
+        .unwrap();
+        let activation = Activation {
+            copies: &copies,
+            ui: &ui,
+            ssh_config: None,
+            interactive: false,
+            dry_first: true,
+            log: tmp.path(),
+        };
+        let job = Job {
+            machine: MachineId(1),
+            generation: generation("saved"),
+            task: TaskId(1),
+        };
+        let error = activate_one(&activation, &job, TaskId(9))
+            .await
+            .unwrap_err();
+        if fail_profile {
+            assert!(error.to_string().contains("set profile after boot"));
+            assert!(
+                matches!(error, ConfctlError::ProcessFailure { evidence, .. }
+                if evidence.status.unwrap().code()==Some(9) && evidence.stdout_complete && evidence.stderr_complete)
+            );
+        } else if reject_final {
+            assert!(error.to_string().contains("controlled boot final delivery"));
+        } else {
+            assert!(error.is_cancelled());
+        }
+        {
+            let calls = runner.calls.lock().unwrap();
+            assert_eq!(calls.len(), 3);
+            assert_eq!(calls[0].args, ["dry-activate"]);
+            assert_eq!(calls[1].args, ["boot"]);
+            assert_eq!(calls[2].program, std::path::Path::new("nix-env"));
+            assert_eq!(
+                calls[2].args,
+                [
+                    "-p",
+                    "/nix/var/nix/profiles/system",
+                    "--set",
+                    "/store/system"
+                ]
+            );
+            assert!(
+                calls
+                    .iter()
+                    .all(|spec| spec.stdout == StreamPolicy::CaptureAndForward
+                        && spec.stderr == StreamPolicy::CaptureAndForward)
+            );
+        }
+        ui.shutdown().unwrap();
+        drop(ui);
+        drop(events);
+        assert_eq!(
+            consumer.await.unwrap(),
+            [(
+                TaskId(9),
+                if fail_profile {
+                    TaskState::Failed
+                } else {
+                    TaskState::Succeeded
+                }
+            )]
+        );
+    }
+}
+
+struct StatusRunner {
+    active: std::sync::atomic::AtomicUsize,
+    peak: std::sync::atomic::AtomicUsize,
+    fail: bool,
+}
+impl ProcessRunner for StatusRunner {
+    async fn run(
+        &self,
+        spec: ProcessSpec,
+        scope: ProcessScope,
+    ) -> Result<ProcessOutcome, ConfctlError> {
+        use std::sync::atomic::Ordering;
+        let active = self.active.fetch_add(1, Ordering::SeqCst) + 1;
+        self.peak.fetch_max(active, Ordering::SeqCst);
+        let canceled = tokio::select! {
+            _=scope.cancellation.cancelled()=>true,
+            _=tokio::time::sleep(std::time::Duration::from_millis(10))=>false,
+        };
+        self.active.fetch_sub(1, Ordering::SeqCst);
+        if canceled {
+            return Err(ConfctlError::Cancelled);
+        }
+        if self.fail && scope.task == TaskId(1) {
+            return Err(ConfctlError::State(
+                "controlled query infrastructure failure".into(),
+            ));
+        }
+        let bytes = match spec.program.to_str().unwrap() {
+            "cat" => b"123.5 0\n".to_vec(),
+            "realpath" => b"/store/system\n".to_vec(),
+            "bash" => {
+                b"/store/system\n/nix/var/nix/profiles/system-1-link;/store/system;1700000000;\n"
+                    .to_vec()
+            }
+            other => panic!("unexpected query {other}"),
+        };
+        Ok(ProcessOutcome {
+            status: std::process::ExitStatus::from_raw(0),
+            stdout: Captured::Memory(bytes),
+            stderr: Captured::Memory(vec![]),
+            stdout_complete: true,
+            stderr_complete: true,
+            started: Instant::now(),
+            ended: Instant::now(),
+            termination: TerminationCause::Exited,
+        })
+    }
+}
+
+#[tokio::test]
+async fn boot_status_queries_are_bounded_and_join_before_error_or_cancellation_return() {
+    for (fail, reject) in [(false, false), (true, false), (false, true)] {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = ConfigRoot::new(tmp.path()).unwrap();
+        let mut data = serde_json::Map::new();
+        for i in 0..8 {
+            data.insert(
+                format!("host{i}"),
+                json!({"name":format!("host{i}"),"metaConfig":{"host":{"target":"localhost"}}}),
+            );
+        }
+        let inv = Inventory::from_value(data.into()).unwrap();
+        let runner = StatusRunner {
+            active: 0.into(),
+            peak: 0.into(),
+            fail,
+        };
+        let cancel = CancellationToken::new();
+        let (events, mut rx) = EventSink::channel(1);
+        let consumer = tokio::spawn(async move {
+            let mut finals = Vec::new();
+            while let Some(delivery) = rx.receive().await {
+                let (event, ack) = delivery.into_parts();
+                if reject
+                    && matches!(
+                        event,
+                        UiEvent::TaskStarted {
+                            task: TaskId(1),
+                            ..
+                        }
+                    )
+                {
+                    ack.acknowledge(Err("controlled status delivery failure".into()));
+                    continue;
+                }
+                if let UiEvent::TaskFinished { task, state } = event {
+                    finals.push((task, state));
+                }
+                ack.acknowledge(Ok(()));
+            }
+            finals
+        });
+        let copies = Copies {
+            runner: &runner,
+            events: &events,
+            cancellation: &cancel,
+            inventory: &inv,
+            root: &root,
+            rollback: AutoRollback::Configured,
+            ssh_opts: None,
+        };
+        let jobs = (0..8)
+            .map(|i| Job {
+                machine: MachineId(i),
+                generation: generation("saved"),
+                task: TaskId(i as u64 + 1),
+            })
+            .collect::<Vec<_>>();
+        let result = boot_statuses(&copies, &jobs, None).await;
+        if fail || reject {
+            let text = result.unwrap_err().to_string();
+            assert!(
+                text.contains(if fail {
+                    "controlled query infrastructure failure"
+                } else {
+                    "controlled status delivery failure"
+                }),
+                "{text}"
+            );
+        } else {
+            let statuses = result.unwrap();
+            assert_eq!(statuses.len(), 8);
+            assert!(statuses.iter().all(|s| already_booted(
+                &inv.machines[0],
+                &generation("saved"),
+                s
+            )));
+            assert_eq!(runner.peak.load(std::sync::atomic::Ordering::SeqCst), 5);
+        }
+        assert!(runner.peak.load(std::sync::atomic::Ordering::SeqCst) <= 5);
+        assert_eq!(runner.active.load(std::sync::atomic::Ordering::SeqCst), 0);
+        drop(events);
+        let finals = consumer.await.unwrap();
+        if !fail && !reject {
+            assert_eq!(finals.len(), 8);
+        } else {
+            assert!(finals.len() <= 5);
+            assert!(finals.iter().any(|(_, state)| *state == TaskState::Failed));
+        }
+    }
+}

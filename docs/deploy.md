@@ -1,10 +1,12 @@
-# Copy saved generations
+# Deploy saved generations
 
 The Rust development binary supports `confctl-rust deploy --copy-only
 --generation <selector> [machine-pattern] [action]`. The default `confctl` remains
-Ruby. Requests that build a new generation or activate it remain unavailable
-before application setup. This route copies existing store paths only, even when
-reboot, activation or health-check options are supplied.
+Ruby. This route copies existing store paths only, even when reboot, activation
+or health-check options are supplied. The non-copy-only route also supports
+`confctl-rust deploy --generation <selector> [machine-pattern] boot` without
+`--reboot`. Other actions, the default switch action, new builds and rebooting
+remain unavailable before application setup.
 
 Selection includes managed machines of every spin, including carried machines;
 it does not apply the runnable filter. The command previews hosts, selector and
@@ -64,6 +66,55 @@ Recognized count/path activity also produces host-labelled copy lines through
 the same relay, so redirected output retains per-host progress. Arbitrary raw
 chunks produce no extra diagnostics, and progress never declares copy success.
 Partial remote store copies and earlier kernel-state effects remain after errors.
-Generation records, GC roots and current links stay unchanged. This route makes
+Generation records, GC roots and current links stay unchanged. Copy-only makes
 no profile change, activation, reboot or health-check request. Controlled command
-fixtures do not establish real-site copying or full live-terminal qualification.
+fixtures do not establish real-site copying, activation or full live-terminal
+qualification.
+
+## Prepare a saved generation for boot
+
+After the same consent, optional refresh and generation confirmations, boot
+queries resolved hosts with at most five concurrent read-only observations.
+A standalone host is skipped only when its known running toplevel and its known
+current system profile both match the saved toplevel. A carried host uses the
+known current carrier-profile path alone, even if a later profile-list read
+fails. Native read failures produce diagnostics and leave those observations
+unknown; unknown state never means already current. Configuration, decoding,
+capture, output and cancellation failures stop the invocation. Copy-only does
+not perform these status queries.
+
+Bulk mode finishes all copies successfully before activating any host. It then
+visits copied hosts sequentially in their original selection order. Interactive
+bulk mode confirms and copies each host serially before starting this activation
+phase; declining a copy also skips that host's activation. `--one-by-one` instead
+copies and activates each host before moving to the next one. All known-current
+hosts may be skipped successfully without copying or activation.
+
+Standalone hosts execute `<saved-toplevel>/bin/switch-to-configuration boot`,
+then, only after success, `nix-env -p /nix/var/nix/profiles/system --set
+<saved-toplevel>`. Localhost executes as the invoking user. Remote commands use
+root SSH, the configured port and nonempty `CONFCTL_SSH_CONFIG`, separately from
+the copy transport's `NIX_SSHOPTS`. Carried boot only copies store paths; it does
+not activate the carried system or update its profile.
+
+`--dry-activate-first` runs `dry-activate` before standalone boot. With
+`--interactive`, the normal-echo activation choice has no default: `y` continues,
+`s` skips and `a` aborts; `r` repeats the dry run only when dry-first is enabled.
+Invalid or empty answers repeat the choice. `--yes` does not bypass it. Carried
+boot adds neither a dry run nor an activation prompt.
+
+Each standalone activation task covers its required ordered commands and only
+succeeds after profile setting. Native output and statuses retain their existing
+capture and delivery ownership. Failure stops later activation; cancellation
+joins entered children and is checked after acknowledged output and results.
+Earlier refreshes, copies, bootloader changes and profile updates remain. Boot
+success followed by profile failure is a partial result, without rollback or a
+boot-readiness guarantee. Inspect target state before retrying the saved
+generation or deliberately choosing an older one.
+
+Saved records, local current links, GC roots and remote formats stay unchanged.
+The mutation guard does not coordinate with Ruby or other deployment tools.
+Boot without reboot runs no rollback helper, reboot, wait-online or health check,
+regardless of their parsed options. Native success does not establish that a
+later reboot will succeed. The default Ruby entrypoint and production cutover
+are unchanged.

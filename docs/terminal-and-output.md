@@ -76,8 +76,12 @@ removes that log; failures retain it under the existing policy.
 Saved-generation copy-only deploys admit one task per resolved host, with bounded
 copying-count/path progress from native stderr and unknown totals when absent.
 Optional runtime-kernel refresh uses distinct preceding task IDs. Copy results do
-not claim activation. Other deploy modes and operation producers are not wired
-to this lifecycle yet.
+not claim activation. Saved-generation boot adds separate bounded status-query
+tasks and standalone activation tasks covering dry activation when requested,
+boot and profile setting. Carried boot has only the copy effect. Delivered task
+results remain actual observations if later output or cancellation fails the
+invocation. Other deploy modes and operation producers are not wired to this
+lifecycle yet.
 
 Live tail fragments and task rows share a compact source key: @ followed by
 the complete TaskId in base 36. Tail suffixes /o and /e identify stdout and

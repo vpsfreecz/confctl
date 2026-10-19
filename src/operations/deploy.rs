@@ -1,5 +1,5 @@
-//! Copy existing generations only. Earlier remote copies and optional kernel
-//! state refreshes are retained on failure; activation is a separate route.
+//! Copy saved generations or prepare standalone hosts for boot without reboot.
+//! Earlier copies, kernel refreshes and activation effects survive later failure.
 use crate::{
     app::Context,
     configuration::{ConfigEpoch, ConfigRoot, MutationLock, StateFiles},
@@ -35,7 +35,7 @@ pub(super) async fn run(
     ctx: &Context,
 ) -> Result<(), ConfctlError> {
     let selector = request.generation.as_ref().ok_or_else(|| {
-        ConfctlError::Configuration("copy-only requires a saved generation".into())
+        ConfctlError::Configuration("deployment requires a saved generation".into())
     })?;
     let defaults = InvocationSettings::new(
         root.clone(),
@@ -111,6 +111,9 @@ pub(super) async fn run(
     }
     confirm_resolved(ctx, request, inventory, selector, &jobs, &missing).await?;
     check_cancel(&ctx.cancellation)?;
+    if !request.copy_only {
+        return boot(ctx, request, inventory, &root, jobs, first_task, limit).await;
+    }
     if !serial {
         jobs = copy_order(inventory, jobs);
     }
@@ -130,7 +133,9 @@ pub(super) async fn run(
     let result = async {
         admit(&copies, &jobs, ctx.log_path()).await?;
         if serial {
-            serial_copy(&copies, &jobs, request.interactive.then_some(&ctx.ui)).await
+            serial_copy(&copies, &jobs, request.interactive.then_some(&ctx.ui))
+                .await
+                .map(|_| ())
         } else {
             bulk_copy(&copies, &jobs, limit).await
         }
@@ -166,12 +171,21 @@ async fn confirm_targets(
         .ui
         .confirm(ConfirmPrompt {
             preview: vec![
-                diagnostic("The following machines will have saved generations copied:\n"),
+                diagnostic(if request.copy_only {
+                    "The following machines will have saved generations copied:\n"
+                } else {
+                    "The following machines will receive saved generations for boot:\n"
+                }),
                 super::machines::table(inventory, selected, columns, true),
                 diagnostic(&format!(
-                    "Generation: {}\nTarget action: {action}{} (copy only)\n",
+                    "Generation: {}\nTarget action: {action}{}{}\n",
                     selector_text(selector),
-                    if request.reboot { " + reboot" } else { "" }
+                    if request.reboot { " + reboot" } else { "" },
+                    if request.copy_only {
+                        " (copy only)"
+                    } else {
+                        " (without reboot)"
+                    }
                 )),
             ],
             assume_yes: request.build.targets.yes,
@@ -283,6 +297,7 @@ async fn confirm_resolved(
     check_cancel(&ctx.cancellation)
 }
 
+#[derive(Clone)]
 struct Job {
     machine: MachineId,
     generation: BuildGeneration,
@@ -710,7 +725,8 @@ async fn serial_copy<P: ProcessRunner>(
     copies: &Copies<'_, P>,
     jobs: &[Job],
     ui: Option<&crate::terminal::Ui>,
-) -> Result<(), ConfctlError> {
+) -> Result<Vec<MachineId>, ConfctlError> {
+    let mut copied = Vec::new();
     for (index, job) in jobs.iter().enumerate() {
         let mut finalized = false;
         let result = async {
@@ -741,14 +757,16 @@ async fn serial_copy<P: ProcessRunner>(
                 }
             }
             finalized = true;
-            copy_one(copies, job, copies.cancellation).await
+            copy_one(copies, job, copies.cancellation).await?;
+            copied.push(job.machine);
+            Ok(())
         }
         .await;
         if let Err(error) = result {
             return Err(unentered(copies, &jobs[index + usize::from(finalized)..], error).await);
         }
     }
-    Ok(())
+    Ok(copied)
 }
 async fn bulk_copy<P: ProcessRunner>(
     copies: &Copies<'_, P>,
@@ -816,5 +834,487 @@ async fn bulk_copy<P: ProcessRunner>(
     }
     Ok(())
 }
+
+async fn boot(
+    ctx: &Context,
+    request: &DeployRequest,
+    inventory: &Inventory,
+    root: &ConfigRoot,
+    mut jobs: Vec<Job>,
+    first_task: u64,
+    limit: usize,
+) -> Result<(), ConfctlError> {
+    let ssh_opts = std::env::var_os("NIX_SSHOPTS");
+    let ssh_config = std::env::var_os("CONFCTL_SSH_CONFIG");
+    let copies = Copies {
+        runner: &ctx.processes,
+        events: &ctx.events,
+        cancellation: &ctx.cancellation,
+        inventory,
+        root,
+        rollback: request.auto_rollback,
+        ssh_opts: ssh_opts.as_deref(),
+    };
+    for (index, job) in jobs.iter_mut().enumerate() {
+        job.task = TaskId(first_task + index as u64);
+    }
+    let statuses = boot_statuses(&copies, &jobs, ssh_config.as_deref()).await?;
+    let first_copy = first_task + jobs.len() as u64;
+    let mut remaining = Vec::new();
+    for (job, status) in jobs.into_iter().zip(&statuses) {
+        if already_booted(inventory.get(job.machine), &job.generation, status) {
+            checked(
+                &ctx.events,
+                &ctx.cancellation,
+                diagnostic(&format!(
+                    "Skipping {}: already using target generation {}\n",
+                    inventory.get(job.machine).name,
+                    job.generation.name
+                )),
+            )
+            .await?;
+        } else {
+            remaining.push(job);
+        }
+    }
+    for (index, job) in remaining.iter_mut().enumerate() {
+        job.task = TaskId(first_copy + index as u64);
+    }
+    let activation = Activation {
+        copies: &copies,
+        ui: &ctx.ui,
+        ssh_config: ssh_config.as_deref(),
+        interactive: request.interactive,
+        dry_first: request.dry_activate_first,
+        log: ctx.log_path(),
+    };
+    let result = async {
+        admit(&copies, &remaining, ctx.log_path()).await?;
+        let first_activation = first_copy + remaining.len() as u64;
+        if request.one_by_one {
+            for (index, job) in remaining.iter().enumerate() {
+                let result = async {
+                    let copied = serial_copy(&copies, std::slice::from_ref(job),
+                        request.interactive.then_some(&ctx.ui)).await?;
+                    if !copied.is_empty() {
+                        activate_one(&activation, job, TaskId(first_activation + index as u64)).await?;
+                    }
+                    Ok(())
+                }.await;
+                if let Err(error) = result {
+                    return Err(unentered(&copies, &remaining[index + 1..], error).await);
+                }
+            }
+        } else {
+            // Interactive bulk remains a complete copy phase before activation.
+            let copied = if request.interactive {
+                serial_copy(&copies, &remaining, Some(&ctx.ui)).await?
+            } else {
+                let ordered = copy_order(inventory, remaining.clone());
+                bulk_copy(&copies, &ordered, limit).await?;
+                remaining.iter().map(|job| job.machine).collect()
+            };
+            for (index, job) in remaining.iter().enumerate() {
+                if copied.contains(&job.machine) {
+                    activate_one(&activation, job, TaskId(first_activation + index as u64)).await?;
+                }
+            }
+        }
+        checked(&ctx.events, &ctx.cancellation, diagnostic(
+            "Saved-generation boot preparation completed; carried hosts were copied only. No reboot or health check was performed.\n"
+        )).await
+    }.await;
+    if let Err(error) = result {
+        let later = ctx.events.emit(UiEvent::Diagnostic {
+            stream: OutputStream::Stderr, style: Style::Failure,
+            text: "Boot preparation stopped; earlier copies, runtime-kernel state, bootloader changes and profile updates are retained. Inspect target state before retrying; no rollback or reboot was performed.\n".into(),
+        }).await;
+        return Err(error.with_secondary(later.err().into_iter().collect()));
+    }
+    Ok(())
+}
+
+fn already_booted(
+    machine: &Machine,
+    generation: &BuildGeneration,
+    status: &super::host_status::HostStatus,
+) -> bool {
+    if status
+        .current_toplevel
+        .as_ref()
+        .map(|path| path.as_os_str())
+        != Some(generation.toplevel.as_os_str())
+    {
+        return false;
+    }
+    // Ruby uses the carrier profile observation alone, even after a later read failure.
+    machine.carrier.is_some()
+        || status.generations.as_ref().is_some_and(|records| {
+            records.iter().any(|record| {
+                record.current && record.toplevel.as_os_str() == generation.toplevel.as_os_str()
+            })
+        })
+}
+
+async fn boot_statuses<P: ProcessRunner>(
+    copies: &Copies<'_, P>,
+    jobs: &[Job],
+    ssh_config: Option<&OsStr>,
+) -> Result<Vec<super::host_status::HostStatus>, ConfctlError> {
+    let token = copies.cancellation.child_token();
+    let mut next = 0;
+    let mut active = Vec::new();
+    let mut statuses: Vec<_> = std::iter::repeat_with(|| None).take(jobs.len()).collect();
+    let mut errors = Vec::new();
+    poll_fn(|cx| {
+        while active.len() < 5 && next < jobs.len() && !token.is_cancelled() {
+            active.push((
+                next,
+                Box::pin(boot_status(copies, &jobs[next], &token, ssh_config)),
+            ));
+            next += 1;
+        }
+        let mut i = 0;
+        while i < active.len() {
+            match active[i].1.as_mut().poll(cx) {
+                Poll::Pending => i += 1,
+                Poll::Ready(result) => {
+                    let (index, _) = active.remove(i);
+                    match result {
+                        Ok(status) => statuses[index] = Some(status),
+                        Err(error) => {
+                            errors.push(error);
+                            token.cancel();
+                        }
+                    }
+                }
+            }
+        }
+        if active.is_empty() && (next == jobs.len() || token.is_cancelled()) {
+            Poll::Ready(())
+        } else {
+            if active.len() < 5 && next < jobs.len() {
+                cx.waker().wake_by_ref();
+            }
+            Poll::Pending
+        }
+    })
+    .await;
+    if !errors.is_empty() {
+        return Err(errors.remove(0).with_secondary(errors));
+    }
+    check_cancel(copies.cancellation)?;
+    Ok(statuses
+        .into_iter()
+        .map(|status| status.expect("joined boot status"))
+        .collect())
+}
+
+async fn boot_status<P: ProcessRunner>(
+    copies: &Copies<'_, P>,
+    job: &Job,
+    token: &CancellationToken,
+    ssh_config: Option<&OsStr>,
+) -> Result<super::host_status::HostStatus, ConfctlError> {
+    let host = &copies.inventory.get(job.machine).name;
+    let description = format!("query boot state on {host}");
+    copies
+        .events
+        .emit(UiEvent::TaskPending {
+            task: job.task,
+            description: description.clone(),
+        })
+        .await?;
+    let result: Result<super::host_status::HostStatus, ConfctlError> = async {
+        check_cancel(token)?;
+        checked(
+            copies.events,
+            token,
+            UiEvent::TaskStarted {
+                task: job.task,
+                description,
+            },
+        )
+        .await?;
+        let status = super::host_status::query(
+            copies.inventory,
+            copies.inventory.get(job.machine),
+            copies.runner,
+            token,
+            job.task,
+            ssh_config,
+            true,
+        )
+        .await?;
+        for message in &status.diagnostics {
+            checked(
+                copies.events,
+                token,
+                UiEvent::Diagnostic {
+                    stream: OutputStream::Stderr,
+                    style: Style::Plain,
+                    text: format!("{host}: {message}\n"),
+                },
+            )
+            .await?;
+        }
+        if let Some(failure) = &status.failure {
+            checked(
+                copies.events,
+                token,
+                UiEvent::Diagnostic {
+                    stream: OutputStream::Stderr,
+                    style: Style::Failure,
+                    text: format!("{}\n", failure.diagnostic(host)),
+                },
+            )
+            .await?;
+        }
+        Ok(status)
+    }
+    .await;
+    let state = match &result {
+        Ok(status) if status.failure.is_none() => TaskState::Succeeded,
+        Ok(_) => TaskState::Failed,
+        Err(error) if error.is_cancelled() => TaskState::Canceled,
+        Err(_) => TaskState::Failed,
+    };
+    let delivery = copies
+        .events
+        .emit(UiEvent::TaskFinished {
+            task: job.task,
+            state,
+        })
+        .await;
+    match (result, delivery) {
+        (Err(error), Err(later)) => Err(error.with_secondary(vec![later])),
+        (_, Err(error)) | (Err(error), _) => Err(error),
+        (Ok(status), Ok(())) => {
+            check_cancel(token)?;
+            Ok(status)
+        }
+    }
+}
+
+struct Activation<'a, P> {
+    copies: &'a Copies<'a, P>,
+    ui: &'a crate::terminal::Ui,
+    ssh_config: Option<&'a OsStr>,
+    interactive: bool,
+    dry_first: bool,
+    log: &'a std::path::Path,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum BootChoice {
+    Continue,
+    Retry,
+    Skip,
+    Abort,
+}
+fn boot_choice(line: &[u8], dry_first: bool) -> Option<BootChoice> {
+    match line.trim_ascii().to_ascii_lowercase().as_slice() {
+        b"y" => Some(BootChoice::Continue),
+        b"r" if dry_first => Some(BootChoice::Retry),
+        b"s" => Some(BootChoice::Skip),
+        b"a" => Some(BootChoice::Abort),
+        _ => None,
+    }
+}
+async fn choose_boot<P>(activation: &Activation<'_, P>) -> Result<BootChoice, ConfctlError> {
+    loop {
+        let prompt = if activation.dry_first {
+            "[y] Continue, [r] Retry dry activation, [s] Skip, [a] Abort: "
+        } else {
+            "[y] Continue, [s] Skip, [a] Abort: "
+        };
+        let line = activation.ui.line(prompt.into()).await?;
+        check_cancel(activation.copies.cancellation)?;
+        if let Some(choice) = boot_choice(&line, activation.dry_first) {
+            checked(
+                activation.copies.events,
+                activation.copies.cancellation,
+                diagnostic("\n"),
+            )
+            .await?;
+            return Ok(choice);
+        }
+    }
+}
+
+async fn activate_one<P: ProcessRunner>(
+    activation: &Activation<'_, P>,
+    job: &Job,
+    task: TaskId,
+) -> Result<(), ConfctlError> {
+    let copies = activation.copies;
+    let host = &copies.inventory.get(job.machine).name;
+    if copies.inventory.get(job.machine).carrier.is_some() {
+        return checked(
+            copies.events,
+            copies.cancellation,
+            diagnostic(&format!(
+                "{host}: carried boot copies store paths only; no activation or profile change.\n"
+            )),
+        )
+        .await;
+    }
+    let description = format!("prepare boot on {host}");
+    copies
+        .events
+        .emit(UiEvent::TaskPending {
+            task,
+            description: description.clone(),
+        })
+        .await?;
+    let result = async {
+        checked(
+            copies.events,
+            copies.cancellation,
+            UiEvent::LogAvailable {
+                task,
+                path: activation.log.into(),
+            },
+        )
+        .await?;
+        let mut entered = false;
+        loop {
+            if activation.dry_first {
+                boot_command(
+                    activation,
+                    job,
+                    task,
+                    &description,
+                    &mut entered,
+                    "dry-activate",
+                )
+                .await?;
+            }
+            if activation.interactive {
+                checked(
+                    copies.events,
+                    copies.cancellation,
+                    diagnostic(&format!(
+                        "Prepare generation {} for boot on {host}\n",
+                        job.generation.name
+                    )),
+                )
+                .await?;
+                match choose_boot(activation).await? {
+                    BootChoice::Retry => continue,
+                    BootChoice::Skip => return Ok(TaskState::Skipped),
+                    BootChoice::Abort => {
+                        return Err(ConfctlError::State("Aborting boot preparation".into()));
+                    }
+                    BootChoice::Continue => {}
+                }
+            }
+            boot_command(activation, job, task, &description, &mut entered, "boot").await?;
+            boot_command(
+                activation,
+                job,
+                task,
+                &description,
+                &mut entered,
+                "set profile after boot",
+            )
+            .await?;
+            return Ok(TaskState::Succeeded);
+        }
+    }
+    .await;
+    let state = match &result {
+        Ok(state) => *state,
+        Err(error) if error.is_cancelled() => TaskState::Canceled,
+        Err(_) => TaskState::Failed,
+    };
+    let delivery = copies
+        .events
+        .emit(UiEvent::TaskFinished { task, state })
+        .await;
+    match (result, delivery) {
+        (Err(error), Err(later)) => Err(error.with_secondary(vec![later])),
+        (_, Err(error)) | (Err(error), _) => Err(error),
+        (Ok(_), Ok(())) => check_cancel(copies.cancellation),
+    }
+}
+
+async fn boot_command<P: ProcessRunner>(
+    activation: &Activation<'_, P>,
+    job: &Job,
+    task: TaskId,
+    description: &str,
+    entered: &mut bool,
+    phase: &str,
+) -> Result<(), ConfctlError> {
+    let copies = activation.copies;
+    let machine = copies.inventory.get(job.machine);
+    check_cancel(copies.cancellation)?;
+    if !*entered {
+        checked(
+            copies.events,
+            copies.cancellation,
+            UiEvent::TaskStarted {
+                task,
+                description: description.into(),
+            },
+        )
+        .await?;
+        *entered = true;
+    }
+    checked(
+        copies.events,
+        copies.cancellation,
+        diagnostic(&format!("{}: {phase}\n", machine.name)),
+    )
+    .await?;
+    let argv = if phase == "set profile after boot" {
+        vec![
+            "nix-env".into(),
+            "-p".into(),
+            "/nix/var/nix/profiles/system".into(),
+            "--set".into(),
+            job.generation.toplevel.as_os_str().into(),
+        ]
+    } else {
+        vec![
+            job.generation
+                .toplevel
+                .join("bin/switch-to-configuration")
+                .into_os_string(),
+            phase.into(),
+        ]
+    };
+    let mut spec = super::connection::command_spec(machine, activation.ssh_config, &argv)?;
+    spec.redacted_description = format!("{phase} on {}", machine.name);
+    spec.cwd = Some(copies.root.path().into());
+    spec.stdout = StreamPolicy::CaptureAndForward;
+    spec.stderr = StreamPolicy::CaptureAndForward;
+    let mut scope = ProcessScope::new(copies.cancellation.clone(), task);
+    scope.phase = Some(Phase::Deployment);
+    let outcome = copies.runner.run(spec, scope).await?;
+    let failure = if outcome.termination == TerminationCause::Canceled {
+        Some(ConfctlError::Cancelled)
+    } else if !outcome.stdout_complete || !outcome.stderr_complete {
+        Some(ConfctlError::State(format!(
+            "incomplete {phase} capture on {}",
+            machine.name
+        )))
+    } else if !outcome.status.success() {
+        Some(ConfctlError::Child {
+            description: format!("{phase} on {}", machine.name),
+            code: outcome.code(),
+            signal: outcome.signal(),
+            log: None,
+        })
+    } else {
+        None
+    };
+    if let Some(error) = failure {
+        return Err(process_error(error, outcome));
+    }
+    check_cancel(copies.cancellation)
+}
+
 #[cfg(test)]
 mod tests;
