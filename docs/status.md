@@ -1,13 +1,35 @@
-# Status without a target build
+# Read-only status
 
 `confctl-rust status --generation none [machine-pattern]` compares resolved target
 input revisions with deployed input metadata. It checks managed machines with a
 target, including carried machines through their carrier. Review the preview
 and confirm, or pass `--yes`. An empty selection fails.
 
-This mode evaluates each machine's resolved input metadata without building a
-target system. Omitted generation and saved-generation status remain unavailable
-in the Rust CLI. The default `confctl` entry point remains Ruby.
+The `none` mode evaluates each machine's resolved input metadata without building
+a target system. `confctl-rust status --generation <current|offset|name>` compares
+against a saved local generation instead. Omitted generation, which would build
+a new target, remains unavailable in the Rust CLI. The default `confctl` entry
+point remains Ruby.
+
+Saved status resolves a generation for each selected host after the initial
+confirmation. The preview shows found and missing hosts, generation names,
+kernels and input revisions. If no host has the generation, the command fails.
+Otherwise it asks before ignoring missing hosts; `--yes` accepts both prompts.
+Missing hosts receive no remote reads or status rows.
+
+`current` follows the validated local current link, or the newest supported
+record when the link is absent. `0` and `-0` select the newest record, positive
+offsets count from the oldest starting at 1, and `-1` selects the record before
+the newest. Leading zeros are accepted; `+1` is a literal name. Out-of-range and
+huge numeric offsets are missing. Numeric selection refuses when records were
+excluded; rejected explicit names and broken current links also fail without
+repairing state.
+
+Saved status uses the record's input metadata and toplevel. It performs no
+per-host target input evaluation and never substitutes today's configuration
+for missing saved metadata. It reads uptime, then the running system's strict
+realpath on standalone machines or the logical profile's strict realpath on
+carriers, followed by profile generations and deployed inputs.
 
 The command queries uptime and profile generations before reading deployed input
 metadata. Standalone machines use `/etc/confctl/inputs-info.json`. Carried machines
@@ -23,7 +45,10 @@ known zero. Role cells include `same`, `changed` or `unknown`, so comparisons re
 readable without color. Equality requires full non-null revisions with matching
 types; matching short revisions are insufficient. Status is `ok` only when the
 host is online and every role in a nonempty target map matches. Extra deployed
-roles alone do not make the host outdated.
+roles alone do not make the host outdated. Saved status additionally requires a
+known running toplevel with exactly the same native path bytes as the saved
+toplevel. Lexically equivalent paths are insufficient; an unknown running path
+cannot match. A successful observation task can still report an outdated system.
 
 Offline, outdated and unknown observations still allow exit status 0. Diagnostics
 identify unavailable input metadata and failed native queries. Configuration,
@@ -32,7 +57,8 @@ the command. Correct the configuration or connectivity issue and run the read
 again; the command does not poll or repair state.
 
 Status reads local generation records and reports exclusions without changing
-records or current links. It creates no mutation lock or GC roots, reads no
-current-system path, and performs no copy, activation, kernel refresh or profile
-write. Normal inventory materialization, metadata evaluation and invocation
-logging still occur.
+records or current links. It creates no mutation lock or GC roots and performs
+no copy, activation, kernel refresh or profile write. The `none` mode does not
+read the current-system path. Normal inventory materialization, configured
+metadata evaluation in `none` mode and invocation logging still occur. Saved
+record formats and the Ruby entry point are unchanged.

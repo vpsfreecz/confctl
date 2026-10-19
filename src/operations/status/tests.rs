@@ -15,6 +15,7 @@ fn row(target: Value, deployed: Value) -> Row {
             ..HostStatus::default()
         },
         target: normalize(&target),
+        target_toplevel: None,
         deployed: normalize(&deployed),
         local_count: 0,
         failed: false,
@@ -165,4 +166,31 @@ fn only_complete_failed_native_nix_eval_is_an_unknown_target() {
     assert!(!native_eval_failure(&ConfctlError::Configuration(
         "bad configuration".into()
     )));
+}
+
+#[test]
+fn saved_status_requires_known_exact_native_current_path() {
+    use std::os::unix::ffi::OsStringExt;
+    let expected = PathBuf::from(std::ffi::OsString::from_vec(b"/saved/\xff/system".to_vec()));
+    for (current, status) in [
+        (Some(expected.clone()), "ok"),
+        (Some("/saved/other".into()), "outdated"),
+        (Some("/saved/./system".into()), "outdated"),
+        (None, "outdated"),
+    ] {
+        let mut row = row(json!({"role":"rev"}), json!({"role":"rev"}));
+        row.target_toplevel = Some(expected.clone());
+        row.observed.current_toplevel = current;
+        let UiEvent::Table { rows, .. } = table(&[row]) else {
+            panic!()
+        };
+        assert_eq!(rows[0][3], status);
+    }
+    let mut row = row(json!({"role":"rev"}), json!({"role":"rev"}));
+    row.target_toplevel = Some("/saved/system".into());
+    row.observed.current_toplevel = Some("/saved/./system".into());
+    let UiEvent::Table { rows, .. } = table(&[row]) else {
+        panic!()
+    };
+    assert_eq!(rows[0][3], "outdated");
 }

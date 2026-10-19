@@ -1,12 +1,15 @@
-//! Read-only public status for the explicit no-target-build mode.
+//! Read-only public status against configured inputs or a saved generation.
 use super::host_status::HostStatus;
 use crate::{
     app::Context,
     configuration::{ConfigEpoch, ConfigRoot},
-    domain::{Action, Inventory, Machine, ManagedFilter, SelectionPolicy, select},
+    domain::{
+        Action, GenerationSelector, Inventory, Machine, MachineId, ManagedFilter, SelectionPolicy,
+        select,
+    },
     error::ConfctlError,
     events::{OutputStream, Style, TableFormat, TableLayout, TaskId, TaskState, UiEvent},
-    generation::GenerationInventory,
+    generation::{BuildGeneration, GenerationInventory},
     nix::{InvocationSettings, NixClient, NixOptions, bytes, process_error},
     process::{Captured, ProcessOutcome, ProcessRunner, ProcessScope, TerminationCause},
     terminal::ConfirmPrompt,
@@ -16,6 +19,7 @@ use std::{
     collections::BTreeSet,
     ffi::OsStr,
     future::{Future, poll_fn},
+    path::PathBuf,
     task::Poll,
 };
 use tokio_util::sync::CancellationToken;
@@ -25,6 +29,7 @@ struct Row {
     host: String,
     observed: HostStatus,
     target: Option<Inputs>,
+    target_toplevel: Option<PathBuf>,
     deployed: Option<Inputs>,
     local_count: usize,
     failed: bool,
@@ -41,11 +46,21 @@ pub(super) async fn run(
 ) -> Result<(), ConfctlError> {
     let Action::Status {
         targets,
-        skip_toplevel: true,
-        ..
+        generation,
+        skip_toplevel,
     } = action
     else {
-        unreachable!("status adapter requires generation none")
+        unreachable!("status adapter requires status action")
+    };
+    assert!(
+        *skip_toplevel || generation.is_some(),
+        "status requires an explicit generation"
+    );
+    let generation = generation.as_ref().filter(|_| !*skip_toplevel);
+    let generation_text = match generation {
+        Some(GenerationSelector::Current) => "current",
+        Some(GenerationSelector::Offset(text) | GenerationSelector::Name(text)) => text,
+        None => "none",
     };
     let cancellation = context.cancellation.child_token();
     let defaults = InvocationSettings::new(
@@ -90,7 +105,7 @@ pub(super) async fn run(
                 UiEvent::Diagnostic {
                     stream: OutputStream::Stdout,
                     style: Style::Plain,
-                    text: "\nGeneration: none\n".into(),
+                    text: format!("\nGeneration: {generation_text}\n"),
                 },
             ],
             assume_yes: targets.yes,
@@ -101,20 +116,40 @@ pub(super) async fn run(
         return Err(ConfctlError::State("Aborted".into()));
     }
     check_cancel(&context.cancellation)?;
-    for id in &selected.machines {
-        super::host_status::routing(inventory, inventory.get(*id))?;
+    let jobs = if let Some(selector) = generation {
+        resolve_saved(
+            &root,
+            inventory,
+            &selected.machines,
+            selector,
+            targets.yes,
+            context,
+        )
+        .await?
+    } else {
+        selected
+            .machines
+            .iter()
+            .map(|id| Job {
+                machine: *id,
+                generation: None,
+                local_count: 0,
+            })
+            .collect()
+    };
+    for job in &jobs {
+        super::host_status::routing(inventory, inventory.get(job.machine))?;
     }
     let ssh_config = std::env::var_os("CONFCTL_SSH_CONFIG");
-    let mut pending = selected
-        .machines
+    let mut pending = jobs
         .iter()
         .enumerate()
-        .map(|(index, id)| {
+        .map(|(index, job)| {
             let cancellation = &cancellation;
             let ssh_config = ssh_config.as_deref();
             let nix = &nix;
             Some(Box::pin(async move {
-                let machine = inventory.get(*id);
+                let machine = inventory.get(job.machine);
                 let task = TaskId(index as u64 + 1);
                 let description = format!("check status on {}", machine.name);
                 let result: Result<Row, ConfctlError> = async {
@@ -131,16 +166,8 @@ pub(super) async fn run(
                         .emit(UiEvent::TaskStarted { task, description })
                         .await?;
                     check_cancel(cancellation)?;
-                    let row = observe(
-                        inventory,
-                        machine,
-                        nix,
-                        context,
-                        cancellation,
-                        task,
-                        ssh_config,
-                    )
-                    .await?;
+                    let row = observe(inventory, job, nix, context, cancellation, task, ssh_config)
+                        .await?;
                     for diagnostic in &row.diagnostics {
                         context
                             .events
@@ -214,7 +241,7 @@ pub(super) async fn run(
         .into_iter()
         .map(|r| r.expect("joined status query"))
         .collect::<Vec<_>>();
-    for row in &mut rows {
+    for row in rows.iter_mut().filter(|_| generation.is_none()) {
         let local = GenerationInventory::load_local(&root, &row.host)?;
         row.local_count = local.generations.len();
         for diagnostic in local.diagnostics {
@@ -231,6 +258,126 @@ pub(super) async fn run(
     }
     context.events.emit(table(&rows)).await?;
     check_cancel(&context.cancellation)
+}
+
+struct Job {
+    machine: MachineId,
+    generation: Option<BuildGeneration>,
+    local_count: usize,
+}
+
+async fn resolve_saved(
+    root: &ConfigRoot,
+    inventory: &Inventory,
+    ids: &[MachineId],
+    selector: &GenerationSelector,
+    assume_yes: bool,
+    context: &Context,
+) -> Result<Vec<Job>, ConfctlError> {
+    let mut jobs = Vec::new();
+    let mut missing = Vec::new();
+    for id in ids {
+        check_cancel(&context.cancellation)?;
+        let host = &inventory.get(*id).name;
+        let local = GenerationInventory::load_local(root, host)?;
+        for diagnostic in &local.diagnostics {
+            context
+                .events
+                .emit(UiEvent::Diagnostic {
+                    stream: OutputStream::Stderr,
+                    style: Style::Plain,
+                    text: format!("{diagnostic}\n"),
+                })
+                .await?;
+            check_cancel(&context.cancellation)?;
+        }
+        match local.select_saved(host, selector)? {
+            Some(generation) => jobs.push(Job {
+                machine: *id,
+                generation: Some(generation.clone()),
+                local_count: local.generations.len(),
+            }),
+            None => missing.push(*id),
+        }
+    }
+    context
+        .events
+        .emit(saved_table(inventory, &jobs, &missing)?)
+        .await?;
+    check_cancel(&context.cancellation)?;
+    if jobs.is_empty() {
+        return Err(ConfctlError::Selection(
+            "Generation not found on any selected machine".into(),
+        ));
+    }
+    if !missing.is_empty()
+        && !context
+            .ui
+            .confirm(ConfirmPrompt {
+                preview: vec![UiEvent::Diagnostic {
+                    stream: OutputStream::Stdout,
+                    style: Style::Plain,
+                    text: format!(
+                        "Generation was not found on:\n{}These hosts will be ignored.\n",
+                        missing
+                            .iter()
+                            .map(|id| format!("  {}\n", inventory.get(*id).name))
+                            .collect::<String>()
+                    ),
+                }],
+                assume_yes,
+                ..ConfirmPrompt::default()
+            })
+            .await?
+    {
+        return Err(ConfctlError::State("Aborted".into()));
+    }
+    check_cancel(&context.cancellation)?;
+    Ok(jobs)
+}
+
+fn saved_table(
+    inventory: &Inventory,
+    jobs: &[Job],
+    missing: &[MachineId],
+) -> Result<UiEvent, ConfctlError> {
+    let roles = jobs
+        .iter()
+        .filter_map(|job| job.generation.as_ref())
+        .flat_map(|generation| generation.inputs_info.keys().cloned())
+        .collect::<BTreeSet<_>>();
+    let mut columns = vec!["NAME".into(), "GENERATION".into(), "KERNEL".into()];
+    columns.extend(roles.iter().map(|r| r.to_uppercase()));
+    let mut rows = Vec::new();
+    for job in jobs {
+        let generation = job.generation.as_ref().expect("resolved saved generation");
+        let mut row = vec![
+            inventory.get(job.machine).name.clone(),
+            generation.name.clone(),
+            super::generation_list::kernel_version(&generation.toplevel)?.unwrap_or_default(),
+        ];
+        row.extend(
+            roles.iter().map(|role| {
+                super::generation_list::input_revision(generation.inputs_info.get(role))
+            }),
+        );
+        rows.push(row);
+    }
+    rows.extend(missing.iter().map(|id| {
+        let mut row = vec![inventory.get(*id).name.clone(), "not found".into()];
+        row.resize(columns.len(), String::new());
+        row
+    }));
+    Ok(UiEvent::Table {
+        stream: OutputStream::Stdout,
+        columns,
+        rows,
+        cell_styles: Vec::new(),
+        format: TableFormat {
+            layout: TableLayout::Columns,
+            ..TableFormat::default()
+        },
+    })
 }
 
 fn eligible(machine: &Machine) -> bool {
@@ -251,64 +398,76 @@ fn check_cancel(cancellation: &CancellationToken) -> Result<(), ConfctlError> {
 
 async fn observe<P: ProcessRunner>(
     inventory: &Inventory,
-    machine: &Machine,
+    job: &Job,
     nix: &NixClient<P>,
     context: &Context,
     cancellation: &CancellationToken,
     task: TaskId,
     ssh_config: Option<&OsStr>,
 ) -> Result<Row, ConfctlError> {
+    let machine = inventory.get(job.machine);
     let mut row = Row {
         host: machine.name.clone(),
         observed: HostStatus::default(),
         target: None,
+        target_toplevel: job.generation.as_ref().map(|g| g.toplevel.clone()),
         deployed: None,
-        local_count: 0,
+        local_count: job.local_count,
         failed: false,
         diagnostics: Vec::new(),
         native_failures: Vec::new(),
         eval_failures: Vec::new(),
     };
-    let key = nix.machine_key(&machine.name).await?;
-    match nix
-        .eval_json(&format!(".#confctl.inputsInfo.{}", attribute(&key)))
-        .await
-    {
-        Ok(value) => {
-            row.target = normalize(&value);
-            if row.target.is_none() {
-                row.failed = true;
-                row.diagnostics.push(format!(
-                    "{}: target inputs info is not an object",
-                    machine.name
-                ));
-            } else if row.target.as_ref().is_some_and(Inputs::is_empty) {
-                row.diagnostics.push(format!(
-                    "{}: target inputs info has no roles to compare",
-                    machine.name
-                ));
-            }
-        }
-        Err(error) if native_eval_failure(&error) => {
-            let ConfctlError::NixCommandFailure(failure) = &error else {
-                unreachable!()
-            };
-            let ConfctlError::ProcessFailure { evidence, .. } = failure.source.as_ref() else {
-                unreachable!()
-            };
-            let stderr = match bytes(&evidence.stderr).await {
-                Ok(bytes) => bytes,
-                Err(source) => return Err(error.with_secondary(vec![source])),
-            };
+    if let Some(generation) = &job.generation {
+        row.target = normalize(&Value::Object(generation.inputs_info.clone()));
+        if row.target.as_ref().is_some_and(Inputs::is_empty) {
             row.diagnostics.push(format!(
-                "{}: target inputs evaluation failed: {error}\n{}",
-                machine.name,
-                String::from_utf8_lossy(&stderr)
+                "{}: saved inputs info has no roles to compare",
+                machine.name
             ));
-            row.failed = true;
-            row.eval_failures.push(error);
         }
-        Err(error) => return Err(error),
+    } else {
+        let key = nix.machine_key(&machine.name).await?;
+        match nix
+            .eval_json(&format!(".#confctl.inputsInfo.{}", attribute(&key)))
+            .await
+        {
+            Ok(value) => {
+                row.target = normalize(&value);
+                if row.target.is_none() {
+                    row.failed = true;
+                    row.diagnostics.push(format!(
+                        "{}: target inputs info is not an object",
+                        machine.name
+                    ));
+                } else if row.target.as_ref().is_some_and(Inputs::is_empty) {
+                    row.diagnostics.push(format!(
+                        "{}: target inputs info has no roles to compare",
+                        machine.name
+                    ));
+                }
+            }
+            Err(error) if native_eval_failure(&error) => {
+                let ConfctlError::NixCommandFailure(failure) = &error else {
+                    unreachable!()
+                };
+                let ConfctlError::ProcessFailure { evidence, .. } = failure.source.as_ref() else {
+                    unreachable!()
+                };
+                let stderr = match bytes(&evidence.stderr).await {
+                    Ok(bytes) => bytes,
+                    Err(source) => return Err(error.with_secondary(vec![source])),
+                };
+                row.diagnostics.push(format!(
+                    "{}: target inputs evaluation failed: {error}\n{}",
+                    machine.name,
+                    String::from_utf8_lossy(&stderr)
+                ));
+                row.failed = true;
+                row.eval_failures.push(error);
+            }
+            Err(error) => return Err(error),
+        }
     }
     check_cancel(cancellation)?;
     row.observed = super::host_status::query(
@@ -318,7 +477,7 @@ async fn observe<P: ProcessRunner>(
         cancellation,
         task,
         ssh_config,
-        false,
+        job.generation.is_some(),
     )
     .await?;
     row.diagnostics
@@ -597,6 +756,12 @@ fn table(rows: &[Row]) -> UiEvent {
             .uptime
             .is_some_and(|u| u.is_finite() && u >= 0.0);
         let ok = online
+            && row.target_toplevel.as_ref().is_none_or(|target| {
+                row.observed
+                    .current_toplevel
+                    .as_ref()
+                    .is_some_and(|current| current.as_os_str() == target.as_os_str())
+            })
             && row.target.as_ref().is_some_and(|target| {
                 !target.is_empty()
                     && target.iter().all(|(role, info)| {
