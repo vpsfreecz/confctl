@@ -4,6 +4,8 @@
 mod channel_tests;
 mod diagnostic;
 mod invocation_log;
+#[cfg(all(test, target_os = "linux"))]
+mod runtime_kernels_tests;
 mod signals;
 
 use invocation_log::InvocationLog;

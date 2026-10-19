@@ -6,7 +6,7 @@ use crate::{
     configuration::{FilePolicy, MutationGuard, RuntimeKernelSettings, StateFiles, WriteReceipt},
     domain::{Inventory, Machine, MachineId},
     error::ConfctlError,
-    events::{EventSink, OutputStream, Style, TaskId, UiEvent},
+    events::{EventSink, OutputStream, Style, TaskId, TaskState, UiEvent},
     process::{
         Captured, PartialProcessEvidence, ProcessOutcome, ProcessRunner, ProcessScope, ProcessSpec,
         TerminationCause,
@@ -30,7 +30,6 @@ pub struct FeatureContext<'a, P> {
     pub cancellation: &'a CancellationToken,
     pub mutation: &'a MutationGuard,
     pub ssh_config: Option<&'a OsStr>,
-    pub task: TaskId,
 }
 
 #[derive(Debug)]
@@ -244,7 +243,7 @@ async fn emit(events: &EventSink, text: String) -> Result<(), ConfctlError> {
 /// or 'static/Clone runner requirement is introduced to implement concurrency.
 pub async fn refresh<P: ProcessRunner>(
     ctx: &FeatureContext<'_, P>,
-    machines: &[MachineId],
+    tasks: &[(MachineId, TaskId)],
 ) -> Result<KernelRefreshReport, ConfctlError> {
     if !ctx.settings.enable {
         return Err(ConfctlError::Configuration(
@@ -255,14 +254,21 @@ pub async fn refresh<P: ProcessRunner>(
     let path = ctx.settings.state_file.as_ref().ok_or_else(|| {
         ConfctlError::Configuration("runtimeKernels.stateFile is required when enabled".into())
     })?;
-    let mut selected = Vec::with_capacity(machines.len());
-    for id in machines {
+    let mut selected = Vec::with_capacity(tasks.len());
+    let mut task_ids = Vec::with_capacity(tasks.len());
+    let mut names = Vec::with_capacity(tasks.len());
+    for (id, task) in tasks {
         let machine = ctx.inventory.machines.get(id.0).ok_or_else(|| {
             ConfctlError::State("kernel refresh has an invalid selected machine ID".into())
         })?;
-        if selected.contains(id) {
+        if selected.contains(id) || names.contains(&machine.name.as_str()) {
             return Err(ConfctlError::State(
                 "kernel refresh repeats a selected machine ID".into(),
+            ));
+        }
+        if task.0 == 0 || task_ids.contains(task) {
+            return Err(ConfctlError::State(
+                "kernel refresh requires distinct nonzero task IDs".into(),
             ));
         }
         if machine.spin() != Some("vpsadminos") {
@@ -271,6 +277,8 @@ pub async fn refresh<P: ProcessRunner>(
             ));
         }
         selected.push(*id);
+        task_ids.push(*task);
+        names.push(machine.name.as_str());
     }
     let mut saved = match ctx.files.read_optional(path)? {
         None => Value::Object(Default::default()),
@@ -284,17 +292,53 @@ pub async fn refresh<P: ProcessRunner>(
         .iter()
         .map(|id| probe_spec(ctx.inventory.get(*id), ctx.ssh_config))
         .collect::<Result<Vec<_>, _>>()?;
+    for ((_, task), spec) in tasks.iter().zip(&specs) {
+        ctx.events
+            .emit(UiEvent::TaskPending {
+                task: *task,
+                description: spec.redacted_description.clone(),
+            })
+            .await?;
+    }
     let mut pending: Vec<_> = selected
         .iter()
         .copied()
         .zip(specs)
-        .map(|(id, spec)| {
+        .zip(task_ids)
+        .map(|((id, spec), task)| {
             let cancellation = local.clone();
             Some(Box::pin(async move {
-                ctx.runner
-                    .run(spec, ProcessScope::new(cancellation, ctx.task))
-                    .await
-                    .and_then(|outcome| decode_probe(id, outcome))
+                let result = if cancellation.is_cancelled() {
+                    Err(ConfctlError::Cancelled)
+                } else {
+                    match ctx
+                        .events
+                        .emit(UiEvent::TaskStarted {
+                            task,
+                            description: spec.redacted_description.clone(),
+                        })
+                        .await
+                    {
+                        Ok(()) => ctx
+                            .runner
+                            .run(spec, ProcessScope::new(cancellation.clone(), task))
+                            .await
+                            .and_then(|outcome| decode_probe(id, outcome)),
+                        Err(error) => Err(error),
+                    }
+                };
+                let state = match &result {
+                    Ok(row) if row.error.is_none() => TaskState::Succeeded,
+                    Ok(_) => TaskState::Failed,
+                    Err(error) if error.is_cancelled() => TaskState::Canceled,
+                    Err(_) => TaskState::Failed,
+                };
+                let final_event = ctx.events.emit(UiEvent::TaskFinished { task, state }).await;
+                match (result, final_event) {
+                    (result, Ok(())) => result,
+                    (Ok(_), Err(error)) => Err(error),
+                    (Err(error), Err(event_error)) => Err(error.with_secondary(vec![event_error])),
+                }
             }))
         })
         .collect();

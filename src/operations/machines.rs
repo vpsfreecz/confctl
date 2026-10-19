@@ -77,7 +77,12 @@ pub(super) async fn list(
     }
     Ok(())
 }
-fn table(inventory: &Inventory, selected: &Selection, columns: &[String], header: bool) -> UiEvent {
+pub(super) fn table(
+    inventory: &Inventory,
+    selected: &Selection,
+    columns: &[String],
+    header: bool,
+) -> UiEvent {
     UiEvent::Table {
         stream: OutputStream::Stdout,
         columns: columns.iter().map(|name| name.to_uppercase()).collect(),

@@ -3,6 +3,7 @@
 
 mod inputs;
 mod machines;
+mod runtime_kernels;
 
 use crate::{
     app::{Context, Operations},
@@ -16,7 +17,10 @@ impl Operations for CoreOperations {
     fn available(&self, action: &Action) -> bool {
         matches!(
             action,
-            Action::InputsList { .. } | Action::List { .. } | Action::ChannelList { .. }
+            Action::InputsList { .. }
+                | Action::List { .. }
+                | Action::ChannelList { .. }
+                | Action::RuntimeKernelsUpdate { .. }
         )
     }
     async fn run(
@@ -34,6 +38,9 @@ impl Operations for CoreOperations {
                 has_extra_arguments,
             } => inputs::channels(&root, pattern.as_deref(), *has_extra_arguments, context).await?,
             Action::List { .. } => machines::list(&invocation.action, root, context).await?,
+            Action::RuntimeKernelsUpdate { .. } => {
+                runtime_kernels::update(&invocation.action, root, context).await?
+            }
             action => {
                 return Err(ConfctlError::Configuration(format!(
                     "Rust operation '{}' is not implemented yet",

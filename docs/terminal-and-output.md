@@ -30,13 +30,24 @@ without freezing the timing ledger.
 `TaskPending` records admitted work whose execution body has not been entered.
 `TaskStarted` promotes the same ID and description to running logical work, or
 registers it directly when there is no pending phase. Running does not assert
-that a native child is alive. Operation producers do not emit `TaskPending` yet.
+that a native child is alive.
 Pending work may finish as skipped, canceled, failed or incomplete before entry;
 the view retains its not-started status. Progress requires a running task, and
 only a task that has entered execution can succeed. Repeated identical results
 are harmless; conflicting results and backward transitions are delivery errors.
 When an output group ends without a task result, the final view shows incomplete
 with its last observed entry status. It does not infer success or cancellation.
+
+`runtime-kernels update` emits pending events for the confirmed, validated host
+probes and starts each task as its logical probe body enters the process runner.
+Each host has its own task ID and description. A decoded kernel succeeds; an
+ordinary host error fails that task while allowing the refresh to finish and
+remove the host's saved kernel. Infrastructure errors and cancellation fail the
+command after joining entered probes. Probe results precede the separate atomic
+save of combined state; successful tasks do not promise that save succeeded.
+Declining confirmation admits no probes. Other operation producers are not wired
+to this lifecycle yet. Controlled command-route tests do not establish live
+progress, quiet elapsed updates, resize or full terminal qualification.
 
 Live tail fragments and task rows share a compact source key: @ followed by
 the complete TaskId in base 36. Tail suffixes /o and /e identify stdout and
