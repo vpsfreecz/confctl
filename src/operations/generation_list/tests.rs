@@ -32,12 +32,7 @@ fn offsets_are_global_and_preserve_out_of_range_pattern_spelling() {
         assert_eq!(offset_index(text, 0), None, "empty/{text}");
     }
     let saved = generation("0009", "2000-01-01T00:00:00Z", json!({}));
-    let mut entries = vec![Entry {
-        host: "alpha",
-        generation: &saved,
-        current: true,
-        kernel: None,
-    }];
+    let mut entries = vec![Entry::local("alpha", &saved, true, None)];
     filter(
         &mut entries,
         &UnifiedGenerationSelector::Offset("0009".into()),
@@ -60,12 +55,7 @@ fn days_have_a_strict_shared_cutoff_and_arbitrary_magnitudes() {
     ] {
         let mut entries = [&before, &equal, &after]
             .into_iter()
-            .map(|generation| Entry {
-                host: "host",
-                generation,
-                current: false,
-                kernel: None,
-            })
+            .map(|generation| Entry::local("host", generation, false, None))
             .collect();
         filter(
             &mut entries,
@@ -73,10 +63,7 @@ fn days_have_a_strict_shared_cutoff_and_arbitrary_magnitudes() {
             now,
         );
         assert_eq!(
-            entries
-                .iter()
-                .map(|e| e.generation.name.as_str())
-                .collect::<Vec<_>>(),
+            entries.iter().map(|e| e.name.as_str()).collect::<Vec<_>>(),
             expected
         );
     }
@@ -96,18 +83,8 @@ fn table_keeps_first_seen_roles_before_sorting_and_preserves_saved_values() {
     );
     let snapshot = later.encode();
     let UiEvent::Table { columns, rows, .. } = table(vec![
-        Entry {
-            host: "zhost",
-            generation: &later,
-            current: true,
-            kernel: Some("6.12".into()),
-        },
-        Entry {
-            host: "ahost",
-            generation: &earlier,
-            current: false,
-            kernel: None,
-        },
+        Entry::local("zhost", &later, true, Some("6.12".into())),
+        Entry::local("ahost", &earlier, false, None),
     ]) else {
         panic!()
     };
@@ -169,4 +146,65 @@ fn kernel_links_follow_both_system_conventions_and_propagate_io_errors() {
     let loop_path = temp.path().join("loop");
     symlink(&loop_path, &loop_path).unwrap();
     assert!(kernel_version(&loop_path).is_err());
+}
+
+#[test]
+fn remote_first_unification_retains_build_distinctions_and_current_memberships() {
+    let remote = |id: &str, current, kernel: &str| HostGeneration {
+        id: id.into(),
+        toplevel: "/nonexistent".into(),
+        date: "2026-10-19T12:00:00Z"
+            .parse::<DateTime<chrono::Local>>()
+            .unwrap(),
+        kernel: Some(kernel.into()),
+        current,
+    };
+    let first = remote("1", true, "remote-first");
+    let duplicate = remote("2", false, "remote-later");
+    let saved = generation(
+        "local-name",
+        "2000-01-01T00:00:00Z",
+        json!({"nixpkgs":"abcdefghijk"}),
+    );
+    let mut distinct = saved.clone();
+    distinct.name = "other-name".into();
+    let mut different_inputs = saved.clone();
+    different_inputs
+        .inputs
+        .insert("nixpkgs".into(), json!("/other-input"));
+    let mut entries = Vec::new();
+    add_remote(&mut entries, "host", &first);
+    add_remote(&mut entries, "host", &duplicate);
+    add_build(&mut entries, "host", &saved, true, Some("local".into()));
+    add_build(&mut entries, "host", &distinct, false, None);
+    add_build(&mut entries, "host", &different_inputs, false, None);
+    assert_eq!(entries.len(), 3);
+    assert!(entries[0].current);
+    assert_eq!(entries[0].date, saved.date);
+    let UiEvent::Table { rows, .. } = table(entries) else {
+        panic!()
+    };
+    assert_eq!(
+        &rows[0][..6],
+        [
+            "host",
+            "local-name",
+            "2",
+            "build+host",
+            "build",
+            "remote-first"
+        ]
+    );
+    assert_eq!(&rows[2][..6], ["host", "other-name", "", "build", "", ""]);
+
+    let mut different_path = remote("3", false, "other");
+    different_path.toplevel = "/nonexistent/./".into();
+    let mut entries = Vec::new();
+    add_remote(&mut entries, "host", &different_path);
+    add_build(&mut entries, "host", &saved, false, None);
+    assert_eq!(
+        entries.len(),
+        2,
+        "toplevel matching uses saved bytes, not normalized path components"
+    );
 }

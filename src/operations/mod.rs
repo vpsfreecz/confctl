@@ -5,6 +5,7 @@ mod build;
 mod connection;
 mod deploy;
 mod generation_list;
+mod host_status;
 mod inputs;
 mod machines;
 mod runtime_kernels;
@@ -21,7 +22,7 @@ pub struct CoreOperations;
 impl Operations for CoreOperations {
     fn available(&self, action: &Action) -> bool {
         matches!(action, Action::Deploy(request) if request.copy_only && request.generation.is_some())
-            || matches!(action, Action::GenerationList { locations, .. } if !locations.remote)
+            || matches!(action, Action::GenerationList { .. })
             || matches!(
                 action,
                 Action::InputsList { .. }

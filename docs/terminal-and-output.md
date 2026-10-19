@@ -51,7 +51,15 @@ establish live progress, quiet elapsed updates, resize or full terminal qualific
 `test-connection` admits one task per confirmed runnable host. Each serial uptime
 probe starts and finishes its own task. Ordinary host failures fail those tasks
 while allowing the completed command to exit 0. Local generation listing emits
-a result table without host-probe tasks.
+a result table without host-probe tasks. Remote or combined generation listing
+admits a task for each selected host query; unavailable hosts fail their tasks
+while ordinary host failures still allow the listing to exit 0.
+
+`ssh` admits per-host tasks and reports actual completed and failed host counts
+for commands. Command stdout and stderr share one native pipe and capture.
+Interactive shells park painting through the foreground terminal owner and
+restore terminal and input ownership on return. Ordinary nonzero child results
+fail their tasks while allowing the completed command to exit 0.
 
 `build` registers one task per actual build group after consent and planning.
 Groups run serially; a shared Nix build does not prove that each host executed
