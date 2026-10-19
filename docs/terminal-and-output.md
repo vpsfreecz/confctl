@@ -27,6 +27,17 @@ totals show counts; positive totals permit a clamped progress bar. Narrow rows
 keep the result before a clipped description. Rendering reads elapsed time
 without freezing the timing ledger.
 
+`TaskPending` records admitted work whose execution body has not been entered.
+`TaskStarted` promotes the same ID and description to running logical work, or
+registers it directly when there is no pending phase. Running does not assert
+that a native child is alive. Operation producers do not emit `TaskPending` yet.
+Pending work may finish as skipped, canceled, failed or incomplete before entry;
+the view retains its not-started status. Progress requires a running task, and
+only a task that has entered execution can succeed. Repeated identical results
+are harmless; conflicting results and backward transitions are delivery errors.
+When an output group ends without a task result, the final view shows incomplete
+with its last observed entry status. It does not infer success or cancellation.
+
 Live tail fragments and task rows share a compact source key: @ followed by
 the complete TaskId in base 36. Tail suffixes /o and /e identify stdout and
 stderr. A source change starts a separate displayed fragment, so partial lines

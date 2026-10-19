@@ -1,6 +1,6 @@
 //! Ratatui widgets render a bounded frame; native painting has no input reader.
 
-use super::model::{Model, TaskRow, clip, sanitize_text, source_label};
+use super::model::{Model, TaskPhase, TaskRow, clip, sanitize_text, source_label};
 use crate::{events::TaskState, timing::format_elapsed};
 use ratatui::{
     buffer::Buffer,
@@ -104,11 +104,17 @@ pub fn render(model: &Model, info: &FrameInfo<'_>, width: u16, height: u16) -> B
         let y = header_count + tail_height + index;
         let row_area = Rect::new(0, y as u16, width, 1);
         let (label, _) = task_label(row, usize::from(width));
-        let color = match row.state {
-            Some(TaskState::Succeeded) => Color::Green,
-            Some(TaskState::Failed) => Color::Red,
-            Some(TaskState::Skipped | TaskState::Incomplete | TaskState::Canceled) => Color::Yellow,
-            None => Color::Cyan,
+        let color = match row.phase {
+            TaskPhase::Final {
+                state: Some(TaskState::Succeeded),
+                ..
+            } => Color::Green,
+            TaskPhase::Final {
+                state: Some(TaskState::Failed),
+                ..
+            } => Color::Red,
+            TaskPhase::Final { .. } | TaskPhase::Pending => Color::Yellow,
+            TaskPhase::Executing => Color::Cyan,
         };
         let style = if info.color {
             Style::default().fg(color)
@@ -173,7 +179,7 @@ fn task_description(row: &TaskRow) -> String {
 
 /// The boolean marks a shortened view, which needs a full final task summary.
 pub(super) fn task_label(row: &TaskRow, columns: usize) -> (String, bool) {
-    let state = row.state.map(state_label).unwrap_or("running");
+    let state = phase_label(&row.phase);
     let source = source_label(row.id);
     let description = task_description(row);
     let prefix = format!("{state} {source} {} ", task_counts(row));
@@ -207,9 +213,49 @@ pub(super) fn task_summary(row: &TaskRow) -> String {
         source_label(row.id),
         row.id.0,
         task_description(row),
-        row.state.map(state_label).unwrap_or("incomplete"),
+        phase_label(&row.phase),
         task_counts(row)
     )
+}
+
+fn phase_label(phase: &TaskPhase) -> &'static str {
+    match phase {
+        TaskPhase::Pending => "pending",
+        TaskPhase::Executing => "running",
+        TaskPhase::Final {
+            state: None,
+            entered: false,
+        } => "incomplete (last pending)",
+        TaskPhase::Final {
+            state: None,
+            entered: true,
+        } => "incomplete (last running)",
+        TaskPhase::Final {
+            state: Some(state),
+            entered: true,
+        } => state_label(*state),
+        TaskPhase::Final {
+            state: Some(TaskState::Skipped),
+            entered: false,
+        } => "skipped (not started)",
+        TaskPhase::Final {
+            state: Some(TaskState::Canceled),
+            entered: false,
+        } => "canceled (not started)",
+        TaskPhase::Final {
+            state: Some(TaskState::Failed),
+            entered: false,
+        } => "failed (not started)",
+        TaskPhase::Final {
+            state: Some(TaskState::Incomplete),
+            entered: false,
+        } => "incomplete (not started)",
+        // apply() rejects this transition; keep the rendering honest if constructed directly.
+        TaskPhase::Final {
+            state: Some(TaskState::Succeeded),
+            entered: false,
+        } => "invalid unstarted success",
+    }
 }
 
 fn single_line(text: &str) -> String {
@@ -471,6 +517,33 @@ mod tests {
         assert_eq!(buffer.area.height, 22);
     }
     #[test]
+    fn pending_and_executing_tasks_have_distinct_labels_without_native_claims() {
+        let mut model = Model::new(2, 80);
+        model
+            .apply(&UiEvent::TaskPending {
+                task: TaskId(1),
+                description: "node-a".into(),
+            })
+            .unwrap();
+        model
+            .apply(&UiEvent::TaskStarted {
+                task: TaskId(2),
+                description: "node-b".into(),
+            })
+            .unwrap();
+        let output = text(&render(&model, &info(), 80, 10));
+        assert!(output.contains("pending @1 0 node-a"));
+        assert!(output.contains("running @2 0 node-b"));
+        model
+            .apply(&UiEvent::TaskFinished {
+                task: TaskId(1),
+                state: TaskState::Canceled,
+            })
+            .unwrap();
+        let summary = task_summary(&model.rows()[0]);
+        assert!(summary.contains("node-a: canceled (not started)"));
+    }
+    #[test]
     fn tiny_zero_and_narrow_sizes_never_underflow_or_invent_percentages() {
         let mut model = Model::new(2, 80);
         model
@@ -618,7 +691,7 @@ mod tests {
         assert!(output.contains('…'));
         let summary = task_summary(row);
         assert!(summary.contains("@3w5e11264sgsf (task 18446744073709551615)"));
-        assert!(summary.contains("node-a activation: incomplete"));
+        assert!(summary.contains("node-a activation: running"));
     }
 
     #[test]

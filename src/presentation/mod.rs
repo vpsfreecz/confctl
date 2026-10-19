@@ -806,6 +806,7 @@ impl Presentation {
         Ok(())
     }
     fn finalize_group(&mut self) -> Result<(), ConfctlError> {
+        self.model.finalize();
         if !self.config.policy.live || !self.active_view {
             return Ok(());
         }

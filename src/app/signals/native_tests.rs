@@ -634,7 +634,9 @@ fn route_app(test: &str, case: &str) {
 }
 fn route_child(case: &str) {
     let own = Identity::read(std::process::id()).unwrap();
-    std::fs::write(control().join("route-child-pid"), own.pid.to_string()).unwrap();
+    let temporary = control().join("route-child-pid.new");
+    std::fs::write(&temporary, own.pid.to_string()).unwrap();
+    std::fs::rename(temporary, control().join("route-child-pid")).unwrap();
     std::fs::write(
         control().join("route-child-identity"),
         serde_json::to_vec(&serde_json::json!({"pid":own.pid,"start":own.start})).unwrap(),

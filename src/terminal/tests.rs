@@ -466,6 +466,19 @@ async fn protected_pty_hangup_then_future_drop_retains_restore_failures() {
     assert!(pending.as_mut().poll(&mut context).is_pending());
     echo_disabled(&slave).await;
     drop(master);
+    // A parallel fork may retain the CLOEXEC master until exec. Observe the
+    // hangup before cancellation so this case actually exercises failed restore.
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match rustix::termios::tcgetattr(&slave) {
+                Err(rustix::io::Errno::IO) => break,
+                Ok(_) => tokio::task::yield_now().await,
+                Err(error) => panic!("observe PTY hangup: {error}"),
+            }
+        }
+    })
+    .await
+    .expect("PTY hangup before reply cancellation");
     // Never poll the reply again. Its receiver remains live while PendingRead
     // Drop joins cancellation; a queued cleanup error still has an owner.
     drop(pending);

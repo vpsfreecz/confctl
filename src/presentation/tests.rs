@@ -761,6 +761,47 @@ async fn omitted_and_shortened_task_rows_keep_full_final_source_associations() {
 }
 
 #[tokio::test]
+async fn checked_finish_keeps_missing_pending_and_executing_results_incomplete() {
+    let directory = tempfile::tempdir().expect("directory");
+    let (stdout, out) = writer(None, false);
+    let (stderr, _) = writer(None, false);
+    let (sink, receiver) = EventSink::channel(1);
+    let (_state, observe) = watch::channel(TerminalState::Idle);
+    let (control, presentation) = Presentation::new(
+        receiver,
+        observe,
+        OutputTargets { stdout, stderr },
+        config(directory.path(), true),
+        None,
+    )
+    .unwrap();
+    let running = tokio::spawn(presentation.run());
+    sink.emit(UiEvent::TaskPending {
+        task: TaskId(1),
+        description: "node-a".into(),
+    })
+    .await
+    .unwrap();
+    sink.emit(UiEvent::TaskStarted {
+        task: TaskId(2),
+        description: "node-b".into(),
+    })
+    .await
+    .unwrap();
+    control.finish().await.unwrap();
+    running.await.unwrap().unwrap();
+    let rendered = String::from_utf8(out.lock().unwrap().clone()).unwrap();
+    // Every paint begins with Hide. Earlier timer paints may truthfully show
+    // execution; only the checked final panel must show incomplete results.
+    let final_panel = rendered.rsplit("\x1b[?25l").next().unwrap();
+    assert!(final_panel.contains("incomplete (last pending) @1 0 node-a"));
+    assert!(final_panel.contains("incomplete (last running) @2 0 node-b"));
+    assert!(!final_panel.contains("succeeded"));
+    assert!(!final_panel.contains("canceled"));
+    assert!(!final_panel.contains("running @2"));
+}
+
+#[tokio::test]
 async fn tiny_unregistered_output_retains_source_without_inventing_task_state() {
     let directory = tempfile::tempdir().expect("directory");
     let (stdout, out) = writer(None, false);
