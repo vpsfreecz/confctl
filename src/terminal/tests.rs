@@ -101,6 +101,154 @@ async fn yes_skips_preview_and_eof_is_not_an_implicit_answer() {
     ui.shutdown().expect("join");
 }
 
+#[tokio::test]
+async fn visible_line_preserves_echo_bytes_and_exclusive_prompt_ownership() {
+    let (master, slave) = local_pty();
+    let original = rustix::termios::tcgetattr(&slave).expect("termios");
+    let (events, mut receiver) = EventSink::channel(1);
+    let ui = Ui::new(&slave, events, CancellationToken::new(), None).expect("UI");
+    ui.set_live(true).expect("live");
+    let mut line = Box::pin(ui.line("Choice: ".into()));
+    let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+    assert!(line.as_mut().poll(&mut context).is_pending());
+    let parked = receiver.receive().await.expect("park event");
+    assert_eq!(parked.event, UiEvent::TerminalState(TerminalState::Prompt));
+    parked.acknowledge(Ok(()));
+    assert!(line.as_mut().poll(&mut context).is_pending());
+    let prompt = receiver.receive().await.expect("prompt event");
+    assert_eq!(
+        prompt.event,
+        UiEvent::PromptFrame {
+            preview: Vec::new(),
+            text: "Choice: ".into(),
+        }
+    );
+    prompt.acknowledge(Ok(()));
+    assert!(line.as_mut().poll(&mut context).is_pending());
+    assert!(matches!(
+        ui.foreground().await,
+        Err(ConfctlError::TerminalBusy)
+    ));
+    // A second broker request confirms the first read has entered and remains
+    // pending, so a mistaken protected read cannot hide its echo change.
+    assert!(matches!(
+        ui.session
+            .broker
+            .line(false, &CancellationToken::new())
+            .await,
+        Err(ConfctlError::TerminalBusy)
+    ));
+    pty_tests::assert_modes(
+        &original,
+        &rustix::termios::tcgetattr(&slave).expect("termios"),
+    );
+    rustix::io::write(&master, b" r \n").expect("choice");
+    assert_eq!(line.await.expect("choice"), b" r \n");
+    // This raw PTY retains ECHOCTL, which displays newline as ^J. Check the
+    // literal answer prefix without imposing another terminal echo policy.
+    let mut echo = [0; 3];
+    let mut master = std::fs::File::from(master);
+    master.read_exact(&mut echo).expect("echoed choice");
+    assert_eq!(&echo, b" r ");
+    assert_eq!(ui.state(), TerminalState::Live);
+    pty_tests::assert_modes(
+        &original,
+        &rustix::termios::tcgetattr(&slave).expect("termios"),
+    );
+    ui.shutdown().expect("broker joined");
+}
+
+#[tokio::test]
+async fn visible_line_requires_successful_park_and_prompt_ack_before_reading() {
+    for fail_prompt in [false, true] {
+        for missing_ack in [false, true] {
+            let (input, mut peer) = UnixStream::pair().expect("input");
+            peer.write_all(b"\xffr\n").expect("unread choice");
+            let (events, mut receiver) = EventSink::channel(1);
+            let ui = Ui::new(&input, events, CancellationToken::new(), None).expect("UI");
+            ui.set_live(true).expect("live");
+            let mut line = Box::pin(ui.line("Choice: ".into()));
+            let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+            assert!(line.as_mut().poll(&mut context).is_pending());
+            let mut delivery = receiver.receive().await.expect("park event");
+            if fail_prompt {
+                delivery.acknowledge(Ok(()));
+                assert!(line.as_mut().poll(&mut context).is_pending());
+                delivery = receiver.receive().await.expect("prompt event");
+            }
+            assert!(line.as_mut().poll(&mut context).is_pending());
+            assert_eq!(ui.state(), TerminalState::Prompt);
+            if missing_ack {
+                drop(delivery);
+            } else {
+                delivery.acknowledge(Err("fixture output failure".into()));
+            }
+            assert!(matches!(line.await, Err(ConfctlError::EventDelivery(_))));
+            assert_eq!(ui.state(), TerminalState::Live);
+            let mut ready = [rustix::event::PollFd::new(
+                &input,
+                rustix::event::PollFlags::IN,
+            )];
+            let zero = rustix::event::Timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            };
+            assert_eq!(
+                rustix::event::poll(&mut ready, Some(&zero)).expect("unread input poll"),
+                1
+            );
+            let mut unread = [0; 3];
+            rustix::io::read(&input, &mut unread).expect("input was not consumed");
+            assert_eq!(&unread, b"\xffr\n");
+            ui.shutdown().expect("broker joined");
+        }
+    }
+}
+
+#[tokio::test]
+async fn visible_line_cancel_and_drop_restore_ownership_at_prompt_and_read() {
+    for reading in [false, true] {
+        for drop_future in [false, true] {
+            let (input, mut peer) = UnixStream::pair().expect("input");
+            let cancel = CancellationToken::new();
+            let (events, mut receiver) = EventSink::channel(1);
+            let ui = Ui::new(&input, events, cancel.clone(), None).expect("UI");
+            ui.set_live(true).expect("live");
+            let mut line = Box::pin(ui.line("Choice: ".into()));
+            let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+            assert!(line.as_mut().poll(&mut context).is_pending());
+            receiver
+                .receive()
+                .await
+                .expect("park event")
+                .acknowledge(Ok(()));
+            assert!(line.as_mut().poll(&mut context).is_pending());
+            let prompt = receiver.receive().await.expect("prompt event");
+            if reading {
+                prompt.acknowledge(Ok(()));
+                assert!(line.as_mut().poll(&mut context).is_pending());
+            }
+            if drop_future {
+                drop(line);
+            } else {
+                cancel.cancel();
+                assert!(matches!(line.await, Err(ConfctlError::Cancelled)));
+            }
+            assert_eq!(ui.state(), TerminalState::Live);
+            peer.write_all(b"next\n").expect("next owner's input");
+            assert_eq!(
+                ui.session
+                    .broker
+                    .line(false, &CancellationToken::new())
+                    .await
+                    .expect("input released"),
+                b"next\n"
+            );
+            ui.shutdown().expect("broker joined");
+        }
+    }
+}
+
 async fn bounded_answer(bytes: Vec<u8>, eof: bool) -> Result<Vec<u8>, ConfctlError> {
     let (input, mut peer) = UnixStream::pair().expect("input");
     let broker = InputBroker::new(&input).expect("broker");
