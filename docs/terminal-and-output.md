@@ -71,7 +71,8 @@ until both totals are known, and reset for each native attempt. A successful
 group includes generation reuse/publication. On failure, later groups are skipped
 or canceled and earlier saved generations and partial roots remain in place.
 Task log locators refer to the app-owned invocation log. Successful finalization
-removes that log; failures retain it under the existing policy.
+removes that log unless the operation explicitly requests retention; failures
+retain it under the existing policy.
 
 Saved-generation copy-only deploys admit one task per resolved host, with bounded
 copying-count/path progress from native stderr and unknown totals when absent.
@@ -84,6 +85,13 @@ remain actual observations if later output or cancellation fails the invocation.
 Default/new-build deploy, switch, test and reboot remain unavailable; other
 operation producers are not wired to this lifecycle yet. Controlled route
 fixtures do not establish real-site activation or full live-terminal qualification.
+
+`health-check` admits one task per configured logical check and starts it on
+entry to the bounded check runner. Attempts share that task and its log locator;
+failed attempts remain visible even when a retry succeeds. A failed assessment
+requests retention of the raw invocation log before diagnostics or cooldown.
+The final summary reports actual passed and failed checks. Cancellation and
+delivery failures join entered work and preserve already delivered results.
 
 Live tail fragments and task rows share a compact source key: @ followed by
 the complete TaskId in base 36. Tail suffixes /o and /e identify stdout and

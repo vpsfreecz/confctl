@@ -5,6 +5,8 @@ mod build;
 mod connection;
 mod deploy;
 mod generation_list;
+mod health_check;
+mod health_systemd;
 mod host_status;
 mod inputs;
 mod machines;
@@ -33,6 +35,7 @@ impl Operations for CoreOperations {
                     | Action::Build(_)
                     | Action::TestConnection { .. }
                     | Action::Ssh(_)
+                    | Action::HealthCheck { .. }
             )
     }
     async fn run(
@@ -59,6 +62,9 @@ impl Operations for CoreOperations {
                 generation_list::list(&invocation.action, root, context).await?
             }
             Action::Ssh(_) => ssh::run(&invocation.action, root, context).await?,
+            Action::HealthCheck { .. } => {
+                health_check::run(&invocation.action, root, context).await?
+            }
             Action::RuntimeKernelsUpdate { .. } => {
                 runtime_kernels::update(&invocation.action, root, context).await?
             }
