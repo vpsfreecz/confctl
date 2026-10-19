@@ -157,3 +157,43 @@ fn missing_optional_rollback_and_inputs_info_alias_remain_readable() {
         .is_err()
     );
 }
+
+#[test]
+fn local_inventory_reader_needs_no_gc_roots_or_mutation_and_keeps_rejected_bytes() {
+    let scratch = tempfile::tempdir().unwrap();
+    let root = ConfigRoot::new(scratch.path()).unwrap();
+    assert!(
+        GenerationInventory::load_local(&root, "absent")
+            .unwrap()
+            .generations
+            .is_empty()
+    );
+    assert!(!root.path().join(".confctl").exists());
+    let host = root.path().join(".confctl/generations/nested:host");
+    let good = generation("supported");
+    for name in ["supported", "rejected"] {
+        fs::create_dir_all(host.join(name)).unwrap();
+    }
+    let bytes = serde_json::to_vec(&good.encode()).unwrap();
+    fs::write(host.join("supported/generation.json"), &bytes).unwrap();
+    fs::write(host.join("rejected/generation.json"), b"{bad").unwrap();
+    std::os::unix::fs::symlink("rejected", host.join("current")).unwrap();
+    let inventory = GenerationInventory::load_local(&root, "nested/host").unwrap();
+    assert_eq!(inventory.generations.len(), 1);
+    assert_eq!(inventory.generations[0].name, "supported");
+    assert!(inventory.rejected.contains_key("rejected") && inventory.current_error.is_some());
+    assert!(!root.path().join(".confctl/mutation.lock").exists());
+    assert_eq!(
+        fs::read(host.join("supported/generation.json")).unwrap(),
+        bytes
+    );
+    assert_eq!(
+        fs::read(host.join("rejected/generation.json")).unwrap(),
+        b"{bad"
+    );
+    assert_eq!(
+        fs::read_link(host.join("current")).unwrap(),
+        Path::new("rejected")
+    );
+    assert!(GenerationInventory::load_local(&root, "..").is_err());
+}
