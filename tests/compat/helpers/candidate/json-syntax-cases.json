@@ -1,0 +1,13 @@
+{
+  "status": "Inputs only; original and candidate observations pending, no wider KEXEC-03 expectations accepted",
+  "coordinate_rule": "Record structured candidate line and column without clamping; do not claim Ruby equivalence",
+  "cases": [
+    {"id": "bad-object-observed", "body": "{bad", "scope": "Existing approved KEXEC-03 row only"},
+    {"id": "empty", "body": "", "scope": "Unqualified"},
+    {"id": "whitespace-only", "body": " \t\r\n", "scope": "Unqualified"},
+    {"id": "eof-after-object-open", "body": "{", "scope": "Unqualified"},
+    {"id": "truncated-literal", "body": "{\"machines\": tru", "scope": "Unqualified"},
+    {"id": "multiline", "body": "{\n  \"machines\": [\n    }\n  ]\n}", "scope": "Unqualified"},
+    {"id": "nonascii", "body": "{\"ž\": }", "scope": "Unqualified"}
+  ]
+}

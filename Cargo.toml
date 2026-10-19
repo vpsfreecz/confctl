@@ -15,6 +15,38 @@ path = "src/lib.rs"
 name = "confctl-rust"
 path = "src/main.rs"
 
+[[bin]]
+name = "confctl-auto-rollback"
+path = "src/bin/confctl-auto-rollback.rs"
+
+[[bin]]
+name = "carrier-env"
+path = "src/bin/carrier-env.rs"
+
+[[bin]]
+name = "build-netboot-server"
+path = "src/bin/build-netboot-server.rs"
+
+[[bin]]
+name = "kexec-netboot"
+path = "src/bin/kexec-netboot.rs"
+
+[[test]]
+name = "confctl-watchdog-fixture"
+path = "tests/compat/helpers/qualification/watchdog_fixture.rs"
+harness = false
+required-features = ["qualification-fixtures"]
+
+[[test]]
+name = "confctl-helper-diagnostic-fixture"
+path = "tests/compat/helpers/qualification/diagnostic_fixture.rs"
+harness = false
+required-features = ["qualification-fixtures"]
+
+[features]
+# These externally driven mains require explicit mode/root/environment inputs.
+qualification-fixtures = []
+
 [dependencies]
 clap = { version = "4.6.7", default-features = false, features = ["std", "string"] }
 chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
@@ -29,3 +61,5 @@ thiserror = "2.0.21"
 tempfile = "3.27.0"
 tokio = { version = "1.53.3", features = ["rt-multi-thread", "macros", "process", "io-util", "signal", "sync", "time", "net", "fs"] }
 tokio-util = { version = "0.7.20", features = ["rt"] }
+reqwest = { version = "=0.13.5", default-features = false, features = ["rustls", "system-proxy"] }
+async-compression = { version = "=0.4.51", default-features = false, features = ["tokio", "gzip", "zlib"] }

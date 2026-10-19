@@ -1,4 +1,4 @@
-# Runtime-kernel JSON compatibility source
+# Purpose-specific Ruby JSON compatibility source
 
 `float.rs` and `float/powers.rs` are a safe Rust translation of the Grisu2
 formatter vendored by the Ruby JSON gem **2.21.2**. The source identifies
@@ -13,7 +13,8 @@ Qualified originals, SHA256:
 - `ext/json/ext/generator/generator.c` (`generate_json_float`):
   `76bb6f5530d4e0f378b0c4b6eba8f525127bcb254435431cb93f184d77f57f4d`
 
-`json.rs` is private to the built-in runtime-kernel state writer. Parsed Integer
+`json.rs` is private to the built-in runtime-kernel state writer and the netboot
+builder generation/index pretty writer. Parsed Integer
 tokens preserve arbitrary precision and insertion order. Parsed Float tokens
 convert to binary64 before the frozen formatter; retaining their original decimal
 lexemes or using a different shortest-roundtrip formatter would change bytes.

@@ -1,0 +1,377 @@
+{
+  "status": "Explicit approved candidate expectations; source-only, not executed",
+  "source_revision": "cc40679d267165aecfa569128438bb55fe910268",
+  "root_binding": "Only the retained per-fixture root is replaced by @ROOT@; all file entries, alias traversals and ordered events retained.",
+  "scope": "Exactly five HELPER-DIAG-01 observations and the KEXEC-03 bad-object observation. No other error branch or JSON case is qualified.",
+  "rows": {
+    "carrier-nix-failure": {
+      "exception": "HELPER-DIAG-01",
+      "original": {
+        "capture": "evidence/m0-site/full-captures/carrier-nix-failure.json",
+        "sha256": "dbae5988a0d08834b86f077782906e0d4b99d5c585b076ed2ebd81be802bed5d",
+        "exception_class": "RuntimeError"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "nix-env -p @ROOT@/profile --set /nix/store/fixture failed\n",
+        "exit_status": 1,
+        "signal": null,
+        "observation": {
+          "events": [
+            {
+              "event": "system",
+              "argv": [
+                "nix-env",
+                "-p",
+                "@ROOT@/profile",
+                "--set",
+                "/nix/store/fixture"
+              ]
+            }
+          ],
+          "files": {},
+          "check": null,
+          "temporary_files": []
+        }
+      }
+    },
+    "carrier-callback-failure": {
+      "exception": "HELPER-DIAG-01",
+      "original": {
+        "capture": "evidence/m0-site/full-captures/carrier-callback-failure.json",
+        "sha256": "b2684f33bd2579fc472be0c937ed479deb78e0f52ff86ae0bd4078a0a4791d59",
+        "exception_class": "RuntimeError"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "@ROOT@/on-change failed\n",
+        "exit_status": 1,
+        "signal": null,
+        "observation": {
+          "events": [
+            {
+              "event": "system",
+              "argv": [
+                "nix-env",
+                "-p",
+                "@ROOT@/profile",
+                "--set",
+                "/nix/store/fixture"
+              ]
+            },
+            {
+              "event": "system",
+              "argv": [
+                "@ROOT@/on-change"
+              ]
+            }
+          ],
+          "files": {},
+          "check": null,
+          "temporary_files": []
+        }
+      }
+    },
+    "netboot-invalid-0": {
+      "exception": "HELPER-DIAG-01",
+      "original": {
+        "capture": "evidence/m0-site/full-captures/netboot-invalid-0.json",
+        "sha256": "183c6f16b39a61e7352be914827a3d2b85a01d818e38a9c0782c4979a33ebcd2",
+        "exception_class": "JSON::ParserError"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "Invalid machine metadata JSON: @ROOT@/profiles/confctl-node-1-link/machine.json\n",
+        "exit_status": 1,
+        "signal": null,
+        "observation": {
+          "events": [
+            {
+              "event": "lock.open"
+            }
+          ],
+          "files": {
+            "http.old/sentinel": {
+              "text": "old"
+            },
+            "http/sentinel": {
+              "text": "old"
+            },
+            "tftp.old/sentinel": {
+              "text": "old"
+            },
+            "tftp/sentinel": {
+              "text": "old"
+            },
+            "http": {
+              "symlink": "http.old"
+            },
+            "tftp": {
+              "symlink": "tftp.old"
+            }
+          },
+          "check": null,
+          "temporary_files": []
+        }
+      }
+    },
+    "netboot-invalid-1": {
+      "exception": "HELPER-DIAG-01",
+      "original": {
+        "capture": "evidence/m0-site/full-captures/netboot-invalid-1.json",
+        "sha256": "b196661b4197810205f263acbc0552b0928681e13bb570827124b13b6d133108",
+        "exception_class": "Errno::ENOENT"
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "No such file or directory: @ROOT@/profiles/confctl-node\n",
+        "exit_status": 1,
+        "signal": null,
+        "observation": {
+          "events": [
+            {
+              "event": "lock.open"
+            }
+          ],
+          "files": {
+            "http.old/sentinel": {
+              "text": "old"
+            },
+            "http/sentinel": {
+              "text": "old"
+            },
+            "tftp.old/sentinel": {
+              "text": "old"
+            },
+            "tftp/sentinel": {
+              "text": "old"
+            },
+            "http": {
+              "symlink": "http.old"
+            },
+            "tftp": {
+              "symlink": "tftp.old"
+            }
+          },
+          "check": null,
+          "temporary_files": []
+        }
+      }
+    },
+    "netboot-publish-failure": {
+      "exception": "HELPER-DIAG-01",
+      "original": {
+        "capture": "evidence/m0-site/full-captures/netboot-publish-failure.json",
+        "sha256": "775e5cd5a2e570ca8becbe3c2278fffba169840d0e84c02211163363694cc111",
+        "exception_class": "RuntimeError"
+      },
+      "expected": {
+        "stdout": "node.invalid\n  - 2023-11-14 22:13:20 - 25.11.test (current)\n  - 2023-11-14 22:13:20 - 25.11.test\n\nnixos.invalid\n  - 2023-11-14 22:13:20 - 25.11.test (current)\n\n",
+        "stderr": "Failed to install new root to @ROOT@/tftp\n",
+        "exit_status": 1,
+        "signal": null,
+        "observation": {
+          "events": [
+            {
+              "event": "lock.open"
+            },
+            {
+              "event": "system",
+              "argv": [
+                "@ROOT@/tools/bin/ln",
+                "-sfn",
+                "tftp.abcdef",
+                "@ROOT@/tftp"
+              ]
+            }
+          ],
+          "files": {
+            "http.abcdef/machines.json": {
+              "text": "{\n  \"machines\": [\n    {\n      \"url\": \"http://boot.fixture.invalid/node.invalid\",\n      \"name\": \"node\",\n      \"spin\": \"vpsadminos\",\n      \"fqdn\": \"node.invalid\",\n      \"label\": \"node.fixture.invalid\",\n      \"generations\": [\n        {\n          \"url\": \"http://boot.fixture.invalid/node.invalid/9\",\n          \"store_path\": \"@ROOT@/store/node-9\",\n          \"generation\": 9,\n          \"time\": 1700000000,\n          \"time_s\": \"2023-11-14 22:13:20\",\n          \"current\": true,\n          \"toplevel\": \"@ROOT@/systems/node-9\",\n          \"version\": \"25.11.test\",\n          \"revision\": \"0123456789abcdef\",\n          \"shortrev\": \"012345678\",\n          \"macs\": [\n            \"02:00:00:00:00:01\"\n          ],\n          \"kernel_version\": \"6.12.3\",\n          \"kernel_params\": [\n            \"httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs\",\n            \"console=ttyS0\"\n          ],\n          \"boot_files\": {\n            \"bzImage\": \"http://boot.fixture.invalid/node.invalid/9/bzImage\",\n            \"initrd\": \"http://boot.fixture.invalid/node.invalid/9/initrd\",\n            \"root.squashfs\": \"http://boot.fixture.invalid/node.invalid/9/root.squashfs\"\n          },\n          \"variants\": [\n            {\n              \"name\": \"default\",\n              \"label\": \"Default runlevel\",\n              \"kernel_params\": [\n                \"runlevel=default\"\n              ]\n            },\n            {\n              \"name\": \"nopools\",\n              \"label\": \"Default runlevel without container imports\",\n              \"kernel_params\": [\n                \"runlevel=default\",\n                \"osctl.pools=0\"\n              ]\n            },\n            {\n              \"name\": \"nostart\",\n              \"label\": \"Default runlevel without container autostart\",\n              \"kernel_params\": [\n                \"runlevel=default\",\n                \"osctl.autostart=0\"\n              ]\n            },\n            {\n              \"name\": \"rescue\",\n              \"label\": \"Rescue runlevel (network and sshd)\",\n              \"kernel_params\": [\n                \"runlevel=rescue\"\n              ]\n            },\n            {\n              \"name\": \"single\",\n              \"label\": \"Single-user runlevel (console only)\",\n              \"kernel_params\": [\n                \"runlevel=single\"\n              ]\n            }\n          ],\n          \"inputs_info\": {\n            \"vpsadminos\": {\n              \"rev\": \"abcdef\"\n            }\n          }\n        },\n        {\n          \"url\": \"http://boot.fixture.invalid/node.invalid/7\",\n          \"store_path\": \"@ROOT@/store/node-7\",\n          \"generation\": 7,\n          \"time\": 1700000000,\n          \"time_s\": \"2023-11-14 22:13:20\",\n          \"current\": false,\n          \"toplevel\": \"@ROOT@/systems/node-7\",\n          \"version\": \"25.11.test\",\n          \"revision\": \"0123456789abcdef\",\n          \"shortrev\": \"012345678\",\n          \"macs\": [\n            \"02:00:00:00:00:01\"\n          ],\n          \"kernel_version\": \"6.12.3\",\n          \"kernel_params\": [\n            \"httproot=http://boot.fixture.invalid/node.invalid/7/root.squashfs\",\n            \"console=ttyS0\"\n          ],\n          \"boot_files\": {\n            \"bzImage\": \"http://boot.fixture.invalid/node.invalid/7/bzImage\",\n            \"initrd\": \"http://boot.fixture.invalid/node.invalid/7/initrd\",\n            \"root.squashfs\": \"http://boot.fixture.invalid/node.invalid/7/root.squashfs\"\n          },\n          \"variants\": [\n            {\n              \"name\": \"default\",\n              \"label\": \"Default runlevel\",\n              \"kernel_params\": [\n                \"runlevel=default\"\n              ]\n            },\n            {\n              \"name\": \"nopools\",\n              \"label\": \"Default runlevel without container imports\",\n              \"kernel_params\": [\n                \"runlevel=default\",\n                \"osctl.pools=0\"\n              ]\n            },\n            {\n              \"name\": \"nostart\",\n              \"label\": \"Default runlevel without container autostart\",\n              \"kernel_params\": [\n                \"runlevel=default\",\n                \"osctl.autostart=0\"\n              ]\n            },\n            {\n              \"name\": \"rescue\",\n              \"label\": \"Rescue runlevel (network and sshd)\",\n              \"kernel_params\": [\n                \"runlevel=rescue\"\n              ]\n            },\n            {\n              \"name\": \"single\",\n              \"label\": \"Single-user runlevel (console only)\",\n              \"kernel_params\": [\n                \"runlevel=single\"\n              ]\n            }\n          ],\n          \"inputs_info\": {\n            \"vpsadminos\": {\n              \"rev\": \"abcdef\"\n            }\n          }\n        }\n      ]\n    },\n    {\n      \"url\": \"http://boot.fixture.invalid/nixos.invalid\",\n      \"name\": \"nixos\",\n      \"spin\": \"nixos\",\n      \"fqdn\": \"nixos.invalid\",\n      \"label\": \"nixos.fixture.invalid\",\n      \"generations\": [\n        {\n          \"url\": \"http://boot.fixture.invalid/nixos.invalid/3\",\n          \"store_path\": \"@ROOT@/store/nixos-3\",\n          \"generation\": 3,\n          \"time\": 1700000000,\n          \"time_s\": \"2023-11-14 22:13:20\",\n          \"current\": true,\n          \"toplevel\": \"@ROOT@/systems/nixos-3\",\n          \"version\": \"25.11.test\",\n          \"revision\": \"0123456789abcdef\",\n          \"shortrev\": \"012345678\",\n          \"macs\": [\n            \"02:00:00:00:00:02\"\n          ],\n          \"kernel_version\": \"6.12.3\",\n          \"kernel_params\": [\n            \"httproot=http://boot.fixture.invalid/nixos.invalid/3/initrd\",\n            \"init=@ROOT@/systems/nixos-3/init\",\n            \"console=ttyS0\"\n          ],\n          \"boot_files\": {\n            \"bzImage\": \"http://boot.fixture.invalid/nixos.invalid/3/bzImage\",\n            \"initrd\": \"http://boot.fixture.invalid/nixos.invalid/3/initrd\"\n          },\n          \"variants\": [],\n          \"inputs_info\": {\n            \"vpsadminos\": {\n              \"rev\": \"abcdef\"\n            }\n          }\n        }\n      ]\n    }\n  ]\n}"
+            },
+            "http.abcdef/nixos.invalid/3/bzImage": {
+              "symlink": "@ROOT@/store/nixos-3/bzImage"
+            },
+            "http.abcdef/nixos.invalid/3/generation.json": {
+              "text": "{\n  \"url\": \"http://boot.fixture.invalid/nixos.invalid/3\",\n  \"store_path\": \"@ROOT@/store/nixos-3\",\n  \"generation\": 3,\n  \"time\": 1700000000,\n  \"time_s\": \"2023-11-14 22:13:20\",\n  \"current\": true,\n  \"toplevel\": \"@ROOT@/systems/nixos-3\",\n  \"version\": \"25.11.test\",\n  \"revision\": \"0123456789abcdef\",\n  \"shortrev\": \"012345678\",\n  \"macs\": [\n    \"02:00:00:00:00:02\"\n  ],\n  \"kernel_version\": \"6.12.3\",\n  \"kernel_params\": [\n    \"httproot=http://boot.fixture.invalid/nixos.invalid/3/initrd\",\n    \"init=@ROOT@/systems/nixos-3/init\",\n    \"console=ttyS0\"\n  ],\n  \"boot_files\": {\n    \"bzImage\": \"http://boot.fixture.invalid/nixos.invalid/3/bzImage\",\n    \"initrd\": \"http://boot.fixture.invalid/nixos.invalid/3/initrd\"\n  },\n  \"variants\": [],\n  \"inputs_info\": {\n    \"vpsadminos\": {\n      \"rev\": \"abcdef\"\n    }\n  }\n}"
+            },
+            "http.abcdef/nixos.invalid/3/initrd": {
+              "symlink": "@ROOT@/store/nixos-3/initrd"
+            },
+            "http.abcdef/nixos.invalid/3/kernel-params": {
+              "text": "httproot=http://boot.fixture.invalid/nixos.invalid/3/initrd init=@ROOT@/systems/nixos-3/init console=ttyS0"
+            },
+            "http.abcdef/nixos.invalid/current": {
+              "symlink": "3"
+            },
+            "http.abcdef/nixos.invalid/machine.json": {
+              "text": "{\n  \"url\": \"http://boot.fixture.invalid/nixos.invalid\",\n  \"name\": \"nixos\",\n  \"spin\": \"nixos\",\n  \"fqdn\": \"nixos.invalid\",\n  \"label\": \"nixos.fixture.invalid\",\n  \"generations\": [\n    {\n      \"url\": \"http://boot.fixture.invalid/nixos.invalid/3\",\n      \"store_path\": \"@ROOT@/store/nixos-3\",\n      \"generation\": 3,\n      \"time\": 1700000000,\n      \"time_s\": \"2023-11-14 22:13:20\",\n      \"current\": true,\n      \"toplevel\": \"@ROOT@/systems/nixos-3\",\n      \"version\": \"25.11.test\",\n      \"revision\": \"0123456789abcdef\",\n      \"shortrev\": \"012345678\",\n      \"macs\": [\n        \"02:00:00:00:00:02\"\n      ],\n      \"kernel_version\": \"6.12.3\",\n      \"kernel_params\": [\n        \"httproot=http://boot.fixture.invalid/nixos.invalid/3/initrd\",\n        \"init=@ROOT@/systems/nixos-3/init\",\n        \"console=ttyS0\"\n      ],\n      \"boot_files\": {\n        \"bzImage\": \"http://boot.fixture.invalid/nixos.invalid/3/bzImage\",\n        \"initrd\": \"http://boot.fixture.invalid/nixos.invalid/3/initrd\"\n      },\n      \"variants\": [],\n      \"inputs_info\": {\n        \"vpsadminos\": {\n          \"rev\": \"abcdef\"\n        }\n      }\n    }\n  ]\n}"
+            },
+            "http.abcdef/node.invalid/7/bzImage": {
+              "symlink": "@ROOT@/store/node-7/bzImage"
+            },
+            "http.abcdef/node.invalid/7/generation.json": {
+              "text": "{\n  \"url\": \"http://boot.fixture.invalid/node.invalid/7\",\n  \"store_path\": \"@ROOT@/store/node-7\",\n  \"generation\": 7,\n  \"time\": 1700000000,\n  \"time_s\": \"2023-11-14 22:13:20\",\n  \"current\": false,\n  \"toplevel\": \"@ROOT@/systems/node-7\",\n  \"version\": \"25.11.test\",\n  \"revision\": \"0123456789abcdef\",\n  \"shortrev\": \"012345678\",\n  \"macs\": [\n    \"02:00:00:00:00:01\"\n  ],\n  \"kernel_version\": \"6.12.3\",\n  \"kernel_params\": [\n    \"httproot=http://boot.fixture.invalid/node.invalid/7/root.squashfs\",\n    \"console=ttyS0\"\n  ],\n  \"boot_files\": {\n    \"bzImage\": \"http://boot.fixture.invalid/node.invalid/7/bzImage\",\n    \"initrd\": \"http://boot.fixture.invalid/node.invalid/7/initrd\",\n    \"root.squashfs\": \"http://boot.fixture.invalid/node.invalid/7/root.squashfs\"\n  },\n  \"variants\": [\n    {\n      \"name\": \"default\",\n      \"label\": \"Default runlevel\",\n      \"kernel_params\": [\n        \"runlevel=default\"\n      ]\n    },\n    {\n      \"name\": \"nopools\",\n      \"label\": \"Default runlevel without container imports\",\n      \"kernel_params\": [\n        \"runlevel=default\",\n        \"osctl.pools=0\"\n      ]\n    },\n    {\n      \"name\": \"nostart\",\n      \"label\": \"Default runlevel without container autostart\",\n      \"kernel_params\": [\n        \"runlevel=default\",\n        \"osctl.autostart=0\"\n      ]\n    },\n    {\n      \"name\": \"rescue\",\n      \"label\": \"Rescue runlevel (network and sshd)\",\n      \"kernel_params\": [\n        \"runlevel=rescue\"\n      ]\n    },\n    {\n      \"name\": \"single\",\n      \"label\": \"Single-user runlevel (console only)\",\n      \"kernel_params\": [\n        \"runlevel=single\"\n      ]\n    }\n  ],\n  \"inputs_info\": {\n    \"vpsadminos\": {\n      \"rev\": \"abcdef\"\n    }\n  }\n}"
+            },
+            "http.abcdef/node.invalid/7/initrd": {
+              "symlink": "@ROOT@/store/node-7/initrd"
+            },
+            "http.abcdef/node.invalid/7/kernel-params": {
+              "text": "httproot=http://boot.fixture.invalid/node.invalid/7/root.squashfs console=ttyS0"
+            },
+            "http.abcdef/node.invalid/7/root.squashfs": {
+              "symlink": "@ROOT@/store/node-7/root.squashfs"
+            },
+            "http.abcdef/node.invalid/9/bzImage": {
+              "symlink": "@ROOT@/store/node-9/bzImage"
+            },
+            "http.abcdef/node.invalid/9/generation.json": {
+              "text": "{\n  \"url\": \"http://boot.fixture.invalid/node.invalid/9\",\n  \"store_path\": \"@ROOT@/store/node-9\",\n  \"generation\": 9,\n  \"time\": 1700000000,\n  \"time_s\": \"2023-11-14 22:13:20\",\n  \"current\": true,\n  \"toplevel\": \"@ROOT@/systems/node-9\",\n  \"version\": \"25.11.test\",\n  \"revision\": \"0123456789abcdef\",\n  \"shortrev\": \"012345678\",\n  \"macs\": [\n    \"02:00:00:00:00:01\"\n  ],\n  \"kernel_version\": \"6.12.3\",\n  \"kernel_params\": [\n    \"httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs\",\n    \"console=ttyS0\"\n  ],\n  \"boot_files\": {\n    \"bzImage\": \"http://boot.fixture.invalid/node.invalid/9/bzImage\",\n    \"initrd\": \"http://boot.fixture.invalid/node.invalid/9/initrd\",\n    \"root.squashfs\": \"http://boot.fixture.invalid/node.invalid/9/root.squashfs\"\n  },\n  \"variants\": [\n    {\n      \"name\": \"default\",\n      \"label\": \"Default runlevel\",\n      \"kernel_params\": [\n        \"runlevel=default\"\n      ]\n    },\n    {\n      \"name\": \"nopools\",\n      \"label\": \"Default runlevel without container imports\",\n      \"kernel_params\": [\n        \"runlevel=default\",\n        \"osctl.pools=0\"\n      ]\n    },\n    {\n      \"name\": \"nostart\",\n      \"label\": \"Default runlevel without container autostart\",\n      \"kernel_params\": [\n        \"runlevel=default\",\n        \"osctl.autostart=0\"\n      ]\n    },\n    {\n      \"name\": \"rescue\",\n      \"label\": \"Rescue runlevel (network and sshd)\",\n      \"kernel_params\": [\n        \"runlevel=rescue\"\n      ]\n    },\n    {\n      \"name\": \"single\",\n      \"label\": \"Single-user runlevel (console only)\",\n      \"kernel_params\": [\n        \"runlevel=single\"\n      ]\n    }\n  ],\n  \"inputs_info\": {\n    \"vpsadminos\": {\n      \"rev\": \"abcdef\"\n    }\n  }\n}"
+            },
+            "http.abcdef/node.invalid/9/initrd": {
+              "symlink": "@ROOT@/store/node-9/initrd"
+            },
+            "http.abcdef/node.invalid/9/kernel-params": {
+              "text": "httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0"
+            },
+            "http.abcdef/node.invalid/9/root.squashfs": {
+              "symlink": "@ROOT@/store/node-9/root.squashfs"
+            },
+            "http.abcdef/node.invalid/current": {
+              "symlink": "9"
+            },
+            "http.abcdef/node.invalid/machine.json": {
+              "text": "{\n  \"url\": \"http://boot.fixture.invalid/node.invalid\",\n  \"name\": \"node\",\n  \"spin\": \"vpsadminos\",\n  \"fqdn\": \"node.invalid\",\n  \"label\": \"node.fixture.invalid\",\n  \"generations\": [\n    {\n      \"url\": \"http://boot.fixture.invalid/node.invalid/9\",\n      \"store_path\": \"@ROOT@/store/node-9\",\n      \"generation\": 9,\n      \"time\": 1700000000,\n      \"time_s\": \"2023-11-14 22:13:20\",\n      \"current\": true,\n      \"toplevel\": \"@ROOT@/systems/node-9\",\n      \"version\": \"25.11.test\",\n      \"revision\": \"0123456789abcdef\",\n      \"shortrev\": \"012345678\",\n      \"macs\": [\n        \"02:00:00:00:00:01\"\n      ],\n      \"kernel_version\": \"6.12.3\",\n      \"kernel_params\": [\n        \"httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs\",\n        \"console=ttyS0\"\n      ],\n      \"boot_files\": {\n        \"bzImage\": \"http://boot.fixture.invalid/node.invalid/9/bzImage\",\n        \"initrd\": \"http://boot.fixture.invalid/node.invalid/9/initrd\",\n        \"root.squashfs\": \"http://boot.fixture.invalid/node.invalid/9/root.squashfs\"\n      },\n      \"variants\": [\n        {\n          \"name\": \"default\",\n          \"label\": \"Default runlevel\",\n          \"kernel_params\": [\n            \"runlevel=default\"\n          ]\n        },\n        {\n          \"name\": \"nopools\",\n          \"label\": \"Default runlevel without container imports\",\n          \"kernel_params\": [\n            \"runlevel=default\",\n            \"osctl.pools=0\"\n          ]\n        },\n        {\n          \"name\": \"nostart\",\n          \"label\": \"Default runlevel without container autostart\",\n          \"kernel_params\": [\n            \"runlevel=default\",\n            \"osctl.autostart=0\"\n          ]\n        },\n        {\n          \"name\": \"rescue\",\n          \"label\": \"Rescue runlevel (network and sshd)\",\n          \"kernel_params\": [\n            \"runlevel=rescue\"\n          ]\n        },\n        {\n          \"name\": \"single\",\n          \"label\": \"Single-user runlevel (console only)\",\n          \"kernel_params\": [\n            \"runlevel=single\"\n          ]\n        }\n      ],\n      \"inputs_info\": {\n        \"vpsadminos\": {\n          \"rev\": \"abcdef\"\n        }\n      }\n    },\n    {\n      \"url\": \"http://boot.fixture.invalid/node.invalid/7\",\n      \"store_path\": \"@ROOT@/store/node-7\",\n      \"generation\": 7,\n      \"time\": 1700000000,\n      \"time_s\": \"2023-11-14 22:13:20\",\n      \"current\": false,\n      \"toplevel\": \"@ROOT@/systems/node-7\",\n      \"version\": \"25.11.test\",\n      \"revision\": \"0123456789abcdef\",\n      \"shortrev\": \"012345678\",\n      \"macs\": [\n        \"02:00:00:00:00:01\"\n      ],\n      \"kernel_version\": \"6.12.3\",\n      \"kernel_params\": [\n        \"httproot=http://boot.fixture.invalid/node.invalid/7/root.squashfs\",\n        \"console=ttyS0\"\n      ],\n      \"boot_files\": {\n        \"bzImage\": \"http://boot.fixture.invalid/node.invalid/7/bzImage\",\n        \"initrd\": \"http://boot.fixture.invalid/node.invalid/7/initrd\",\n        \"root.squashfs\": \"http://boot.fixture.invalid/node.invalid/7/root.squashfs\"\n      },\n      \"variants\": [\n        {\n          \"name\": \"default\",\n          \"label\": \"Default runlevel\",\n          \"kernel_params\": [\n            \"runlevel=default\"\n          ]\n        },\n        {\n          \"name\": \"nopools\",\n          \"label\": \"Default runlevel without container imports\",\n          \"kernel_params\": [\n            \"runlevel=default\",\n            \"osctl.pools=0\"\n          ]\n        },\n        {\n          \"name\": \"nostart\",\n          \"label\": \"Default runlevel without container autostart\",\n          \"kernel_params\": [\n            \"runlevel=default\",\n            \"osctl.autostart=0\"\n          ]\n        },\n        {\n          \"name\": \"rescue\",\n          \"label\": \"Rescue runlevel (network and sshd)\",\n          \"kernel_params\": [\n            \"runlevel=rescue\"\n          ]\n        },\n        {\n          \"name\": \"single\",\n          \"label\": \"Single-user runlevel (console only)\",\n          \"kernel_params\": [\n            \"runlevel=single\"\n          ]\n        }\n      ],\n      \"inputs_info\": {\n        \"vpsadminos\": {\n          \"rev\": \"abcdef\"\n        }\n      }\n    }\n  ]\n}"
+            },
+            "http.old/sentinel": {
+              "text": "old"
+            },
+            "http/sentinel": {
+              "text": "old"
+            },
+            "tftp.abcdef/boot/nixos.invalid/3/bzImage": {
+              "symlink": "@ROOT@/store/nixos-3/bzImage"
+            },
+            "tftp.abcdef/boot/nixos.invalid/3/initrd": {
+              "symlink": "@ROOT@/store/nixos-3/initrd"
+            },
+            "tftp.abcdef/boot/nixos.invalid/current": {
+              "symlink": "3"
+            },
+            "tftp.abcdef/boot/node.invalid/7/bzImage": {
+              "symlink": "@ROOT@/store/node-7/bzImage"
+            },
+            "tftp.abcdef/boot/node.invalid/7/initrd": {
+              "symlink": "@ROOT@/store/node-7/initrd"
+            },
+            "tftp.abcdef/boot/node.invalid/9/bzImage": {
+              "symlink": "@ROOT@/store/node-9/bzImage"
+            },
+            "tftp.abcdef/boot/node.invalid/9/initrd": {
+              "symlink": "@ROOT@/store/node-9/initrd"
+            },
+            "tftp.abcdef/boot/node.invalid/current": {
+              "symlink": "9"
+            },
+            "tftp.abcdef/ldlinux.c32": {
+              "text": "ldlinux.c32"
+            },
+            "tftp.abcdef/libcom32.c32": {
+              "text": "libcom32.c32"
+            },
+            "tftp.abcdef/libutil.c32": {
+              "text": "libutil.c32"
+            },
+            "tftp.abcdef/memdisk": {
+              "text": "memdisk"
+            },
+            "tftp.abcdef/menu.c32": {
+              "text": "menu.c32"
+            },
+            "tftp.abcdef/pxelinux.0": {
+              "text": "pxelinux.0"
+            },
+            "tftp.abcdef/pxelinux.cfg/01-02-00-00-00-00-01": {
+              "symlink": "../pxeserver/machines/node.invalid/auto.cfg"
+            },
+            "tftp.abcdef/pxelinux.cfg/01-02-00-00-00-00-02": {
+              "symlink": "../pxeserver/machines/nixos.invalid/auto.cfg"
+            },
+            "tftp.abcdef/pxelinux.cfg/default": {
+              "text": "DEFAULT menu.c32\nPROMPT 0\nTIMEOUT 0\nMENU TITLE boot.fixture.invalid\n\nLABEL vpsadminos\n  MENU LABEL vpsAdminOS >\n  KERNEL menu.c32\n  APPEND pxeserver/vpsadminos.cfg\n\nLABEL nixos\n  MENU LABEL NixOS >\n  KERNEL menu.c32\n  APPEND pxeserver/nixos.cfg\n\nLABEL local_boot\n  MENU LABEL Local Boot\n  LOCALBOOT 0\n\nLABEL warm_reboot\n  MENU LABEL Warm Reboot\n  KERNEL reboot.c32\n  APPEND --warm\n\nLABEL cold_reboot\n  MENU LABEL Cold Reboot\n  KERNEL reboot.c32\n"
+            },
+            "tftp.abcdef/pxeserver/machines/nixos.invalid/auto.cfg": {
+              "text": "DEFAULT nixos.invalid\nPROMPT 0\nTIMEOUT 50\n\nLABEL nixos.invalid\n  MENU LABEL nixos.fixture.invalid\n  LINUX boot/nixos.invalid/3/bzImage\n  INITRD boot/nixos.invalid/3/initrd\n  APPEND httproot=http://boot.fixture.invalid/nixos.invalid/3/initrd init=@ROOT@/systems/nixos-3/init console=ttyS0\n"
+            },
+            "tftp.abcdef/pxeserver/machines/nixos.invalid/menu.cfg": {
+              "text": "MENU TITLE nixos.fixture.invalid\n\nLABEL nixos.invalid\n  MENU LABEL nixos.fixture.invalid\n  LINUX boot/nixos.invalid/3/bzImage\n  INITRD boot/nixos.invalid/3/initrd\n  APPEND httproot=http://boot.fixture.invalid/nixos.invalid/3/initrd init=@ROOT@/systems/nixos-3/init console=ttyS0\n\nLABEL mainmenu\n  MENU LABEL < Back to Main Menu\n  KERNEL menu.c32\n  APPEND pxelinux.cfg/default\n"
+            },
+            "tftp.abcdef/pxeserver/machines/node.invalid/auto.cfg": {
+              "text": "DEFAULT menu.c32\nTIMEOUT 50\nMENU TITLE node.fixture (9 - current - 012345678 - 6.12.3)\n\nLABEL default\n  MENU LABEL Default runlevel\n  LINUX boot/node.invalid/9/bzImage\n  INITRD boot/node.invalid/9/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0 runlevel=default\n\nLABEL nopools\n  MENU LABEL Default runlevel without container imports\n  LINUX boot/node.invalid/9/bzImage\n  INITRD boot/node.invalid/9/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0 runlevel=default osctl.pools=0\n\nLABEL nostart\n  MENU LABEL Default runlevel without container autostart\n  LINUX boot/node.invalid/9/bzImage\n  INITRD boot/node.invalid/9/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0 runlevel=default osctl.autostart=0\n\nLABEL rescue\n  MENU LABEL Rescue runlevel (network and sshd)\n  LINUX boot/node.invalid/9/bzImage\n  INITRD boot/node.invalid/9/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0 runlevel=rescue\n\nLABEL single\n  MENU LABEL Single-user runlevel (console only)\n  LINUX boot/node.invalid/9/bzImage\n  INITRD boot/node.invalid/9/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0 runlevel=single\n\nLABEL node.invalid-generations\n  MENU LABEL Generations >\n  KERNEL menu.c32\n  APPEND pxeserver/machines/node.invalid/generations.cfg\n\nLABEL mainmenu\n  MENU LABEL < Back to Main Menu\n  KERNEL menu.c32\n  APPEND pxelinux.cfg/default\n"
+            },
+            "tftp.abcdef/pxeserver/machines/node.invalid/generation-7.cfg": {
+              "text": "MENU TITLE node.fixture (7 - 2023-11-14 22:13:20 - 012345678 - 6.12.3)\n\nLABEL default\n  MENU LABEL Default runlevel\n  LINUX boot/node.invalid/7/bzImage\n  INITRD boot/node.invalid/7/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/7/root.squashfs console=ttyS0 runlevel=default\n\nLABEL nopools\n  MENU LABEL Default runlevel without container imports\n  LINUX boot/node.invalid/7/bzImage\n  INITRD boot/node.invalid/7/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/7/root.squashfs console=ttyS0 runlevel=default osctl.pools=0\n\nLABEL nostart\n  MENU LABEL Default runlevel without container autostart\n  LINUX boot/node.invalid/7/bzImage\n  INITRD boot/node.invalid/7/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/7/root.squashfs console=ttyS0 runlevel=default osctl.autostart=0\n\nLABEL rescue\n  MENU LABEL Rescue runlevel (network and sshd)\n  LINUX boot/node.invalid/7/bzImage\n  INITRD boot/node.invalid/7/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/7/root.squashfs console=ttyS0 runlevel=rescue\n\nLABEL single\n  MENU LABEL Single-user runlevel (console only)\n  LINUX boot/node.invalid/7/bzImage\n  INITRD boot/node.invalid/7/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/7/root.squashfs console=ttyS0 runlevel=single\n\nLABEL node.invalid-generations\n  MENU LABEL < Back to Generations\n  KERNEL menu.c32\n  APPEND pxeserver/machines/node.invalid/generations.cfg\n\nLABEL mainmenu\n  MENU LABEL < Back to Main Menu\n  KERNEL menu.c32\n  APPEND pxelinux.cfg/default\n"
+            },
+            "tftp.abcdef/pxeserver/machines/node.invalid/generation-9.cfg": {
+              "text": "MENU TITLE node.fixture (9 - current - 012345678 - 6.12.3)\n\nLABEL default\n  MENU LABEL Default runlevel\n  LINUX boot/node.invalid/9/bzImage\n  INITRD boot/node.invalid/9/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0 runlevel=default\n\nLABEL nopools\n  MENU LABEL Default runlevel without container imports\n  LINUX boot/node.invalid/9/bzImage\n  INITRD boot/node.invalid/9/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0 runlevel=default osctl.pools=0\n\nLABEL nostart\n  MENU LABEL Default runlevel without container autostart\n  LINUX boot/node.invalid/9/bzImage\n  INITRD boot/node.invalid/9/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0 runlevel=default osctl.autostart=0\n\nLABEL rescue\n  MENU LABEL Rescue runlevel (network and sshd)\n  LINUX boot/node.invalid/9/bzImage\n  INITRD boot/node.invalid/9/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0 runlevel=rescue\n\nLABEL single\n  MENU LABEL Single-user runlevel (console only)\n  LINUX boot/node.invalid/9/bzImage\n  INITRD boot/node.invalid/9/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0 runlevel=single\n\nLABEL node.invalid-generations\n  MENU LABEL < Back to Generations\n  KERNEL menu.c32\n  APPEND pxeserver/machines/node.invalid/generations.cfg\n\nLABEL mainmenu\n  MENU LABEL < Back to Main Menu\n  KERNEL menu.c32\n  APPEND pxelinux.cfg/default\n"
+            },
+            "tftp.abcdef/pxeserver/machines/node.invalid/generations.cfg": {
+              "text": "MENU TITLE node.fixture.invalid - generations\n\nLABEL generations\n  MENU LABEL Gen 9 - 2023-11-14 22:13:20 - 012345678 - 6.12.3\n  KERNEL menu.c32\n  APPEND pxeserver/machines/node.invalid/generation-9.cfg\n\nLABEL generations\n  MENU LABEL Gen 7 - 2023-11-14 22:13:20 - 012345678 - 6.12.3\n  KERNEL menu.c32\n  APPEND pxeserver/machines/node.invalid/generation-7.cfg\n\n\nLABEL machine\n  MENU LABEL < Back to node.fixture.invalid\n  KERNEL menu.c32\n  APPEND pxeserver/machines/node.invalid/menu.cfg\n\nLABEL mainmenu\n  MENU LABEL < Back to Main Menu\n  KERNEL menu.c32\n  APPEND pxelinux.cfg/default\n"
+            },
+            "tftp.abcdef/pxeserver/machines/node.invalid/menu.cfg": {
+              "text": "MENU TITLE node.fixture (9 - current - 012345678 - 6.12.3)\n\nLABEL default\n  MENU LABEL Default runlevel\n  LINUX boot/node.invalid/9/bzImage\n  INITRD boot/node.invalid/9/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0 runlevel=default\n\nLABEL nopools\n  MENU LABEL Default runlevel without container imports\n  LINUX boot/node.invalid/9/bzImage\n  INITRD boot/node.invalid/9/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0 runlevel=default osctl.pools=0\n\nLABEL nostart\n  MENU LABEL Default runlevel without container autostart\n  LINUX boot/node.invalid/9/bzImage\n  INITRD boot/node.invalid/9/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0 runlevel=default osctl.autostart=0\n\nLABEL rescue\n  MENU LABEL Rescue runlevel (network and sshd)\n  LINUX boot/node.invalid/9/bzImage\n  INITRD boot/node.invalid/9/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0 runlevel=rescue\n\nLABEL single\n  MENU LABEL Single-user runlevel (console only)\n  LINUX boot/node.invalid/9/bzImage\n  INITRD boot/node.invalid/9/initrd\n  APPEND httproot=http://boot.fixture.invalid/node.invalid/9/root.squashfs console=ttyS0 runlevel=single\n\nLABEL node.invalid-generations\n  MENU LABEL Generations >\n  KERNEL menu.c32\n  APPEND pxeserver/machines/node.invalid/generations.cfg\n\nLABEL mainmenu\n  MENU LABEL < Back to Main Menu\n  KERNEL menu.c32\n  APPEND pxelinux.cfg/default\n"
+            },
+            "tftp.abcdef/pxeserver/nixos.cfg": {
+              "text": "MENU TITLE NixOS\n\nLABEL nixos.invalid\n  MENU LABEL nixos.fixture.invalid >\n  KERNEL menu.c32\n  APPEND pxeserver/machines/nixos.invalid/menu.cfg\n\nLABEL mainmenu\n  MENU LABEL < Back to Main Menu\n  KERNEL menu.c32\n  APPEND pxelinux.cfg/default\n"
+            },
+            "tftp.abcdef/pxeserver/vpsadminos.cfg": {
+              "text": "MENU TITLE vpsAdminOS\n\nLABEL node.invalid\n  MENU LABEL node.fixture.invalid >\n  KERNEL menu.c32\n  APPEND pxeserver/machines/node.invalid/menu.cfg\n\nLABEL mainmenu\n  MENU LABEL < Back to Main Menu\n  KERNEL menu.c32\n  APPEND pxelinux.cfg/default\n"
+            },
+            "tftp.abcdef/reboot.c32": {
+              "text": "reboot.c32"
+            },
+            "tftp.old/sentinel": {
+              "text": "old"
+            },
+            "tftp/sentinel": {
+              "text": "old"
+            },
+            "http": {
+              "symlink": "http.old"
+            },
+            "tftp": {
+              "symlink": "tftp.old"
+            }
+          },
+          "check": null,
+          "temporary_files": []
+        }
+      }
+    },
+    "kexec-json-failure": {
+      "exception": "KEXEC-03",
+      "original": {
+        "capture": "evidence/m0-site/full-captures/kexec-json-failure.json",
+        "sha256": "21f4868d80e187f690ffd35d7f676e97056ef9637f2fcf190e2665f1836f7abb",
+        "exception_class": null
+      },
+      "expected": {
+        "stdout": "",
+        "stderr": "ERROR: Could not parse JSON: invalid JSON at line 1 column 2\n",
+        "exit_status": 1,
+        "signal": null,
+        "observation": {
+          "events": [
+            {
+              "event": "http",
+              "url": "http://boot.fixture.invalid/machines.json"
+            }
+          ],
+          "files": {},
+          "check": null,
+          "temporary_files": []
+        }
+      }
+    }
+  }
+}
