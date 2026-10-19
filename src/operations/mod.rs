@@ -12,6 +12,7 @@ mod inputs;
 mod machines;
 mod runtime_kernels;
 mod ssh;
+mod status;
 
 use crate::{
     app::{Context, Operations},
@@ -25,7 +26,14 @@ impl Operations for CoreOperations {
     fn available(&self, action: &Action) -> bool {
         matches!(action, Action::Deploy(request) if request.generation.is_some()
             && (request.copy_only || (matches!(request.action, crate::domain::SwitchAction::Boot | crate::domain::SwitchAction::DryActivate) && !request.reboot)))
-            || matches!(action, Action::GenerationList { .. })
+            || matches!(
+                action,
+                Action::GenerationList { .. }
+                    | Action::Status {
+                        skip_toplevel: true,
+                        ..
+                    }
+            )
             || matches!(
                 action,
                 Action::InputsList { .. }
@@ -53,6 +61,7 @@ impl Operations for CoreOperations {
                 has_extra_arguments,
             } => inputs::channels(&root, pattern.as_deref(), *has_extra_arguments, context).await?,
             Action::List { .. } => machines::list(&invocation.action, root, context).await?,
+            Action::Status { .. } => status::run(&invocation.action, root, context).await?,
             Action::Build(request) => build::run(request, root, context).await?,
             Action::Deploy(request) => deploy::run(request, root, context).await?,
             Action::TestConnection { .. } => {
