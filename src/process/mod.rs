@@ -66,6 +66,10 @@ pub enum StreamPolicy {
     Forward,
     CaptureAndForward,
     Foreground,
+    /// Stderr only: share stdout's native pipe and its capture/forward policy.
+    /// Stdout must be piped. There is no independent stderr capture or EOF:
+    /// outcomes/evidence use stdout, with stderr Unavailable and incomplete.
+    MergeToStdout,
 }
 
 impl StreamPolicy {
@@ -714,6 +718,14 @@ async fn execute(
     {
         return Err(ConfctlError::Cancelled);
     }
+    let merge_stderr = spec.stderr == StreamPolicy::MergeToStdout;
+    if spec.stdout == StreamPolicy::MergeToStdout
+        || (merge_stderr && spec.stdout == StreamPolicy::Foreground)
+    {
+        return Err(ConfctlError::Configuration(
+            "stderr merging requires piped stdout and is valid only for stderr".into(),
+        ));
+    }
     let foreground = matches!(spec.stdin, StdinPolicy::Foreground)
         || spec.stdout == StreamPolicy::Foreground
         || spec.stderr == StreamPolicy::Foreground;
@@ -731,7 +743,7 @@ async fn execute(
     } else {
         Some(prepare_stream(owner, spec.stdout)?)
     };
-    let stderr_stream = if spec.stderr == StreamPolicy::Foreground {
+    let stderr_stream = if merge_stderr || spec.stderr == StreamPolicy::Foreground {
         None
     } else {
         Some(prepare_stream(owner, spec.stderr)?)
@@ -775,16 +787,30 @@ async fn execute(
             policy
         }
     };
-    command.stdout(if spec.stdout == StreamPolicy::Foreground {
-        Stdio::inherit()
+    let merged_stdout = if merge_stderr {
+        let (read, write) = rustix::pipe::pipe_with(rustix::pipe::PipeFlags::CLOEXEC)
+            .map_err(|error| io_error("create merged output pipe", None, error.into()))?;
+        let other_write = write
+            .try_clone()
+            .map_err(|error| io_error("duplicate merged output writer", None, error))?;
+        let reader = tokio::process::ChildStdout::from_std(std::process::ChildStdout::from(read))
+            .map_err(|error| io_error("prepare merged output reader", None, error))?;
+        command.stdout(Stdio::from(write));
+        command.stderr(Stdio::from(other_write));
+        Some(reader)
     } else {
-        Stdio::piped()
-    });
-    command.stderr(if spec.stderr == StreamPolicy::Foreground {
-        Stdio::inherit()
-    } else {
-        Stdio::piped()
-    });
+        command.stdout(if spec.stdout == StreamPolicy::Foreground {
+            Stdio::inherit()
+        } else {
+            Stdio::piped()
+        });
+        command.stderr(if spec.stderr == StreamPolicy::Foreground {
+            Stdio::inherit()
+        } else {
+            Stdio::piped()
+        });
+        None
+    };
     #[cfg(unix)]
     command.process_group(0);
     // Installing SIGCHLD ownership before spawn also replaces inherited IGN,
@@ -792,7 +818,11 @@ async fn execute(
     // Keep Child unpolled even when Tokio uses its pidfd implementation.
     let _child_signal = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::child())
         .map_err(|error| io_error("own child notifications", None, error))?;
-    let mut child = command.spawn().map_err(|source| ConfctlError::Spawn {
+    let spawned = command.spawn();
+    // Command retains supplied Stdio handles for reuse. Close the parent's
+    // merged-pipe writers now so the existing drain can observe real EOF.
+    drop(command);
+    let mut child = spawned.map_err(|source| ConfctlError::Spawn {
         description: spec.redacted_description.clone(),
         source,
     })?;
@@ -847,7 +877,9 @@ async fn execute(
     let (errors, mut failures) = mpsc::unbounded_channel();
     let mut pumps = Vec::new();
     let mut relays = Vec::new();
-    if let (Some(stdout), Some(prepared)) = (child.stdout.take(), stdout_stream) {
+    if let (Some(stdout), Some(prepared)) =
+        (merged_stdout.or_else(|| child.stdout.take()), stdout_stream)
+    {
         let (pump, relay) = start_stream(
             owner,
             prepared,
