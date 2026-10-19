@@ -68,6 +68,78 @@ fn local_probe_ignores_ssh_config_and_port() {
 }
 
 #[test]
+fn shared_command_spec_preserves_native_local_argv_and_leaves_remote_policy_to_callers() {
+    let native = OsString::from_vec(b"native\xff ' $;\n".to_vec());
+    let argv = vec![OsString::from("printf"), "".into(), native];
+    let local = machine("local", json!({"target":"localhost","port":false}));
+    let spec = command_spec(&local, Some(OsStr::new("unused config")), &argv).unwrap();
+    assert_eq!(spec.program, Path::new("printf"));
+    assert_eq!(spec.args, argv[1..]);
+    assert!(command_spec(&local, None, &[]).is_err());
+
+    let mut remote = machine("carried", json!({"target":"target.invalid","port":2022}));
+    remote.carrier = Some("ignored-carrier".into());
+    let spec = command_spec(&remote, Some(OsStr::new("config")), &argv).unwrap();
+    assert_eq!(spec.program, Path::new("ssh"));
+    assert_eq!(
+        spec.args,
+        [
+            "-F".into(),
+            "config".into(),
+            "-l".into(),
+            "root".into(),
+            "-p".into(),
+            "2022".into(),
+            "target.invalid".into(),
+            shell_join(&argv),
+        ]
+    );
+    let interactive = command_spec(&remote, None, &[]).unwrap();
+    assert_eq!(
+        interactive.args,
+        ["-l", "root", "-p", "2022", "target.invalid"]
+    );
+}
+
+#[test]
+fn native_shellwords_quotes_round_trip_empty_unicode_invalid_bytes_and_metacharacters() {
+    assert_eq!(shell_quote(OsStr::new("")), OsString::from("''"));
+    assert_eq!(
+        shell_quote(OsStr::new("safe_-/.,:+@09")),
+        OsString::from("safe_-/.,:+@09")
+    );
+    assert_eq!(
+        shell_quote(OsStr::new("a b'c\\d\n$;ž")),
+        OsString::from("a\\ b\\'c\\\\d'\n'\\$\\;\\ž")
+    );
+    assert_eq!(
+        shell_quote(&OsString::from_vec(b"bad\xff\xfe".to_vec())).as_bytes(),
+        b"bad\\\xff\\\xfe"
+    );
+    let args = vec![
+        OsString::new(),
+        "two words".into(),
+        "'\"\\$`;|&<>()*?!#~=".into(),
+        "line\nreturn\rtab\t".into(),
+        "wide界 e\u{301}".into(),
+        OsString::from_vec(b"invalid\xff\xfeend".to_vec()),
+    ];
+    let mut argv = vec!["printf".into(), "%s\\000".into()];
+    argv.extend(args.clone());
+    let output = std::process::Command::new("sh")
+        .args([OsString::from("-c"), shell_join(&argv)])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    let expected = args
+        .iter()
+        .flat_map(|arg| arg.as_bytes().iter().copied().chain([0]))
+        .collect::<Vec<_>>();
+    assert_eq!(output.stdout, expected);
+    assert!(output.stderr.is_empty());
+}
+
+#[test]
 fn ports_preserve_ruby_conversion_without_a_port_sized_integer() {
     for (value, expected) in [
         (Value::Null, "0"),
