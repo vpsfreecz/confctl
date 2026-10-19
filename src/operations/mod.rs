@@ -1,6 +1,7 @@
 //! Command dispatch admits only concrete adapters. Unsupported development
 //! routes stay explicit failures before timing/UI/state construction.
 
+mod build;
 mod inputs;
 mod machines;
 mod runtime_kernels;
@@ -21,6 +22,7 @@ impl Operations for CoreOperations {
                 | Action::List { .. }
                 | Action::ChannelList { .. }
                 | Action::RuntimeKernelsUpdate { .. }
+                | Action::Build(_)
         )
     }
     async fn run(
@@ -38,6 +40,7 @@ impl Operations for CoreOperations {
                 has_extra_arguments,
             } => inputs::channels(&root, pattern.as_deref(), *has_extra_arguments, context).await?,
             Action::List { .. } => machines::list(&invocation.action, root, context).await?,
+            Action::Build(request) => build::run(request, root, context).await?,
             Action::RuntimeKernelsUpdate { .. } => {
                 runtime_kernels::update(&invocation.action, root, context).await?
             }
@@ -50,4 +53,9 @@ impl Operations for CoreOperations {
         }
         Ok(ExitDisposition::completed())
     }
+}
+
+#[cfg(test)]
+pub(crate) fn set_build_test_roots(roots: crate::generation::GcRoots) {
+    build::set_test_roots(roots);
 }

@@ -18,6 +18,14 @@ use std::{collections::HashMap, sync::Mutex};
 use tokio::sync::Mutex as AsyncMutex;
 use tokio_util::sync::CancellationToken;
 
+pub(crate) mod progress;
+
+struct BuildInputs<'a> {
+    installables: &'a [String],
+    legacy_args: &'a [String],
+    task: Option<TaskId>,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct NixOptions {
     pub show_trace: bool,
@@ -280,6 +288,23 @@ impl<P: ProcessRunner> NixClient<P> {
         installables: &[String],
         legacy_args: &[String],
     ) -> Result<Value, ConfctlError> {
+        self.build_json_task(installables, legacy_args, None).await
+    }
+    pub async fn build_json_for_task(
+        &self,
+        installables: &[String],
+        legacy_args: &[String],
+        task: TaskId,
+    ) -> Result<Value, ConfctlError> {
+        self.build_json_task(installables, legacy_args, Some(task))
+            .await
+    }
+    async fn build_json_task(
+        &self,
+        installables: &[String],
+        legacy_args: &[String],
+        task: Option<TaskId>,
+    ) -> Result<Value, ConfctlError> {
         self.root.require_flake()?;
         let settings = self.settings().await?.value;
         self.query(
@@ -287,7 +312,11 @@ impl<P: ProcessRunner> NixClient<P> {
             settings.nix.impure_eval,
             self.options.max_jobs.as_deref(),
             true,
-            Some((installables, legacy_args)),
+            Some(BuildInputs {
+                installables,
+                legacy_args,
+                task,
+            }),
             &self.options,
         )
         .await
@@ -298,7 +327,7 @@ impl<P: ProcessRunner> NixClient<P> {
         impure: bool,
         max_jobs: Option<&str>,
         build: bool,
-        build_inputs: Option<(&[String], &[String])>,
+        build_inputs: Option<BuildInputs<'_>>,
         options: &NixOptions,
     ) -> Result<Value, ConfctlError> {
         let (installable, apply) = target;
@@ -318,9 +347,9 @@ impl<P: ProcessRunner> NixClient<P> {
                 no_update,
             ));
             if build {
-                if let Some((installables, legacy)) = build_inputs {
-                    args.extend(legacy.iter().cloned());
-                    args.extend(installables.iter().cloned());
+                if let Some(inputs) = &build_inputs {
+                    args.extend(inputs.legacy_args.iter().cloned());
+                    args.extend(inputs.installables.iter().cloned());
                 }
             } else {
                 if let Some(apply) = apply {
@@ -336,7 +365,13 @@ impl<P: ProcessRunner> NixClient<P> {
                 program: spec.program.as_os_str().into(),
                 args: spec.args.clone(),
             };
-            let mut scope = ProcessScope::new(self.cancellation.clone(), TaskId(0));
+            let build_task = build_inputs.as_ref().and_then(|inputs| inputs.task);
+            let mut scope =
+                ProcessScope::new(self.cancellation.clone(), build_task.unwrap_or(TaskId(0)));
+            if build_task.is_some() {
+                spec.stderr = crate::process::StreamPolicy::CaptureAndForward;
+                scope.nix_progress = true;
+            }
             scope.phase = Some(if build {
                 Phase::Build
             } else {
@@ -454,7 +489,14 @@ pub fn selected_apply(keys: &[String]) -> String {
     }
     let list = unique
         .iter()
-        .map(|key| format!("\"{}\"", key.replace('\\', "\\\\").replace('"', "\\\"")))
+        .map(|key| {
+            format!(
+                "\"{}\"",
+                key.replace('\\', "\\\\")
+                    .replace('"', "\\\"")
+                    .replace("${", "\\${")
+            )
+        })
         .collect::<Vec<_>>()
         .join(" ");
     format!("x: builtins.listToAttrs (map (k: {{ name = k; value = x.${{k}}; }}) [ {list} ])")

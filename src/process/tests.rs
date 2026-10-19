@@ -439,8 +439,8 @@ async fn spool_write_fault_retains_confirmed_prefix_and_marks_incomplete() {
         &runner.owner,
         prepared,
         &b"unwritten"[..],
-        OutputStream::Stdout,
-        TaskId(16),
+        (OutputStream::Stdout, TaskId(16)),
+        false,
         CancellationToken::new(),
         errors,
     );
@@ -587,8 +587,8 @@ async fn canceled_open_reader_retains_incomplete_prefix_without_waiting_for_eof(
         &runner.owner,
         prepared,
         reader,
-        OutputStream::Stdout,
-        TaskId(18),
+        (OutputStream::Stdout, TaskId(18)),
+        false,
         cancel.clone(),
         errors,
     );
@@ -767,8 +767,8 @@ async fn drain_fault_retains_prefix_and_marks_incomplete() {
         &runner.owner,
         prepared,
         PrefixThenDrainFault(false),
-        OutputStream::Stdout,
-        TaskId(22),
+        (OutputStream::Stdout, TaskId(22)),
+        false,
         CancellationToken::new(),
         errors,
     );
@@ -1029,4 +1029,112 @@ async fn login_probe_preserves_original_stdin_flags_identity_and_unread_typeahea
     let count = rustix::io::read(&input, &mut remaining).expect("queued input remains");
     assert_eq!(&remaining[..count], b"unread-typeahead\n");
     runner.shutdown().await.expect("probe supervisor joined");
+}
+
+#[tokio::test]
+async fn nix_build_progress_uses_existing_relay_before_child_exit_and_retains_raw_bytes() {
+    let directory = tempfile::tempdir().unwrap();
+    let release = directory.path().join("release");
+    let (runner, mut receiver) = owner(directory.path(), 1024, None);
+    let mut spec = shell(
+        "printf 'build' >&2; printf \"ing '/nix/store/a.drv'...\\nunknown raw\\n\" >&2; while [ ! -f \"$1\" ]; do sleep 0.01; done; printf '[1]'",
+    );
+    spec.args
+        .extend(["fixture".into(), release.as_os_str().into()]);
+    spec.stderr = StreamPolicy::CaptureAndForward;
+    let mut scope = ProcessScope::new(CancellationToken::new(), TaskId(9));
+    scope.nix_progress = true;
+    let running = runner.clone();
+    let child = tokio::spawn(async move { running.run(spec, scope).await });
+    let mut raw = Vec::new();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let delivery = receiver.receive().await.unwrap();
+            let progress = matches!(
+                delivery.event,
+                UiEvent::TaskProgress {
+                    task: TaskId(9),
+                    completed: 1,
+                    total: None,
+                    ..
+                }
+            );
+            if let UiEvent::Output {
+                task,
+                stream,
+                bytes,
+            } = &delivery.event
+            {
+                assert_eq!(*task, TaskId(9));
+                assert_eq!(*stream, OutputStream::Stderr);
+                raw.extend_from_slice(bytes);
+            }
+            assert!(
+                !child.is_finished(),
+                "progress must precede controlled child completion"
+            );
+            delivery.acknowledge(Ok(()));
+            if progress {
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    std::fs::write(release, b"go").unwrap();
+    let consumer = tokio::spawn(async move {
+        while let Some(delivery) = receiver.receive().await {
+            delivery.acknowledge(Ok(()));
+        }
+    });
+    let outcome = child.await.unwrap().unwrap();
+    assert_eq!(outcome.stdout.memory(), Some(&b"[1]"[..]));
+    assert_eq!(
+        outcome.stderr.memory(),
+        Some(&b"building '/nix/store/a.drv'...\nunknown raw\n"[..])
+    );
+    assert!(raw.starts_with(b"building '/nix/store/a.drv'...\n"));
+    runner.shutdown().await.unwrap();
+    drop(runner);
+    consumer.await.unwrap();
+}
+
+#[tokio::test]
+async fn nix_build_progress_rejection_joins_child_and_retains_raw_stderr() {
+    let directory = tempfile::tempdir().unwrap();
+    let (runner, mut receiver) = owner(directory.path(), 1024, None);
+    let mut spec = shell("printf \"building '/nix/store/a.drv'...\\n\" >&2; exec sleep 120");
+    spec.stderr = StreamPolicy::CaptureAndForward;
+    let mut scope = ProcessScope::new(CancellationToken::new(), TaskId(10));
+    scope.nix_progress = true;
+    let consumer = tokio::spawn(async move {
+        while let Some(delivery) = receiver.receive().await {
+            let reject = matches!(delivery.event, UiEvent::TaskProgress { .. });
+            delivery.acknowledge(if reject {
+                Err("injected progress output failure".into())
+            } else {
+                Ok(())
+            });
+        }
+    });
+    let error = tokio::time::timeout(Duration::from_secs(5), runner.run(spec, scope))
+        .await
+        .unwrap()
+        .unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("injected progress output failure")
+    );
+    let ConfctlError::ProcessFailure { evidence, .. } = error else {
+        panic!("retained process evidence")
+    };
+    assert!(evidence.status.is_some());
+    assert_eq!(
+        evidence.stderr.memory(),
+        Some(&b"building '/nix/store/a.drv'...\n"[..])
+    );
+    runner.shutdown().await.unwrap();
+    drop(runner);
+    consumer.await.unwrap();
 }

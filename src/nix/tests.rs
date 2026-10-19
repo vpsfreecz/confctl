@@ -418,6 +418,10 @@ fn apply_keys_escape_without_changing_authoritative_values() {
         selected_apply(&["a\"b".into(), "a\"b".into(), "a\\b".into()]),
         r#"x: builtins.listToAttrs (map (k: { name = k; value = x.${k}; }) [ "a\"b" "a\\b" ])"#
     );
+    assert_eq!(
+        selected_apply(&["${name}".into()]),
+        r#"x: builtins.listToAttrs (map (k: { name = k; value = x.${k}; }) [ "\${name}" ])"#
+    );
 }
 
 #[tokio::test]

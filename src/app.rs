@@ -1,6 +1,8 @@
 //! Thin invocation construction and joined shutdown around typed operations.
 
 #[cfg(all(test, target_os = "linux"))]
+mod build_tests;
+#[cfg(all(test, target_os = "linux"))]
 mod channel_tests;
 mod diagnostic;
 mod invocation_log;
@@ -66,6 +68,13 @@ pub struct Context {
     pub processes: Supervisor,
     pub ui: Ui,
     pub timing: Timing,
+    log_path: PathBuf,
+}
+
+impl Context {
+    pub fn log_path(&self) -> &std::path::Path {
+        &self.log_path
+    }
 }
 
 type SharedWriter = OutputWriter;
@@ -217,6 +226,7 @@ async fn execute<O: Operations>(
         processes,
         ui,
         timing: timing.clone(),
+        log_path: invocation_log.path().into(),
     };
     let mut renderer = tokio::spawn(presentation.run());
     let signal_cancel = cancellation.clone();

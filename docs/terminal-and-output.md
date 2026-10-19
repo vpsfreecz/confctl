@@ -45,9 +45,21 @@ ordinary host error fails that task while allowing the refresh to finish and
 remove the host's saved kernel. Infrastructure errors and cancellation fail the
 command after joining entered probes. Probe results precede the separate atomic
 save of combined state; successful tasks do not promise that save succeeded.
-Declining confirmation admits no probes. Other operation producers are not wired
-to this lifecycle yet. Controlled command-route tests do not establish live
-progress, quiet elapsed updates, resize or full terminal qualification.
+Declining confirmation admits no probes. Controlled command-route tests do not
+establish live progress, quiet elapsed updates, resize or full terminal qualification.
+
+`build` registers one task per actual build group after consent and planning.
+Groups run serially; a shared Nix build does not prove that each host executed
+separately. Stderr streams through the existing checked output relay while stdout
+stays captured for JSON decoding. Bounded incremental parsing recognizes Nix's
+build/fetch summaries and activity lines; unknown output remains visible and raw
+captures are unchanged. Counts describe activity, with an indeterminate total
+until both totals are known, and reset for each native attempt. A successful
+group includes generation reuse/publication. On failure, later groups are skipped
+or canceled and earlier saved generations and partial roots remain in place.
+Task log locators refer to the app-owned invocation log. Successful finalization
+removes that log; failures retain it under the existing policy. Deployment and
+other operation producers are not wired to this lifecycle yet.
 
 Live tail fragments and task rows share a compact source key: @ followed by
 the complete TaskId in base 36. Tail suffixes /o and /e identify stdout and
