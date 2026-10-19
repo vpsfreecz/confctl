@@ -5,8 +5,9 @@ The Rust development binary supports `confctl-rust deploy --copy-only
 Ruby. This route copies existing store paths only, even when reboot, activation
 or health-check options are supplied. The non-copy-only route also supports
 `confctl-rust deploy --generation <selector> [machine-pattern] boot` without
-`--reboot`. Other actions, the default switch action, new builds and rebooting
-remain unavailable before application setup.
+`--reboot`, and the same command with action `dry-activate`. Other actions, the
+default switch action, new builds and rebooting remain unavailable before
+application setup.
 
 Selection includes managed machines of every spin, including carried machines;
 it does not apply the runnable filter. The command previews hosts, selector and
@@ -118,3 +119,29 @@ Boot without reboot runs no rollback helper, reboot, wait-online or health check
 regardless of their parsed options. Native success does not establish that a
 later reboot will succeed. The default Ruby entrypoint and production cutover
 are unchanged.
+
+## Dry-activate a saved generation
+
+Use `confctl-rust deploy --generation <selector> [machine-pattern] dry-activate`
+to run the saved toplevel's `bin/switch-to-configuration dry-activate` script.
+This uses the same consent, mutation guard, optional runtime-kernel refresh,
+generation lookup, status-query order and copy scheduling as boot. Standalone
+hosts skip only when the known running path matches the saved native path bytes;
+the profile need not match, and a later native profile-query failure does not
+erase that observation. Unknown running state never skips. Carried hosts keep
+their known current carrier-profile predicate and only receive copies.
+
+Standalone dry activation runs no profile setter or other activation action.
+With `--dry-activate-first`, Continue intentionally runs two dry commands: the
+preliminary command and the requested command. Retry repeats the preliminary
+command before offering the choice again. The same mandatory interactive
+choices, skip-after-copy behavior, bulk barrier and one-by-one ordering apply.
+`--yes` does not bypass activation choices. Native failure or cancellation stops
+later activation and retains earlier effects.
+
+Dry activation is not a preview without effects: kernel-state refreshes, store
+copies and effects of the saved script can remain. Inspect partial results
+before an explicit rerun. Success means that the requested dry command completed;
+it does not guarantee that a future switch or reboot will succeed. This route
+runs no rollback helper, profile change, reboot or health check and leaves local
+saved records, current links and GC roots unchanged.
