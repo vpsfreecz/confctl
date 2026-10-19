@@ -2,6 +2,7 @@
 //! routes stay explicit failures before timing/UI/state construction.
 
 mod build;
+mod connection;
 mod inputs;
 mod machines;
 mod runtime_kernels;
@@ -23,6 +24,7 @@ impl Operations for CoreOperations {
                 | Action::ChannelList { .. }
                 | Action::RuntimeKernelsUpdate { .. }
                 | Action::Build(_)
+                | Action::TestConnection { .. }
         )
     }
     async fn run(
@@ -41,6 +43,9 @@ impl Operations for CoreOperations {
             } => inputs::channels(&root, pattern.as_deref(), *has_extra_arguments, context).await?,
             Action::List { .. } => machines::list(&invocation.action, root, context).await?,
             Action::Build(request) => build::run(request, root, context).await?,
+            Action::TestConnection { .. } => {
+                connection::test(&invocation.action, root, context).await?
+            }
             Action::RuntimeKernelsUpdate { .. } => {
                 runtime_kernels::update(&invocation.action, root, context).await?
             }
