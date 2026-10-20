@@ -215,17 +215,18 @@ Read-only routes must not acquire this lock. The additional lock file is an
 accepted compatibility difference for mutating routes. Ruby does not
 participate, so concurrent Ruby and Rust mutation is unsupported.
 
-An outer mutation must acquire once after prompts and retain that guard across
-the source write, fresh Nix evaluation and generated-file publication. A later
-failure preserves an earlier successful write; the sequence provides no
-rollback transaction. Integration of these app-level workflows remains a
-separate acceptance gate from the guarded writer and service tests.
+Each route defines when it acquires the lock. Generation removal and rotation
+lock before observation and consent; gen-data locks before authentication. An
+outer mutation acquires once and retains the same borrowed guard across source
+writes, fresh Nix evaluation and generated-file publication. A later failure
+preserves earlier successful writes; the sequence provides no rollback transaction.
 
 GC roots incorporate real configuration path hash, login, host, generation and
-suffix. Local fixtures use a pre-existing generation to test reuse without
-writing host gcroots. New-generation publication/root failures and bidirectional
-Ruby/Rust writes still need their owning state package tests. Moving the
-configuration directory or collecting retained closures affects rollback and
+suffix. App fixtures cover reuse, new-generation publication, publication and
+later-action failures, and cancellation of entered builds. They use fake native
+tools and temporary GC roots. Bidirectional Ruby/Rust state use, real Nix builds,
+native deployment and site behavior remain separate qualification gates. Moving
+the configuration directory or collecting retained closures affects rollback and
 is not authorized by test completion.
 
 Login preserves the baseline `Etc.getlogin` contract: use libc login first,
