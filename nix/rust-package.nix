@@ -37,7 +37,6 @@ let
     nativeBuildInputs = [
       pkgs.cmake
       pkgs.pandoc
-      pkgs.asciidoctor
     ];
     nativeCheckInputs = [
       pkgs.git
@@ -55,13 +54,12 @@ let
       chmod 755 "$out/bin/confctl"
       ln -s confctl "$out/bin/confctl-rust"
 
-      for name in confctl confctl-options.nix; do
+      for name in confctl confctl-reference confctl-options.nix kexec-netboot; do
         pandoc --from=markdown --to=man --standalone \
           --metadata="title:$name" --metadata=section:8 \
+          --metadata=date: \
           --output="$out/share/man/man8/$name.8" "man/man8/$name.8.md"
       done
-      asciidoctor -b manpage -D "$out/share/man/man8" \
-        nix/modules/confctl/kexec-netboot/kexec-netboot.8.adoc
       install -m644 LICENSE.txt "$out/share/licenses/confctl/LICENSE.txt"
       sed -n '/^\/\/ Boost Software License/,/^$/p' src/remote/json/float.rs \
         | sed 's|^// *||' > "$out/share/licenses/confctl/Boost-1.0.txt"
@@ -82,7 +80,7 @@ let
         ${package}/libexec/confctl/$name --help > "$TMPDIR/$name-help"
         test -s "$TMPDIR/$name-help"
       done
-      for name in confctl confctl-options.nix kexec-netboot; do
+      for name in confctl confctl-reference confctl-options.nix kexec-netboot; do
         test -s ${package}/share/man/man8/$name.8
       done
       test -s ${package}/share/licenses/confctl/LICENSE.txt

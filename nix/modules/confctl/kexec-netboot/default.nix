@@ -42,10 +42,17 @@ let
     ln -s ${kexecNetboot} $out/bin/kexec-netboot
 
     mkdir -p $out/share/man/man8
-    ${pkgs.asciidoctor}/bin/asciidoctor \
-      -b manpage \
-      -D $out/share/man/man8 \
-      ${./kexec-netboot.8.adoc}
+    ${
+      if rustPackage != null then
+        "cp ${rustPackage}/share/man/man8/kexec-netboot.8 $out/share/man/man8/kexec-netboot.8"
+      else
+        ''
+          ${pkgs.asciidoctor}/bin/asciidoctor \
+            -b manpage \
+            -D $out/share/man/man8 \
+            ${./kexec-netboot.8.adoc}
+        ''
+    }
   '';
 in
 {

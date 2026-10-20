@@ -52,6 +52,12 @@
 - `CONFCTL_LOGNAME` must name the absolute lexical GNU logname entry before
   compiling. Preserve its multicall basename rather than resolving the symlink.
 - Markdown manual sources are rendered by the Rust package with build-only
-  Pandoc; kexec uses build-only Asciidoctor. Automatic reference generation and
-  final Ruby release-tool removal remain pending. Cargo fixtures cannot certify
+  Pandoc, including the generated CLI reference and kexec manual. Maintain the
+  reference with `cargo run --locked --example generate-reference -- cli`, writing
+  a temporary candidate before replacing the checked-in page. Check drift with
+  `cargo run --locked --example generate-reference -- cli --check man/man8/confctl-reference.8.md`
+  and test the renderer with `cargo test --locked --example generate-reference`.
+  See the packaging guide for explicit options JSON input and safe regeneration.
+  Synthetic fixture JSON must not refresh the authoritative options manual.
+  Ruby release-tool removal remains pending. Cargo fixtures cannot certify
   evaluated wrappers, installed manuals or runtime closure contents.

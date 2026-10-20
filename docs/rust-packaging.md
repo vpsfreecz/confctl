@@ -63,11 +63,73 @@ effects.
 
 Only the selected manuals, project license and vendored float-conversion notice
 are installed with the binaries and wrappers. Pandoc renders checked-in Markdown
-with explicit man-section/title metadata. The kexec manual uses Asciidoctor at
-build time. Neither tool is a runtime dependency through the install recipe.
+with explicit man-section/title metadata and no generated date. This includes
+the CLI reference and kexec manual. Rust kexec module wrappers copy the manual
+from the same Rust package as their backend. Pandoc is a build-only input.
 The package does not install source trees, Ruby application code, test fixtures
-or oracle archives. CLI/Nix-derived reference generation and final Ruby
-build/release-tool removal remain later work.
+or oracle archives. Ruby defaults, its AsciiDoc manual branch, Rake/ERB generation
+and release tools remain available during coexistence.
+
+## Reference maintenance
+
+The `generate-reference` Cargo example has two modes. `cli` reads the actual
+command schema and public parser help; `options FILE` reads an explicit JSON
+array exported by this repository's `#moduleOptions`. Neither mode runs child
+commands or reads a configuration. The example is not installed as a CLI tool.
+
+Generate a complete temporary candidate before replacing the CLI page:
+
+```sh
+candidate="$(mktemp man/man8/.confctl-reference.XXXXXX)"
+cargo run --locked --example generate-reference -- cli > "$candidate" &&
+  mv -- "$candidate" man/man8/confctl-reference.8.md
+```
+
+The page uses public help text, omitting line-end spaces, and adds option
+spellings, aliases, negative forms and switch defaults from the schema. Defaults
+absent from the option schema are not inferred from settings or help prose. The
+[command manual](../man/man8/confctl.8.md) remains the explanation of command
+behavior. Check the page and renderer without Nix:
+
+```sh
+cargo test --locked --example generate-reference
+cargo run --locked --example generate-reference -- cli --check man/man8/confctl-reference.8.md
+```
+
+`--check FILE` compares the fully rendered output with a file and never writes
+it. Generation metadata uses the Cargo package version and no wall-clock date.
+The small `tests/fixtures/reference-options.json` is synthetic renderer data,
+not an evaluated options inventory. It must never replace
+`man/man8/confctl-options.nix.8.md`.
+
+To refresh the options manual, export `#moduleOptions` from this repository's
+locked inputs. This command uses locally available inputs and fails if an input
+is missing. A site's `#confctl.moduleOptions` is a different export.
+
+```sh
+nix eval --offline --no-update-lock-file --no-write-lock-file \
+  --option allow-import-from-derivation false --json .#moduleOptions > module-options.json
+```
+
+Render the export into a temporary candidate before replacing the manual:
+
+```sh
+candidate="$(mktemp man/man8/.confctl-options.XXXXXX)"
+cargo run --locked --example generate-reference -- options module-options.json > "$candidate" &&
+  mv -- "$candidate" man/man8/confctl-options.nix.8.md
+```
+
+The renderer keeps confctl settings, cluster metadata and system settings in
+their existing groups. Descriptions retain literal/option markup and Unicode;
+defaults and examples distinguish absent values, JSON null, false, ordinary
+JSON data and explicit Nix `literalExpression` text. Unsupported expression or
+field shapes fail before any output is written. Declaration paths from the
+repository or its store source use stable `<confctl/nix/modules/...>` labels.
+Package builds consume the checked-in Markdown; they do not run this example,
+Nix, Ruby or compatibility oracles to regenerate it.
+
+Renderer tests use synthetic data. Validate the full options inventory against
+an actual export, and check the rendered manuals in the built package.
 
 The package's `passthru.tests.smoke` prepares installed help, executable and
 manual checks for later native execution. `passthru.tests.shellSelection` checks
@@ -77,17 +139,17 @@ binaries with confined fake native commands, distinct callbacks, literal native
 paths, empty FQDN, help-before-data and native failure. They do not evaluate Nix
 wrappers or prove the installed closure. Runtime references, dependency notices,
 linked libraries, both architectures and real shell/helper selections still need
-native qualification. No package build or closure audit is established by this
-source unit. The existing tinycc development-shell mismatch and missing native
-builders remain separate blockers; no pin, hash or dependency update is implied.
+native qualification.
 
 The hosted Rust workflow uses Rust 1.95.0 with rustfmt and Clippy, verifies fixture
 prerequisites and sets the lexical GNU logname entry before compiling. It checks
 all targets/features and lints them, then runs default tests with qualification
-mains disabled and ignored native tests left ignored. Toolchain/crate downloads
-are future hosted CI behavior. Local source checks do not establish an Ubuntu
-runner result, pinned production-coreutils parity, real Nix builds, site migration
-or operator acceptance. Ruby workflows and the self-hosted suite remain separate.
+mains disabled and ignored native tests left ignored. The example step tests
+the reference renderer and checks CLI-page drift. Toolchain and crate downloads
+occur in disposable hosted
+CI. Hosted checks do not establish pinned production-coreutils parity, evaluated
+packages, installed manuals, real Nix builds, site migration or operator
+acceptance. Ruby workflows and the self-hosted suite remain separate.
 
 The self-hosted native VM/GC job runs automatically only for default-branch
 pushes matching its existing path filters. Feature branches, including Ruby
