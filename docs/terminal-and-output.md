@@ -53,6 +53,13 @@ disabled; a later failure retains completed edits. These commands need no
 confirmation and contact no hosts. The guide covers migration and recovery from
 partial effects.
 
+[Input mutations](flake-inputs.md#rust-input-mutations-and-recovery) use one logical
+task (ID 0) for selection, serial Nix edits, optional history and Git commit. Nix
+mutation streams are forwarded and captured. Git commit parks presentation and
+inherits streams through the foreground owner; its editor follows actual stdout
+TTY status. A task result includes joined completion and terminal restoration;
+failures retain earlier lock/cache/commit effects.
+
 `runtime-kernels update` emits pending events for the confirmed, validated host
 probes and starts each task as its logical probe body enters the process runner.
 Each host has its own task ID and description. A decoded kernel succeeds; an

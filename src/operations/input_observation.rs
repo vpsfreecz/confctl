@@ -319,7 +319,7 @@ pub(super) fn comparison(target: Option<&Value>, deployed: Option<&Value>) -> Co
         _ => Comparison::Unknown,
     }
 }
-fn attribute(key: &str) -> String {
+pub(super) fn attribute(key: &str) -> String {
     if !key.is_empty()
         && key.chars().enumerate().all(|(i, c)| {
             c.is_ascii_alphabetic()

@@ -12,6 +12,8 @@ mod generation_list;
 mod health_check;
 mod health_systemd;
 mod host_status;
+mod input_git;
+mod input_mutation;
 mod input_observation;
 mod inputs;
 mod machines;
@@ -38,6 +40,12 @@ impl Operations for CoreOperations {
             || matches!(
                 action,
                 Action::InputsList { .. }
+                    | Action::InputsUpdate { .. }
+                    | Action::InputsSet { .. }
+                    | Action::ChannelUpdate { .. }
+                    | Action::ChannelSet { .. }
+                    | Action::MachineUpdate { .. }
+                    | Action::MachineSet { .. }
                     | Action::Init
                     | Action::Add { .. }
                     | Action::Rename { .. }
@@ -61,6 +69,14 @@ impl Operations for CoreOperations {
     ) -> Result<ExitDisposition, ConfctlError> {
         let root = ConfigRoot::new(&context.cwd)?;
         match &invocation.action {
+            Action::InputsUpdate { .. }
+            | Action::InputsSet { .. }
+            | Action::ChannelUpdate { .. }
+            | Action::ChannelSet { .. }
+            | Action::MachineUpdate { .. }
+            | Action::MachineSet { .. } => {
+                input_mutation::run(&invocation.action, root, context).await?
+            }
             Action::Init => config_init::run(root, context).await?,
             Action::Add { .. } | Action::Rename { .. } | Action::Rediscover => {
                 configuration::run(&invocation.action, root, context).await?

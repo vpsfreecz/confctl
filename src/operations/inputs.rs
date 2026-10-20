@@ -61,7 +61,10 @@ pub(super) async fn channels(
         .await
 }
 
-fn channel_names<'a>(channels: &'a Map<String, Value>, pattern: Option<&str>) -> Vec<&'a str> {
+pub(super) fn channel_names<'a>(
+    channels: &'a Map<String, Value>,
+    pattern: Option<&str>,
+) -> Vec<&'a str> {
     let Some(pattern) = pattern else {
         let mut names: Vec<_> = channels.keys().map(String::as_str).collect();
         names.sort();
