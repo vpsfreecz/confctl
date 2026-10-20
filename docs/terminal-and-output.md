@@ -38,6 +38,13 @@ are harmless; conflicting results and backward transitions are delivery errors.
 When an output group ends without a task result, the final view shows incomplete
 with its last observed entry status. It does not infer success or cancellation.
 
+[`init`](config-init.md) needs no existing flake, Nix child or consent. It emits
+acknowledged `mkdir`/`mkfile` notices before creating each literal starter
+template, with a cancellation check after acknowledgement. The existing
+advisory mutation lock spans the writes; Ruby writers do not share it. A conflict,
+write/output failure or cancellation retains completed and partially written
+files. These local effects admit no host or native-process tasks.
+
 `runtime-kernels update` emits pending events for the confirmed, validated host
 probes and starts each task as its logical probe body enters the process runner.
 Each host has its own task ID and description. A decoded kernel succeeds; an

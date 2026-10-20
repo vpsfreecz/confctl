@@ -210,6 +210,9 @@ entry point remains Ruby, and real-site/terminal qualification is separate.
 [`diff` and `changelog`](docs/changes.md) compare inputs without building systems;
 changelog can clone or fetch Git mirrors. Reports support redirected stdout and
 an optional [pager](docs/pager.md).
+[`confctl-rust init`](docs/config-init.md) creates the Ruby-compatible starter
+templates without an existing flake, Nix evaluation or confirmation. Its guide
+lists permitted existing entries and recovery from partial initialization.
 
 ## Machine metadata and inputs
 Machine configuration directory usually contains at least two files:

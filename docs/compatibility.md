@@ -59,7 +59,7 @@ silently become the new parser's defaults.
 The `confctl-rust` development binary provides the Rust parser and application
 entrypoint. The default `confctl` remains Ruby during development. Typed requests
 cover the 29 original command actions and the built-in `runtime-kernels update`
-action. The concrete routes are `ls`, `inputs ls`, `inputs channel ls`,
+action. The concrete routes are [`init`](config-init.md), `ls`, `inputs ls`, `inputs channel ls`,
 `runtime-kernels update`, `build`, [`test-connection`](connection-check.md),
 [`ssh`](ssh.md), [`cssh`](cssh.md) and [`generation ls`](generation-listing.md) for default/local,
 remote or combined local/remote records.
