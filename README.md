@@ -226,6 +226,12 @@ retention, GC policy and recovery limits after irreversible partial cleanup.
 and network Nix data. All 30 parsed action leaves have concrete Rust dispatch;
 the default Ruby entry point and separate native and site acceptance gates remain.
 
+An additive [Rust package and helper opt-in](docs/rust-packaging.md) is available
+through `packages.<system>.confctl-rust`, `apps.<system>.confctl-rust`, explicit
+`mkConfigDevShell` implementation selection and independent `rustHelpers`.
+Ruby remains the default. Package builds, runtime closures and both target
+architectures require separate native qualification.
+
 ## Machine metadata and inputs
 Machine configuration directory usually contains at least two files:
 `cluster/<machine name>/config.nix` and `cluster/<machine name>/module.nix`.

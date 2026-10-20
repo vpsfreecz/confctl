@@ -1,0 +1,56 @@
+name: Rust
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.95.0
+          components: rustfmt, clippy
+
+      - name: Check fixture tools and compile-time login entry
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tool in git python3 cc cmake cat sleep logname bash; do
+            command -v "$tool" >/dev/null || { echo "Missing fixture tool: $tool" >&2; exit 1; }
+          done
+          logname_entry="$(command -v logname)"
+          case "$logname_entry" in
+            /*) test -x "$logname_entry" ;;
+            *) echo "logname must resolve to an absolute executable entry" >&2; exit 1 ;;
+          esac
+          printf 'CONFCTL_LOGNAME=%s\n' "$logname_entry" >> "$GITHUB_ENV"
+
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Check all Rust targets and features
+        run: cargo check --workspace --all-targets --all-features --locked
+
+      - name: Run strict Clippy
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+      - name: Run default Rust tests
+        run: cargo test --workspace --locked

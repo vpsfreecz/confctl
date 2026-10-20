@@ -57,7 +57,9 @@ must be decided from captured evidence before changing behavior; they must not
 silently become the new parser's defaults.
 
 The `confctl-rust` development binary provides the Rust parser and application
-entrypoint. The default `confctl` remains Ruby during development. Typed requests
+entrypoint. The default `confctl` remains Ruby during development. The additive
+[Rust package and helper selection](rust-packaging.md) requires an explicit
+opt-in; it does not change existing packages, module defaults or site pins. Typed requests
 cover the 29 original command actions and the built-in `runtime-kernels update`
 action. The concrete routes are [`init`](config-init.md),
 [`add`, `rename` and `rediscover`](configuration-commands.md), `ls`, `inputs ls`, `inputs channel ls`,

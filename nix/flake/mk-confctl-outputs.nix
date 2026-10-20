@@ -3,6 +3,7 @@
   inputs,
   channels ? { },
   system ? null,
+  rustHelpers ? false,
 }:
 let
   resolvedSystem =
@@ -351,6 +352,19 @@ let
       };
     };
 
+  rustPackageFor =
+    pkgs:
+    import ../rust-package.nix {
+      inherit pkgs;
+      src = confctlSrc;
+    };
+
+  helperPackageModule =
+    { pkgs, ... }:
+    {
+      _module.args.confctlRustPackage = if rustHelpers then rustPackageFor pkgs else null;
+    };
+
   confMachineFor =
     m:
     (confLib.findMetaConfig {
@@ -408,6 +422,7 @@ let
           ];
     in
     moduleArgsModules
+    ++ [ helperPackageModule ]
     ++ clusterModulesForSystem
     ++ [
       (confDir + "/cluster/${m.clusterName}/config.nix")
@@ -429,7 +444,11 @@ let
         ruby = pkgs.ruby;
       };
     in
-    if pkgs ? replaceVarsWith then
+    if rustHelpers then
+      pkgs.writeShellScript "confctl-auto-rollback" ''
+        exec -a "$0" ${rustPackageFor pkgs}/libexec/confctl/confctl-auto-rollback "$@"
+      ''
+    else if pkgs ? replaceVarsWith then
       pkgs.replaceVarsWith {
         inherit (args) src isExecutable;
         inherit replacements;

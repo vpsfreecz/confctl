@@ -25,6 +25,7 @@
       mkConfigDevShell = import ./nix/flake/mk-config-devshell.nix { inherit self nixpkgs; };
       mkConfctlDevShell = import ./nix/flake/mk-confctl-devshell.nix { inherit nixpkgs; };
       mkConfctlPackage = import ./nix/package.nix;
+      mkRustPackage = import ./nix/rust-package.nix;
 
       mkRspecCheck =
         system:
@@ -135,6 +136,10 @@
             inherit pkgs;
             src = self.outPath;
           };
+          confctl-rust = mkRustPackage {
+            inherit pkgs;
+            src = self.outPath;
+          };
         }
         // nixpkgs.lib.optionalAttrs (hasTestRunner system) {
           test-runner = vpsadminos.packages.${system}.test-runner;
@@ -143,7 +148,13 @@
 
       apps = forAllSystems (
         system:
-        nixpkgs.lib.optionalAttrs (hasTestRunner system) {
+        {
+          confctl-rust = {
+            type = "app";
+            program = "${self.packages.${system}.confctl-rust}/bin/confctl-rust";
+          };
+        }
+        // nixpkgs.lib.optionalAttrs (hasTestRunner system) {
           test-runner = {
             type = "app";
             program = "${vpsadminos.packages.${system}.test-runner}/bin/test-runner";
