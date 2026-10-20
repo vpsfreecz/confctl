@@ -457,7 +457,10 @@ impl Supervisor {
     }
 
     /// Stops admission, cancels owned work, then joins workers and every pipe.
-    /// Join/drop operation futures first, then drain retained replies here.
+    /// Callers may retain unpolled operation futures through this join to keep
+    /// their guards alive. Drop those futures afterward, then call
+    /// `take_unobserved_errors` to drain errors still owned by queued replies,
+    /// even when shutdown returned an error.
     /// Do not select/drop this cleanup future as a response to cancellation.
     pub async fn shutdown(&self) -> Result<(), ConfctlError> {
         self.owner.closing.store(true, Ordering::SeqCst);
@@ -469,19 +472,24 @@ impl Supervisor {
                 failures.push(join_error(error));
             }
         }
-        failures.append(
-            &mut *self
-                .owner
-                .unobserved
-                .lock()
-                .unwrap_or_else(|error| error.into_inner()),
-        );
+        failures.extend(self.take_unobserved_errors());
         if failures.is_empty() {
             Ok(())
         } else {
             let first = failures.remove(0);
             Err(first.with_secondary(failures))
         }
+    }
+
+    /// Take retained reply errors once; this does not wait, signal or clone.
+    pub(crate) fn take_unobserved_errors(&self) -> Vec<ConfctlError> {
+        std::mem::take(
+            &mut *self
+                .owner
+                .unobserved
+                .lock()
+                .unwrap_or_else(|error| error.into_inner()),
+        )
     }
 }
 
