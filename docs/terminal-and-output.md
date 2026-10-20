@@ -74,6 +74,16 @@ Interactive shells park painting through the foreground terminal owner and
 restore terminal and input ownership on return. Ordinary nonzero child results
 fail their tasks while allowing the completed command to exit 0.
 
+[`cssh`](cssh.md) admits one task for the single `nix-shell` ClusterSSH launcher.
+It forwards and captures stdout and stderr and retains the invocation log.
+The child inherits the display and authentication environment with `shellHook`
+removed. An ordinary nonzero exit or signal fails the launcher task while the
+completed invocation exits 0. Startup, capture and delivery errors fail the
+invocation; cancellation joins the owned launcher and exits 130. Its result
+does not prove connections to individual hosts or closure of windows and remote
+shells that outlive it. Fake-tool route tests do not establish real GUI or host
+qualification.
+
 `build` registers one task per actual build group after consent and planning.
 Groups run serially; a shared Nix build does not prove that each host executed
 separately. Stderr streams through the existing checked output relay while stdout
