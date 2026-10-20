@@ -219,6 +219,9 @@ lists permitted existing entries and recovery from partial initialization.
 flake configuration without confirmation or host contact. Their guide covers
 literal templates, preserved rename contents, path restrictions, netboot hook
 migration and recovery after partial edits.
+[`generation rm`, `generation rotate` and `collect-garbage`](docs/generation-cleanup.md)
+remove saved records and profiles and collect store objects. Their guide explains
+retention, GC policy and recovery limits after irreversible partial cleanup.
 
 ## Machine metadata and inputs
 Machine configuration directory usually contains at least two files:

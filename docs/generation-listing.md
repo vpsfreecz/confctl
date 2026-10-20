@@ -74,3 +74,6 @@ input revisions to show.
 Input revisions accept saved string and object forms. Objects use `shortRev` or
 its `short_rev` alias, then the first eight characters of `rev`. Listing retains
 unknown saved metadata and never rewrites the records.
+
+For confirmed removal, retention and optional garbage collection, see
+[generation cleanup](generation-cleanup.md).

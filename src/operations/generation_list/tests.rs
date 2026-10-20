@@ -1,4 +1,8 @@
+use super::super::generation_selection::*;
+use super::super::host_status::HostGeneration;
 use super::*;
+use crate::{domain::UnifiedGenerationSelector, events::UiEvent, generation::BuildGeneration};
+use chrono::{DateTime, Utc};
 use serde_json::json;
 use std::os::unix::fs::symlink;
 
@@ -82,7 +86,7 @@ fn table_keeps_first_seen_roles_before_sorting_and_preserves_saved_values() {
         json!({"arole":{"rev":"abcdef012345"},"raw":false}),
     );
     let snapshot = later.encode();
-    let UiEvent::Table { columns, rows, .. } = table(vec![
+    let UiEvent::Table { columns, rows, .. } = table(&[
         Entry::local("zhost", &later, true, Some("6.12".into())),
         Entry::local("ahost", &earlier, false, None),
     ]) else {
@@ -181,7 +185,7 @@ fn remote_first_unification_retains_build_distinctions_and_current_memberships()
     assert_eq!(entries.len(), 3);
     assert!(entries[0].current);
     assert_eq!(entries[0].date, saved.date);
-    let UiEvent::Table { rows, .. } = table(entries) else {
+    let UiEvent::Table { rows, .. } = table(&entries) else {
         panic!()
     };
     assert_eq!(

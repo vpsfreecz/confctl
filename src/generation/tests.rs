@@ -270,3 +270,134 @@ fn saved_selector_owns_typed_offsets_names_and_exclusion_refusals() {
             .is_none()
     );
 }
+
+#[tokio::test]
+async fn destroy_keeps_namespace_current_targets_and_unlinks_only_owned_entries() {
+    let (scratch, store) = fixture();
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let guard = crate::configuration::MutationLock::acquire(&store.root, &cancel)
+        .await
+        .unwrap();
+    let mut saved = generation("saved");
+    let target = scratch.path().join("store-target");
+    fs::write(&target, b"keep store bytes").unwrap();
+    saved.toplevel = target.clone();
+    saved.auto_rollback = None;
+    saved.inputs.insert("z".into(), json!(target));
+    store.publish(&guard, "nested/host", &saved).unwrap();
+    let dir = store.host_directory("nested/host").unwrap();
+    let root = store.roots.directory();
+    assert!(
+        root.join("nested:host-generation-saved-toplevel")
+            .is_symlink()
+    );
+    assert!(
+        root.join("nested:host-generation-saved-input.z")
+            .is_symlink()
+    );
+    // Both missing optional links and dangling input links are supported.
+    fs::remove_file(dir.join("saved/nixpkgs.input")).unwrap();
+    store
+        .destroy(&guard, "nested/host", &saved, &cancel)
+        .unwrap();
+    assert!(!dir.join("saved").exists());
+    assert_eq!(
+        fs::read_link(dir.join("current")).unwrap(),
+        Path::new("saved")
+    );
+    assert!(dir.join("current").is_symlink());
+    assert_eq!(fs::read(target).unwrap(), b"keep store bytes");
+    assert!(dir.is_dir() && root.is_dir());
+    assert!(fs::read_dir(root).unwrap().next().is_none());
+    assert!(store.root.path().join(".confctl/mutation.lock").exists());
+}
+
+#[tokio::test]
+async fn destroy_validates_guard_record_and_parent_before_effects_then_stops_at_partial_fault() {
+    let (scratch, store) = fixture();
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let guard = crate::configuration::MutationLock::acquire(&store.root, &cancel)
+        .await
+        .unwrap();
+    let saved = generation("saved");
+    store.publish(&guard, "host", &saved).unwrap();
+    let dir = store.host_directory("host").unwrap().join("saved");
+    let roots = store.roots.directory();
+    let other = tempfile::tempdir().unwrap();
+    let other_root = ConfigRoot::new(other.path()).unwrap();
+    let wrong = crate::configuration::MutationLock::acquire(&other_root, &cancel)
+        .await
+        .unwrap();
+    assert!(store.destroy(&wrong, "host", &saved, &cancel).is_err());
+    assert!(roots.join("host-generation-saved-toplevel").is_symlink());
+    let mut changed = saved.clone();
+    changed.toplevel = "/changed".into();
+    assert!(store.destroy(&guard, "host", &changed, &cancel).is_err());
+    let moved = scratch.path().join("moved");
+    fs::rename(&dir, &moved).unwrap();
+    std::os::unix::fs::symlink(&moved, &dir).unwrap();
+    assert!(store.destroy(&guard, "host", &saved, &cancel).is_err());
+    assert!(roots.join("host-generation-saved-toplevel").is_symlink());
+    fs::remove_file(&dir).unwrap();
+    fs::rename(&moved, &dir).unwrap();
+    // Input root fails after the two earlier roots, before any record entry.
+    let bad = roots.join("host-generation-saved-input.nixpkgs");
+    fs::remove_file(&bad).unwrap();
+    fs::create_dir(&bad).unwrap();
+    assert!(store.destroy(&guard, "host", &saved, &cancel).is_err());
+    assert!(!roots.join("host-generation-saved-toplevel").is_symlink());
+    assert!(
+        !roots
+            .join("host-generation-saved-auto_rollback")
+            .is_symlink()
+    );
+    assert!(dir.join("toplevel").is_symlink() && dir.join("generation.json").is_file());
+    fs::remove_dir(bad).unwrap();
+    fs::write(dir.join("unknown"), b"retained").unwrap();
+    assert!(store.destroy(&guard, "host", &saved, &cancel).is_err());
+    assert_eq!(fs::read(dir.join("unknown")).unwrap(), b"retained");
+    assert!(!dir.join("generation.json").exists());
+    assert!(
+        store
+            .host_directory("host")
+            .unwrap()
+            .join("current")
+            .is_symlink()
+    );
+}
+
+#[tokio::test]
+async fn destroy_cancel_and_cross_configuration_roots_never_unlink() {
+    let (_scratch, store) = fixture();
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let guard = crate::configuration::MutationLock::acquire(&store.root, &cancel)
+        .await
+        .unwrap();
+    let saved = generation("saved");
+    store.publish(&guard, "host", &saved).unwrap();
+    let other = tempfile::tempdir().unwrap();
+    let other_root = ConfigRoot::new(other.path()).unwrap();
+    let wrong_store = GenerationStore::new(
+        store.root.clone(),
+        GcRoots::new(&other_root, other.path(), "login").unwrap(),
+    );
+    assert!(
+        wrong_store
+            .destroy(&guard, "host", &saved, &cancel)
+            .is_err()
+    );
+    cancel.cancel();
+    assert!(
+        store
+            .destroy(&guard, "host", &saved, &cancel)
+            .unwrap_err()
+            .is_cancelled()
+    );
+    assert!(
+        store
+            .roots
+            .directory()
+            .join("host-generation-saved-toplevel")
+            .is_symlink()
+    );
+}

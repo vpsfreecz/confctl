@@ -65,6 +65,9 @@ action. The concrete routes are [`init`](config-init.md),
 `runtime-kernels update`, `build`, [`test-connection`](connection-check.md),
 [`ssh`](ssh.md), [`cssh`](cssh.md) and [`generation ls`](generation-listing.md) for default/local,
 remote or combined local/remote records.
+[`generation rm`, `generation rotate` and `collect-garbage`](generation-cleanup.md)
+perform cleanup with retained partial effects. The guide records rotation's GC
+OR condition and the deliberate progress and concurrency corrections.
 Configuration edits run without confirmation or host contact. Add writes literal
 Ruby-compatible templates; rename preserves the moved contents. All three
 replace the core cluster list before requiring valid settings, even when netboot

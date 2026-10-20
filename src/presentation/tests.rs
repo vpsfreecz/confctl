@@ -974,3 +974,74 @@ async fn frame_style_shape_is_checked_before_any_prelude_output_even_for_duplica
     assert!(control.finish().await.is_err());
     assert!(out.lock().expect("stdout").is_empty());
 }
+
+#[tokio::test]
+async fn gc_labels_and_unknown_progress_keep_required_both_stream_output_once() {
+    let directory = tempfile::tempdir().unwrap();
+    let (stdout, out) = writer(None, false);
+    let (stderr, err) = writer(None, false);
+    let (events, receiver) = EventSink::channel(1);
+    let (_state, observe) = watch::channel(TerminalState::Live);
+    let (control, presentation) = Presentation::new(
+        receiver,
+        observe,
+        OutputTargets { stdout, stderr },
+        config(directory.path(), true),
+        None,
+    )
+    .unwrap();
+    let job = tokio::spawn(presentation.run());
+    for (task, host) in [(TaskId(1), "alpha"), (TaskId(2), "beta")] {
+        events
+            .emit(UiEvent::TaskStarted {
+                task,
+                description: format!("GC {host}"),
+            })
+            .await
+            .unwrap();
+        let output = crate::process::gc_output::GcOutput::new(host);
+        output
+            .forward(
+                &events,
+                (task, OutputStream::Stdout),
+                b"deleting '/nix/store/stdout'\n",
+                true,
+                &CancellationToken::new(),
+            )
+            .await
+            .unwrap();
+        output
+            .forward(
+                &events,
+                (task, OutputStream::Stderr),
+                b"deleting '/nix/store/stderr'\n",
+                true,
+                &CancellationToken::new(),
+            )
+            .await
+            .unwrap();
+        events
+            .emit(UiEvent::TaskFinished {
+                task,
+                state: crate::events::TaskState::Succeeded,
+            })
+            .await
+            .unwrap();
+    }
+    control.finish().await.unwrap();
+    job.await.unwrap().unwrap();
+    let out = out.lock().unwrap();
+    let err = err.lock().unwrap();
+    for host in ["alpha", "beta"] {
+        let a = format!("{host}> deleting '/nix/store/stdout'\n");
+        let b = format!("{host}> deleting '/nix/store/stderr'\n");
+        assert_eq!(
+            out.windows(a.len()).filter(|w| *w == a.as_bytes()).count(),
+            1
+        );
+        assert_eq!(
+            err.windows(b.len()).filter(|w| *w == b.as_bytes()).count(),
+            1
+        );
+    }
+}

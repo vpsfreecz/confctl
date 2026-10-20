@@ -77,6 +77,19 @@ a result table without host-probe tasks. Remote or combined generation listing
 admits a task for each selected host query; unavailable hosts fail their tasks
 while ordinary host failures still allow the listing to exit 0.
 
+[`generation rm` and `generation rotate`](generation-cleanup.md) hold the
+cooperative mutation lock from planning through consent, removal and optional
+GC joins. Local record and GC-root unlinks, profile deletion and store GC are real effects;
+failures retain completed work without current-link repair or rollback. The
+guide describes retention and rotation's GC OR policy.
+
+GC forwards both streams live with host labels while raw captures and logs retain
+native bytes. Only recognized deleting-path lines count; the total remains
+unknown and native outcomes decide success. Ordinary host failures aggregate;
+infrastructure, delivery and cancellation errors stop admission and join entered
+children and relays. The cleanup guide describes the progress and concurrency
+corrections relative to Ruby.
+
 `status` with an explicit generation admits one task per confirmed, resolved
 host observation. Saved status compares the saved toplevel and input metadata
 with deployed state; `--generation none` evaluates current target inputs instead.
