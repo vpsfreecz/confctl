@@ -1557,8 +1557,33 @@ fn actual_reboot_pty_consent_live_wait_and_terminal_restoration() {
             && text.contains("remaining"),
         "{text}"
     );
+    // Scheduling can shift displayed ticks; only progress while waiting counts.
+    fn waiting_elapsed_increases(text: &str) -> bool {
+        let mut previous = None;
+        for detail in text.split("waiting for uptime observation; ").skip(1) {
+            let Some((elapsed, _)) = detail.split_once("s elapsed; ") else {
+                continue;
+            };
+            let Ok(elapsed) = elapsed.parse::<f64>() else {
+                continue;
+            };
+            if previous.is_some_and(|value| elapsed > value) {
+                return true;
+            }
+            previous = Some(elapsed);
+        }
+        false
+    }
+    assert!(!waiting_elapsed_increases(concat!(
+        "waiting for uptime observation; 0.0s elapsed; 0.0s remaining\r\n",
+        "lower uptime observed; 0.9s elapsed; 0.0s remaining",
+    )));
+    assert!(!waiting_elapsed_increases(concat!(
+        "\x1b[2Kwaiting for uptime observation; 0.4s elapsed; 0.0s remaining\r",
+        "\x1b[2Kwaiting for uptime observation; 0.4s elapsed; 0.0s remaining",
+    )));
     assert!(
-        text.contains("0.3s elapsed") || text.contains("0.6s elapsed"),
+        waiting_elapsed_increases(&text),
         "elapsed failed to update during blocked poll: {text}"
     );
 }
