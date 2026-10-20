@@ -12,12 +12,17 @@
   system,
   pkgs ? nixpkgs.legacyPackages.${system},
   mode ? "minimal",
+  implementation ? "ruby",
   extraPackages ? [ ],
   legacyCompat ? false,
 }:
 let
   lib = pkgs.lib;
-  confctlPackage = self.packages.${system}.confctl;
+  confctlPackage =
+    if implementation == "rust" then
+      self.packages.${system}.confctl-rust
+    else
+      self.packages.${system}.confctl;
   bundlerMode = builtins.elem mode [
     "tools"
     "bundled-confctl"
@@ -127,6 +132,12 @@ let
         chmod +x "$PWD/.bin/confctl"
       '';
 in
+assert lib.assertMsg (builtins.elem implementation [
+  "ruby"
+  "rust"
+]) "mkConfigDevShell implementation must be 'ruby' or 'rust'";
+assert lib.assertMsg (!(implementation == "rust" && mode == "bundled-confctl"))
+  "mkConfigDevShell implementation 'rust' does not support bundled-confctl; use mode 'tools' for repository gems";
 assert builtins.elem mode [
   "minimal"
   "tools"
@@ -158,7 +169,16 @@ pkgs.mkShell {
 
     ${modeShellHook}
 
-    export MANPATH="$CONFCTL_SRC/man:$(man --path)"
+    ${
+      if implementation == "rust" then
+        ''
+          export MANPATH="${confctlPackage}/share/man:$(man --path)"
+        ''
+      else
+        ''
+          export MANPATH="$CONFCTL_SRC/man:$(man --path)"
+        ''
+    }
     export PS1="(confctl) $PS1"
 
     echo

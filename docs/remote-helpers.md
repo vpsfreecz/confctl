@@ -7,6 +7,11 @@ extensions, or dispatch a generic remote task protocol. Test probes and fixture
 switch programs under `tests/compat/helpers/qualification/` are separate test
 tools and are never installed.
 
+The [Rust package](rust-packaging.md) supplies private backends under
+`libexec/confctl`. `mkConfctlOutputs { rustHelpers = true; ...; }` selects their
+module wrappers independently of the CLI shell selection. Its default is false;
+standalone module imports without the private package argument keep Ruby.
+
 ## Package data
 
 The module wrappers supply these fixed private fields, overwriting inherited

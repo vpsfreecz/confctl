@@ -21,6 +21,14 @@ not update inputs automatically.
 Software-pin configurations must be migrated using confctl v3 before upgrading.
 See the repository's `docs/swpins-to-flakes.md` for migration and rollback.
 
+## RUST PACKAGE SELECTION
+The additive `confctl-rust` flake package provides `confctl` and `confctl-rust`
+without changing the existing Ruby package. Configuration shells select it with
+`implementation = "rust"` in `mkConfigDevShell`, using minimal or tools mode.
+Rust rejects bundled-confctl before bootstrap. Target helper selection uses
+`rustHelpers = true` in `mkConfctlOutputs` independently; its default is false.
+See `docs/rust-packaging.md` for package, rollback and qualification limits.
+
 ## PATTERNS
 `confctl` commands accept patterns instead of names. These patterns work
 similarly to shell patterns, see
@@ -641,7 +649,22 @@ Use retained confctl v3 for old software-pin generations.
       Use when the new version is older than the previously set version. Used for
       generating the commit changelog direction.
 
+## RUST BUILT-INS
+`confctl runtime-kernels update` [*machine-pattern*]
+  Refresh enabled runtime-kernel state for selected vpsAdminOS machines under
+  the configuration mutation lock. Failed host observations remove only the
+  selected keys. Enable `confctl.runtimeKernels.enable` and set its stateFile.
+
+Rust add, rename and rediscover can publish an enabled netboot inventory through
+`confctl.netbootInventory.enable` and outputFile. They retain completed core
+edits if later settings or inventory publication fails. Migrate old scripts to
+these explicit settings before using the Rust routes. Do not run Ruby and Rust
+writers concurrently: only Rust participates in the advisory mutation lock.
+
 ## USER-DEFINED COMMANDS
+This extension interface belongs to the Ruby CLI. The Rust CLI does not load
+Ruby scripts or offer a runtime fallback.
+
 User-defined Ruby scripts can be placed in directory `scripts`. Each script
 should create a subclass of `ConfCtl::UserScript` and call class-method `register`.
 Scripts can define their own `confctl` subcommands.

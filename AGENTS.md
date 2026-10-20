@@ -40,3 +40,18 @@
   4. Commit with subject format: `flake: vpsadminos <old9> -> <new9>` (example: `flake: vpsadminos 2cab01000 -> 08bb11324`).
 - Describe PRs clearly with motivation, scope, and manual verification notes; link relevant issues and update docs/manpages when behavior changes.
 - Run rspec, rubocop, and nixfmt before pushing; ensure generated artifacts (`man/`, `pkg/` when releasing) reflect your changes.
+
+## Rust candidate packaging and checks
+- Read [the Rust packaging guide](docs/rust-packaging.md) before changing its
+  package, helper producers or workflow. Ruby package/defaults remain separate.
+- Rust checks use `cargo fmt --all -- --check`,
+  `cargo check --workspace --all-targets --all-features --locked`, strict Clippy
+  with the same scope, and default `cargo test --workspace --locked`.
+  All-feature checks compile qualification mains; do not execute them or ignored
+  native tests without a separate assignment.
+- `CONFCTL_LOGNAME` must name the absolute lexical GNU logname entry before
+  compiling. Preserve its multicall basename rather than resolving the symlink.
+- Markdown manual sources are rendered by the Rust package with build-only
+  Pandoc; kexec uses build-only Asciidoctor. Automatic reference generation and
+  final Ruby release-tool removal remain pending. Cargo fixtures cannot certify
+  evaluated wrappers, installed manuals or runtime closure contents.

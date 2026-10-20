@@ -51,34 +51,46 @@ let
 
   httpRoot = "${baseDir}/http";
 
-  builderConfig = builtins.toJSON {
-    ruby = pkgs.ruby;
-    coreutils = pkgs.coreutils;
-    syslinux = pkgs.syslinux;
-    inherit tftpRoot httpRoot;
-    hostName = config.networking.hostName;
-    httpUrl = "http://${cfg.host}";
-    memtest =
-      if cfg.memtest86.enable then
-        {
-          package = pkgs.memtest86plus;
-          params = cfg.memtest86.params;
-        }
-      else
-        null;
-    isoImages = cfg.isoImages;
-  };
+  rustPackage = config._module.args.confctlRustPackage or null;
 
-  builder = pkgs.replaceVarsWith {
-    src = ./build-netboot-server.rb;
-    name = "build-netboot-server";
-    dir = "bin";
-    isExecutable = true;
-    replacements = {
-      ruby = pkgs.ruby;
-      jsonConfig = pkgs.writeText "netboot-server.json" builderConfig;
-    };
-  };
+  builderConfig = builtins.toJSON (
+    {
+      coreutils = pkgs.coreutils;
+      syslinux = pkgs.syslinux;
+      inherit tftpRoot httpRoot;
+      hostName = config.networking.hostName;
+      httpUrl = "http://${cfg.host}";
+      memtest =
+        if cfg.memtest86.enable then
+          {
+            package = pkgs.memtest86plus;
+            params = cfg.memtest86.params;
+          }
+        else
+          null;
+      isoImages = cfg.isoImages;
+    }
+    // lib.optionalAttrs (rustPackage == null) { ruby = pkgs.ruby; }
+  );
+  jsonConfig = pkgs.writeText "netboot-server.json" builderConfig;
+
+  builder =
+    if rustPackage != null then
+      pkgs.writeShellScriptBin "build-netboot-server" ''
+        export CONFCTL_INTERNAL_NETBOOT_CONFIG=${lib.escapeShellArg (toString jsonConfig)}
+        exec -a "$0" ${rustPackage}/libexec/confctl/build-netboot-server "$@"
+      ''
+    else
+      pkgs.replaceVarsWith {
+        src = ./build-netboot-server.rb;
+        name = "build-netboot-server";
+        dir = "bin";
+        isExecutable = true;
+        replacements = {
+          ruby = pkgs.ruby;
+          inherit jsonConfig;
+        };
+      };
 in
 {
   options = {
