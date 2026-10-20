@@ -847,3 +847,159 @@ fn supervisor_exit_before_initial_attach_preserves_completion_tail_and_cancellat
         .expect("runtime")
         .block_on(fixture(TEST, &role));
 }
+
+#[test]
+fn pager_output_lease_owns_tty_with_piped_input_and_joins_stops_and_cancel() {
+    use std::io::Read;
+    const TEST: &str = "process::foreground_tests::pager_output_lease_owns_tty_with_piped_input_and_joins_stops_and_cancel";
+    if let Some(role) = std::env::var_os(CHILD_ENV) {
+        let role = role.to_str().unwrap();
+        if role == "early-exit" {
+            std::process::exit(7);
+        }
+        let mut tty = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("/dev/tty")
+            .unwrap();
+        if role == "stops" {
+            let go = PathBuf::from(std::env::var_os("CONFCTL_PAGER_GO").unwrap());
+            let deadline = Instant::now();
+            while !go.exists() {
+                assert!(deadline.elapsed() < Duration::from_secs(5));
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            let mut modes = rustix::termios::tcgetattr(&tty).unwrap();
+            modes.local_modes.remove(rustix::termios::LocalModes::ECHO);
+            rustix::termios::tcsetattr(&tty, rustix::termios::OptionalActions::Now, &modes)
+                .unwrap();
+            for signal in [
+                ::nix::sys::signal::Signal::SIGTSTP,
+                ::nix::sys::signal::Signal::SIGTTIN,
+            ] {
+                ::nix::sys::signal::raise(signal).unwrap();
+                assert!(
+                    !rustix::termios::tcgetattr(&tty)
+                        .unwrap()
+                        .local_modes
+                        .contains(rustix::termios::LocalModes::ECHO)
+                );
+            }
+        }
+        let mut answer = [0; 2];
+        tty.read_exact(&mut answer).unwrap();
+        assert_eq!(&answer, b"y\n");
+        let mut report = Vec::new();
+        std::io::stdin().read_to_end(&mut report).unwrap();
+        assert_eq!(report, b"report\0\xff");
+        println!("PAGER_TTY_READ");
+        return;
+    }
+    if std::env::var_os(CASE_ENV).is_none() {
+        for role in ["piped", "tty-input", "stops", "cancel", "early-exit"] {
+            let transcript = run_fixture(
+                TEST,
+                role,
+                if matches!(role, "cancel" | "early-exit") {
+                    b""
+                } else {
+                    b"y\n"
+                },
+            );
+            assert!(
+                transcript.status.success(),
+                "{}",
+                String::from_utf8_lossy(&transcript.bytes)
+            );
+            if !matches!(role, "cancel" | "early-exit") {
+                assert!(String::from_utf8_lossy(&transcript.bytes).contains("PAGER_TTY_READ"));
+            }
+        }
+        return;
+    }
+    enter_controlling_session();
+    let role = std::env::var(CASE_ENV).unwrap();
+    let original = rustix::termios::tcgetattr(std::io::stdout()).unwrap();
+    let pipe = if role != "tty-input" {
+        let (read, write) = rustix::pipe::pipe().unwrap();
+        rustix::stdio::dup2_stdin(read).unwrap();
+        Some(write)
+    } else {
+        None
+    };
+    tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+        let directory = tempfile::tempdir().unwrap();
+        let (events, mut receiver) = EventSink::channel(1);
+        let consumer = tokio::spawn(async move { while let Some(delivery) = receiver.receive().await { delivery.acknowledge(Ok(())); } });
+        let cancel = CancellationToken::new();
+        let (sender, mut requests) = mpsc::channel::<ForegroundSuspendRequest>(1);
+        let ui = Ui::new(std::io::stdin(), events.clone(), cancel.clone(), None).unwrap().with_foreground_suspend(sender);
+        let stop = CancellationToken::new();
+        let service_stop = stop.clone();
+        let modes = original.clone();
+        let service = tokio::spawn(async move {
+            let mut count = 0;
+            loop { tokio::select! {
+                _ = service_stop.cancelled() => break,
+                request = requests.recv() => {
+                    let request = request.unwrap();
+                    assert_eq!(rustix::termios::tcgetpgrp(&request.tty).unwrap(), request.expected_foreground);
+                    assert_modes(&modes, &rustix::termios::tcgetattr(&request.tty).unwrap());
+                    count += 1;
+                    request.reply.send(Ok(ForegroundResume { foreground: request.expected_foreground })).unwrap_or_else(|_| panic!("resume request lost"));
+                }
+            }}
+            count
+        });
+        let runner = Supervisor::new(events.clone(), directory.path().into(), 64, Duration::from_millis(30), None, None);
+        let mut spec = ProcessSpec::new(std::env::current_exe().unwrap(), "pager PTY fixture");
+        spec.args = vec!["--exact".into(), TEST.into(), "--nocapture".into()];
+        spec.env.push((CHILD_ENV.into(), Some(role.clone().into())));
+        let go = directory.path().join("go");
+        spec.env.push(("CONFCTL_PAGER_GO".into(), Some(go.as_os_str().to_owned())));
+        spec.stdout = StreamPolicy::Foreground;
+        spec.stderr = StreamPolicy::Foreground;
+        let (mut writer, input) = PagerInput::channel();
+        spec.stdin = StdinPolicy::Pager(input);
+        if role == "piped" { spec.before_attach_stop = Some(rustix::process::Signal::TTIN); }
+        if role == "early-exit" { spec.before_attach_exit = true; }
+        let mut scope = ProcessScope::new(cancel.clone(), TaskId(1));
+        scope.foreground = Some(ui.pager_foreground(std::io::stdout().as_fd().try_clone_to_owned().unwrap()).await.unwrap());
+        let running = runner.clone();
+        let job = tokio::spawn(async move { running.run(spec, scope).await });
+        let producer = async {
+            let result = writer.write(b"report\0\xff", &cancel).await;
+            if role == "cancel" { assert!(result.is_ok() || result.unwrap_err().is_cancelled()); }
+            else if role == "early-exit" { assert_eq!(result.unwrap(), WrittenOrClosed::Closed); }
+            else { assert_eq!(result.unwrap(), WrittenOrClosed::Written); }
+            drop(writer);
+        };
+        let coordinate = async {
+            if matches!(role.as_str(), "stops" | "cancel") {
+                let deadline = Instant::now();
+                while rustix::termios::tcgetpgrp(std::io::stdout()).unwrap() == rustix::process::getpgrp() {
+                    assert!(deadline.elapsed() < Duration::from_secs(5));
+                    tokio::task::yield_now().await;
+                }
+                if role == "cancel" { cancel.cancel(); } else { std::fs::write(go, b"go").unwrap(); }
+            }
+            job.await.unwrap().unwrap()
+        };
+        let (outcome, ()) = tokio::join!(coordinate, producer);
+        if role == "cancel" { assert_eq!(outcome.termination, TerminationCause::Canceled); }
+        else if role == "early-exit" { assert_eq!(outcome.code(), Some(7)); }
+        else { assert!(outcome.status.success()); }
+        assert!(matches!(outcome.stdout, Captured::Unavailable) && !outcome.stdout_complete);
+        assert!(matches!(outcome.stderr, Captured::Unavailable) && !outcome.stderr_complete);
+        assert_eq!(rustix::termios::tcgetpgrp(std::io::stdout()).unwrap(), rustix::process::getpgrp());
+        assert_modes(&original, &rustix::termios::tcgetattr(std::io::stdout()).unwrap());
+        assert_eq!(ui.state(), crate::terminal::TerminalState::Idle);
+        stop.cancel();
+        assert_eq!(service.await.unwrap(), if role == "stops" { 2 } else { 0 });
+        runner.shutdown().await.unwrap();
+        ui.shutdown().unwrap();
+        drop(ui); drop(runner); drop(events);
+        consumer.await.unwrap();
+    });
+    drop(pipe);
+}

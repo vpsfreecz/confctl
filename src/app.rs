@@ -76,6 +76,28 @@ pub struct Context {
 }
 
 impl Context {
+    #[cfg(test)]
+    pub(crate) fn for_test(
+        cwd: PathBuf,
+        cancellation: CancellationToken,
+        events: EventSink,
+        processes: Supervisor,
+        ui: Ui,
+        timing: Timing,
+        log_path: PathBuf,
+    ) -> Self {
+        Self {
+            cwd,
+            cancellation,
+            events,
+            processes,
+            ui,
+            timing,
+            log_path,
+            keep_log: AtomicBool::new(false),
+        }
+    }
+
     pub fn log_path(&self) -> &std::path::Path {
         &self.log_path
     }

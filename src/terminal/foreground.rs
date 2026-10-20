@@ -31,6 +31,7 @@ struct Saved {
 
 pub struct ForegroundAttachment {
     session: Arc<Session>,
+    output_tty: Option<Arc<OwnedFd>>,
     child: Pid,
     saved: Option<Saved>,
     child_termios: Option<Termios>,
@@ -42,8 +43,8 @@ impl ForegroundLease {
     pub fn attach(&mut self, child: Pid) -> Result<ForegroundAttachment, ConfctlError> {
         self._lease.session.broker.check_available()?;
         let session = self._lease.session.clone();
-        let saved = if session.controlling_tty {
-            let foreground = rustix::termios::tcgetpgrp(&session.terminal)
+        let saved = if self.controlling_tty() {
+            let foreground = rustix::termios::tcgetpgrp(self.terminal())
                 .map_err(|error| terminal_error("read foreground process group", error.into()))?;
             if foreground != rustix::process::getpgrp() {
                 return Err(terminal_error(
@@ -53,7 +54,7 @@ impl ForegroundLease {
             }
             Some(Saved {
                 foreground,
-                termios: rustix::termios::tcgetattr(&session.terminal).map_err(|error| {
+                termios: rustix::termios::tcgetattr(self.terminal()).map_err(|error| {
                     terminal_error("save foreground terminal attributes", error.into())
                 })?,
             })
@@ -62,6 +63,7 @@ impl ForegroundLease {
         };
         let mut attachment = ForegroundAttachment {
             session,
+            output_tty: self.output_tty.clone(),
             child,
             saved,
             child_termios: None,
@@ -73,6 +75,9 @@ impl ForegroundLease {
 }
 
 impl ForegroundAttachment {
+    fn terminal(&self) -> &OwnedFd {
+        self.output_tty.as_deref().unwrap_or(&self.session.terminal)
+    }
     pub fn restore(mut self) -> Result<(), ConfctlError> {
         self.restore_inner()
     }
@@ -81,7 +86,7 @@ impl ForegroundAttachment {
         let Some(saved) = &self.saved else {
             return Ok(());
         };
-        let foreground = rustix::termios::tcgetpgrp(&self.session.terminal).map_err(|error| {
+        let foreground = rustix::termios::tcgetpgrp(self.terminal()).map_err(|error| {
             terminal_error("verify resumed foreground process group", error.into())
         })?;
         if foreground != saved.foreground {
@@ -93,17 +98,13 @@ impl ForegroundAttachment {
         let result = with_ttou_blocked(|| {
             // Mark cleanup necessary before the first possible mutation.
             self.active = true;
-            rustix::termios::tcsetpgrp(&self.session.terminal, self.child)
+            rustix::termios::tcsetpgrp(self.terminal(), self.child)
                 .map_err(|error| terminal_error("attach foreground process group", error.into()))?;
             if let Some(attributes) = &self.child_termios {
-                rustix::termios::tcsetattr(
-                    &self.session.terminal,
-                    OptionalActions::Now,
-                    attributes,
-                )
-                .map_err(|error| {
-                    terminal_error("restore resumed child terminal attributes", error.into())
-                })?;
+                rustix::termios::tcsetattr(self.terminal(), OptionalActions::Now, attributes)
+                    .map_err(|error| {
+                        terminal_error("restore resumed child terminal attributes", error.into())
+                    })?;
             }
             Ok(())
         });
@@ -123,7 +124,7 @@ impl ForegroundAttachment {
         // Read the stopped child's modes before giving the terminal back. A
         // failed snapshot still attempts parent restoration in the same order.
         let snapshot = if self.active && self.saved.is_some() {
-            rustix::termios::tcgetattr(&self.session.terminal)
+            rustix::termios::tcgetattr(self.terminal())
                 .map(|attributes| self.child_termios = Some(attributes))
                 .map_err(|error| {
                     terminal_error("save stopped child terminal attributes", error.into())
@@ -156,8 +157,7 @@ impl ForegroundAttachment {
                 )
             })?;
         let tty = self
-            .session
-            .terminal
+            .terminal()
             .try_clone()
             .map_err(|error| terminal_error("duplicate controlling terminal", error))?;
         let (reply, response) = oneshot::channel();
@@ -175,7 +175,7 @@ impl ForegroundAttachment {
             result = response => result.map_err(|_| terminal_error("await foreground resume", io::Error::other("application resume reply lost")))??,
             _ = cancellation.cancelled() => return Err(ConfctlError::Cancelled),
         };
-        let actual = rustix::termios::tcgetpgrp(&self.session.terminal)
+        let actual = rustix::termios::tcgetpgrp(self.terminal())
             .map_err(|error| terminal_error("verify foreground resume", error.into()))?;
         if resumed.foreground != saved.foreground || actual != saved.foreground {
             return Err(terminal_error(
@@ -190,7 +190,7 @@ impl ForegroundAttachment {
         if self.saved.is_none() {
             return Ok(false);
         }
-        rustix::termios::tcgetpgrp(&self.session.terminal)
+        rustix::termios::tcgetpgrp(self.terminal())
             .map(|foreground| foreground == self.child)
             .map_err(|error| {
                 terminal_error("verify attached child foreground ownership", error.into())
@@ -212,18 +212,15 @@ impl ForegroundAttachment {
             .expect("active attachment has saved terminal state");
         with_ttou_blocked(|| {
             let mut errors = Vec::new();
-            if let Err(error) = rustix::termios::tcsetpgrp(&self.session.terminal, saved.foreground)
-            {
+            if let Err(error) = rustix::termios::tcsetpgrp(self.terminal(), saved.foreground) {
                 errors.push(terminal_error(
                     "restore foreground process group",
                     error.into(),
                 ));
             }
-            if let Err(error) = rustix::termios::tcsetattr(
-                &self.session.terminal,
-                OptionalActions::Now,
-                &saved.termios,
-            ) {
+            if let Err(error) =
+                rustix::termios::tcsetattr(self.terminal(), OptionalActions::Now, &saved.termios)
+            {
                 errors.push(terminal_error(
                     "restore foreground terminal attributes",
                     error.into(),

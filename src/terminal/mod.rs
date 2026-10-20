@@ -88,16 +88,27 @@ impl Drop for Lease {
 
 pub struct ForegroundLease {
     _lease: Lease,
+    // Pager output may be the controlling terminal while prompt input is piped.
+    output_tty: Option<Arc<OwnedFd>>,
 }
 
 impl ForegroundLease {
+    fn terminal(&self) -> &OwnedFd {
+        self.output_tty
+            .as_deref()
+            .unwrap_or(&self._lease.session.terminal)
+    }
+    fn controlling_tty(&self) -> bool {
+        self.output_tty.is_some() || self._lease.session.controlling_tty
+    }
+
     /// Validate real handoff prerequisites before a child exists. Non-TTY
     /// inheritance needs no job control; controlling TTYs need the app's live
     /// suspend owner and current foreground ownership.
     pub fn validate_process_handoff(&self) -> Result<(), ConfctlError> {
         self._lease.session.broker.check_available()?;
         let session = &self._lease.session;
-        if session.controlling_tty {
+        if self.controlling_tty() {
             let ready = session
                 .suspend
                 .lock()
@@ -107,13 +118,12 @@ impl ForegroundLease {
             if !ready {
                 return Err(ConfctlError::ForegroundJobControlUnavailable);
             }
-            let foreground = rustix::termios::tcgetpgrp(&session.terminal).map_err(|source| {
-                ConfctlError::Io {
+            let foreground =
+                rustix::termios::tcgetpgrp(self.terminal()).map_err(|source| ConfctlError::Io {
                     operation: "validate foreground terminal ownership",
                     path: None,
                     source: source.into(),
-                }
-            })?;
+                })?;
             if foreground != rustix::process::getpgrp() {
                 return Err(ConfctlError::TerminalBusy);
             }
@@ -274,7 +284,28 @@ impl Ui {
         self.session.broker.check_available()?;
         Ok(ForegroundLease {
             _lease: self.acquire(TerminalState::ExternalChild).await?,
+            output_tty: None,
         })
+    }
+
+    /// Park the existing owner while handing off the original output terminal.
+    /// A TTY outside this process's controlling session is never adopted.
+    pub async fn pager_foreground(
+        &self,
+        output_tty: OwnedFd,
+    ) -> Result<ForegroundLease, ConfctlError> {
+        self.session.broker.check_available()?;
+        rustix::termios::tcgetpgrp(&output_tty).map_err(|source| ConfctlError::Io {
+            operation: "validate pager controlling terminal",
+            path: None,
+            source: source.into(),
+        })?;
+        let lease = ForegroundLease {
+            _lease: self.acquire(TerminalState::ExternalChild).await?,
+            output_tty: Some(Arc::new(output_tty)),
+        };
+        lease.validate_process_handoff()?;
+        Ok(lease)
     }
 
     pub fn shutdown(&self) -> Result<(), ConfctlError> {
