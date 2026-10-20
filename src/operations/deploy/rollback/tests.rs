@@ -1,4 +1,5 @@
 use super::*;
+use crate::native_tool;
 use crate::{
     configuration::ConfigRoot,
     domain::{AutoRollback, Inventory, MachineId, SwitchAction},
@@ -79,10 +80,7 @@ impl ProcessRunner for Runner {
         spec.env.extend([
             ("RB_ROOT".into(), Some(self.root.clone().into_os_string())),
             ("RB_MODE".into(), Some(self.mode.into())),
-            (
-                "PATH".into(),
-                Some(format!("{}:/bin:/run/current-system/sw/bin", self.root.display()).into()),
-            ),
+            ("PATH".into(), Some(self.root.as_os_str().into())),
         ]);
         let is_helper = spec
             .redacted_description
@@ -109,6 +107,13 @@ impl Fixture {
     fn new(mode: &'static str) -> (Self, EventReceiver) {
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path();
+        fs::create_dir(dir.join("native")).unwrap();
+        for tool in ["cat", "sleep"] {
+            std::os::unix::fs::symlink(native_tool::resolve(tool), dir.join("native").join(tool))
+                .unwrap();
+        }
+        std::os::unix::fs::symlink(dir.join("native/cat"), dir.join("cat")).unwrap();
+
         let helper = dir.join("helper 'native");
         let path = dir.join(OsString::from_vec(b"confirm 'native\\\xff".to_vec()));
         fs::write(
@@ -141,10 +146,10 @@ exec /bin/sh -c "$1"
 printf '%s\0' "$@" > "$RB_ROOT/control-$$"
 case "$2" in
  'cat '*)
-  if [ "$RB_MODE" = blocked ]; then printf '%s' "$$" > "$RB_ROOT/control-pid"; exec /run/current-system/sw/bin/sleep 60; fi
-  if [ "$RB_MODE" = early ] || [ "$RB_MODE" = signal ]; then /run/current-system/sw/bin/sleep 0.05; fi
+  if [ "$RB_MODE" = blocked ]; then printf '%s' "$$" > "$RB_ROOT/control-pid"; exec "$RB_ROOT/native/sleep" 60; fi
+  if [ "$RB_MODE" = early ] || [ "$RB_MODE" = signal ]; then "$RB_ROOT/native/sleep" 0.05; fi
   if [ "$RB_MODE" != early ] && [ "$RB_MODE" != signal ]; then
-   while [ ! -e "$RB_ROOT/ready" ]; do /run/current-system/sw/bin/sleep 0.01; done
+   while [ ! -e "$RB_ROOT/ready" ]; do "$RB_ROOT/native/sleep" 0.01; done
   fi
   if [ "$RB_MODE" = switching ] && [ ! -e "$RB_ROOT/first-read" ]; then : > "$RB_ROOT/first-read"; printf 'switching'; exit 0; fi
   if [ "$RB_MODE" = read-retry ] && [ ! -e "$RB_ROOT/read-failed" ]; then : > "$RB_ROOT/read-failed"; exit 9; fi ;;
@@ -168,24 +173,24 @@ if [ "$RB_MODE" = early ]; then exit 0; fi
 if [ "$RB_MODE" = signal ]; then kill -TERM "$$"; exit 93; fi
 path=$5
 if [ "$RB_MODE" = blocked ]; then
- while [ ! -s "$RB_ROOT/control-pid" ]; do /run/current-system/sw/bin/sleep 0.01; done
- printf 'both entered\n'; exec /run/current-system/sw/bin/sleep 60
+ while [ ! -s "$RB_ROOT/control-pid" ]; do "$RB_ROOT/native/sleep" 0.01; done
+ printf 'both entered\n'; exec "$RB_ROOT/native/sleep" 60
 fi
 if [ "$RB_MODE" = switching ]; then
  printf 'switching' > "$path"; : > "$RB_ROOT/ready"
- while [ ! -e "$RB_ROOT/first-read" ]; do /run/current-system/sw/bin/sleep 0.01; done
+ while [ ! -e "$RB_ROOT/first-read" ]; do "$RB_ROOT/native/sleep" 0.01; done
 fi
 if [ "$RB_MODE" = unknown ]; then printf 'unknown' > "$path"; else printf '\000 \tswitched\r\n\000' > "$path"; fi
 : > "$RB_ROOT/ready"
 if [ "$RB_MODE" = exhaust ]; then
- while [ ! -e "$RB_ROOT/exhausted" ]; do /run/current-system/sw/bin/sleep 0.01; done
- /run/current-system/sw/bin/sleep 0.05
+ while [ ! -e "$RB_ROOT/exhausted" ]; do "$RB_ROOT/native/sleep" 0.01; done
+ "$RB_ROOT/native/sleep" 0.05
  printf 'natural helper completion\n'; exit 0
 fi
 while :; do
  state=; read -r state < "$path"
  [ "$state" != confirmed ] || break
- /run/current-system/sw/bin/sleep 0.01
+ "$RB_ROOT/native/sleep" 0.01
 done
 printf 'helper stdout\377\n'; printf 'helper stderr\033\n' >&2
 if [ "$RB_MODE" = hidden ]; then printf 'simulated inner exit 7 ignored\n'; fi

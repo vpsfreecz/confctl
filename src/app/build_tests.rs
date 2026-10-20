@@ -1,5 +1,6 @@
 //! Actual build command path with temporary configuration and fake Nix outputs.
 use super::*;
+use crate::native_tool;
 use crate::{
     configuration::ConfigRoot,
     generation::{BuildGeneration, GcRoots},
@@ -72,6 +73,12 @@ impl Fixture {
         let fake = scratch.path().join("fake");
         fs::create_dir_all(root.join("replies")).unwrap();
         fs::create_dir(&fake).unwrap();
+        fs::create_dir(root.join("native")).unwrap();
+        for tool in ["cat", "sleep"] {
+            std::os::unix::fs::symlink(native_tool::resolve(tool), root.join("native").join(tool))
+                .unwrap();
+        }
+
         fs::write(root.join("flake.nix"), "{ outputs = _: {}; }\n").unwrap();
         let lock = b"{\"version\":7,\"nodes\":{\"root\":{\"inputs\":{}}}}\n".to_vec();
         fs::write(root.join("flake.lock"), &lock).unwrap();
@@ -130,12 +137,12 @@ case "$last" in
   count=0
   if [ -f "$CONFCTL_BUILD_APP_ROOT/settings-count" ]; then read -r count < "$CONFCTL_BUILD_APP_ROOT/settings-count"; fi
   count=$((count+1)); printf '%s\n' "$count" > "$CONFCTL_BUILD_APP_ROOT/settings-count"
-  if [ "$count" -lt 3 ]; then cat "$CONFCTL_BUILD_APP_ROOT/replies/defaults.json"; else cat "$CONFCTL_BUILD_APP_ROOT/replies/build-settings.json"; fi
+  if [ "$count" -lt 3 ]; then "$CONFCTL_BUILD_APP_ROOT/native/cat" "$CONFCTL_BUILD_APP_ROOT/replies/defaults.json"; else "$CONFCTL_BUILD_APP_ROOT/native/cat" "$CONFCTL_BUILD_APP_ROOT/replies/build-settings.json"; fi
   ;;
  '.#confctl.machinesJson') printf '[{"outputs":{"out":"%s/replies/machines.json"}}]\n' "$CONFCTL_BUILD_APP_ROOT" ;;
- '.#confctl.buildPlan') cat "$CONFCTL_BUILD_APP_ROOT/replies/plan.json" ;;
- '.#confctl.build') cat "$CONFCTL_BUILD_APP_ROOT/replies/outputs.json" ;;
- '.#confctl.inputsInfo') cat "$CONFCTL_BUILD_APP_ROOT/replies/infos.json" ;;
+ '.#confctl.buildPlan') "$CONFCTL_BUILD_APP_ROOT/native/cat" "$CONFCTL_BUILD_APP_ROOT/replies/plan.json" ;;
+ '.#confctl.build') "$CONFCTL_BUILD_APP_ROOT/native/cat" "$CONFCTL_BUILD_APP_ROOT/replies/outputs.json" ;;
+ '.#confctl.inputsInfo') "$CONFCTL_BUILD_APP_ROOT/native/cat" "$CONFCTL_BUILD_APP_ROOT/replies/infos.json" ;;
  *)
   if [ "$1" != build ]; then printf 'unexpected Nix eval: %s\n' "$last" >&2; exit 97; fi
   printf "these 2 derivations will be built:\nthis path will be fetched (1 MiB)\nbuilding '/nix/store/fixture.drv'...\nunknown build log\n" >&2
@@ -157,11 +164,6 @@ esac
         self.run_args(role, None, if role == "decline" { b"n\n" } else { b"" })
     }
     fn command_args(&self, role: &str, args: Option<&[&str]>) -> Command {
-        let inherited = std::env::var_os("PATH").unwrap_or_default();
-        let path = std::env::join_paths(
-            std::iter::once(self.fake.clone()).chain(std::env::split_paths(&inherited)),
-        )
-        .unwrap();
         let mut command = Command::new(std::env::current_exe().unwrap());
         if let Some(args) = args {
             command.env(
@@ -173,7 +175,7 @@ esac
             .args(["--exact", FIXTURE, "--nocapture"])
             .env(ROLE, role)
             .env(ROOT, &self.root)
-            .env("PATH", path)
+            .env("PATH", &self.fake)
             .env("NIX_SSHOPTS", "-o Existing=yes")
             .env("CONFCTL_SSH_CONFIG", self.root.join("ssh config"))
             .stdin(Stdio::piped())
@@ -289,7 +291,7 @@ printf 'helper-start %s\n' "$NB_HOST" >> "$CONFCTL_BUILD_APP_ROOT/sequence"
 "$3/bin/switch-to-configuration" "$4"
 path="$CONFCTL_BUILD_APP_ROOT/confirm-${5##*/}"
 printf switched > "$path"
-while :; do state=; read -r state < "$path"; [ "$state" != confirmed ] || break; /run/current-system/sw/bin/sleep 0.01; done
+while :; do state=; read -r state < "$path"; [ "$state" != confirmed ] || break; "$CONFCTL_BUILD_APP_ROOT/native/sleep" 0.01; done
 printf 'helper-end %s\n' "$NB_HOST" >> "$CONFCTL_BUILD_APP_ROOT/sequence"
 if [ "$CONFCTL_BUILD_APP_ROLE" = helper-fail ]; then exit 9; fi"#,
             );
@@ -299,15 +301,15 @@ if [ "$CONFCTL_BUILD_APP_ROLE" = helper-fail ]; then exit 9; fi"#,
             r#"printf '%s\0' "$@" > "$CONFCTL_BUILD_APP_ROOT/nix-call-$$"
 last=; for arg do last=$arg; done
 case "$last" in
- '.#confctl.settings') exec /run/current-system/sw/bin/cat "$CONFCTL_BUILD_APP_ROOT/replies/defaults.json" ;;
+ '.#confctl.settings') exec "$CONFCTL_BUILD_APP_ROOT/native/cat" "$CONFCTL_BUILD_APP_ROOT/replies/defaults.json" ;;
  '.#confctl.machinesJson') printf '[{"outputs":{"out":"%s/replies/machines.json"}}]\n' "$CONFCTL_BUILD_APP_ROOT" ;;
  '.#confctl.buildPlan')
   file=plan; if [ -e "$CONFCTL_BUILD_APP_ROOT/runtime-kernels.json" ]; then file=plan-after; fi
   printf 'plan %s\n' "$file" >> "$CONFCTL_BUILD_APP_ROOT/sequence"
-  exec /run/current-system/sw/bin/cat "$CONFCTL_BUILD_APP_ROOT/replies/$file.json" ;;
+  exec "$CONFCTL_BUILD_APP_ROOT/native/cat" "$CONFCTL_BUILD_APP_ROOT/replies/$file.json" ;;
  '.#confctl.machineKeys') printf '{"ahead":"ahead-key","alpha":"alpha-key","carrier#beta":"beta/key","zed":"zed-key"}\n' ;;
- '.#confctl.build') exec /run/current-system/sw/bin/cat "$CONFCTL_BUILD_APP_ROOT/replies/outputs.json" ;;
- '.#confctl.inputsInfo') exec /run/current-system/sw/bin/cat "$CONFCTL_BUILD_APP_ROOT/replies/infos.json" ;;
+ '.#confctl.build') exec "$CONFCTL_BUILD_APP_ROOT/native/cat" "$CONFCTL_BUILD_APP_ROOT/replies/outputs.json" ;;
+ '.#confctl.inputsInfo') exec "$CONFCTL_BUILD_APP_ROOT/native/cat" "$CONFCTL_BUILD_APP_ROOT/replies/infos.json" ;;
  '.#confctl.inputsInfo.'*) printf 'current-inputs %s\n' "$last" >> "$CONFCTL_BUILD_APP_ROOT/sequence"; printf '{"nixpkgs":"CURRENT"}\n' ;;
  '.#confctl.inputs')
   input=input; if [ -e "$CONFCTL_BUILD_APP_ROOT/runtime-kernels.json" ]; then input=refreshed; fi
@@ -318,7 +320,7 @@ case "$last" in
   n=$((n+1)); printf '%s\n' "$n" > "$CONFCTL_BUILD_APP_ROOT/build-count"
   printf 'build %s\n' "$n" >> "$CONFCTL_BUILD_APP_ROOT/sequence"
   if [ "$CONFCTL_BUILD_APP_ROLE" = later-fail ] && [ "$n" = 2 ]; then exit 7; fi
-  if [ "$CONFCTL_BUILD_APP_ROLE" = slow-build ]; then printf '%s' "$$" > "$CONFCTL_BUILD_APP_ROOT/build-pid"; exec /run/current-system/sw/bin/sleep 60; fi
+  if [ "$CONFCTL_BUILD_APP_ROLE" = slow-build ]; then printf '%s' "$$" > "$CONFCTL_BUILD_APP_ROOT/build-pid"; exec "$CONFCTL_BUILD_APP_ROOT/native/sleep" 60; fi
   printf "building '/nix/store/fake.drv'...\n" >&2
   printf '[{"outputs":{"out":"not-selected"}}]\n' ;;
 esac"#,
@@ -335,7 +337,7 @@ exec /bin/sh -c "$1""#,
         native(
             &self.fake.join("sh"),
             r#"case "$2" in
- 'cat /run/confctl-confirm-'*' 2>/dev/null') path=${2#cat }; path=${path% 2>/dev/null}; exec /run/current-system/sw/bin/cat "$CONFCTL_BUILD_APP_ROOT/confirm-${path##*/}" ;;
+ 'cat /run/confctl-confirm-'*' 2>/dev/null') path=${2#cat }; path=${path% 2>/dev/null}; exec "$CONFCTL_BUILD_APP_ROOT/native/cat" "$CONFCTL_BUILD_APP_ROOT/confirm-${path##*/}" ;;
  'echo confirmed > /run/confctl-confirm-'*) path=${2#echo confirmed > }; printf 'confirmed\n' > "$CONFCTL_BUILD_APP_ROOT/confirm-${path##*/}"; printf 'confirm %s\n' "$NB_HOST" >> "$CONFCTL_BUILD_APP_ROOT/sequence" ;;
  *) exec /bin/sh "$@" ;;
 esac"#,
@@ -346,7 +348,7 @@ esac"#,
  /proc/uptime) printf '1 0\n' ;;
  /etc/confctl/inputs-info.json) printf '{"nixpkgs":"CURRENT"}\n' ;;
  *machine.json) printf '{"inputs-info":{"nixpkgs":"CURRENT"}}\n' ;;
- *) exec /run/current-system/sw/bin/cat "$@" ;;
+ *) exec "$CONFCTL_BUILD_APP_ROOT/native/cat" "$@" ;;
 esac"#,
         );
         native(
@@ -359,7 +361,7 @@ esac"#,
         );
         native(
             &self.fake.join("bash"),
-            r#"/run/current-system/sw/bin/cat > "$CONFCTL_BUILD_APP_ROOT/observed-profile-script-$$"
+            r#""$CONFCTL_BUILD_APP_ROOT/native/cat" > "$CONFCTL_BUILD_APP_ROOT/observed-profile-script-$$"
 printf '/other-profile\n'"#,
         );
         native(
@@ -1111,7 +1113,7 @@ exec /bin/sh -c "$1""#,
             &f.fake.join("cat"),
             r#"case "$1" in
  /proc/uptime) if [ -e "$CONFCTL_BUILD_APP_ROOT/rebooted-$NB_HOST" ]; then printf '1 0\n'; else printf '100 0\n'; fi ;;
- *) exec /run/current-system/sw/bin/cat "$@" ;;
+ *) exec "$CONFCTL_BUILD_APP_ROOT/native/cat" "$@" ;;
 esac"#,
         );
         native(

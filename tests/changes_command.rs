@@ -1,5 +1,7 @@
 //! Network-free actual diff/changelog routes; every external tool is a fake.
 #![cfg(target_os = "linux")]
+#[path = "support/native_tool.rs"]
+mod native_tool;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -29,11 +31,9 @@ impl Fixture {
         fs::create_dir_all(root.join("native")).unwrap();
         fs::create_dir(&bin).unwrap();
         fs::create_dir(&home).unwrap();
-        let cat = std::env::split_paths(&std::env::var_os("PATH").unwrap())
-            .map(|p| p.join("cat"))
-            .find(|p| p.is_file())
-            .unwrap();
-        symlink(cat, root.join("native/cat")).unwrap();
+        for tool in ["cat", "sleep"] {
+            symlink(native_tool::resolve(tool), root.join("native").join(tool)).unwrap();
+        }
         fs::write(root.join("flake.nix"), "{outputs=_:{};}\n").unwrap();
         fs::write(root.join("flake.lock"), "retained lock\n").unwrap();
         let fixture = Self {
@@ -116,7 +116,7 @@ case "$1" in
  -C) printf 'updated\n' >> "$2/fixture-cache" ;;
  *) exit 97 ;;
 esac
-if [ -e "$CHANGES_ROOT/git-slow" ]; then printf '%s\n' "$$" > "$CHANGES_ROOT/git-pid"; exec /run/current-system/sw/bin/sleep 60; fi
+if [ -e "$CHANGES_ROOT/git-slow" ]; then printf '%s\n' "$$" > "$CHANGES_ROOT/git-pid"; exec "$CHANGES_ROOT/native/sleep" 60; fi
 if [ -e "$CHANGES_ROOT/git-fail" ]; then printf 'Git native failure\377\n' >&2; exit 17; fi
 case "$*" in *' log '*)
  : > "$CHANGES_ROOT/git-log-entered"

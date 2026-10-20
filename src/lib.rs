@@ -22,3 +22,7 @@ pub mod timing;
 
 mod machine_endpoint;
 mod vpsadmin;
+
+#[cfg(test)]
+#[path = "../tests/support/native_tool.rs"]
+mod native_tool;

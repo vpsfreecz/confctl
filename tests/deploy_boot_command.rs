@@ -1,5 +1,7 @@
 //! Saved boot routes use confined fake queries, copies and activation executables.
 #![cfg(target_os = "linux")]
+#[path = "support/native_tool.rs"]
+mod native_tool;
 use confctl::generation::BuildGeneration;
 use serde_json::json;
 use std::{
@@ -29,6 +31,11 @@ impl Fixture {
         let bin = tmp.path().join("bin");
         fs::create_dir(&root).unwrap();
         fs::create_dir(&bin).unwrap();
+        fs::create_dir(root.join("native")).unwrap();
+        std::os::unix::fs::symlink(native_tool::resolve("cat"), root.join("native/cat")).unwrap();
+        std::os::unix::fs::symlink(native_tool::resolve("sleep"), root.join("native/sleep"))
+            .unwrap();
+
         fs::write(root.join("flake.nix"), "{}\n").unwrap();
         fs::write(root.join("flake.lock"), "unchanged lock\n").unwrap();
         fs::write(root.join("machines.json"), serde_json::to_vec(&json!({
@@ -52,7 +59,7 @@ printf 'effect %s %s\n' "$1" "$BOOT_HOST" >> "$BOOT_ROOT/sequence"
 printf 'native %s on %s\n' "$1" "$BOOT_HOST"
 if { [ "$BOOT_MODE" = slow-boot ] && [ "$1" = boot ]; } || { [ "$BOOT_MODE" = slow-dry ] && [ "$1" = dry-activate ]; }; then
  printf '%s' "$$" > "$BOOT_ROOT/pid"
- exec /run/current-system/sw/bin/sleep 60
+ exec "$BOOT_ROOT/native/sleep" 60
 fi
 if [ "$BOOT_MODE" = boot-fail ] && [ "$1" = boot ]; then exit 7; fi
 if [ "$BOOT_MODE" = dry-fail ] && [ "$1" = dry-activate ]; then exit 8; fi
@@ -130,7 +137,7 @@ esac
         executable(
             &bin.join("bash"),
             r#"#!/bin/sh
-script=$(/run/current-system/sw/bin/cat)
+script=$("$BOOT_ROOT/native/cat")
 host=$BOOT_HOST
 profile=/nix/var/nix/profiles/system
 case "$script" in *confctl-guest*) host=guest; profile=/nix/var/nix/profiles/confctl-guest ;; esac
@@ -208,7 +215,7 @@ exec /bin/sh -c "$1"
 printf 'effect reboot %s\n' "$BOOT_HOST" >> "$BOOT_ROOT/sequence"
 printf rebooted > "$BOOT_ROOT/rebooted-$BOOT_HOST"
 printf 'native reboot output on %s\n' "$BOOT_HOST"
-if [ "$BOOT_MODE" = slow-reboot ]; then printf '%s' "$$" > "$BOOT_ROOT/reboot-pid"; exec /run/current-system/sw/bin/sleep 60; fi
+if [ "$BOOT_MODE" = slow-reboot ]; then printf '%s' "$$" > "$BOOT_ROOT/reboot-pid"; exec "$BOOT_ROOT/native/sleep" 60; fi
 if [ "$BOOT_MODE" = reboot-fail ]; then printf 'reboot failed marker\n' >&2; exit 7; fi
 if [ "$BOOT_MODE" = reboot-signal ]; then kill -TERM "$$"; fi
 "#,
@@ -235,8 +242,8 @@ case "$BOOT_MODE" in
  invalid-poll) printf 'garbage\n'; exit 0 ;;
  nonfinite-poll) printf 'inf\n'; exit 0 ;;
  negative-poll) printf -- '-0.5\n'; exit 0 ;;
- slow-poll) printf '%s' "$$" > "$BOOT_ROOT/reboot-pid"; exec /run/current-system/sw/bin/sleep 60 ;;
- blocked-poll) /run/current-system/sw/bin/sleep 0.8 ;;
+ slow-poll) printf '%s' "$$" > "$BOOT_ROOT/reboot-pid"; exec "$BOOT_ROOT/native/sleep" 60 ;;
+ blocked-poll) "$BOOT_ROOT/native/sleep" 0.8 ;;
 esac
 printf '1.25 0\n'
 "#,

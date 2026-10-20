@@ -1,4 +1,5 @@
 use super::*;
+use crate::native_tool;
 
 fn shell(script: &str) -> ProcessSpec {
     let mut spec = ProcessSpec::new("sh", "fake local child");
@@ -1161,10 +1162,10 @@ async fn login_probe_preserves_original_stdin_flags_identity_and_unread_typeahea
     );
     let directory = tempfile::tempdir().expect("spools");
     let (runner, _receiver) = owner(directory.path(), 128, None);
-    // Qualified lexical multicall entry; resolving the symlink changes argv0.
+    // Native lexical applet entry; resolving the symlink changes argv0.
     let mut spec = ProcessSpec::new(
-        "/nix/store/mhv491ysr5xqajfipq4r18wcqhjw4smz-coreutils-9.11/bin/logname",
-        "qualified no-read login probe",
+        native_tool::resolve("logname"),
+        "native no-read login probe",
     );
     spec.stdin = StdinPolicy::LoginProbe(probe);
     spec.env = vec![

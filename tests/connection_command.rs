@@ -1,6 +1,8 @@
 //! Real executable routing; every Nix/SSH/local probe is a temporary fake.
 #![cfg(target_os = "linux")]
 
+#[path = "support/native_tool.rs"]
+mod native_tool;
 use serde_json::json;
 use std::{
     ffi::OsString,
@@ -27,6 +29,10 @@ impl Fixture {
         let bin = scratch.path().join("bin");
         fs::create_dir_all(root.join(".confctl/generations/local")).unwrap();
         fs::create_dir(&bin).unwrap();
+        fs::create_dir(root.join("native")).unwrap();
+        std::os::unix::fs::symlink(native_tool::resolve("sleep"), root.join("native/sleep"))
+            .unwrap();
+
         fs::write(root.join("flake.nix"), "{ outputs = _: {}; }\n").unwrap();
         fs::write(root.join("flake.lock"), b"unchanged lock bytes\n").unwrap();
         fs::write(
@@ -113,7 +119,7 @@ printf 'UPTIME_PRIVATE_REMOTE 88.0\n'
             .env("CONNECTION_ROOT", &self.root)
             .env("CONNECTION_MODE", mode)
             .env("CONFCTL_SSH_CONFIG", &self.config)
-            .env("CONNECTION_SLEEP", "/run/current-system/sw/bin/sleep")
+            .env("CONNECTION_SLEEP", self.root.join("native/sleep"))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());

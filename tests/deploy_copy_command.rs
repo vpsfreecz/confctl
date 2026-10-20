@@ -1,5 +1,7 @@
 //! Saved-generation copy route with confined fake Nix/host/copy executables.
 #![cfg(target_os = "linux")]
+#[path = "support/native_tool.rs"]
+mod native_tool;
 use confctl::generation::BuildGeneration;
 use serde_json::{Value, json};
 use std::{
@@ -29,6 +31,10 @@ impl Fixture {
         let bin = tmp.path().join("bin");
         fs::create_dir_all(&root).unwrap();
         fs::create_dir(&bin).unwrap();
+        fs::create_dir(root.join("native")).unwrap();
+        std::os::unix::fs::symlink(native_tool::resolve("sleep"), root.join("native/sleep"))
+            .unwrap();
+
         fs::write(root.join("flake.nix"), "{}\n").unwrap();
         fs::write(root.join("flake.lock"), "retained lock\n").unwrap();
         let machines = json!({
@@ -113,7 +119,7 @@ record="$COPY_ROOT/copy-call-$$"
 } > "$record"
 printf '%s\n' "$$" >> "$COPY_ROOT/call-order"
 printf 'copy %s\n' "$*" >> "$COPY_ROOT/sequence"
-if [ "$COPY_MODE" = slow ]; then printf '%s' "$$" > "$COPY_ROOT/pid"; exec /run/current-system/sw/bin/sleep 60; fi
+if [ "$COPY_MODE" = slow ]; then printf '%s' "$$" > "$COPY_ROOT/pid"; exec "$COPY_ROOT/native/sleep" 60; fi
 printf "copying 2 paths...\ncopying path '/store/first'...\nraw copy log\ncopying path '/store/second'...\n" >&2
 if [ "$COPY_MODE" = carrier-failure ]; then exit 7; fi
 if [ "$COPY_MODE" = failure ] || [ "$COPY_MODE" = refresh-failure ]; then
