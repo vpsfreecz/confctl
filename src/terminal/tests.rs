@@ -701,3 +701,23 @@ fn shutdown_keeps_retained_primary_and_wake_join_failures_in_order() {
     assert!(secondary[1].to_string().contains("input broker panicked"));
     broker.shutdown().expect("no duplicate failures");
 }
+
+#[tokio::test]
+async fn pager_rejects_noncontrolling_output_without_replacing_prompt_input() {
+    let (input, mut peer) = UnixStream::pair().unwrap();
+    let (events, _receiver) = EventSink::channel(1);
+    let ui = Ui::new(&input, events, CancellationToken::new(), None).unwrap();
+    let (_master, slave) = pty_tests::open_pty();
+    assert!(ui.pager_foreground(slave).await.is_err());
+    assert_eq!(ui.state(), TerminalState::Idle);
+    peer.write_all(b"untouched\n").unwrap();
+    assert_eq!(
+        ui.session
+            .broker
+            .line(false, &CancellationToken::new())
+            .await
+            .unwrap(),
+        b"untouched\n"
+    );
+    ui.shutdown().unwrap();
+}

@@ -11,6 +11,9 @@ mod health_systemd;
 mod host_status;
 mod inputs;
 mod machines;
+// Registered normally when the comparison adapter is integrated.
+#[cfg(test)]
+mod pager;
 mod runtime_kernels;
 mod ssh;
 mod status;

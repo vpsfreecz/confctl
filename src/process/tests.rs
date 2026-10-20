@@ -1358,3 +1358,189 @@ async fn copy_progress_arrives_before_child_exit_and_failure_joins_it() {
         runner.shutdown().await.unwrap();
     }
 }
+
+#[tokio::test]
+async fn pager_actual_epipe_is_closed_and_keeps_nonzero_native_outcome() {
+    let directory = tempfile::tempdir().unwrap();
+    let (runner, _receiver) = owner(directory.path(), 64, None);
+    let cancel = CancellationToken::new();
+    let (mut writer, input) = PagerInput::channel();
+    let mut spec = shell("exec 0<&-; printf 'real pager output'; exit 7");
+    spec.stdin = StdinPolicy::Pager(input);
+    let produce = async {
+        assert_eq!(
+            writer
+                .write(&vec![b'x'; 1024 * 1024], &cancel)
+                .await
+                .unwrap(),
+            WrittenOrClosed::Closed
+        );
+        assert!(!cancel.is_cancelled());
+        drop(writer);
+    };
+    let (result, ()) = tokio::join!(
+        runner.run(spec, ProcessScope::new(cancel.clone(), TaskId(1))),
+        produce
+    );
+    let result = result.unwrap();
+    assert_eq!(result.code(), Some(7));
+    assert_eq!(result.termination, TerminationCause::Exited);
+    assert_eq!(result.stdout.memory().unwrap(), b"real pager output");
+    runner.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn pager_chunk_delivery_is_acknowledged_and_finish_closes_stdin() {
+    let directory = tempfile::tempdir().unwrap();
+    let (runner, _receiver) = owner(directory.path(), 64, None);
+    let (mut writer, input) = PagerInput::channel();
+    let bytes = b"report\0\xff\n".repeat(CHUNK);
+    let mut spec = shell("cat");
+    spec.stdin = StdinPolicy::Pager(input);
+    let produce = async {
+        assert_eq!(
+            writer
+                .write(&bytes, &CancellationToken::new())
+                .await
+                .unwrap(),
+            WrittenOrClosed::Written
+        );
+        drop(writer);
+    };
+    let (outcome, ()) = tokio::join!(
+        runner.run(spec, ProcessScope::new(CancellationToken::new(), TaskId(1))),
+        produce
+    );
+    let outcome = outcome.unwrap();
+    assert!(outcome.status.success());
+    assert_eq!(crate::nix::bytes(&outcome.stdout).await.unwrap(), bytes);
+    runner.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn pager_lost_channel_and_non_epipe_write_and_shutdown_are_errors() {
+    use std::{
+        pin::Pin,
+        task::{Context, Poll},
+    };
+    struct FailedWrite {
+        error: Option<io::Error>,
+        shutdown: bool,
+    }
+    impl AsyncWrite for FailedWrite {
+        fn poll_write(
+            mut self: Pin<&mut Self>,
+            _: &mut Context<'_>,
+            bytes: &[u8],
+        ) -> Poll<io::Result<usize>> {
+            if self.shutdown {
+                Poll::Ready(Ok(bytes.len()))
+            } else {
+                Poll::Ready(Err(self.error.take().unwrap()))
+            }
+        }
+        fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+        fn poll_shutdown(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Poll::Ready(Err(self.error.take().unwrap()))
+        }
+    }
+    for error in [
+        io::Error::from_raw_os_error(::nix::libc::EIO),
+        io::Error::new(io::ErrorKind::BrokenPipe, "not a pipe EPIPE"),
+    ] {
+        let (mut writer, input) = PagerInput::channel();
+        let mut failing = FailedWrite {
+            error: Some(error),
+            shutdown: false,
+        };
+        let cancel = CancellationToken::new();
+        let (native, acknowledged) = tokio::join!(
+            pager_input(&mut failing, input),
+            writer.write(b"report", &cancel)
+        );
+        assert!(native.is_err() && acknowledged.is_err());
+    }
+    let (writer, input) = PagerInput::channel();
+    drop(writer);
+    let mut failing = FailedWrite {
+        error: Some(io::Error::from_raw_os_error(::nix::libc::EIO)),
+        shutdown: true,
+    };
+    assert!(pager_input(&mut failing, input).await.is_err());
+    let (mut writer, input) = PagerInput::channel();
+    drop(input);
+    assert!(
+        writer
+            .write(b"report", &CancellationToken::new())
+            .await
+            .is_err()
+    );
+    let (mut writer, mut input) = PagerInput::channel();
+    let consume = async {
+        drop(input.0.recv().await.unwrap());
+    };
+    let cancel = CancellationToken::new();
+    let ((), result) = tokio::join!(consume, writer.write(b"report", &cancel));
+    assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn pager_cancellation_wakes_pending_chunk_and_joins_child() {
+    let directory = tempfile::tempdir().unwrap();
+    let (runner, _receiver) = owner(directory.path(), 64, None);
+    let cancel = CancellationToken::new();
+    let (mut writer, input) = PagerInput::channel();
+    let mut spec = shell("exec sleep 30");
+    spec.stdin = StdinPolicy::Pager(input);
+    let produce = async {
+        let bytes = vec![b'x'; 1024 * 1024];
+        let pending = writer.write(&bytes, &cancel);
+        tokio::pin!(pending);
+        tokio::select! { result = &mut pending => panic!("unexpected result: {result:?}"), _ = tokio::time::sleep(Duration::from_millis(30)) => {} }
+        cancel.cancel();
+        assert!(pending.await.unwrap_err().is_cancelled());
+    };
+    let (outcome, ()) = tokio::join!(
+        runner.run(spec, ProcessScope::new(cancel.clone(), TaskId(1))),
+        produce
+    );
+    assert_eq!(outcome.unwrap().termination, TerminationCause::Canceled);
+    runner.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn ordinary_bytes_file_epipe_and_source_failure_remain_failures() {
+    for file in [false, true] {
+        let directory = tempfile::tempdir().unwrap();
+        let (runner, _receiver) = owner(directory.path(), 64, None);
+        let bytes = vec![b'x'; 1024 * 1024];
+        let source = directory.path().join("input");
+        std::fs::write(&source, &bytes).unwrap();
+        let mut spec = shell("exec 0<&-; exit 0");
+        spec.stdin = if file {
+            StdinPolicy::File(source)
+        } else {
+            StdinPolicy::Bytes(bytes)
+        };
+        assert!(
+            runner
+                .run(spec, ProcessScope::new(CancellationToken::new(), TaskId(1)))
+                .await
+                .is_err()
+        );
+        runner.shutdown().await.unwrap();
+    }
+    let directory = tempfile::tempdir().unwrap();
+    let (runner, _receiver) = owner(directory.path(), 64, None);
+    let mut spec = shell("cat");
+    spec.stdin = StdinPolicy::File(directory.path().join("missing"));
+    assert!(
+        runner
+            .run(spec, ProcessScope::new(CancellationToken::new(), TaskId(1)))
+            .await
+            .is_err()
+    );
+    runner.shutdown().await.unwrap();
+}

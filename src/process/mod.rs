@@ -42,10 +42,97 @@ pub enum StdinPolicy {
     Null,
     Bytes(Vec<u8>),
     File(PathBuf),
+    /// Report chunks acknowledged only after the pager pipe write completes.
+    Pager(PagerInput),
     Foreground,
     /// Reserved for the audited no-read GNU logname probe, never arbitrary
     /// interactive inheritance. The resolver owns its pinned executable path.
     LoginProbe(LoginProbeStdin),
+}
+
+/// The result describes pipe acceptance, not whether a human saw the bytes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WrittenOrClosed {
+    Written,
+    Closed,
+}
+
+#[derive(Debug)]
+struct PagerChunk {
+    bytes: Vec<u8>,
+    response: oneshot::Sender<io::Result<WrittenOrClosed>>,
+}
+
+#[derive(Debug)]
+pub struct PagerInput(mpsc::Receiver<PagerChunk>);
+
+pub struct PagerWriter(mpsc::Sender<PagerChunk>);
+
+impl PagerInput {
+    pub fn channel() -> (PagerWriter, Self) {
+        let (sender, receive) = mpsc::channel(1);
+        (PagerWriter(sender), Self(receive))
+    }
+}
+
+impl PagerWriter {
+    pub async fn write(
+        &mut self,
+        bytes: &[u8],
+        cancel: &CancellationToken,
+    ) -> Result<WrittenOrClosed, ConfctlError> {
+        for bytes in bytes.chunks(CHUNK) {
+            let (response, receive) = oneshot::channel();
+            let chunk = PagerChunk {
+                bytes: bytes.to_vec(),
+                response,
+            };
+            tokio::select! {
+                result = self.0.send(chunk) => result.map_err(|_| ConfctlError::EventDelivery("pager input owner closed without a pipe-write result".into()))?,
+                _ = cancel.cancelled() => return Err(ConfctlError::Cancelled),
+            }
+            let result = tokio::select! {
+                result = receive => result.map_err(|_| ConfctlError::EventDelivery("pager pipe write was not acknowledged".into()))?,
+                _ = cancel.cancelled() => return Err(ConfctlError::Cancelled),
+            }.map_err(|source| io_error("write pager stdin", None, source))?;
+            if cancel.is_cancelled() {
+                return Err(ConfctlError::Cancelled);
+            }
+            if result == WrittenOrClosed::Closed {
+                return Ok(result);
+            }
+        }
+        if cancel.is_cancelled() {
+            return Err(ConfctlError::Cancelled);
+        }
+        Ok(WrittenOrClosed::Written)
+    }
+}
+
+async fn pager_input(
+    stdin: &mut (impl AsyncWrite + Unpin),
+    mut input: PagerInput,
+) -> io::Result<()> {
+    while let Some(chunk) = input.0.recv().await {
+        match stdin.write_all(&chunk.bytes).await {
+            Ok(()) => {
+                let _ = chunk.response.send(Ok(WrittenOrClosed::Written));
+            }
+            Err(error) if error.raw_os_error() == Some(::nix::libc::EPIPE) => {
+                let _ = chunk.response.send(Ok(WrittenOrClosed::Closed));
+                return Ok(());
+            }
+            Err(error) => {
+                let copy = error
+                    .raw_os_error()
+                    .map(io::Error::from_raw_os_error)
+                    .unwrap_or_else(|| io::Error::new(error.kind(), error.to_string()));
+                let _ = chunk.response.send(Err(copy));
+                return Err(error);
+            }
+        }
+    }
+    stdin.shutdown().await
 }
 
 /// A duplicate of the original fd0 open-file description, not a reopened
@@ -923,6 +1010,7 @@ async fn execute(
                     let mut source = File::open(path).await?;
                     tokio::io::copy(&mut source, &mut stdin).await?;
                 }
+                StdinPolicy::Pager(input) => return pager_input(&mut stdin, input).await,
                 _ => {}
             }
             stdin.shutdown().await
