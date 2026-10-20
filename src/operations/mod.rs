@@ -2,6 +2,7 @@
 //! routes stay explicit failures before timing/UI/state construction.
 
 mod build;
+mod changes;
 mod connection;
 mod cssh;
 mod deploy;
@@ -9,10 +10,9 @@ mod generation_list;
 mod health_check;
 mod health_systemd;
 mod host_status;
+mod input_observation;
 mod inputs;
 mod machines;
-// Registered normally when the comparison adapter is integrated.
-#[cfg(test)]
 mod pager;
 mod runtime_kernels;
 mod ssh;
@@ -44,6 +44,8 @@ impl Operations for CoreOperations {
                     | Action::Ssh(_)
                     | Action::Cssh { .. }
                     | Action::HealthCheck { .. }
+                    | Action::Diff(_)
+                    | Action::Changelog { .. }
             )
     }
     async fn run(
@@ -62,6 +64,9 @@ impl Operations for CoreOperations {
             } => inputs::channels(&root, pattern.as_deref(), *has_extra_arguments, context).await?,
             Action::List { .. } => machines::list(&invocation.action, root, context).await?,
             Action::Status { .. } => status::run(&invocation.action, root, context).await?,
+            Action::Diff(_) | Action::Changelog { .. } => {
+                changes::run(&invocation.action, root, context).await?
+            }
             Action::Build(request) => build::run(request, root, context).await?,
             Action::Deploy(request) => deploy::run(request, root, context).await?,
             Action::TestConnection { .. } => {

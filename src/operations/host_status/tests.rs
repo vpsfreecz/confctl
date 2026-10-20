@@ -74,6 +74,37 @@ struct RecordingRunner {
     outcomes: Mutex<VecDeque<ProcessOutcome>>,
     specs: Mutex<Vec<ProcessSpec>>,
 }
+
+#[tokio::test]
+async fn uptime_only_reads_one_native_phase_without_current_or_profile_observations() {
+    let inventory = Inventory::from_value(
+        json!({"host":{"name":"host","metaConfig":{"host":{"target":"localhost"}}}}),
+    )
+    .unwrap();
+    for code in [0, 255] {
+        let runner = RecordingRunner {
+            outcomes: Mutex::new(vec![outcome(code, b"1.5 0\n")].into()),
+            specs: Mutex::new(Vec::new()),
+        };
+        let status = uptime_only(
+            &inventory,
+            &inventory.machines[0],
+            &runner,
+            &CancellationToken::new(),
+            TaskId(9),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(status.uptime, if code == 0 { Some(1.5) } else { None });
+        assert_eq!(status.failure.is_some(), code != 0);
+        assert!(status.current_toplevel.is_none() && status.generations.is_none());
+        let calls = runner.specs.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].program, PathBuf::from("cat"));
+        assert_eq!(calls[0].args, ["/proc/uptime"]);
+    }
+}
 impl ProcessRunner for RecordingRunner {
     async fn run(
         &self,

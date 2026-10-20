@@ -68,6 +68,19 @@ guard, then admits observations in selected order with IDs above the build range
 Returned objects supply target paths; current configured inputs are compared
 even for reused records. Saved/none modes retain their read-only behavior.
 
+[`diff` and `changelog`](changes.md) admit sequential host-comparison tasks for
+uptime and input reads, without system builds or profile enumeration. Changelog
+also runs Git mirror clone/fetch/log operations in role order. Host outcomes
+remain distinct from input equality. The lazy [pager](pager.md) owns one separate
+task and is always joined, including after producer errors or actual pipe EPIPE.
+EPIPE stops later host and Git work; earlier observations and cache effects remain.
+Disabled paging emits report bytes through acknowledged stdout, including
+redirected output. Configured pager commands run without discovery, probes,
+argument stripping or fallback. Ordinary host/Git failures and ordinary pager
+exits can leave failed tasks while the invocation exits 0; infrastructure,
+delivery and cancellation errors fail the invocation. Targeted fake-tool/PTY
+tests do not establish real-site or full terminal qualification.
+
 `ssh` admits per-host tasks and reports actual completed and failed host counts
 for commands. Command stdout and stderr share one native pipe and capture.
 Interactive shells park painting through the foreground terminal owner and
