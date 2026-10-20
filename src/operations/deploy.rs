@@ -1,4 +1,4 @@
-//! Copy saved generations or run saved activation actions without reboot.
+//! Build or select generations, copy, activate and optionally reboot/wait.
 //! Earlier copies, kernel refreshes and activation effects survive later failure.
 use crate::{
     app::Context,
@@ -30,6 +30,7 @@ use std::{
 use tokio_util::sync::CancellationToken;
 
 mod health;
+mod reboot;
 mod rollback;
 
 pub(super) async fn run(
@@ -221,6 +222,8 @@ async fn confirm_targets(
                     if request.reboot { " + reboot" } else { "" },
                     if request.copy_only {
                         " (copy only)"
+                    } else if request.reboot {
+                        ""
                     } else {
                         " (without reboot)"
                     }
@@ -895,7 +898,12 @@ async fn activate_generations(
         }
     }
     let first_activation = task_end(first_copy, remaining.len())?;
-    let mut next_health_id = task_end(first_activation, remaining.len())?;
+    let first_reboot = task_end(first_activation, remaining.len())?;
+    let mut next_health_id = if request.reboot {
+        task_end(first_reboot, remaining.len())?
+    } else {
+        first_reboot
+    };
     for (index, job) in remaining.iter_mut().enumerate() {
         job.task = TaskId(first_copy + index as u64);
     }
@@ -919,7 +927,8 @@ async fn activate_generations(
                         request.interactive.then_some(&ctx.ui)).await?;
                     if !copied.is_empty() && activate_one(&activation, job, TaskId(first_activation + index as u64)).await? {
                         completed.push(job);
-                        if matches!(request.action, SwitchAction::Test | SwitchAction::Switch) {
+                        let health_ready = !request.reboot || reboot::run(ctx, inventory.get(job.machine), ssh_config.as_deref(), TaskId(first_reboot + index as u64), &request.wait_online, request.interactive).await? != reboot::Outcome::Skipped;
+                        if health_ready && needs_health(request) {
                             health_outcomes.push(health::run(ctx, request, inventory, root, &[job.machine], &mut next_health_id).await?);
                         }
                     }
@@ -943,12 +952,21 @@ async fn activate_generations(
                     completed.push(job);
                 }
             }
-            if matches!(request.action, SwitchAction::Test | SwitchAction::Switch) {
+            if request.reboot {
+                for (index, job) in remaining.iter().enumerate() {
+                    if completed.iter().any(|done| done.machine == job.machine) {
+                        reboot::run(ctx, inventory.get(job.machine), ssh_config.as_deref(), TaskId(first_reboot + index as u64), &request.wait_online, request.interactive).await?;
+                    }
+                }
+            }
+            if needs_health(request) {
                 let hosts = confirmed.iter().copied().filter(|id| completed.iter().any(|job| job.machine == *id)).collect::<Vec<_>>();
                 health_outcomes.push(health::run(ctx, request, inventory, root, &hosts, &mut next_health_id).await?);
             }
         }
-        let summary = if matches!(request.action, SwitchAction::Test | SwitchAction::Switch) {
+        let summary = if request.reboot {
+            format!("{} boot actions completed; eligible reboot/wait work completed or was explicitly skipped. {} Carried hosts were copied only; localhost was not rebooted. Native reboot failures and lower-uptime observations do not prove command effect or the running generation.\n", deployment_name(request), health::summary(&health_outcomes))
+        } else if matches!(request.action, SwitchAction::Test | SwitchAction::Switch) {
             let mut helpers = 0;
             let mut carried = 0;
             for job in &completed {
@@ -970,13 +988,20 @@ async fn activate_generations(
     if let Err(error) = result {
         let later = ctx.events.emit(UiEvent::Diagnostic {
             stream: OutputStream::Stderr, style: Style::Failure,
-            text: if matches!(request.action, SwitchAction::Test | SwitchAction::Switch) {
+            text: if request.reboot {
+                format!("{} boot/reboot stopped; earlier local publications, refreshes, copies, bootloader/profile changes, reboot requests and health-program effects are retained. Inspect target state and connectivity before an explicit rerun; no automatic second reboot, compensation or remote cancellation was requested.\n", deployment_name(request))
+            } else if matches!(request.action, SwitchAction::Test | SwitchAction::Switch) {
                 format!("{} {} stopped; earlier local publications, refreshes, copies, script{} and health-program effects are retained. Remote watchdog state and hidden switch/rollback status may be unknown. Inspect the target before an explicit rerun; no compensating activation, confirmation or profile setting was requested.\n", deployment_name(request), action_name(request.action), if request.action == SwitchAction::Switch { ", profile, carrier callback" } else { "" })
             } else { format!("{} {} stopped; earlier local publications, copies, runtime-kernel state and script effects{} are retained. Inspect target state before retrying; no rollback or reboot was performed.\n", deployment_name(request), action_name(request.action), if request.action == SwitchAction::Boot { ", including bootloader changes and profile updates," } else { "" }) },
         }).await;
         return Err(error.with_secondary(later.err().into_iter().collect()));
     }
     Ok(())
+}
+
+fn needs_health(request: &DeployRequest) -> bool {
+    matches!(request.action, SwitchAction::Test | SwitchAction::Switch)
+        || (request.action == SwitchAction::Boot && request.reboot)
 }
 
 fn copy_limit(request: &DeployRequest) -> Result<usize, ConfctlError> {

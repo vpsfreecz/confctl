@@ -178,6 +178,15 @@ pub(super) async fn uptime_only<P: ProcessRunner>(
         &["cat".into(), "/proc/uptime".into()],
     )?;
     spec.redacted_description = format!("query generations on {}", machine.name);
+    uptime_spec(runner, cancellation, task, spec).await
+}
+
+pub(super) async fn uptime_spec<P: ProcessRunner>(
+    runner: &P,
+    cancellation: &CancellationToken,
+    task: TaskId,
+    spec: ProcessSpec,
+) -> Result<HostStatus, ConfctlError> {
     let mut status = HostStatus::default();
     match observe(runner, spec, cancellation, task, "uptime", |text| {
         text.split_whitespace()

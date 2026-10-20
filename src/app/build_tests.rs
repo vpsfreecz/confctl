@@ -1093,3 +1093,128 @@ fn new_build_cancellation_joins_entered_build_before_any_deployment_or_status_qu
         f.unchanged();
     }
 }
+
+#[test]
+fn new_build_reboot_completes_all_builds_then_ordered_boot_reboot_health() {
+    for serial in [false, true] {
+        let f = Fixture::new();
+        f.composed(true, false);
+        native(
+            &f.fake.join("ssh"),
+            r#"printf '%s\0' "$@" > "$CONFCTL_BUILD_APP_ROOT/ssh-call-$$"
+while [ "$#" -gt 0 ]; do case "$1" in -F|-l|-p|-o) shift; shift ;; *) break ;; esac; done
+NB_HOST=${1%.invalid}; export NB_HOST; shift
+[ "$#" = 1 ] || exit 97
+exec /bin/sh -c "$1""#,
+        );
+        native(
+            &f.fake.join("cat"),
+            r#"case "$1" in
+ /proc/uptime) if [ -e "$CONFCTL_BUILD_APP_ROOT/rebooted-$NB_HOST" ]; then printf '1 0\n'; else printf '100 0\n'; fi ;;
+ *) exec /run/current-system/sw/bin/cat "$@" ;;
+esac"#,
+        );
+        native(
+            &f.fake.join("reboot"),
+            r#"printf 'reboot %s\n' "$NB_HOST" >> "$CONFCTL_BUILD_APP_ROOT/sequence"
+printf done > "$CONFCTL_BUILD_APP_ROOT/rebooted-$NB_HOST""#,
+        );
+        let mut args = vec![
+            "--color=never",
+            "deploy",
+            "--yes",
+            "--reboot",
+            "--wait-online=0",
+            "--max-concurrent-copy=1",
+        ];
+        if serial {
+            args.push("--one-by-one");
+        }
+        args.extend(["*", "boot"]);
+        let out = f.run_args("composed", Some(&args), b"");
+        assert_eq!(out.status.code(), Some(0), "{serial}: {out:?}");
+        let seq = f.sequence();
+        assert!(
+            seq_position(&seq, "build 2") < seq_position(&seq, "copy "),
+            "{seq:?}"
+        );
+        let phases = seq
+            .iter()
+            .filter(|v| {
+                v.starts_with("activate ")
+                    || v.starts_with("profile ")
+                    || v.starts_with("reboot ")
+                    || (serial && v.starts_with("health "))
+            })
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            phases,
+            if serial {
+                vec![
+                    "activate alpha boot",
+                    "profile alpha",
+                    "reboot alpha",
+                    "health alpha",
+                    "activate ahead boot",
+                    "profile ahead",
+                    "reboot ahead",
+                    "health ahead",
+                    "activate zed boot",
+                    "profile zed",
+                    "reboot zed",
+                    "health zed",
+                ]
+            } else {
+                vec![
+                    "activate alpha boot",
+                    "profile alpha",
+                    "activate ahead boot",
+                    "profile ahead",
+                    "activate zed boot",
+                    "profile zed",
+                    "reboot alpha",
+                    "reboot ahead",
+                    "reboot zed",
+                ]
+            },
+            "{seq:?}"
+        );
+        if !serial {
+            let mut health = seq
+                .iter()
+                .filter(|v| v.starts_with("health "))
+                .map(String::as_str)
+                .collect::<Vec<_>>();
+            health.sort_unstable();
+            assert_eq!(
+                health,
+                ["health ahead", "health alpha", "health zed"],
+                "{seq:?}; {out:?}"
+            );
+            assert!(
+                seq_position(&seq, "reboot zed") < seq_position(&seq, "health "),
+                "{seq:?}"
+            );
+            // Acknowledged attempt diagnostics preserve admission order; OS child
+            // scheduling is independent within the fixed five-check bound.
+            let text = String::from_utf8_lossy(&out.stdout);
+            let attempts = ["ahead", "alpha", "zed"].map(|host| {
+                text.find(&format!("{host}: health-tool {host}: attempt 1"))
+                    .unwrap_or_else(|| panic!("{text}"))
+            });
+            assert!(
+                attempts[0] < attempts[1] && attempts[1] < attempts[2],
+                "{text}"
+            );
+        }
+        assert!(!f.root.join("rebooted-carrier").exists());
+        assert!(f.native_records("helper-").is_empty());
+        assert!(f.native_records("carrier-").is_empty());
+        assert_eq!(
+            fs::read_link(f.root.join(".confctl/generations/alpha/current")).unwrap(),
+            Path::new("2000-01-01--00-00-00")
+        );
+        f.unchanged();
+    }
+}

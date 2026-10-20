@@ -28,7 +28,7 @@ use crate::{
 pub struct CoreOperations;
 impl Operations for CoreOperations {
     fn available(&self, action: &Action) -> bool {
-        matches!(action, Action::Deploy(request) if request.copy_only || !request.reboot)
+        matches!(action, Action::Deploy(_))
             || matches!(
                 action,
                 Action::GenerationList { .. } | Action::Status { .. }

@@ -226,7 +226,10 @@ fn description(machine: &Machine) -> String {
     format!("test connection to {}", machine.name)
 }
 
-fn probe_spec(machine: &Machine, ssh_config: Option<&OsStr>) -> Result<ProcessSpec, ConfctlError> {
+pub(super) fn probe_spec(
+    machine: &Machine,
+    ssh_config: Option<&OsStr>,
+) -> Result<ProcessSpec, ConfctlError> {
     let mut spec = command_spec(machine, ssh_config, &["cat".into(), "/proc/uptime".into()])?;
     spec.redacted_description = description(machine);
     if spec.program == Path::new("ssh") {

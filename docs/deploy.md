@@ -8,7 +8,7 @@ or health-check options are supplied. The non-copy-only route also supports
 `--reboot`, and the same command with action `dry-activate`, `test` or `switch`.
 Omitting the action selects switch. Without `--generation`, deploy builds the
 confirmed hosts first, then uses the same four actions or copy-only policy.
-Rebooting remains unavailable outside copy-only, which never requests a reboot.
+Boot also supports `--reboot` and `--wait-online`; copy-only never requests a reboot.
 
 Selection includes managed machines of every spin, including carried machines;
 it does not apply the runnable filter. The command previews hosts, selector and
@@ -155,6 +155,51 @@ Boot without reboot runs no rollback helper, reboot, wait-online or health check
 regardless of their parsed options. Native success does not establish that a
 later reboot will succeed. The default Ruby entrypoint and production cutover
 are unchanged.
+
+## Reboot after boot activation
+
+`confctl-rust deploy --reboot --wait-online 600 <host> boot` builds and prepares
+boot, sets the profile, then sends one native `reboot` request. Add
+`--generation <selector>` to use a saved generation. Boot never runs the rollback
+helper. Known-current hosts receive no copy or reboot. Carried hosts only receive
+copies; localhost can receive boot/profile changes but is never rebooted.
+
+Bulk deployment completes all copies and activations before serial reboots,
+then runs configured health checks in confirmed host order. One-by-one completes
+each host's copy, activation/profile, reboot/wait and health before the next copy.
+Interactive reboot consent is separate and defaults to no, even with `--yes`.
+Blank or `n` declines, `y` accepts, and other input repeats the reboot prompt.
+Bulk health includes activated localhost and reboot-declined hosts; one-by-one
+skips their health when reboot is skipped. `nowait` does not disable health.
+
+The default wait budget is 600 seconds; `wait` has no elapsed limit and `nowait`
+makes no baseline or polling uptime reads. Waiting obtains a fresh uptime before
+the reboot request, polls immediately afterward and then every 300ms. Only a
+finite nonnegative uptime strictly below that baseline establishes observed
+online state. No observed outage is required. Polls alone add SSH
+`ConnectTimeout=3`, `ServerAliveInterval=3` and `ServerAliveCountMax=1`; baseline
+and reboot retain the normal root/config/port arguments.
+
+Elapsed time includes reboot and poll requests. Even a zero budget permits the
+first poll, with success checked before timeout. The budget never kills an
+entered native request; cancellation still cancels and joins entered local
+children. Huge decimal budgets cannot wrap into immediate expiry. Malformed,
+nonfinite and negative uptime fail the invocation instead of Ruby's `to_f`
+coercion falsely treating malformed output as zero and declaring the host online.
+Other uptime-reader callers retain their existing behavior.
+
+A complete nonzero or signaled reboot result is diagnosed and retained, with
+unknown remote effect. Ruby's continuation policy still applies: nowait can
+finish with exit 0 if later required work succeeds, while the reboot task remains
+failed; waiting can subsequently succeed on a lower-uptime observation. Neither
+case proves that this request caused a reboot or that the requested generation
+is running. Native spawn, capture, delivery, malformed data, cancellation and
+timeout failures stop later reboot and health work. Earlier builds, refreshes,
+copies, bootloader/profile changes and possibly effective reboot requests remain.
+Inspect target state and connectivity before an explicit rerun. There is no
+automatic second reboot, remote cancellation, compensation or restoration.
+Confined fake-tool and targeted PTY checks do not qualify real host reboot,
+remote completion, full terminal behavior or production cutover.
 
 ## Dry-activate a saved generation
 

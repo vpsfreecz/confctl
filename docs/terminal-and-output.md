@@ -131,8 +131,13 @@ rounds remain visibly unverified.
 New-build deploy first completes every build group, retaining the actual returned
 records and publication effects, before these status/copy/activation/health
 phases. IDs are reserved across all phases. Build failure admits no later phase,
-and copy-only builds make no status, activation or health request. Reboot remains
-unavailable outside copy-only, which performs no reboot; other
+and copy-only builds make no status, activation or health request. Boot with
+`--reboot` reserves distinct reboot/wait IDs before health IDs. Each actual
+request has one task, a log locator and live elapsed/remaining progress while
+polls block. Native nowait failure fails its task while retaining the command's
+continuation policy; a lower-uptime observation succeeds without proving the
+request caused it or the target generation booted. Cancellation and output
+failure join entered local children and preserve delivered results. Other
 operation producers are not wired to this lifecycle yet. Controlled route
 fixtures do not establish real-site activation or full live-terminal qualification.
 
