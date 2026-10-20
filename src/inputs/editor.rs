@@ -1,10 +1,10 @@
 use super::{FlakeLock, InputChange, check_nix_output};
 use crate::{
-    configuration::ConfigRoot,
+    configuration::{ConfigRoot, MutationGuard},
     error::ConfctlError,
     events::TaskId,
     nix::{bytes, process_error},
-    process::{ProcessRunner, ProcessScope, ProcessSpec, TerminationCause},
+    process::{Captured, ProcessRunner, ProcessScope, ProcessSpec, StreamPolicy, TerminationCause},
     timing::Phase,
 };
 use std::{ffi::OsString, fs, path::Path};
@@ -25,7 +25,12 @@ impl<P: ProcessRunner> InputEditor<P> {
             cancellation,
         }
     }
-    pub async fn update(&self, inputs: &[String]) -> Result<Vec<InputChange>, ConfctlError> {
+    pub async fn update(
+        &self,
+        guard: &MutationGuard,
+        inputs: &[String],
+    ) -> Result<Vec<InputChange>, ConfctlError> {
+        self.check(guard)?;
         self.root.require_flake()?;
         require_inputs(inputs)?;
         let path = self.root.path().join("flake.lock");
@@ -40,15 +45,17 @@ impl<P: ProcessRunner> InputEditor<P> {
         };
         let mut args = vec!["flake".into(), "update".into()];
         args.extend(inputs.iter().map(OsString::from));
-        self.run_nix(args).await?;
+        self.run_nix(guard, args).await?;
         let new = FlakeLock::load(&path)?;
         Ok(InputChange::between(old.as_ref(), &new, inputs))
     }
     pub async fn set(
         &self,
+        guard: &MutationGuard,
         inputs: &[String],
         revision: &str,
     ) -> Result<Vec<InputChange>, ConfctlError> {
+        self.check(guard)?;
         self.root.require_flake()?;
         require_inputs(inputs)?;
         let path = self.root.path().join("flake.lock");
@@ -74,38 +81,56 @@ impl<P: ProcessRunner> InputEditor<P> {
             })
             .collect::<Result<Vec<_>, ConfctlError>>()?;
         for (input, url, _) in &prepared {
+            self.check(guard)?;
             let temporary = temporary_lock(self.root.path())?;
             // Nix creates its output file with the caller's normal umask, as in
             // Ruby. TempPath retains cleanup ownership after that creation.
             fs::remove_file(&temporary)
                 .map_err(|source| io("prepare Nix lock output", &temporary, source))?;
-            self.run_nix(vec![
-                "flake".into(),
-                "lock".into(),
-                "--update-input".into(),
-                input.into(),
-                "--override-input".into(),
-                input.into(),
-                url.into(),
-                "--output-lock-file".into(),
-                temporary.as_os_str().to_owned(),
-            ])
+            self.run_nix(
+                guard,
+                vec![
+                    "flake".into(),
+                    "lock".into(),
+                    "--update-input".into(),
+                    input.into(),
+                    "--override-input".into(),
+                    input.into(),
+                    url.into(),
+                    "--output-lock-file".into(),
+                    temporary.as_os_str().to_owned(),
+                ],
+            )
             .await?;
             let mut new = FlakeLock::load(&temporary)?;
             for (name, _, original) in &prepared {
                 new.restore_original(name, original.as_ref())?;
             }
+            self.check(guard)?;
             fs::write(&temporary, new.pretty())
                 .map_err(|source| io("restore original input metadata", &temporary, source))?;
+            self.check(guard)?;
             fs::rename(&temporary, &path)
                 .map_err(|source| io("publish flake.lock", &path, source))?;
+            self.check(guard)?;
         }
         let new = FlakeLock::load(&path)?;
         Ok(InputChange::between(Some(&old), &new, inputs))
     }
-    async fn run_nix(&self, args: Vec<OsString>) -> Result<(), ConfctlError> {
+    fn check(&self, guard: &MutationGuard) -> Result<(), ConfctlError> {
+        if self.cancellation.is_cancelled() {
+            return Err(ConfctlError::Cancelled);
+        }
+        guard.require_root(&self.root)
+    }
+    async fn run_nix(
+        &self,
+        guard: &MutationGuard,
+        args: Vec<OsString>,
+    ) -> Result<(), ConfctlError> {
         let mut experimental = false;
         loop {
+            self.check(guard)?;
             let mut spec = ProcessSpec::new("nix", "nix input lock mutation");
             if experimental {
                 spec.args.extend(
@@ -120,14 +145,36 @@ impl<P: ProcessRunner> InputEditor<P> {
             }
             spec.args.extend(args.iter().cloned());
             spec.cwd = Some(self.root.path().into());
+            spec.stdout = StreamPolicy::CaptureAndForward;
+            spec.stderr = StreamPolicy::CaptureAndForward;
             let mut scope = ProcessScope::new(self.cancellation.clone(), TaskId(0));
             scope.phase = Some(Phase::Evaluation);
             let result = self.runner.run(spec, scope).await?;
-            if result.termination == TerminationCause::Canceled {
+            if result.termination == TerminationCause::Canceled || self.cancellation.is_cancelled()
+            {
                 return Err(process_error(ConfctlError::Cancelled, result));
             }
-            let out = bytes(&result.stdout).await?;
-            let err = bytes(&result.stderr).await?;
+            if let Err(error) = self.check(guard) {
+                return Err(process_error(error, result));
+            }
+            if !result.stdout_complete
+                || !result.stderr_complete
+                || matches!(result.stdout, Captured::Unavailable)
+                || matches!(result.stderr, Captured::Unavailable)
+            {
+                return Err(process_error(
+                    ConfctlError::State("Nix input mutation capture is incomplete".into()),
+                    result,
+                ));
+            }
+            let captured = async {
+                Ok::<_, ConfctlError>((bytes(&result.stdout).await?, bytes(&result.stderr).await?))
+            }
+            .await;
+            let (out, err) = match captured {
+                Ok(streams) => streams,
+                Err(e) => return Err(process_error(e, result)),
+            };
             let out = String::from_utf8_lossy(&out);
             let err = String::from_utf8_lossy(&err);
             if result.status.success() {

@@ -108,6 +108,8 @@ fn cached_github_warning_remains_failure_even_after_successful_nix_exit() {
 }
 
 struct Reply {
+    complete: bool,
+    cancel: bool,
     code: i32,
     stderr: String,
     lock: Option<Value>,
@@ -120,7 +122,7 @@ impl crate::process::ProcessRunner for FakeEditor {
     async fn run(
         &self,
         spec: crate::process::ProcessSpec,
-        _: crate::process::ProcessScope,
+        scope: crate::process::ProcessScope,
     ) -> Result<crate::process::ProcessOutcome, crate::error::ConfctlError> {
         use crate::process::{Captured, ProcessOutcome, TerminationCause};
         use std::{os::unix::process::ExitStatusExt, time::Instant};
@@ -140,12 +142,15 @@ impl crate::process::ProcessRunner for FakeEditor {
             std::fs::write(target, serde_json::to_vec_pretty(&lock).unwrap()).unwrap();
         }
         self.calls.lock().unwrap().push(spec);
+        if reply.cancel {
+            scope.cancellation.cancel();
+        }
         Ok(ProcessOutcome {
             status: std::process::ExitStatus::from_raw(reply.code << 8),
             stdout: Captured::Memory(vec![]),
             stderr: Captured::Memory(reply.stderr.into_bytes()),
-            stdout_complete: true,
-            stderr_complete: true,
+            stdout_complete: reply.complete,
+            stderr_complete: reply.complete,
             started: Instant::now(),
             ended: Instant::now(),
             termination: TerminationCause::Exited,
@@ -183,16 +188,27 @@ async fn setter_child_argv_fallback_and_original_restoration_match_oracle_effect
     let (scratch, editor, calls) = editor(vec![
         Reply {
             code: 1,
+            complete: true,
+            cancel: false,
             stderr: "experimental feature flakes disabled".into(),
             lock: None,
         },
         Reply {
             code: 0,
+            complete: true,
+            cancel: false,
             stderr: String::new(),
             lock: Some(child_lock()),
         },
     ]);
-    let changes = editor.set(&["alias".into()], "next").await.unwrap();
+    let root = crate::configuration::ConfigRoot::new(scratch.path()).unwrap();
+    let guard = crate::configuration::MutationLock::acquire(
+        &root,
+        &tokio_util::sync::CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    let changes = editor.set(&guard, &["alias".into()], "next").await.unwrap();
     assert_eq!(changes.len(), 1);
     assert_eq!(
         FlakeLock::load(&scratch.path().join("flake.lock"))
@@ -241,25 +257,37 @@ async fn setter_child_argv_fallback_and_original_restoration_match_oracle_effect
             .iter()
             .all(|call| call.cwd.as_deref() == Some(scratch.path()))
     );
-    assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 2);
+    assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 3);
 }
 #[tokio::test]
 async fn failed_setter_child_keeps_previous_lock_and_removes_owned_temporary_output() {
     let (scratch, editor, calls) = editor(vec![Reply {
         code: 23,
+        complete: true,
+        cancel: false,
         stderr: "actual child failure".into(),
         lock: Some(child_lock()),
     }]);
     let path = scratch.path().join("flake.lock");
     let before = std::fs::read(&path).unwrap();
-    let error = editor.set(&["alias".into()], "next").await.unwrap_err();
+    let root = crate::configuration::ConfigRoot::new(scratch.path()).unwrap();
+    let guard = crate::configuration::MutationLock::acquire(
+        &root,
+        &tokio_util::sync::CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    let error = editor
+        .set(&guard, &["alias".into()], "next")
+        .await
+        .unwrap_err();
     assert!(matches!(
         error,
         crate::error::ConfctlError::ProcessFailure { .. }
     ));
     assert_eq!(std::fs::read(path).unwrap(), before);
     assert_eq!(calls.lock().unwrap().len(), 1);
-    assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 2);
+    assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 3);
 }
 #[tokio::test]
 async fn updater_cached_metadata_error_preserves_actual_nix_lock_side_effect() {
@@ -267,10 +295,19 @@ async fn updater_cached_metadata_error_preserves_actual_nix_lock_side_effect() {
     let expected = child_lock();
     let (scratch, editor, calls) = editor(vec![Reply {
         code: 0,
+        complete: true,
+        cancel: false,
         stderr: warning.into(),
         lock: Some(expected.clone()),
     }]);
-    let error = editor.update(&["alias".into()]).await.unwrap_err();
+    let root = crate::configuration::ConfigRoot::new(scratch.path()).unwrap();
+    let guard = crate::configuration::MutationLock::acquire(
+        &root,
+        &tokio_util::sync::CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    let error = editor.update(&guard, &["alias".into()]).await.unwrap_err();
     assert!(error.to_string().contains("rate limit was exceeded"));
     assert_eq!(
         FlakeLock::load(&scratch.path().join("flake.lock"))
@@ -279,4 +316,65 @@ async fn updater_cached_metadata_error_preserves_actual_nix_lock_side_effect() {
         expected
     );
     assert_eq!(calls.lock().unwrap()[0].args, ["flake", "update", "alias"]);
+}
+
+#[tokio::test]
+async fn setter_refuses_incomplete_or_postjoin_cancel_before_publication() {
+    for cancel in [false, true] {
+        let (scratch, editor, calls) = editor(vec![Reply {
+            code: 0,
+            stderr: String::new(),
+            lock: Some(child_lock()),
+            complete: cancel,
+            cancel,
+        }]);
+        let root = crate::configuration::ConfigRoot::new(scratch.path()).unwrap();
+        let guard = crate::configuration::MutationLock::acquire(
+            &root,
+            &tokio_util::sync::CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+        let before = std::fs::read(scratch.path().join("flake.lock")).unwrap();
+        let error = editor
+            .set(&guard, &["alias".into()], "next")
+            .await
+            .unwrap_err();
+        assert_eq!(error.is_cancelled(), cancel);
+        if !cancel {
+            assert!(error.to_string().contains("capture is incomplete"));
+        }
+        assert_eq!(calls.lock().unwrap().len(), 1);
+        assert_eq!(
+            std::fs::read(scratch.path().join("flake.lock")).unwrap(),
+            before
+        );
+        assert!(std::fs::read_dir(scratch.path()).unwrap().all(|e| {
+            !e.unwrap()
+                .file_name()
+                .to_string_lossy()
+                .starts_with("flake.lock.tmp-")
+        }));
+    }
+}
+#[tokio::test]
+async fn editor_refuses_foreign_guard_before_native_effects() {
+    let (_scratch, editor, calls) = editor(vec![]);
+    let other = tempfile::tempdir().unwrap();
+    let root = crate::configuration::ConfigRoot::new(other.path()).unwrap();
+    let guard = crate::configuration::MutationLock::acquire(
+        &root,
+        &tokio_util::sync::CancellationToken::new(),
+    )
+    .await
+    .unwrap();
+    assert!(
+        editor
+            .update(&guard, &["alias".into()])
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("different configuration root")
+    );
+    assert!(calls.lock().unwrap().is_empty());
 }

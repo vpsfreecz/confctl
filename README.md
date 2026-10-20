@@ -201,6 +201,8 @@ confctl inputs channel set --commit production nixpkgs <revision>
 
 Builds and deployments use the existing lock without updating inputs automatically. See [Flake inputs](docs/flake-inputs.md)
 for raw-source inputs, `follows`, path inputs and the optional NIX_PATH bridge.
+The development `confctl-rust` supports all six root/channel/machine update and
+set routes; the guide describes selection, optional Git commits and partial-failure recovery.
 
 The development `confctl-rust` binary supports [deployment](docs/deploy.md) from
 new builds or saved generations across boot, dry-activate, test and switch,

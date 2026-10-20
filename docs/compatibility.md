@@ -61,6 +61,7 @@ entrypoint. The default `confctl` remains Ruby during development. Typed request
 cover the 29 original command actions and the built-in `runtime-kernels update`
 action. The concrete routes are [`init`](config-init.md),
 [`add`, `rename` and `rediscover`](configuration-commands.md), `ls`, `inputs ls`, `inputs channel ls`,
+[root/channel/machine input update and set](flake-inputs.md#rust-input-mutations-and-recovery),
 `runtime-kernels update`, `build`, [`test-connection`](connection-check.md),
 [`ssh`](ssh.md), [`cssh`](cssh.md) and [`generation ls`](generation-listing.md) for default/local,
 remote or combined local/remote records.

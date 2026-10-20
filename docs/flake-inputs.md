@@ -185,3 +185,65 @@ The tool and configuration's confctl input must both include `moduleOptions`
 support to use the option reference and `confctl ls -L`. That output evaluates
 public confctl and cluster options, including `modules/cluster/default.nix`,
 without building machine systems.
+
+## Rust input mutations and recovery
+
+The development `confctl-rust` implements update and set at root, channel and
+machine scope. These commands require a flake and run without confirmation.
+They hold one `.confctl/mutation.lock` advisory lock through selection, Nix,
+changelog preparation, Git hooks/editor and joined completion. Avoid concurrent
+Ruby, external Nix or Git writers: they do not share this lock.
+
+Root update preserves explicit names, order and duplicates. `--all` instead uses
+the sorted root names in the existing lock and ignores positional names. An
+explicit update may create a missing lock; set requires a lock and GitHub or Git
+input metadata. Set prepares every override before its first child and restores
+all selected original metadata in each published temporary result. The existing
+first-node interpretation of `follows`, unknown JSON and URL/query fields remain
+unchanged. These operations do not edit `flake.nix` or refresh generated lists.
+
+Channel selectors preserve brace/comma order and duplicates; glob matches sort
+by name. Underlying input names are deduplicated at their first occurrence.
+Channel set refuses inputs shared outside the selected channel/role pairs unless
+`--allow-shared` (also `--allow_shared`) is supplied, then prints the uses. Channel
+update has no such restriction. Machine routes resolve one exact name or key
+and role through configured Nix evaluation, without inventory builds or host
+contact. Channel and machine summaries read the actual resulting lock.
+
+Null/false channel mappings are empty; an absent, null or false explicitly
+requested role input selects nothing. Empty strings remain literal input names.
+Malformed selected mappings and other non-string names fail before mutation,
+including malformed mappings examined by channel set's shared-use scan. Channel
+listing retains its existing tolerant rendering.
+
+Commit defaults to false; changelog and editor default to true. Only selected
+revision changes enter Git work with `--commit`. Metadata-only changes may leave
+a changed lock while reporting no revision changes. Messages group changes by
+repository and old/new revision, retain the first group's raw URL for its mirror
+identity and include the full oneline log. `--downgrade` reverses only the log
+range; `--no-changelog` avoids mirrors entirely. Mirrors live in the existing
+XDG/HOME `confctl/git-mirrors` cache. Ordinary cache availability errors and
+complete native clone/fetch/log failures produce a visible changelog-unavailable
+note and may still commit. Cancellation, spawn, ownership, drain, incomplete
+capture and delivery failures stop before commit. Comparison commands retain
+their stricter failure policy.
+
+Git receives `commit [-e] -F FILE -- flake.lock` with an owned message file kept
+until its child and terminal restoration finish. `-e` depends on editor=true and
+actual stdout being a TTY, independently of live/plain presentation; redirected
+stdout suppresses editing, not committing. All streams are inherited. Git owns
+its editor, hooks, signing and index behavior. confctl neither stages unrelated
+files nor initializes a repository. An untracked lock can fail natively.
+
+Nix output is forwarded and captured. Only the recognized experimental-feature
+failure retries once; a cached GitHub download warning fails even after native
+exit 0. Nix can already have changed the lock when it fails. A later setter step,
+fatal changelog error, hook/editor or commit failure retains completed lock and
+cache effects. Commit failure prevents the normal success summary; cancellation
+after commit may leave the commit in place. There is no automatic restoration,
+retry or rollback. Inspect the reported phase, `flake.lock`, the invocation log
+and Git state, then explicitly commit, retry or restore the chosen files.
+
+Lock formats remain readable by Ruby and Rust, and Ruby remains the default
+entry point. Confined fake-tool and local Git fixtures do not qualify real Nix
+input acquisition or site configuration behavior.
