@@ -1,6 +1,6 @@
 use super::*;
 use crate::events::EventReceiver;
-use serde_json::json;
+use serde_json::{Value, json};
 use std::{
     collections::VecDeque,
     ffi::OsString,
@@ -137,24 +137,6 @@ fn native_shellwords_quotes_round_trip_empty_unicode_invalid_bytes_and_metachara
         .collect::<Vec<_>>();
     assert_eq!(output.stdout, expected);
     assert!(output.stderr.is_empty());
-}
-
-#[test]
-fn ports_preserve_ruby_conversion_without_a_port_sized_integer() {
-    for (value, expected) in [
-        (Value::Null, "0"),
-        (json!("nonsense"), "0"),
-        (json!("\u{000b}-0002_222suffix"), "-2222"),
-        (json!("22__33"), "22"),
-        (json!(2222.9), "2222"),
-        (
-            json!("999999999999999999999999999"),
-            "999999999999999999999999999",
-        ),
-    ] {
-        assert_eq!(ruby_port(&value).unwrap(), expected);
-    }
-    assert!(ruby_port(&Value::Bool(false)).is_err());
 }
 
 fn outcome(status: i32) -> ProcessOutcome {

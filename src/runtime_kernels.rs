@@ -7,6 +7,7 @@ use crate::{
     domain::{Inventory, Machine, MachineId},
     error::ConfctlError,
     events::{EventSink, OutputStream, Style, TaskId, TaskState, UiEvent},
+    machine_endpoint::{target_host, target_port},
     process::{
         Captured, PartialProcessEvidence, ProcessOutcome, ProcessRunner, ProcessScope, ProcessSpec,
         TerminationCause,
@@ -63,25 +64,7 @@ pub fn normalize_kernel(stdout: &str) -> String {
 /// Purpose-specific compatibility with MachineControl.execute('uname','-r').
 /// No connection-test timeout, carrier redirection or runnable filter applies.
 fn probe_spec(machine: &Machine, ssh_config: Option<&OsStr>) -> Result<ProcessSpec, ConfctlError> {
-    let host = match machine.metadata.get("host") {
-        None => None,
-        Some(Value::Object(host)) => Some(host),
-        _ => {
-            return Err(ConfctlError::Configuration(
-                "machine host metadata does not support key lookup".into(),
-            ));
-        }
-    };
-    let target = match host.and_then(|host| host.get("target")) {
-        None => machine.name.as_str(),
-        Some(Value::String(target)) => target,
-        _ => {
-            return Err(ConfctlError::Configuration(format!(
-                "{} has no target host",
-                machine.name
-            )));
-        }
-    };
+    let target = target_host(machine)?;
     let mut spec = if target == "localhost" {
         let mut spec =
             ProcessSpec::new("uname", format!("query runtime kernel on {}", machine.name));
@@ -93,11 +76,7 @@ fn probe_spec(machine: &Machine, ssh_config: Option<&OsStr>) -> Result<ProcessSp
             spec.args.extend(["-F".into(), config.into()]);
         }
         spec.args.extend(["-l".into(), "root".into()]);
-        let port = host
-            .and_then(|host| host.get("port"))
-            .map(ruby_port)
-            .transpose()?
-            .unwrap_or_else(|| "22".into());
+        let port = target_port(machine)?;
         if port != "22" {
             spec.args.extend(["-p".into(), port.into()]);
         }
@@ -109,62 +88,6 @@ fn probe_spec(machine: &Machine, ssh_config: Option<&OsStr>) -> Result<ProcessSp
     spec.stdout = crate::process::StreamPolicy::Capture;
     spec.stderr = crate::process::StreamPolicy::Capture;
     Ok(spec)
-}
-
-fn ruby_port(value: &Value) -> Result<String, ConfctlError> {
-    let text = match value {
-        Value::Null => return Ok("0".into()),
-        Value::String(text) => text.clone(),
-        Value::Number(number) => {
-            let token = number.to_string();
-            if token.contains(['.', 'e', 'E']) {
-                let value = token
-                    .parse::<f64>()
-                    .map_err(|_| ConfctlError::Configuration("invalid target port Float".into()))?;
-                if !value.is_finite() {
-                    return Err(ConfctlError::Configuration(
-                        "nonfinite target port Float cannot convert to Integer".into(),
-                    ));
-                }
-                format!("{:.0}", value.trunc())
-            } else {
-                token
-            }
-        }
-        _ => {
-            return Err(ConfctlError::Configuration(
-                "target port does not support to_i".into(),
-            ));
-        }
-    };
-    let text = text.trim_start_matches(['\t', '\n', '\x0b', '\x0c', '\r', ' ']);
-    let negative = text.starts_with('-');
-    let unsigned = text.strip_prefix(['+', '-']).unwrap_or(text);
-    // Ruby String#to_i permits one underscore between decimal digits, but
-    // stops at a leading, trailing or doubled underscore. Keep arbitrary-size
-    // integers as text rather than overflowing a native port-sized integer.
-    let bytes = unsigned.as_bytes();
-    let mut digits = String::new();
-    let mut index = 0;
-    while index < bytes.len() {
-        if bytes[index].is_ascii_digit() {
-            digits.push(bytes[index] as char);
-            index += 1;
-        } else if bytes[index] == b'_'
-            && !digits.is_empty()
-            && bytes.get(index + 1).is_some_and(u8::is_ascii_digit)
-        {
-            index += 1;
-        } else {
-            break;
-        }
-    }
-    let digits = digits.trim_start_matches('0');
-    if digits.is_empty() {
-        Ok("0".into())
-    } else {
-        Ok(format!("{}{digits}", if negative { "-" } else { "" }))
-    }
 }
 
 fn captured_bytes(captured: &Captured) -> io::Result<Vec<u8>> {

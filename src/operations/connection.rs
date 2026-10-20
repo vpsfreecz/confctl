@@ -1,5 +1,7 @@
 //! Serial, read-only uptime probes with ordinary per-host failure results.
 
+pub(super) use crate::machine_endpoint::{target_host, target_port};
+
 use crate::{
     app::Context,
     configuration::{ConfigEpoch, ConfigRoot},
@@ -14,7 +16,6 @@ use crate::{
     terminal::ConfirmPrompt,
     timing::Phase,
 };
-use serde_json::Value;
 use std::{
     ffi::{OsStr, OsString},
     io,
@@ -284,39 +285,6 @@ pub(super) fn command_spec(
     Ok(spec)
 }
 
-pub(super) fn target_host(machine: &Machine) -> Result<&str, ConfctlError> {
-    let host = match machine.metadata.get("host") {
-        None => None,
-        Some(Value::Object(host)) => Some(host),
-        _ => {
-            return Err(ConfctlError::Configuration(
-                "machine host metadata does not support key lookup".into(),
-            ));
-        }
-    };
-    let target = match host.and_then(|host| host.get("target")) {
-        None => machine.name.as_str(),
-        Some(Value::String(target)) => target,
-        _ => {
-            return Err(ConfctlError::Configuration(format!(
-                "{} has no target host",
-                machine.name
-            )));
-        }
-    };
-    Ok(target)
-}
-
-pub(super) fn target_port(machine: &Machine) -> Result<String, ConfctlError> {
-    machine
-        .metadata
-        .get("host")
-        .and_then(|host| host.get("port"))
-        .map(ruby_port)
-        .transpose()
-        .map(|port| port.unwrap_or_else(|| "22".into()))
-}
-
 /// Native-byte Shellwords escaping: a newline needs quoted literal content,
 /// since a backslash followed by LF would remove it in the remote shell.
 pub(super) fn shell_quote(value: &OsStr) -> OsString {
@@ -351,60 +319,6 @@ pub(super) fn shell_join(argv: &[OsString]) -> OsString {
         joined.push(shell_quote(arg));
     }
     joined
-}
-
-// Machine#target_port uses Ruby to_i, including decimal prefixes and floats.
-fn ruby_port(value: &Value) -> Result<String, ConfctlError> {
-    let text = match value {
-        Value::Null => return Ok("0".into()),
-        Value::String(text) => text.clone(),
-        Value::Number(number) => {
-            let text = number.to_string();
-            if text.contains(['.', 'e', 'E']) {
-                let value = text
-                    .parse::<f64>()
-                    .map_err(|_| ConfctlError::Configuration("invalid target port Float".into()))?;
-                if !value.is_finite() {
-                    return Err(ConfctlError::Configuration(
-                        "nonfinite target port Float cannot convert to Integer".into(),
-                    ));
-                }
-                format!("{:.0}", value.trunc())
-            } else {
-                text
-            }
-        }
-        _ => {
-            return Err(ConfctlError::Configuration(
-                "target port does not support to_i".into(),
-            ));
-        }
-    };
-    let text = text.trim_start_matches(['\t', '\n', '\x0b', '\x0c', '\r', ' ']);
-    let negative = text.starts_with('-');
-    let unsigned = text.strip_prefix(['+', '-']).unwrap_or(text);
-    let bytes = unsigned.as_bytes();
-    let mut digits = String::new();
-    let mut index = 0;
-    while index < bytes.len() {
-        if bytes[index].is_ascii_digit() {
-            digits.push(bytes[index] as char);
-            index += 1;
-        } else if bytes[index] == b'_'
-            && !digits.is_empty()
-            && bytes.get(index + 1).is_some_and(u8::is_ascii_digit)
-        {
-            index += 1;
-        } else {
-            break;
-        }
-    }
-    let digits = digits.trim_start_matches('0');
-    if digits.is_empty() {
-        Ok("0".into())
-    } else {
-        Ok(format!("{}{digits}", if negative { "-" } else { "" }))
-    }
 }
 
 fn captured_bytes(captured: &Captured) -> io::Result<Vec<u8>> {
