@@ -7,7 +7,7 @@ use std::{
     process::{Command, Output, Stdio},
 };
 pub struct Fixture {
-    pub _scratch: tempfile::TempDir,
+    _scratch: std::cell::RefCell<Option<tempfile::TempDir>>,
     pub root: PathBuf,
     pub bin: PathBuf,
 }
@@ -36,7 +36,7 @@ impl Fixture {
         })).unwrap()).unwrap();
         fs::write(root.join("profiles.json"), b"{}").unwrap();
         let source = r#"#!/usr/bin/env python3
-import os,sys,json,shlex,pathlib,time,signal
+import os,sys,json,shlex,pathlib,time,signal,select
 r=pathlib.Path(os.environ['CLEANUP_ROOT'])
 tool=pathlib.Path(sys.argv[0]).name
 args=sys.argv[1:]
@@ -68,11 +68,45 @@ if tool=='ssh':
   if (r/'delete-fail').exists(): sys.stderr.write('callback failed after profile deletion');sys.exit(9)
   sys.exit(0)
 if command!=['nix-collect-garbage'] and tool!='nix-collect-garbage': sys.stderr.write('forbidden native command');sys.exit(97)
-active=r/('active-'+host);active.write_text('active')
+# Publish active/PID records under a blocked TERM, then install the handler and
+# close every startup write before restoring the mask. Moving signal.signal
+# alone would still allow interruption in the middle of active.write_text.
+old_mask=signal.pthread_sigmask(signal.SIG_BLOCK,{signal.SIGTERM})
+active=r/('active-'+host)
+record={'host':host,'pid':os.getpid(),'pgid':os.getpgrp()}
+active.write_text(json.dumps(record))
+if (r/'startup-term').exists(): os.kill(os.getpid(),signal.SIGTERM)
+record['pending_term']=signal.SIGTERM in signal.sigpending()
+(r/('started-'+host)).write_text(json.dumps(record))
 with open(r/'concurrency','a') as f: f.write(str(len(list(r.glob('active-*'))))+'\n')
 def stopped(signum,frame):
- active.unlink(missing_ok=True);(r/('stopped-'+host)).write_text('stopped');sys.exit(128+signum)
+ if (r/'ignore-term').exists():
+  (r/('ignored-term-'+host)).write_text(str(signum));return
+ active.unlink(missing_ok=True)
+ (r/('stopped-'+host)).write_text(json.dumps(dict(record,signal=signum)))
+ sys.exit(128+signum)
 signal.signal(signal.SIGTERM,stopped)
+signal.pthread_sigmask(signal.SIG_SETMASK,old_mask)
+record['ready']=True
+(r/('ready-'+host)).write_text(json.dumps(record))
+if (r/'direct-wait-release').exists():
+ release=os.open(r/'direct-wait-release',os.O_RDONLY|os.O_NONBLOCK)
+ ready=os.open(r/'ready-events',os.O_WRONLY|os.O_NONBLOCK)
+ os.write(ready,(json.dumps(record)+'\n').encode());os.close(ready)
+ polling=select.poll();polling.register(release,select.POLLIN)
+ if not polling.poll(8000): raise TimeoutError('direct child release deadline')
+ if os.read(release,1)!=b'1': raise RuntimeError('direct child invalid release')
+ os.close(release);active.unlink(missing_ok=True);sys.exit(0)
+# Only the output-failure test creates these FIFOs. Announce after unmasking;
+# neither child emits output until the parent has checked both ready records.
+if (r/('release-'+host)).exists():
+ release=os.open(r/('release-'+host),os.O_RDONLY|os.O_NONBLOCK)
+ ready=os.open(r/'ready-events',os.O_WRONLY|os.O_NONBLOCK)
+ os.write(ready,(json.dumps(record)+'\n').encode());os.close(ready)
+ polling=select.poll();polling.register(release,select.POLLIN)
+ if not polling.poll(8000): raise TimeoutError('GC fixture release deadline')
+ if os.read(release,1)!=b'1': raise RuntimeError('GC fixture invalid release')
+ os.close(release)
 sys.stdout.buffer.write(b"deleting '/nix/store/stdout-path'\nordinary\xff output\n");sys.stdout.flush()
 sys.stderr.buffer.write(b"deleting '/nix/store/stderr-path'\n");sys.stderr.flush()
 while (r/'gate').exists(): time.sleep(.01)
@@ -87,10 +121,21 @@ sys.exit(7 if (r/(host+'.fail')).exists() else 0)
             fs::set_permissions(bin.join(tool), fs::Permissions::from_mode(0o755)).unwrap();
         }
         Self {
-            _scratch: scratch,
+            _scratch: std::cell::RefCell::new(Some(scratch)),
             root,
             bin,
         }
+    }
+    // Keep the exact fixture only when bounded cleanup cannot establish terminal
+    // evidence. Retention is diagnostic storage, not transfer of process ownership.
+    // Only GC tests use retention; the shared generation-cleanup library and
+    // command tests intentionally leave this optional capability unused.
+    #[allow(dead_code)]
+    pub fn preserve(&self) -> Option<PathBuf> {
+        self._scratch
+            .borrow_mut()
+            .take()
+            .map(tempfile::TempDir::keep)
     }
     pub fn command(&self, binary: &Path, args: &[&str]) -> Command {
         let path = std::env::join_paths(
