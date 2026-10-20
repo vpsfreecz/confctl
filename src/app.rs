@@ -5,6 +5,8 @@ mod build_tests;
 #[cfg(all(test, target_os = "linux"))]
 mod channel_tests;
 mod diagnostic;
+#[cfg(all(test, target_os = "linux"))]
+mod gen_data_tests;
 mod invocation_log;
 #[cfg(all(test, target_os = "linux"))]
 mod runtime_kernels_tests;

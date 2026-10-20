@@ -9,6 +9,7 @@ mod configuration;
 mod connection;
 mod cssh;
 mod deploy;
+mod gen_data;
 mod generation_cleanup;
 mod generation_list;
 mod generation_selection;
@@ -46,7 +47,10 @@ impl Operations for CoreOperations {
             )
             || matches!(
                 action,
-                Action::InputsList { .. }
+                Action::GenDataAll
+                    | Action::GenDataContainers
+                    | Action::GenDataNetwork
+                    | Action::InputsList { .. }
                     | Action::InputsUpdate { .. }
                     | Action::InputsSet { .. }
                     | Action::ChannelUpdate { .. }
@@ -76,6 +80,9 @@ impl Operations for CoreOperations {
     ) -> Result<ExitDisposition, ConfctlError> {
         let root = ConfigRoot::new(&context.cwd)?;
         match &invocation.action {
+            Action::GenDataAll | Action::GenDataContainers | Action::GenDataNetwork => {
+                gen_data::run(&invocation.action, root, context).await?
+            }
             Action::InputsUpdate { .. }
             | Action::InputsSet { .. }
             | Action::ChannelUpdate { .. }
@@ -121,12 +128,6 @@ impl Operations for CoreOperations {
             }
             Action::RuntimeKernelsUpdate { .. } => {
                 runtime_kernels::update(&invocation.action, root, context).await?
-            }
-            action => {
-                return Err(ConfctlError::Configuration(format!(
-                    "Rust operation '{}' is not implemented yet",
-                    action.name()
-                )));
             }
         }
         Ok(ExitDisposition::completed())

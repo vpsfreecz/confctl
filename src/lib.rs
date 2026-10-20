@@ -19,3 +19,5 @@ pub mod remote;
 pub mod runtime_kernels;
 pub mod terminal;
 pub mod timing;
+
+mod vpsadmin;

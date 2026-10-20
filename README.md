@@ -222,6 +222,9 @@ migration and recovery after partial edits.
 [`generation rm`, `generation rotate` and `collect-garbage`](docs/generation-cleanup.md)
 remove saved records and profiles and collect store objects. Their guide explains
 retention, GC policy and recovery limits after irreversible partial cleanup.
+[`gen-data vpsadmin`](docs/gen-data.md) authenticates and replaces local container
+and network Nix data. All 30 parsed action leaves have concrete Rust dispatch;
+the default Ruby entry point and separate native and site acceptance gates remain.
 
 ## Machine metadata and inputs
 Machine configuration directory usually contains at least two files:

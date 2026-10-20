@@ -101,8 +101,13 @@ toplevels and current configured inputs with deployed state.
 without system builds or profile enumeration. Only changelog clones or fetches
 Git mirrors; both use the [report pager](pager.md), with redirected output kept
 visible and later host/Git work stopped after an actual pager-pipe EPIPE.
-Other deploy modes and operation adapters remain unavailable. Help and version
-need no inventory, input broker or process supervisor.
+[`gen-data vpsadmin containers`, `network` and `all`](gen-data.md) authenticate
+and publish complete Nix data. The guide describes the same-origin, no-replay API
+subset, scalar conversion and server validation limits, and partial effects from
+sequential file replacements.
+All 30 parsed action leaves have concrete dispatch. Ruby remains the default;
+route-specific option limits and separate native and site acceptance gates still
+apply. Help and version need no inventory, input broker or process supervisor.
 Static original help text is preserved in `src/cli/help.json`, with source
 provenance in that module; it does not load test snapshots or Ruby at runtime.
 The immutable M0 archive and expectations remain the differential oracle.
