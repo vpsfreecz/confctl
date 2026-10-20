@@ -204,7 +204,7 @@ for raw-source inputs, `follows`, path inputs and the optional NIX_PATH bridge.
 
 The development `confctl-rust` binary supports [deployment](docs/deploy.md) from
 new builds or saved generations across boot, dry-activate, test and switch,
-without reboot. Its default [status](docs/status.md) builds a target before
+with optional reboot/wait-online for boot. Its default [status](docs/status.md) builds a target before
 comparison; explicit saved/none modes remain read-only. The default `confctl`
 entry point remains Ruby, and real-site/terminal qualification is separate.
 [`diff` and `changelog`](docs/changes.md) compare inputs without building systems;

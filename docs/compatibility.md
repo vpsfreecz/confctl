@@ -74,8 +74,10 @@ Action `switch` (also the default with a saved generation) switches standalone
 hosts, sets their profile after successful activation and runs health checks.
 Carried switch updates the carrier profile and runs its installed callback.
 Omitting the generation builds all confirmed hosts before the same four actions
-or copy-only policy; default switch is supported. Reboot remains unavailable
-outside copy-only, which performs no reboot.
+or copy-only policy; default switch is supported. Boot supports optional reboot
+and wait-online for saved and new builds; copy-only performs no reboot.
+Reboot waits reject malformed, nonfinite or negative uptime rather than Ruby's
+numeric coercion falsely treating malformed output as zero and online.
 [`health-check`](health-checks.md) runs configured builder, machine and systemd
 checks with per-check retry budgets.
 [`status --generation <selector>`](status.md) compares a saved generation's
