@@ -20,4 +20,5 @@ pub mod runtime_kernels;
 pub mod terminal;
 pub mod timing;
 
+mod machine_endpoint;
 mod vpsadmin;

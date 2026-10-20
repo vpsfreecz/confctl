@@ -788,7 +788,9 @@ fn uname_port_conversion_matches_original_ruby_and_local_target_ignores_unused_p
     let fixture: Value =
         serde_json::from_str(include_str!("../remote/json/ruby-conversions.json")).unwrap();
     for case in fixture["port_cases"].as_array().unwrap() {
-        let converted = ruby_port(&case["value"]);
+        let mut machine = machine("port-case", None);
+        machine.metadata["host"]["port"] = case["value"].clone();
+        let converted = target_port(&machine);
         match case.get("converted") {
             Some(expected) => assert_eq!(
                 converted.unwrap(),
