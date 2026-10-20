@@ -63,7 +63,7 @@ fn child(case: &str) {
 printf '%s\0' "$@" > "$CHANGES_ROOT/pager-argv"
 if [ "$CHANGES_PAGER_CASE" = early ]; then
  IFS= read -r first
- while [ ! -e "$CHANGES_ROOT/git-log-entered" ]; do /run/current-system/sw/bin/sleep 0.01; done
+ while [ ! -e "$CHANGES_ROOT/git-log-entered" ]; do "$CHANGES_ROOT/native/sleep" 0.01; done
  exit 0
 fi
 "$CHANGES_ROOT/native/cat" > "$CHANGES_ROOT/pager-report"

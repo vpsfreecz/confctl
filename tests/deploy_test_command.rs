@@ -1,5 +1,7 @@
 //! Saved test and switch through the real app with confined fake native tools.
 #![cfg(target_os = "linux")]
+#[path = "support/native_tool.rs"]
+mod native_tool;
 use confctl::generation::BuildGeneration;
 use serde_json::{Value, json};
 use std::{
@@ -31,6 +33,11 @@ impl Fixture {
         let bin = tmp.path().join("bin");
         fs::create_dir(&root).unwrap();
         fs::create_dir(&bin).unwrap();
+        fs::create_dir(root.join("native")).unwrap();
+        std::os::unix::fs::symlink(native_tool::resolve("cat"), root.join("native/cat")).unwrap();
+        std::os::unix::fs::symlink(native_tool::resolve("sleep"), root.join("native/sleep"))
+            .unwrap();
+
         fs::create_dir(root.join("virtual-run")).unwrap();
         fs::write(root.join("flake.nix"), "{}\n").unwrap();
         fs::write(root.join("flake.lock"), "retained lock\n").unwrap();
@@ -70,7 +77,7 @@ printf 'switched' > "$path"
 while :; do
  state=; read -r state < "$path"
  [ "$state" != confirmed ] || break
- /run/current-system/sw/bin/sleep 0.01
+ "$DT_ROOT/native/sleep" 0.01
 done
 printf 'helper-end %s\n' "$DT_HOST" >> "$DT_ROOT/sequence"
 if [ "$DT_MODE" = helper-fail ]; then exit 8; fi
@@ -89,7 +96,7 @@ printf '%s %s\n' "$1" "$DT_HOST" >> "$DT_ROOT/sequence"
 case "$1" in test|switch|dry-activate) ;; *) exit 92 ;; esac
 if [ "$DT_MODE" = activation-fail ] && [ "$DT_HOST" = b ]; then exit 7; fi
 if [ "$DT_MODE" = hidden ]; then exit 9; fi
-if [ "$DT_MODE" = activation-slow ] && [ "$1" = switch ]; then printf '%s' "$$" > "$DT_ROOT/activation-pid"; exec /run/current-system/sw/bin/sleep 60; fi
+if [ "$DT_MODE" = activation-slow ] && [ "$1" = switch ]; then printf '%s' "$$" > "$DT_ROOT/activation-pid"; exec "$DT_ROOT/native/sleep" 60; fi
 printf 'test native %s\n' "$DT_HOST"
 "#,
             );
@@ -156,7 +163,7 @@ esac
         executable(
             &bin.join("bash"),
             r#"#!/bin/sh
-script=$(/run/current-system/sw/bin/cat)
+script=$("$DT_ROOT/native/cat")
 if [ "$DT_MODE" = profile-fail ] || [ "$DT_MODE" = carried-known-fail ]; then exit 7; fi
 case "$script" in *confctl-guest*) profile=/nix/var/nix/profiles/confctl-guest ;; *) profile=/nix/var/nix/profiles/system ;; esac
 case "$DT_MODE" in both-known|profile-only) current="$DT_ROOT/toplevels/$DT_HOST 'saved" ;; *) current=/other-profile ;; esac
@@ -170,7 +177,7 @@ printf '%s-1-link;%s;1700000000;\n' "$profile" "$current"
 case "$2" in
  'cat /run/confctl-confirm-'*' 2>/dev/null')
   path=${2#cat }; path=${path% 2>/dev/null}
-  exec /run/current-system/sw/bin/cat "$DT_ROOT/virtual-run/${path##*/}" ;;
+  exec "$DT_ROOT/native/cat" "$DT_ROOT/virtual-run/${path##*/}" ;;
  'echo confirmed > /run/confctl-confirm-'*)
   path=${2#echo confirmed > }
   printf 'confirmed\n' > "$DT_ROOT/virtual-run/${path##*/}"
@@ -197,8 +204,8 @@ printf 'start %s\n' "$$" >> "$DT_ROOT/check-events"
 n=0; file="$DT_ROOT/attempt-$host-$label"
 if [ -r "$file" ]; then read -r n < "$file"; fi
 n=$((n+1)); printf '%s\n' "$n" > "$file"
-if [ "$DT_MODE" = slow ]; then printf '%s' "$$" > "$DT_ROOT/check-pid"; exec /run/current-system/sw/bin/sleep 60; fi
-/run/current-system/sw/bin/sleep 0.10
+if [ "$DT_MODE" = slow ]; then printf '%s' "$$" > "$DT_ROOT/check-pid"; exec "$DT_ROOT/native/sleep" 60; fi
+"$DT_ROOT/native/sleep" 0.10
 printf 'end %s\n' "$$" >> "$DT_ROOT/check-events"
 failed=0
 case "$DT_MODE" in
@@ -225,7 +232,7 @@ printf 'SystemState=running\n'
 printf '%s\0' "$DT_HOST" "$@" > "$DT_ROOT/profile-$$"
 printf 'profile %s\n' "$DT_HOST" >> "$DT_ROOT/sequence"
 [ "$#" = 4 ] && [ "$1" = -p ] && [ "$2" = /nix/var/nix/profiles/system ] && [ "$3" = --set ] || exit 98
-if [ "$DT_MODE" = profile-slow ]; then printf '%s' "$$" > "$DT_ROOT/profile-pid"; exec /run/current-system/sw/bin/sleep 60; fi
+if [ "$DT_MODE" = profile-slow ]; then printf '%s' "$$" > "$DT_ROOT/profile-pid"; exec "$DT_ROOT/native/sleep" 60; fi
 if [ "$DT_MODE" = set-profile-fail ]; then exit 6; fi
 printf '%s' "$4" > "$DT_ROOT/system-profile-$DT_HOST"
 "#,

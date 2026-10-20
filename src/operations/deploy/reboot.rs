@@ -401,6 +401,7 @@ impl Waiting<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::native_tool;
     #[tokio::test]
     async fn waiting_output_ack_failure_or_cancel_joins_the_entered_native_child() {
         use crate::{events::EventSink, process::Supervisor, terminal::Ui, timing::Timing};
@@ -440,9 +441,10 @@ mod tests {
             let mut spec = ProcessSpec::new("/bin/sh", "confined blocked uptime child");
             spec.args = vec![
                 "-c".into(),
-                "printf '%s' \"$$\" > \"$1\"; exec /run/current-system/sw/bin/sleep 60".into(),
+                "printf '%s' \"$$\" > \"$1\"; exec \"$2\" 60".into(),
                 "fixture".into(),
                 pid_path.as_os_str().into(),
+                native_tool::resolve("sleep").into_os_string(),
             ];
             let entered_pid = std::cell::Cell::new(None);
             let consumer = async {

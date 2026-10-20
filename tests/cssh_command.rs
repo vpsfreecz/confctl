@@ -1,6 +1,8 @@
 //! Real CLI with fake inventory, nix-shell and cssh; no GUI or host access.
 #![cfg(target_os = "linux")]
 
+#[path = "support/native_tool.rs"]
+mod native_tool;
 use serde_json::{Value, json};
 use std::{
     fs,
@@ -24,6 +26,10 @@ impl Fixture {
         let bin = scratch.path().join("bin");
         fs::create_dir_all(root.join(".confctl/generations/local")).unwrap();
         fs::create_dir(&bin).unwrap();
+        fs::create_dir(root.join("native")).unwrap();
+        std::os::unix::fs::symlink(native_tool::resolve("sleep"), root.join("native/sleep"))
+            .unwrap();
+
         fs::write(root.join("flake.nix"), "{ outputs = _: {}; }\n").unwrap();
         fs::write(root.join("flake.lock"), "retained lock\n").unwrap();
         fs::write(
@@ -78,7 +84,7 @@ printf 'launcher stderr\376\n' >&2
 case "$CSSH_MODE" in
  fail) exit 7 ;;
  signal) kill -TERM "$$" ;;
- slow) printf '%s\n' "$$" > "$CSSH_ROOT/launcher-pid"; exec /run/current-system/sw/bin/sleep 60 ;;
+ slow) printf '%s\n' "$$" > "$CSSH_ROOT/launcher-pid"; exec "$CSSH_ROOT/native/sleep" 60 ;;
 esac
 "#,
         );

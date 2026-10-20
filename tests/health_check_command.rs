@@ -1,5 +1,7 @@
 //! Public health checks through the actual parser/app and confined fake tools.
 #![cfg(target_os = "linux")]
+#[path = "support/native_tool.rs"]
+mod native_tool;
 use serde_json::{Value, json};
 use std::{
     fs,
@@ -30,6 +32,10 @@ impl Fixture {
         let bin = tmp.path().join("bin");
         fs::create_dir(&root).unwrap();
         fs::create_dir(&bin).unwrap();
+        fs::create_dir(root.join("native")).unwrap();
+        std::os::unix::fs::symlink(native_tool::resolve("sleep"), root.join("native/sleep"))
+            .unwrap();
+
         fs::write(root.join("flake.nix"), "{}\n").unwrap();
         let remote = json!({"name":"remote","key":"remote-key","metaConfig":{"managed":true,"spin":"nixos","tags":["selected"],"host":{"target":"remote.invalid","port":"02_222suffix"},"replace":"{name}","healthChecks":{
             "builderCommands":[{"description":"builder argv","command":["builder-check","{name}","{key}","{host.target}","x{missing}y","{checks}","{replace}"],"exitStatus":7,"timeout":0,"cooldown":0,"standardOutput":{"match":"builder exact\n"},"standardError":{"include":["builder error"]}}],
@@ -86,7 +92,7 @@ exec /bin/sh -c "$1"
             r#"#!/bin/sh
 printf 'start %s\n' "$$" >> "$HC_ROOT/events"
 printf '%s\0' builder "$@" > "$HC_ROOT/argv-builder-$$"
-/run/current-system/sw/bin/sleep 0.03
+"$HC_ROOT/native/sleep" 0.03
 printf 'builder exact\n'
 printf 'builder error\n' >&2
 printf 'end %s\n' "$$" >> "$HC_ROOT/events"
@@ -98,8 +104,8 @@ exit 7
             r#"#!/bin/sh
 printf 'start %s\n' "$$" >> "$HC_ROOT/events"
 printf '%s\0' "machine $HC_HOST" "$@" > "$HC_ROOT/argv-machine-$$"
-if [ "$HC_MODE" = slow ]; then printf '%s' "$$" > "$HC_ROOT/pid";exec /run/current-system/sw/bin/sleep 60;fi
-/run/current-system/sw/bin/sleep 0.03
+if [ "$HC_MODE" = slow ]; then printf '%s' "$$" > "$HC_ROOT/pid";exec "$HC_ROOT/native/sleep" 60;fi
+"$HC_ROOT/native/sleep" 0.03
 if [ "$HC_MODE" = retry ] && [ ! -e "$HC_ROOT/attempt-$HC_HOST" ]; then
  printf 'seen' > "$HC_ROOT/attempt-$HC_HOST";printf 'end %s\n' "$$" >> "$HC_ROOT/events"
  printf 'failed stdout\377\n';printf 'failed stderr\033\n' >&2;exit 5
@@ -121,7 +127,7 @@ printf 'healthy\377\n'
             r#"#!/bin/sh
 printf 'start %s\n' "$$" >> "$HC_ROOT/events"
 printf '%s\0' systemctl "$@" > "$HC_ROOT/argv-systemctl-$$"
-/run/current-system/sw/bin/sleep 0.03
+"$HC_ROOT/native/sleep" 0.03
 printf 'end %s\n' "$$" >> "$HC_ROOT/events"
 [ "$1" = show ] || exit 93
 if [ "$HC_MODE" = system-code ];then exit 2;fi
