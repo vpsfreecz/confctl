@@ -192,7 +192,14 @@ async fn build_publication_failure_keeps_reused_current_and_partial_new_record()
     .await
     .unwrap_err();
     assert!(error.to_string().contains("create generation GC root"));
-    assert_eq!(saved, [("a".into(), "old".into())]);
+    assert_eq!(
+        saved
+            .iter()
+            .map(|(host, generation)| (host.as_str(), generation.name.as_str()))
+            .collect::<Vec<_>>(),
+        [("a", "old")]
+    );
+    assert_eq!(saved[0].1.encode(), old.encode());
     assert_eq!(std::fs::read_link(current).unwrap(), PathBuf::from("old"));
     let new = store.host_directory("b").unwrap();
     assert!(new.join("2020-01-01--00-00-00/generation.json").is_file());
@@ -243,6 +250,7 @@ async fn build_group_failure_finishes_shared_task_and_skips_unentered_groups() {
         &settings,
         &publication,
         &scratch.path().join("log"),
+        TaskId(41),
     )
     .await
     .unwrap_err();
@@ -250,40 +258,40 @@ async fn build_group_failure_finishes_shared_task_and_skips_unentered_groups() {
     drop(events);
     let events = consumer.await.unwrap();
     assert!(
-        matches!(&events[0],UiEvent::TaskPending{task:TaskId(1),description} if description.contains("a"))
+        matches!(&events[0],UiEvent::TaskPending{task:TaskId(41),description} if description.contains("a"))
     );
     assert!(events.iter().any(|event| matches!(
         event,
         UiEvent::TaskPending {
-            task: TaskId(2),
+            task: TaskId(42),
             ..
         }
     )));
     assert!(events.iter().any(|event| matches!(
         event,
         UiEvent::TaskStarted {
-            task: TaskId(1),
+            task: TaskId(41),
             ..
         }
     )));
     assert!(!events.iter().any(|event| matches!(
         event,
         UiEvent::TaskStarted {
-            task: TaskId(2),
+            task: TaskId(42),
             ..
         }
     )));
     assert!(events.iter().any(|event| matches!(
         event,
         UiEvent::TaskFinished {
-            task: TaskId(1),
+            task: TaskId(41),
             state: TaskState::Failed
         }
     )));
     assert!(events.iter().any(|event| matches!(
         event,
         UiEvent::TaskFinished {
-            task: TaskId(2),
+            task: TaskId(42),
             state: TaskState::Skipped
         }
     )));
@@ -407,6 +415,7 @@ async fn build_completion_ack_cancellation_retains_publication_and_actual_group_
                 &settings,
                 &publication,
                 &scratch.path().join("log"),
+                TaskId(1),
             )
             .await
             {

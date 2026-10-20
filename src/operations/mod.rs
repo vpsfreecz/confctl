@@ -24,19 +24,10 @@ use crate::{
 pub struct CoreOperations;
 impl Operations for CoreOperations {
     fn available(&self, action: &Action) -> bool {
-        matches!(action, Action::Deploy(request) if request.generation.is_some()
-            && (request.copy_only || !request.reboot))
+        matches!(action, Action::Deploy(request) if request.copy_only || !request.reboot)
             || matches!(
                 action,
-                Action::GenerationList { .. }
-                    | Action::Status {
-                        generation: Some(_),
-                        ..
-                    }
-                    | Action::Status {
-                        skip_toplevel: true,
-                        ..
-                    }
+                Action::GenerationList { .. } | Action::Status { .. }
             )
             || matches!(
                 action,

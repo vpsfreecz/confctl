@@ -543,15 +543,34 @@ fn dry_boot_and_profile_failures_stop_later_commands_without_undoing_earlier_eff
 
 #[test]
 fn unsupported_boot_variants_and_declined_confirmations_do_not_query_or_copy() {
-    for args in [
-        vec!["--yes", "remote", "switch"],
-        vec!["--yes", "remote", "dry-activate"],
-        vec!["--yes", "remote", "boot"],
-        vec!["--generation=saved", "--reboot", "--yes", "remote", "boot"],
+    for (args, code) in [
+        (vec!["--yes", "--reboot", "remote", "boot"], 1),
+        (vec!["--yes", "--reboot", "remote"], 64),
+        (
+            vec![
+                "--generation=saved",
+                "--yes",
+                "--reboot",
+                "remote",
+                "dry-activate",
+            ],
+            64,
+        ),
+        (
+            vec!["--generation=saved", "--reboot", "--yes", "remote", "boot"],
+            1,
+        ),
     ] {
         let f = Fixture::new();
         let out = f.run(&args, "", b"");
-        assert_eq!(out.status.code(), Some(1), "{args:?}: {out:?}");
+        assert_eq!(out.status.code(), Some(code), "{args:?}: {out:?}");
+        if code == 64 {
+            assert!(
+                String::from_utf8_lossy(&out.stderr)
+                    .contains("--reboot can be used only with switch-action boot"),
+                "{out:?}"
+            );
+        }
         assert!(!f.root.join("sequence").exists());
         f.unchanged();
     }

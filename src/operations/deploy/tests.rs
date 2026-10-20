@@ -143,6 +143,27 @@ fn bulk_order_keeps_standalones_then_round_robins_carriers() {
         [0, 1, 5, 2, 4, 3]
     );
 }
+
+#[test]
+fn build_return_order_and_confirmed_bulk_order_are_distinct_for_partial_subsets() {
+    let jobs = [2, 0, 4].map(|id| Job {
+        machine: MachineId(id),
+        generation: generation("saved"),
+        task: TaskId(id as u64),
+    });
+    let ordered = selected_order(
+        &jobs,
+        &[MachineId(0), MachineId(1), MachineId(2), MachineId(4)],
+    );
+    assert_eq!(
+        ordered.iter().map(|job| job.machine).collect::<Vec<_>>(),
+        [MachineId(0), MachineId(2), MachineId(4)]
+    );
+    assert_eq!(
+        jobs.iter().map(|job| job.machine).collect::<Vec<_>>(),
+        [MachineId(2), MachineId(0), MachineId(4)]
+    );
+}
 struct Runner {
     calls: Mutex<Vec<TaskId>>,
 }

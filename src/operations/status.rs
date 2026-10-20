@@ -1,8 +1,8 @@
-//! Read-only public status against configured inputs or a saved generation.
+//! Status against a newly built target, configured inputs or saved generations.
 use super::host_status::HostStatus;
 use crate::{
     app::Context,
-    configuration::{ConfigEpoch, ConfigRoot},
+    configuration::{ConfigEpoch, ConfigRoot, MutationLock},
     domain::{
         Action, GenerationSelector, Inventory, Machine, MachineId, ManagedFilter, SelectionPolicy,
         select,
@@ -52,14 +52,12 @@ pub(super) async fn run(
     else {
         unreachable!("status adapter requires status action")
     };
-    assert!(
-        *skip_toplevel || generation.is_some(),
-        "status requires an explicit generation"
-    );
+    let building = !*skip_toplevel && generation.is_none();
     let generation = generation.as_ref().filter(|_| !*skip_toplevel);
     let generation_text = match generation {
         Some(GenerationSelector::Current) => "current",
         Some(GenerationSelector::Offset(text) | GenerationSelector::Name(text)) => text,
+        None if building => "new build",
         None => "none",
     };
     let cancellation = context.cancellation.child_token();
@@ -99,7 +97,12 @@ pub(super) async fn run(
                 UiEvent::Diagnostic {
                     stream: OutputStream::Stdout,
                     style: Style::Plain,
-                    text: "The following machines will be checked:\n".into(),
+                    text: if building {
+                        "The following machines will be BUILT and then checked:\n"
+                    } else {
+                        "The following machines will be checked:\n"
+                    }
+                    .into(),
                 },
                 super::machines::table(inventory, &selected, &settings.list_columns, true),
                 UiEvent::Diagnostic {
@@ -116,7 +119,40 @@ pub(super) async fn run(
         return Err(ConfctlError::State("Aborted".into()));
     }
     check_cancel(&context.cancellation)?;
-    let jobs = if let Some(selector) = generation {
+    let guard = if building {
+        Some(MutationLock::acquire(&root, &context.cancellation).await?)
+    } else {
+        None
+    };
+    let mut first_task = 1;
+    let jobs = if building {
+        let built = super::build::build_selected(
+            context,
+            &nix,
+            inventory,
+            &selected.machines,
+            guard.as_ref().expect("default status owns its guard"),
+            &mut first_task,
+        )
+        .await?;
+        selected
+            .machines
+            .iter()
+            .map(|id| Job {
+                machine: *id,
+                generation: Some(
+                    built
+                        .iter()
+                        .find(|(host, _)| host == id)
+                        .expect("complete selected build")
+                        .1
+                        .clone(),
+                ),
+                use_saved_inputs: false,
+                local_count: 0,
+            })
+            .collect()
+    } else if let Some(selector) = generation {
         resolve_saved(
             &root,
             inventory,
@@ -133,10 +169,17 @@ pub(super) async fn run(
             .map(|id| Job {
                 machine: *id,
                 generation: None,
+                use_saved_inputs: false,
                 local_count: 0,
             })
             .collect()
     };
+    first_task
+        .checked_add(
+            u64::try_from(jobs.len())
+                .map_err(|_| ConfctlError::State("Status task IDs overflow".into()))?,
+        )
+        .ok_or_else(|| ConfctlError::State("Status task IDs overflow".into()))?;
     for job in &jobs {
         super::host_status::routing(inventory, inventory.get(job.machine))?;
     }
@@ -150,7 +193,7 @@ pub(super) async fn run(
             let nix = &nix;
             Some(Box::pin(async move {
                 let machine = inventory.get(job.machine);
-                let task = TaskId(index as u64 + 1);
+                let task = TaskId(first_task + index as u64);
                 let description = format!("check status on {}", machine.name);
                 let result: Result<Row, ConfctlError> = async {
                     context
@@ -263,6 +306,7 @@ pub(super) async fn run(
 struct Job {
     machine: MachineId,
     generation: Option<BuildGeneration>,
+    use_saved_inputs: bool,
     local_count: usize,
 }
 
@@ -295,6 +339,7 @@ async fn resolve_saved(
             Some(generation) => jobs.push(Job {
                 machine: *id,
                 generation: Some(generation.clone()),
+                use_saved_inputs: true,
                 local_count: local.generations.len(),
             }),
             None => missing.push(*id),
@@ -418,7 +463,11 @@ async fn observe<P: ProcessRunner>(
         native_failures: Vec::new(),
         eval_failures: Vec::new(),
     };
-    if let Some(generation) = &job.generation {
+    if job.use_saved_inputs {
+        let generation = job
+            .generation
+            .as_ref()
+            .expect("saved inputs need a saved generation");
         row.target = normalize(&Value::Object(generation.inputs_info.clone()));
         if row.target.as_ref().is_some_and(Inputs::is_empty) {
             row.diagnostics.push(format!(

@@ -1,4 +1,4 @@
-# Read-only status
+# Status
 
 `confctl-rust status --generation none [machine-pattern]` compares resolved target
 input revisions with deployed input metadata. It checks managed machines with a
@@ -7,9 +7,24 @@ and confirm, or pass `--yes`. An empty selection fails.
 
 The `none` mode evaluates each machine's resolved input metadata without building
 a target system. `confctl-rust status --generation <current|offset|name>` compares
-against a saved local generation instead. Omitted generation, which would build
-a new target, remains unavailable in the Rust CLI. The default `confctl` entry
-point remains Ruby.
+against a saved local generation instead. Omitting generation builds a new
+target before comparing it. The default `confctl` entry point remains Ruby.
+
+Default `confctl-rust status [machine-pattern]` explicitly previews BUILD followed
+by status checking and asks once. After consent, one mutation guard covers the
+existing grouped build and publication; default build options apply. It performs
+no deploy runtime-kernel refresh, copy, activation, profile or health operation.
+Every build must succeed before observations begin, in original selected-host
+order with task IDs after the build range. The returned generation object
+supplies the target toplevel, while each host's inputs are evaluated from the
+current configuration, including when an old generation with different saved
+input metadata was reused. Local generation counts include completed publication.
+
+Only this default mode can publish generations, roots and current links or
+create the mutation lock. Build/publication/output/cancellation failure stops
+before observations and retains earlier local effects. Later query failures
+also retain publications. Inspect reported saved names and explicitly rerun;
+the command performs no restoration or remote rollback.
 
 Saved status resolves a generation for each selected host after the initial
 confirmation. The preview shows found and missing hosts, generation names,
@@ -56,9 +71,9 @@ process infrastructure, protocol decoding, cancellation and output failures fail
 the command. Correct the configuration or connectivity issue and run the read
 again; the command does not poll or repair state.
 
-Status reads local generation records and reports exclusions without changing
+Explicit saved/none status reads local generation records and reports exclusions without changing
 records or current links. It creates no mutation lock or GC roots and performs
 no copy, activation, kernel refresh or profile write. The `none` mode does not
 read the current-system path. Normal inventory materialization, configured
-metadata evaluation in `none` mode and invocation logging still occur. Saved
+metadata evaluation in `none` or default mode and invocation logging still occur. Saved
 record formats and the Ruby entry point are unchanged.

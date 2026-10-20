@@ -1,4 +1,4 @@
-# Deploy saved generations
+# Build and deploy generations
 
 The Rust development binary supports `confctl-rust deploy --copy-only
 --generation <selector> [machine-pattern] [action]`. The default `confctl` remains
@@ -6,9 +6,9 @@ Ruby. This route copies existing store paths only, even when reboot, activation
 or health-check options are supplied. The non-copy-only route also supports
 `confctl-rust deploy --generation <selector> [machine-pattern] boot` without
 `--reboot`, and the same command with action `dry-activate`, `test` or `switch`.
-Omitting the action with a saved generation also selects switch. New builds
-(including deploy without a generation selector) and rebooting remain
-unavailable before application setup.
+Omitting the action selects switch. Without `--generation`, deploy builds the
+confirmed hosts first, then uses the same four actions or copy-only policy.
+Rebooting remains unavailable outside copy-only, which never requests a reboot.
 
 Selection includes managed machines of every spin, including carried machines;
 it does not apply the runnable filter. The command previews hosts, selector and
@@ -71,6 +71,41 @@ Partial remote store copies and earlier kernel-state effects remain after errors
 Generation records, GC roots and current links stay unchanged. Copy-only makes
 no profile change, activation, reboot or health-check request. Controlled command
 fixtures do not establish real-site copying, activation or full live-terminal
+qualification.
+
+## Build before deployment
+
+`confctl-rust deploy [machine-pattern] [boot|dry-activate|test|switch]` previews
+the build and deployment in one initial consent. One mutation guard spans the
+optional kernel refresh, build/publication, copies, activation and health.
+After refresh, a fresh Nix client evaluates the build plan with the requested
+show-trace, max-jobs and cores options and invocation defaults. Confirmed host
+identities stay fixed; selection is not repeated.
+
+Every build group must finish before any deployment, including one-by-one.
+The build returns the actual reused or newly published generation objects.
+Reuse preserves their existing helper and metadata; targets are not reloaded
+from mutable current links or inferred from build JSON. New publications share
+one invocation timestamp. Build results are printed once, without saved lookup,
+missing-generation or interactive resolved-list prompts. Per-copy, activation
+and health confirmations retain their existing policy.
+
+Groups follow first-seen input order, with reused records before new records
+within each group. Interactive copying, sequential activation and one-by-one
+deployment follow that returned order. Bulk copying instead uses the original
+confirmed host order before standalone/carrier interleaving; bulk health uses
+the completed subset in confirmed order. Copy-only builds and copies without
+known-current observations, activation or health checks.
+
+Build, publication, output or cancellation failure prevents every later
+deployment phase, even when earlier hosts were saved successfully. Earlier
+generation files, roots, current links and kernel refreshes remain. Later
+deployment failure can also retain remote copies, scripts, profiles, callbacks
+and check effects. Inspect the reported saved names and target state, correct
+the cause and explicitly rerun or deploy an older saved generation. The guard
+does not coordinate with Ruby writers, and no local or remote restoration is
+implied. Formats, helper protocols and the default Ruby entry stay unchanged.
+Confined fake-tool tests do not establish real builds, hosts or full terminal
 qualification.
 
 ## Prepare a saved generation for boot

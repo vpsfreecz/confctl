@@ -202,6 +202,12 @@ confctl inputs channel set --commit production nixpkgs <revision>
 Builds and deployments use the existing lock without updating inputs automatically. See [Flake inputs](docs/flake-inputs.md)
 for raw-source inputs, `follows`, path inputs and the optional NIX_PATH bridge.
 
+The development `confctl-rust` binary supports [deployment](docs/deploy.md) from
+new builds or saved generations across boot, dry-activate, test and switch,
+without reboot. Its default [status](docs/status.md) builds a target before
+comparison; explicit saved/none modes remain read-only. The default `confctl`
+entry point remains Ruby, and real-site/terminal qualification is separate.
+
 ## Machine metadata and inputs
 Machine configuration directory usually contains at least two files:
 `cluster/<machine name>/config.nix` and `cluster/<machine name>/module.nix`.
