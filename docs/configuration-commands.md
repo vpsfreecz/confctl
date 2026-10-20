@@ -62,3 +62,24 @@ Ruby. Enabling netboot publication requires the module/tool pin defining
 hook script. Restore the matched old pin, settings and script together when
 rolling back that migration: reverting only the tool after removing the script
 would omit refresh. Preserve generated lists and local state.
+
+The ignored `configuration_real_nix` test is a synthetic source-inclusion and
+site-import qualification, separate from the default fake-tool tests. In an
+already available environment, set absolute `CONFCTL_REAL_NIX_BIN` (the
+designated integrated binary), `CONFCTL_REAL_NIX_SOURCE` (held stable),
+`CONFCTL_REAL_NIX_NIXPKGS`, `CONFCTL_REAL_NIX_SITE_HELPER` (the actual site
+`lib/netboot-machines.nix`), `CONFCTL_REAL_NIX_NIX`, `CONFCTL_REAL_NIX_GIT` and
+`CONFCTL_REAL_NIX_SHELL`, plus the native `CONFCTL_REAL_NIX_SYSTEM` and a new
+`CONFCTL_REAL_NIX_ROOT` outside every Git ancestor. All sources, tools and
+writeText builder dependencies must already be available; missing prerequisites
+fail explicitly. After authorization, select `CONFCTL_REAL_NIX_PHASE=baseline`
+for `cargo test --offline --locked --test configuration_real_nix -- --ignored
+--nocapture`. This prepares only local-input fixtures and stops after one offline
+machinesJson dry-run. Inspect its output: only the small writeText result may
+need building. A separate authorization with `CONFCTL_REAL_NIX_PHASE=cases`
+and the same command/root runs the five cases and explicit fixture-index
+controls. Nix uses the disclosed offline/no-substitute/no-remote-builder prefix
+and empty registry; observers are separate from product calls. Fixtures and raw
+outputs remain in that root for disposition. Neither an ignored test nor a
+successful baseline dry-run closes the qualification gate. These cases do not
+qualify full site or system builds.
