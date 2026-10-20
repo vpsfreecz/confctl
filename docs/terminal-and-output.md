@@ -45,6 +45,14 @@ advisory mutation lock spans the writes; Ruby writers do not share it. A conflic
 write/output failure or cancellation retains completed and partially written
 files. These local effects admit no host or native-process tasks.
 
+[`add`, `rename` and `rediscover`](configuration-commands.md) emit acknowledged
+notices before local edits and check cancellation after acknowledgement. They
+hold one advisory mutation lock through core edits, subsequent settings reads and
+enabled netboot publication. Settings are required even when publication is
+disabled; a later failure retains completed edits. These commands need no
+confirmation and contact no hosts. The guide covers migration and recovery from
+partial effects.
+
 `runtime-kernels update` emits pending events for the confirmed, validated host
 probes and starts each task as its logical probe body enters the process runner.
 Each host has its own task ID and description. A decoded kernel succeeds; an

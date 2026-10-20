@@ -4,6 +4,7 @@
 mod build;
 mod changes;
 mod config_init;
+mod configuration;
 mod connection;
 mod cssh;
 mod deploy;
@@ -38,6 +39,9 @@ impl Operations for CoreOperations {
                 action,
                 Action::InputsList { .. }
                     | Action::Init
+                    | Action::Add { .. }
+                    | Action::Rename { .. }
+                    | Action::Rediscover
                     | Action::List { .. }
                     | Action::ChannelList { .. }
                     | Action::RuntimeKernelsUpdate { .. }
@@ -58,6 +62,9 @@ impl Operations for CoreOperations {
         let root = ConfigRoot::new(&context.cwd)?;
         match &invocation.action {
             Action::Init => config_init::run(root, context).await?,
+            Action::Add { .. } | Action::Rename { .. } | Action::Rediscover => {
+                configuration::run(&invocation.action, root, context).await?
+            }
             Action::InputsList { pattern } => {
                 inputs::list(&root, pattern.as_deref(), &context.events).await?
             }

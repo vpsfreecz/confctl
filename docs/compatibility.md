@@ -59,10 +59,18 @@ silently become the new parser's defaults.
 The `confctl-rust` development binary provides the Rust parser and application
 entrypoint. The default `confctl` remains Ruby during development. Typed requests
 cover the 29 original command actions and the built-in `runtime-kernels update`
-action. The concrete routes are [`init`](config-init.md), `ls`, `inputs ls`, `inputs channel ls`,
+action. The concrete routes are [`init`](config-init.md),
+[`add`, `rename` and `rediscover`](configuration-commands.md), `ls`, `inputs ls`, `inputs channel ls`,
 `runtime-kernels update`, `build`, [`test-connection`](connection-check.md),
 [`ssh`](ssh.md), [`cssh`](cssh.md) and [`generation ls`](generation-listing.md) for default/local,
 remote or combined local/remote records.
+Configuration edits run without confirmation or host contact. Add writes literal
+Ruby-compatible templates; rename preserves the moved contents. All three
+replace the core cluster list before requiring valid settings, even when netboot
+publication is disabled. Enabled publication reads fresh settings and inventory
+under the same advisory lock. Later failure retains completed core edits; the
+[configuration guide](configuration-commands.md) covers path restrictions, hook
+migration, coordinated rollback and explicit rediscovery after partial failure.
 [`deploy --copy-only --generation <selector>`](deploy.md) copies saved generations.
 Saved-generation `deploy --generation <selector> <pattern> boot` also prepares
 standalone hosts for boot without reboot; carried hosts only receive copies.
