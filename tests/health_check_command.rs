@@ -4,6 +4,7 @@
 mod native_tool;
 use serde_json::{Value, json};
 use std::{
+    collections::BTreeSet,
     fs,
     io::Write,
     os::unix::fs::PermissionsExt,
@@ -84,7 +85,7 @@ done
 shift
 [ "$#" = 1 ] || exit 95
 HC_HOST=remote;export HC_HOST
-exec /bin/sh -c "$1"
+exec /bin/sh -c "exec $1"
 "#,
         );
         executable(
@@ -118,7 +119,8 @@ fi
 if [ "$HC_MODE" = output-retry ];then printf 'later stderr\376\n' >&2;fi
 printf 'end %s\n' "$$" >> "$HC_ROOT/events"
 if [ "$HC_MODE" = exhaust ] || [ "$HC_MODE" = cooldown ]; then printf 'still failing\n' >&2;exit 5;fi
-if [ "$HC_MODE" = signal ];then kill -TERM "$$";exit 94;fi
+if [ "$HC_MODE" = signal ];then trap - TERM;kill -TERM "$$";exit 94;fi
+if [ "$HC_MODE" = exit143 ];then exit 143;fi
 printf 'healthy\377\n'
 "#,
         );
@@ -131,7 +133,7 @@ printf '%s\0' systemctl "$@" > "$HC_ROOT/argv-systemctl-$$"
 printf 'end %s\n' "$$" >> "$HC_ROOT/events"
 [ "$1" = show ] || exit 93
 if [ "$HC_MODE" = system-code ];then exit 2;fi
-if [ "$HC_MODE" = system-signal ];then kill -TERM "$$";exit 92;fi
+if [ "$HC_MODE" = system-signal ];then trap - TERM;kill -TERM "$$";exit 92;fi
 if [ "$HC_MODE" = system-retry ] && [ ! -e "$HC_ROOT/system-attempt" ];then
  printf 'seen' > "$HC_ROOT/system-attempt";printf 'SystemState=starting\n';exit 0
 fi
@@ -204,6 +206,35 @@ printf 'SystemState=running\nActiveState=active\n'
             "unterminated argv record: {records:?}"
         );
         records
+    }
+    fn assert_remote_leaders_joined(&self) {
+        let ssh = self.argv_records("ssh-args-");
+        let machine = self.argv_records("argv-machine-");
+        let system = self.argv_records("argv-systemctl-");
+        assert_eq!(ssh.len(), 3);
+        assert_eq!(machine.len(), 1);
+        assert_eq!(system.len(), 2);
+        assert!(machine[0].1.starts_with(b"machine remote\0"));
+        let pid = |name: &str| {
+            let pid = name.rsplit_once('-').unwrap().1.parse::<u32>().unwrap();
+            assert!(pid > 0, "{name}");
+            pid
+        };
+        let ssh_pids = ssh
+            .iter()
+            .map(|(name, _)| pid(name))
+            .collect::<BTreeSet<_>>();
+        // The builder is local; only the three remote checkers must exec as SSH.
+        let checker_pids = machine
+            .iter()
+            .chain(&system)
+            .map(|(name, _)| pid(name))
+            .collect::<BTreeSet<_>>();
+        assert_eq!(checker_pids.len(), 3);
+        assert_eq!(ssh_pids, checker_pids);
+        for pid in checker_pids {
+            assert!(!Path::new("/proc").join(pid.to_string()).exists(), "{pid}");
+        }
     }
 }
 fn wait(mut child: Child) -> Output {
@@ -352,6 +383,7 @@ fn command_and_systemd_retries_keep_failed_attempt_diagnostics_and_expected_nonz
         "exhaust",
         "system-fail",
         "signal",
+        "exit143",
         "system-code",
         "system-signal",
     ] {
@@ -363,10 +395,43 @@ fn command_and_systemd_retries_keep_failed_attempt_diagnostics_and_expected_nonz
         assert_eq!(out.status.code(), Some(1), "{out:?}");
         let text = String::from_utf8_lossy(&out.stdout);
         assert!(text.contains("failed"));
-        if mode == "signal" || mode == "system-signal" {
-            assert!(text.contains("signal 15"), "{text}");
+        match mode {
+            "signal" | "exit143" => {
+                let native = if mode == "signal" {
+                    "signal 15"
+                } else {
+                    "exit status 143"
+                };
+                let expected = format!(
+                    "remote: machine argv: failed attempt 1 ({native}): expected exit status 0, received {native}"
+                );
+                assert!(text.contains(&expected), "{mode}: {text}");
+            }
+            "system-code" | "system-signal" => {
+                let native = if mode == "system-code" {
+                    "exit status 2"
+                } else {
+                    "signal 15"
+                };
+                for check in [
+                    "systemd: SystemState=running",
+                    "unit 'literal.service: ActiveState=active",
+                ] {
+                    let expected = format!(
+                        "remote: {check}: failed attempt 1 ({native}): expected exit status 0, received {native}"
+                    );
+                    assert!(text.contains(&expected), "{mode}: {text}");
+                }
+            }
+            _ => {}
+        }
+        if matches!(mode, "signal" | "system-signal") {
+            assert!(!text.contains("exit status 143"), "{mode}: {text}");
+        } else if mode == "exit143" {
+            assert!(!text.contains("signal 15"), "{text}");
         }
         assert_eq!(f.attempts(), 4);
+        f.assert_remote_leaders_joined();
         f.unchanged();
     }
 }
