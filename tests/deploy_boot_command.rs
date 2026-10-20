@@ -544,8 +544,7 @@ fn dry_boot_and_profile_failures_stop_later_commands_without_undoing_earlier_eff
 #[test]
 fn unsupported_boot_variants_and_declined_confirmations_do_not_query_or_copy() {
     for args in [
-        vec!["--generation=saved", "--yes", "remote"],
-        vec!["--generation=saved", "--yes", "remote", "switch"],
+        vec!["--yes", "remote", "switch"],
         vec!["--yes", "remote", "dry-activate"],
         vec!["--yes", "remote", "boot"],
         vec!["--generation=saved", "--reboot", "--yes", "remote", "boot"],

@@ -313,7 +313,7 @@ async fn bounded_bulk_joins_reverse_completions_and_reports_each_actual_final() 
 }
 
 #[test]
-fn boot_skip_requires_both_known_standalone_paths_but_retains_carrier_partial_current() {
+fn boot_and_switch_skip_requires_both_known_standalone_paths_but_retains_carrier_partial_current() {
     use super::super::host_status::{HostGeneration, HostStatus};
     let inv = inventory();
     let desired = generation("saved");
@@ -326,93 +326,80 @@ fn boot_skip_requires_both_known_standalone_paths_but_retains_carrier_partial_cu
             current,
         }]
     };
-    let mut status = HostStatus::default();
-    assert!(!already_current(
-        &inv.machines[0],
-        &desired,
-        &status,
-        SwitchAction::Boot
-    ));
-    status.generations = Some(records(true));
-    assert!(!already_current(
-        &inv.machines[0],
-        &desired,
-        &status,
-        SwitchAction::Boot
-    ));
-    status.current_toplevel = Some(desired.toplevel.clone());
-    assert!(already_current(
-        &inv.machines[0],
-        &desired,
-        &status,
-        SwitchAction::Boot
-    ));
-    status.generations = Some(records(false));
-    assert!(!already_current(
-        &inv.machines[0],
-        &desired,
-        &status,
-        SwitchAction::Boot
-    ));
-    status.generations = Some(vec![]);
-    assert!(!already_current(
-        &inv.machines[0],
-        &desired,
-        &status,
-        SwitchAction::Boot
-    ));
-    status.generations = None;
-    assert!(!already_current(
-        &inv.machines[0],
-        &desired,
-        &status,
-        SwitchAction::Boot
-    ));
-    assert!(already_current(
-        &inv.machines[2],
-        &desired,
-        &status,
-        SwitchAction::Boot
-    ));
-    status.current_toplevel = None;
-    assert!(!already_current(
-        &inv.machines[2],
-        &desired,
-        &status,
-        SwitchAction::Boot
-    ));
-
-    for spelling in ["/store//system", "/store/./system"] {
-        status.current_toplevel = Some(spelling.into());
+    for action in [SwitchAction::Boot, SwitchAction::Switch] {
+        let mut status = HostStatus::default();
+        assert!(!already_current(
+            &inv.machines[0],
+            &desired,
+            &status,
+            action
+        ));
         status.generations = Some(records(true));
         assert!(!already_current(
             &inv.machines[0],
             &desired,
             &status,
-            SwitchAction::Boot
+            action
         ));
-        assert!(!already_current(
-            &inv.machines[2],
-            &desired,
-            &status,
-            SwitchAction::Boot
-        ));
-
         status.current_toplevel = Some(desired.toplevel.clone());
-        status.generations.as_mut().unwrap()[0].toplevel = spelling.into();
+        assert!(already_current(&inv.machines[0], &desired, &status, action));
+        status.generations = Some(records(false));
         assert!(!already_current(
             &inv.machines[0],
             &desired,
             &status,
-            SwitchAction::Boot
+            action
         ));
-        // Carried boot only needs its exact current-profile path observation.
-        assert!(already_current(
+        status.generations = Some(vec![]);
+        assert!(!already_current(
+            &inv.machines[0],
+            &desired,
+            &status,
+            action
+        ));
+        status.generations = None;
+        assert!(!already_current(
+            &inv.machines[0],
+            &desired,
+            &status,
+            action
+        ));
+        assert!(already_current(&inv.machines[2], &desired, &status, action));
+        status.current_toplevel = None;
+        assert!(!already_current(
             &inv.machines[2],
             &desired,
             &status,
-            SwitchAction::Boot
+            action
         ));
+
+        for spelling in ["/store//system", "/store/./system"] {
+            status.current_toplevel = Some(spelling.into());
+            status.generations = Some(records(true));
+            assert!(!already_current(
+                &inv.machines[0],
+                &desired,
+                &status,
+                action
+            ));
+            assert!(!already_current(
+                &inv.machines[2],
+                &desired,
+                &status,
+                action
+            ));
+
+            status.current_toplevel = Some(desired.toplevel.clone());
+            status.generations.as_mut().unwrap()[0].toplevel = spelling.into();
+            assert!(!already_current(
+                &inv.machines[0],
+                &desired,
+                &status,
+                action
+            ));
+            // Carried boot only needs its exact current-profile path observation.
+            assert!(already_current(&inv.machines[2], &desired, &status, action));
+        }
     }
 }
 
@@ -460,6 +447,9 @@ async fn activation_profile_failure_and_final_ack_cancellation_preserve_actual_e
         (SwitchAction::Boot, true, false),
         (SwitchAction::Boot, false, false),
         (SwitchAction::Boot, false, true),
+        (SwitchAction::Switch, true, false),
+        (SwitchAction::Switch, false, false),
+        (SwitchAction::Switch, false, true),
         (SwitchAction::DryActivate, false, false),
         (SwitchAction::DryActivate, false, true),
     ] {
@@ -497,7 +487,7 @@ async fn activation_profile_failure_and_final_ack_cancellation_preserve_actual_e
             cancellation: &cancel,
             inventory: &inv,
             root: &root,
-            rollback: AutoRollback::Configured,
+            rollback: AutoRollback::Disabled,
             ssh_opts: None,
         };
         let ui = crate::terminal::Ui::new(
@@ -525,7 +515,11 @@ async fn activation_profile_failure_and_final_ack_cancellation_preserve_actual_e
             .await
             .unwrap_err();
         if fail_profile {
-            assert!(error.to_string().contains("set profile after boot"));
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("set profile after {}", action_name(action)))
+            );
             assert!(
                 matches!(error, ConfctlError::ProcessFailure { evidence, .. }
                 if evidence.status.unwrap().code()==Some(9) && evidence.stdout_complete && evidence.stderr_complete)
@@ -543,7 +537,7 @@ async fn activation_profile_failure_and_final_ack_cancellation_preserve_actual_e
             let calls = runner.calls.lock().unwrap();
             assert_eq!(calls[0].args, ["dry-activate"]);
             assert_eq!(calls[1].args, [action_name(action)]);
-            if action == SwitchAction::Boot {
+            if matches!(action, SwitchAction::Boot | SwitchAction::Switch) {
                 assert_eq!(calls.len(), 3);
                 assert_eq!(calls[2].program, std::path::Path::new("nix-env"));
                 assert_eq!(
@@ -584,6 +578,224 @@ async fn activation_profile_failure_and_final_ack_cancellation_preserve_actual_e
                 }
             )]
         );
+    }
+}
+
+#[tokio::test]
+async fn switch_profile_ack_cancellation_suppresses_profile_child_and_keeps_delivery_priority() {
+    for reject in [false, true] {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = ConfigRoot::new(tmp.path()).unwrap();
+        let inv = inventory();
+        let runner = ActivationRunner {
+            calls: Mutex::new(Vec::new()),
+            fail_profile: false,
+        };
+        let cancel = CancellationToken::new();
+        let (events, mut receiver) = EventSink::channel(1);
+        let token = cancel.clone();
+        let consumer = tokio::spawn(async move {
+            let mut finals = Vec::new();
+            while let Some(delivery) = receiver.receive().await {
+                let (event, ack) = delivery.into_parts();
+                if let UiEvent::Diagnostic { text, .. } = &event
+                    && text.contains("set profile after switch")
+                {
+                    token.cancel();
+                    if reject {
+                        ack.acknowledge(Err("controlled profile delivery failure".into()));
+                        continue;
+                    }
+                }
+                if let UiEvent::TaskFinished { task, state } = event {
+                    finals.push((task, state));
+                }
+                ack.acknowledge(Ok(()));
+            }
+            finals
+        });
+        let copies = Copies {
+            runner: &runner,
+            events: &events,
+            cancellation: &cancel,
+            inventory: &inv,
+            root: &root,
+            rollback: AutoRollback::Disabled,
+            ssh_opts: None,
+        };
+        let ui = crate::terminal::Ui::new(
+            std::fs::File::open("/dev/null").unwrap(),
+            events.clone(),
+            cancel.clone(),
+            None,
+        )
+        .unwrap();
+        let activation = Activation {
+            copies: &copies,
+            ui: &ui,
+            ssh_config: None,
+            interactive: false,
+            dry_first: false,
+            action: SwitchAction::Switch,
+            log: tmp.path(),
+        };
+        let job = Job {
+            machine: MachineId(1),
+            generation: generation("saved"),
+            task: TaskId(1),
+        };
+        let error = activate_one(&activation, &job, TaskId(9))
+            .await
+            .unwrap_err();
+        if reject {
+            assert!(
+                error
+                    .to_string()
+                    .contains("controlled profile delivery failure")
+            );
+        } else {
+            assert!(error.is_cancelled());
+        }
+        {
+            let calls = runner.calls.lock().unwrap();
+            assert_eq!(calls.len(), 1);
+            assert_eq!(calls[0].args, ["switch"]);
+        }
+        ui.shutdown().unwrap();
+        drop(ui);
+        drop(events);
+        assert_eq!(
+            consumer.await.unwrap(),
+            [(
+                TaskId(9),
+                if reject {
+                    TaskState::Failed
+                } else {
+                    TaskState::Canceled
+                }
+            )]
+        );
+    }
+}
+
+#[tokio::test]
+async fn carried_switch_has_one_logical_profile_task_and_retains_success_after_final_ack_cancel() {
+    for cancel_final in [false, true] {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = ConfigRoot::new(tmp.path()).unwrap();
+        let inv = Inventory::from_value(json!({
+            "carrier":{"name":"carrier","metaConfig":{"managed":false,"host":{"target":"localhost"}}},
+            "guest":{"name":"carrier#guest","carrier":"carrier","alias":"rack/guest 'alias","metaConfig":{"host":{"target":null}}}
+        })).unwrap();
+        let runner = ActivationRunner {
+            calls: Mutex::new(Vec::new()),
+            fail_profile: false,
+        };
+        let cancel = CancellationToken::new();
+        let (events, mut receiver) = EventSink::channel(1);
+        let token = cancel.clone();
+        let consumer = tokio::spawn(async move {
+            let mut seen = Vec::new();
+            while let Some(delivery) = receiver.receive().await {
+                let (event, ack) = delivery.into_parts();
+                if matches!(event, UiEvent::TaskFinished { .. }) && cancel_final {
+                    token.cancel();
+                }
+                seen.push(event);
+                ack.acknowledge(Ok(()));
+            }
+            seen
+        });
+        let copies = Copies {
+            runner: &runner,
+            events: &events,
+            cancellation: &cancel,
+            inventory: &inv,
+            root: &root,
+            rollback: AutoRollback::Enabled,
+            ssh_opts: None,
+        };
+        let ui = crate::terminal::Ui::new(
+            std::fs::File::open("/dev/null").unwrap(),
+            events.clone(),
+            cancel.clone(),
+            None,
+        )
+        .unwrap();
+        let activation = Activation {
+            copies: &copies,
+            ui: &ui,
+            ssh_config: None,
+            interactive: true,
+            dry_first: true,
+            action: SwitchAction::Switch,
+            log: tmp.path(),
+        };
+        let job = Job {
+            machine: MachineId(1),
+            generation: generation("saved"),
+            task: TaskId(1),
+        };
+        let result = activate_one(&activation, &job, TaskId(9)).await;
+        if cancel_final {
+            assert!(result.unwrap_err().is_cancelled());
+        } else {
+            assert!(result.unwrap());
+        }
+        {
+            let calls = runner.calls.lock().unwrap();
+            assert_eq!(calls.len(), 1);
+            assert_eq!(calls[0].program, std::path::Path::new("carrier-env"));
+            assert_eq!(
+                calls[0].args,
+                [
+                    "-p",
+                    "/nix/var/nix/profiles/confctl-rack:guest 'alias",
+                    "--set",
+                    "/store/system"
+                ]
+            );
+            assert_eq!(calls[0].stdout, StreamPolicy::CaptureAndForward);
+            assert_eq!(calls[0].stderr, StreamPolicy::CaptureAndForward);
+        }
+        ui.shutdown().unwrap();
+        drop(ui);
+        drop(events);
+        let seen = consumer.await.unwrap();
+        let phases = seen
+            .iter()
+            .filter_map(|event| match event {
+                UiEvent::TaskPending { task, description } => {
+                    Some((*task, "pending", description.as_str()))
+                }
+                UiEvent::TaskStarted { task, description } => {
+                    Some((*task, "started", description.as_str()))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            phases,
+            [
+                (
+                    TaskId(9),
+                    "pending",
+                    "set carrier profile for carrier#guest on carrier"
+                ),
+                (
+                    TaskId(9),
+                    "started",
+                    "set carrier profile for carrier#guest on carrier"
+                )
+            ]
+        );
+        assert!(seen.iter().any(|e| matches!(
+            e,
+            UiEvent::TaskFinished {
+                task: TaskId(9),
+                state: TaskState::Succeeded
+            }
+        )));
     }
 }
 

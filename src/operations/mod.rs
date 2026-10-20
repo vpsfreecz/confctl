@@ -25,7 +25,7 @@ pub struct CoreOperations;
 impl Operations for CoreOperations {
     fn available(&self, action: &Action) -> bool {
         matches!(action, Action::Deploy(request) if request.generation.is_some()
-            && (request.copy_only || (matches!(request.action, crate::domain::SwitchAction::Boot | crate::domain::SwitchAction::DryActivate | crate::domain::SwitchAction::Test) && !request.reboot)))
+            && (request.copy_only || !request.reboot))
             || matches!(
                 action,
                 Action::GenerationList { .. }

@@ -1,4 +1,4 @@
-//! Saved test through the real parser/app with confined fake native tools.
+//! Saved test and switch through the real app with confined fake native tools.
 #![cfg(target_os = "linux")]
 use confctl::generation::BuildGeneration;
 use serde_json::{Value, json};
@@ -85,10 +85,11 @@ exit 0
                 &top.join("bin/switch-to-configuration"),
                 r#"#!/bin/sh
 printf '%s\0' "$DT_HOST" "$@" > "$DT_ROOT/activation-$$"
-printf 'test %s\n' "$DT_HOST" >> "$DT_ROOT/sequence"
-[ "$1" = test ] || exit 92
+printf '%s %s\n' "$1" "$DT_HOST" >> "$DT_ROOT/sequence"
+case "$1" in test|switch|dry-activate) ;; *) exit 92 ;; esac
 if [ "$DT_MODE" = activation-fail ] && [ "$DT_HOST" = b ]; then exit 7; fi
 if [ "$DT_MODE" = hidden ]; then exit 9; fi
+if [ "$DT_MODE" = activation-slow ] && [ "$1" = switch ]; then printf '%s' "$$" > "$DT_ROOT/activation-pid"; exec /run/current-system/sw/bin/sleep 60; fi
 printf 'test native %s\n' "$DT_HOST"
 "#,
             );
@@ -145,7 +146,8 @@ printf '123.5 0\n'
             &bin.join("realpath"),
             r#"#!/bin/sh
 if [ "$DT_MODE" = unknown ]; then exit 1; fi
-case "$DT_MODE" in known|profile-fail)
+case "$DT_MODE" in known|profile-fail|both-known|carried-known-fail)
+ case "$3" in /nix/var/nix/profiles/confctl-*) DT_HOST='carrier#guest' ;; esac
  printf "%s/toplevels/%s 'saved\n" "$DT_ROOT" "$DT_HOST" ;;
  *) printf '/other-running\n' ;;
 esac
@@ -155,10 +157,11 @@ esac
             &bin.join("bash"),
             r#"#!/bin/sh
 script=$(/run/current-system/sw/bin/cat)
-if [ "$DT_MODE" = profile-fail ]; then exit 7; fi
-printf '/other-profile\n'
+if [ "$DT_MODE" = profile-fail ] || [ "$DT_MODE" = carried-known-fail ]; then exit 7; fi
 case "$script" in *confctl-guest*) profile=/nix/var/nix/profiles/confctl-guest ;; *) profile=/nix/var/nix/profiles/system ;; esac
-printf '%s-1-link;/other-profile;1700000000;\n' "$profile"
+case "$DT_MODE" in both-known|profile-only) current="$DT_ROOT/toplevels/$DT_HOST 'saved" ;; *) current=/other-profile ;; esac
+printf '%s\n' "$current"
+printf '%s-1-link;%s;1700000000;\n' "$profile" "$current"
 "#,
         );
         executable(
@@ -215,7 +218,32 @@ printf 'health %s systemd\n' "$DT_HOST" >> "$DT_ROOT/sequence"
 printf 'SystemState=running\n'
 "#,
         );
-        for name in ["nix-env", "carrier-env", "reboot", "nix-store", "gc"] {
+        executable(
+            &bin.join("nix-env"),
+            r#"#!/bin/sh
+[ "$DT_ACTION" = switch ] || { printf 'forbidden profile' > "$DT_ROOT/forbidden"; exit 97; }
+printf '%s\0' "$DT_HOST" "$@" > "$DT_ROOT/profile-$$"
+printf 'profile %s\n' "$DT_HOST" >> "$DT_ROOT/sequence"
+[ "$#" = 4 ] && [ "$1" = -p ] && [ "$2" = /nix/var/nix/profiles/system ] && [ "$3" = --set ] || exit 98
+if [ "$DT_MODE" = profile-slow ]; then printf '%s' "$$" > "$DT_ROOT/profile-pid"; exec /run/current-system/sw/bin/sleep 60; fi
+if [ "$DT_MODE" = set-profile-fail ]; then exit 6; fi
+printf '%s' "$4" > "$DT_ROOT/system-profile-$DT_HOST"
+"#,
+        );
+        executable(
+            &bin.join("carrier-env"),
+            r#"#!/bin/sh
+[ "$DT_ACTION" = switch ] || { printf 'forbidden carrier profile' > "$DT_ROOT/forbidden"; exit 97; }
+printf '%s\0' "$DT_HOST" "$@" > "$DT_ROOT/carrier-profile-$$"
+printf 'carrier-profile %s\n' "$DT_HOST" >> "$DT_ROOT/sequence"
+[ "$#" = 4 ] && [ "$1" = -p ] && [ "$3" = --set ] || exit 98
+if [ "$DT_MODE" = carrier-profile-fail ]; then exit 6; fi
+printf '%s' "$4" > "$DT_ROOT/simulated-carrier-profile"
+printf 'callback %s\n' "$DT_HOST" >> "$DT_ROOT/sequence"
+if [ "$DT_MODE" = callback-fail ]; then exit 8; fi
+"#,
+        );
+        for name in ["reboot", "nix-store", "gc"] {
             executable(
                 &bin.join(name),
                 "#!/bin/sh\nprintf 'forbidden' > \"$DT_ROOT/forbidden\"\nexit 97\n",
@@ -254,6 +282,14 @@ printf 'SystemState=running\n'
             .env("DT_ROOT", &self.root)
             .env("DT_HOST", "local")
             .env("DT_MODE", mode)
+            .env(
+                "DT_ACTION",
+                if args.contains(&"test") {
+                    "test"
+                } else {
+                    "switch"
+                },
+            )
             .env("CONFCTL_SSH_CONFIG", "native ssh config")
             .env("NIX_SSHOPTS", "-o Existing=yes")
             .stdin(Stdio::piped())
@@ -803,4 +839,357 @@ fn cancellation_at_acknowledged_health_prompt_starts_no_checks() {
     assert_eq!(out.status.code(), Some(130), "{out:?}");
     assert!(f.records("check-call-").is_empty());
     f.unchanged();
+}
+
+#[test]
+fn saved_switch_explicit_or_default_joins_helper_then_sets_profile_before_health() {
+    for explicit in [false, true] {
+        let f = Fixture::new();
+        let mut args = vec!["--yes", "a"];
+        if explicit {
+            args.push("switch");
+        }
+        let out = f.run(&args, "", b"");
+        assert_eq!(out.status.code(), Some(0), "{out:?}");
+        let s = f.sequence();
+        assert!(position(&s, "copy ") < position(&s, "helper-start a"));
+        assert!(position(&s, "switch a") < position(&s, "confirm a"));
+        assert!(position(&s, "confirm a") < position(&s, "helper-end a"));
+        assert!(position(&s, "helper-end a") < position(&s, "profile a"));
+        assert!(
+            s.iter()
+                .enumerate()
+                .filter(|(_, line)| line.starts_with("health "))
+                .all(|(i, _)| i > position(&s, "profile a"))
+        );
+        let top = f.root.join("toplevels/a 'saved");
+        assert_eq!(f.records("helper-")[0][3], b"switch");
+        assert_eq!(
+            f.records("profile-"),
+            [vec![
+                b"a".to_vec(),
+                b"-p".to_vec(),
+                b"/nix/var/nix/profiles/system".to_vec(),
+                b"--set".to_vec(),
+                top.as_os_str().as_encoded_bytes().to_vec()
+            ]]
+        );
+        assert_eq!(
+            fs::read(f.root.join("system-profile-a")).unwrap(),
+            top.as_os_str().as_encoded_bytes()
+        );
+        assert_eq!(f.records("check-call-").len(), 2);
+        assert_eq!(f.records("systemctl-").len(), 1);
+        let calls = f.records("ssh-");
+        assert!(calls.iter().all(|r| r[..7]
+            == [
+                b"-F".to_vec(),
+                b"native ssh config".to_vec(),
+                b"-l".to_vec(),
+                b"root".to_vec(),
+                b"-p".to_vec(),
+                b"2222".to_vec(),
+                b"a.invalid".to_vec()
+            ]));
+        let summary = String::from_utf8_lossy(&out.stdout);
+        assert!(
+            summary.contains("0 direct switch actions, 1 confirmed rollback-helper protocols"),
+            "{summary}"
+        );
+        assert!(summary.contains("0 carried profile updates"));
+        f.unchanged();
+    }
+}
+
+#[test]
+fn switch_direct_fallbacks_and_activation_or_profile_failure_keep_partial_effects() {
+    for kind in [
+        "disabled",
+        "configured-off",
+        "missing",
+        "helper-fail",
+        "hidden",
+        "activation-fail",
+        "set-profile-fail",
+    ] {
+        let mut f = Fixture::new();
+        let mut args = vec!["--yes", "--max-concurrent-copy=1"];
+        if kind == "disabled" {
+            args.push("--disable-auto-rollback");
+        }
+        if ["configured-off", "activation-fail", "set-profile-fail"].contains(&kind) {
+            f.direct();
+        }
+        if kind == "missing" {
+            for (path, bytes) in &mut f.saved {
+                let mut value: Value = serde_json::from_slice(bytes).unwrap();
+                value["auto_rollback"] = Value::Null;
+                *bytes = serde_json::to_vec(&value).unwrap();
+                fs::write(path, bytes).unwrap();
+            }
+        }
+        args.extend([
+            if kind == "activation-fail" {
+                "b"
+            } else {
+                "{a,b}"
+            },
+            "switch",
+        ]);
+        let failed = ["helper-fail", "activation-fail", "set-profile-fail"].contains(&kind);
+        let out = f.run(&args, kind, b"");
+        assert_eq!(
+            out.status.code(),
+            Some(if failed { 1 } else { 0 }),
+            "{kind}: {out:?}"
+        );
+        if failed {
+            assert!(f.records("check-call-").is_empty());
+            assert!(!f.root.join("system-profile-b").exists());
+            if kind != "set-profile-fail" {
+                assert!(f.records("profile-").is_empty());
+            }
+            assert!(!f.sequence().iter().any(|s| s == "switch b") || kind == "activation-fail");
+        } else {
+            assert_eq!(f.records("profile-").len(), 2);
+            assert_eq!(f.records("check-call-").len(), 3);
+        }
+        if ["disabled", "configured-off", "missing"].contains(&kind) {
+            assert!(f.records("helper-").is_empty());
+            assert!(
+                String::from_utf8_lossy(&out.stdout)
+                    .contains("2 direct switch actions, 0 confirmed rollback-helper protocols")
+            );
+        }
+        f.unchanged();
+    }
+}
+
+#[test]
+fn switch_requires_both_known_paths_and_preserves_carried_partial_read_knowledge() {
+    for mode in [
+        "both-known",
+        "known",
+        "profile-only",
+        "profile-fail",
+        "unknown",
+    ] {
+        let f = Fixture::new();
+        f.direct();
+        let out = f.run(&["--yes", "a", "switch"], mode, b"");
+        assert_eq!(out.status.code(), Some(0), "{mode}: {out:?}");
+        assert_eq!(
+            f.records("profile-").len(),
+            usize::from(mode != "both-known")
+        );
+        assert_eq!(f.records("copy-").len(), usize::from(mode != "both-known"));
+        f.unchanged();
+    }
+    let f = Fixture::new();
+    let out = f.run(
+        &["--yes", "carrier#guest", "switch"],
+        "carried-known-fail",
+        b"",
+    );
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert!(f.records("copy-").is_empty());
+    assert!(f.records("carrier-profile-").is_empty());
+    f.unchanged();
+}
+
+#[test]
+fn carried_switch_routes_profile_and_callback_once_without_guest_actions_or_health() {
+    for alias in [None, Some("rack/guest 'alias")] {
+        let f = Fixture::new();
+        f.edit(|v| {
+            v["a"]["metaConfig"]["managed"] = false.into();
+            if let Some(alias) = alias {
+                v["guest"]["alias"] = alias.into();
+            }
+        });
+        let out = f.run(
+            &[
+                "--yes",
+                "--interactive",
+                "--dry-activate-first",
+                "carrier#guest",
+                "switch",
+            ],
+            "",
+            b"y\ny\n",
+        );
+        assert_eq!(out.status.code(), Some(0), "{out:?}");
+        let records = f.records("carrier-profile-");
+        let expected_profile = format!(
+            "/nix/var/nix/profiles/confctl-{}",
+            alias.unwrap_or("guest").replace('/', ":")
+        );
+        assert_eq!(
+            records,
+            [vec![
+                b"a".to_vec(),
+                b"-p".to_vec(),
+                expected_profile.as_bytes().to_vec(),
+                b"--set".to_vec(),
+                f.root
+                    .join("toplevels/carrier#guest 'saved")
+                    .as_os_str()
+                    .as_encoded_bytes()
+                    .to_vec()
+            ]]
+        );
+        assert_eq!(
+            f.records("copy-")[0][..3],
+            [
+                b"-o Existing=yes -p 2222".to_vec(),
+                b"--to".to_vec(),
+                b"root@a.invalid".to_vec()
+            ]
+        );
+        assert!(f.records("activation-").is_empty());
+        assert!(f.records("helper-").is_empty());
+        assert!(f.records("profile-").is_empty());
+        assert!(f.records("check-call-").is_empty());
+        assert!(f.records("systemctl-").is_empty());
+        assert_eq!(
+            f.sequence().iter().filter(|s| *s == "callback a").count(),
+            1
+        );
+        let text = String::from_utf8_lossy(&out.stdout);
+        assert!(text.contains("carrier#guest on a"), "{text}");
+        assert!(text.contains("0 direct switch actions, 0 confirmed rollback-helper protocols"));
+        assert!(text.contains("1 carried profile updates"));
+        assert!(!text.contains("[y] Continue"));
+        f.unchanged();
+    }
+}
+
+#[test]
+fn switch_bulk_and_one_by_one_order_include_profiles_and_preserve_failed_callback_effect() {
+    for serial in [false, true] {
+        let f = Fixture::new();
+        f.direct();
+        let mut args = vec!["--yes", "--max-concurrent-copy=1"];
+        if serial {
+            args.push("--one-by-one");
+        }
+        args.extend(["{a,b}", "switch"]);
+        let out = f.run(&args, "", b"");
+        assert_eq!(out.status.code(), Some(0), "{out:?}");
+        let s = f.sequence();
+        assert!(position(&s, "switch a") < position(&s, "profile a"));
+        if serial {
+            assert!(position(&s, "health a") < position(&s, "copy root@b.invalid"));
+        } else {
+            assert!(position(&s, "copy root@b.invalid") < position(&s, "switch a"));
+            assert!(position(&s, "profile b") < position(&s, "health a"));
+        }
+        f.unchanged();
+    }
+    for mode in ["carrier-profile-fail", "callback-fail"] {
+        let f = Fixture::new();
+        f.edit(|v| {
+            let mut last = v.as_object_mut().unwrap().remove("b").unwrap();
+            last["name"] = "z".into();
+            v["z"] = last;
+        });
+        let out = f.run(
+            &["--yes", "--one-by-one", "{carrier#guest,z}", "switch"],
+            mode,
+            b"",
+        );
+        assert_eq!(out.status.code(), Some(1), "{mode}: {out:?}");
+        assert_eq!(
+            f.root.join("simulated-carrier-profile").exists(),
+            mode == "callback-fail"
+        );
+        assert_eq!(
+            f.sequence().iter().filter(|s| *s == "callback a").count(),
+            usize::from(mode == "callback-fail")
+        );
+        assert_eq!(f.records("carrier-profile-").len(), 1);
+        assert_eq!(f.records("copy-").len(), 1);
+        assert!(f.records("activation-").is_empty());
+        assert!(f.records("check-call-").is_empty());
+        f.unchanged();
+    }
+}
+
+#[test]
+fn switch_dry_first_choices_and_interactive_bulk_keep_copy_barrier_and_profile_boundary() {
+    for skip in [false, true] {
+        let f = Fixture::new();
+        f.direct();
+        let out = f.run(
+            &[
+                "--yes",
+                "--interactive",
+                "--dry-activate-first",
+                "{a,b}",
+                "switch",
+            ],
+            "",
+            if skip {
+                b"y\ny\ny\ns\ny\ny\n"
+            } else {
+                b"y\ny\ny\nr\ny\ny\ny\n"
+            },
+        );
+        assert_eq!(out.status.code(), Some(0), "{out:?}");
+        let s = f.sequence();
+        assert!(position(&s, "copy root@b.invalid") < position(&s, "dry-activate a"));
+        assert_eq!(
+            s.iter().filter(|s| *s == "dry-activate a").count(),
+            if skip { 1 } else { 2 }
+        );
+        assert_eq!(
+            s.iter().filter(|s| *s == "profile a").count(),
+            usize::from(!skip)
+        );
+        assert!(position(&s, "profile b") < position(&s, "health b"));
+        f.unchanged();
+    }
+}
+
+#[test]
+fn switch_cancel_during_activation_or_profile_joins_and_suppresses_later_hosts_and_health() {
+    for mode in ["activation-slow", "profile-slow"] {
+        let f = Fixture::new();
+        f.direct();
+        let child = f
+            .command(&["--yes", "--one-by-one", "{a,b}", "switch"], mode)
+            .spawn()
+            .unwrap();
+        let path = f.root.join(if mode == "activation-slow" {
+            "activation-pid"
+        } else {
+            "profile-pid"
+        });
+        let until = Instant::now() + Duration::from_secs(5);
+        let pid = loop {
+            if let Ok(text) = fs::read_to_string(&path)
+                && let Ok(pid) = text.parse::<u32>()
+                && pid > 0
+            {
+                break pid;
+            }
+            assert!(Instant::now() < until, "{mode}: {:?}", f.sequence());
+            thread::sleep(Duration::from_millis(10));
+        };
+        rustix::process::kill_process(
+            rustix::process::Pid::from_raw(child.id() as i32).unwrap(),
+            rustix::process::Signal::INT,
+        )
+        .unwrap();
+        let out = wait(child);
+        assert_eq!(out.status.code(), Some(130), "{out:?}");
+        assert!(!Path::new("/proc").join(pid.to_string()).exists());
+        assert_eq!(f.records("copy-").len(), 1);
+        assert!(f.records("check-call-").is_empty());
+        assert!(!f.root.join("system-profile-a").exists());
+        if mode == "activation-slow" {
+            assert!(f.records("profile-").is_empty());
+        }
+        f.unchanged();
+    }
 }
