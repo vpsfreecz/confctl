@@ -60,6 +60,16 @@ inherits streams through the foreground owner; its editor follows actual stdout
 TTY status. A task result includes joined completion and terminal restoration;
 failures retain earlier lock/cache/commit effects.
 
+[`gen-data vpsadmin`](gen-data.md) uses one logical task under the mutation guard
+through authentication, observation and complete-file publication. User name,
+protected password and described challenges use the existing input broker;
+credentials, challenge values and tokens stay out of diagnostics and logs.
+Generated contents are not printed. `all` publishes containers before networks,
+so a later failure can retain the first replacement. The guide describes the
+same-origin and no-replay rules, server validation limits and explicit recovery.
+Loopback HTTP, fake Nix and PTY tests do not qualify live credentials, TLS or site
+behavior.
+
 `runtime-kernels update` emits pending events for the confirmed, validated host
 probes and starts each task as its logical probe body enters the process runner.
 Each host has its own task ID and description. A decoded kernel succeeds; an
