@@ -1,0 +1,55 @@
+[
+  {
+    "name": "confctl.fixture.absent",
+    "type": "string",
+    "declarations": ["/external/module.nix"]
+  },
+  {
+    "name": "confctl.fixture.false",
+    "description": "<option>cluster.fixture</option> &amp; <literal>false</literal> — žluťoučký",
+    "type": "boolean",
+    "default": false,
+    "example": null,
+    "declarations": []
+  },
+  {
+    "name": "confctl.fixture.null",
+    "description": null,
+    "type": "null or string",
+    "default": null,
+    "example": false,
+    "declarations": []
+  },
+  {
+    "name": "cluster.fixture",
+    "description": "Synthetic renderer fixture, not an evaluated option inventory.",
+    "type": "string",
+    "default": "Český text",
+    "declarations": ["/nix/store/fixture-source/nix/modules/cluster/fixture.nix"]
+  },
+  {
+    "name": "confctl.carrier.fixture",
+    "type": "list of strings",
+    "default": ["alpha", "beta"],
+    "declarations": []
+  },
+  {
+    "name": "confctl.programs.fixture",
+    "type": "function",
+    "default": {"_type": "literalExpression", "text": "{ pkgs, ... }: pkgs.hello"},
+    "example": {"_type": "literalExpression", "text": "pkgs.writeText \"a`b\" \"ž\""},
+    "declarations": ["/nix/store/fixture-source/nix/modules/confctl/programs.nix"]
+  },
+  {
+    "name": "confctl.inputsInfo",
+    "type": "attribute set",
+    "default": {"revision": null, "enabled": false, "roles": [1, 2.5]},
+    "declarations": []
+  },
+  {
+    "name": "confctl.configurationInfo",
+    "type": "attribute set",
+    "default": {},
+    "declarations": []
+  }
+]

@@ -52,5 +52,10 @@ jobs:
       - name: Run strict Clippy
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
+      - name: Check pure reference maintenance
+        run: |
+          cargo test --locked --example generate-reference
+          cargo run --locked --example generate-reference -- cli --check man/man8/confctl-reference.8.md
+
       - name: Run default Rust tests
         run: cargo test --workspace --locked

@@ -141,6 +141,10 @@ software-pin or migration commands.
 
 The [command manual](man/man8/confctl.8.md) and
 [option reference](man/man8/confctl-options.nix.8.md) are also installed as man pages.
+The Rust package also installs a [CLI reference](man/man8/confctl-reference.8.md)
+and the [kexec-netboot manual](man/man8/kexec-netboot.8.md). A Cargo example
+[maintains the references](docs/rust-packaging.md#reference-maintenance) from
+the CLI schema or an explicit options JSON export.
 
 For development of confctl itself, the repository's `shell.nix` remains an
 optional Bundler shell using host `<nixpkgs>`. It does not evaluate a cluster;
@@ -540,6 +544,8 @@ end
 See the [man pages](./man/man8) and focused guides:
 
 * [confctl(8)](./man/man8/confctl.8.md)
+* [Rust CLI reference](./man/man8/confctl-reference.8.md)
+* [kexec-netboot(8)](./man/man8/kexec-netboot.8.md)
 * [confctl-options.nix(8)](./man/man8/confctl-options.nix.8.md)
 * [Migrating from swpins to flakes](docs/swpins-to-flakes.md)
 * [CLI and state compatibility during the Rust replacement](docs/compatibility.md)

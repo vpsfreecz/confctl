@@ -691,7 +691,11 @@ end
 ```
 
 ## SEE ALSO
-confctl-options.nix(8)
+confctl-reference(8), confctl-options.nix(8)
+
+The [Rust CLI reference](confctl-reference.8.md) lists commands and public help,
+with option spellings, aliases, negative forms and defaults declared by the
+parser schema.
 
 ## BUGS
 Report bugs to https://github.com/vpsfreecz/confctl/issues.
