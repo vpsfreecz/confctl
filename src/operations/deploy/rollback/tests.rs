@@ -77,14 +77,18 @@ impl ProcessRunner for Runner {
         }
         assert_eq!(spec.program, Path::new("ssh"));
         spec.program = self.root.join("ssh");
-        spec.env.extend([
-            ("RB_ROOT".into(), Some(self.root.clone().into_os_string())),
-            ("RB_MODE".into(), Some(self.mode.into())),
-            ("PATH".into(), Some(self.root.as_os_str().into())),
-        ]);
         let is_helper = spec
             .redacted_description
             .starts_with("rollback-helper protocol");
+        spec.env.extend([
+            ("RB_ROOT".into(), Some(self.root.clone().into_os_string())),
+            ("RB_MODE".into(), Some(self.mode.into())),
+            (
+                "RB_HELPER_REQUEST".into(),
+                Some(if is_helper { "1" } else { "0" }.into()),
+            ),
+            ("PATH".into(), Some(self.root.as_os_str().into())),
+        ]);
         let mut outcome = self.supervisor.run(spec, scope).await?;
         if is_helper && self.mode == "partial-helper" {
             outcome.stderr_complete = false;
@@ -131,13 +135,14 @@ impl Fixture {
             &dir.join("ssh"),
             r#"#!/bin/sh
 printf '%s\0' "$@" > "$RB_ROOT/ssh-$$"
+if [ "$RB_HELPER_REQUEST" = 1 ]; then printf '%s' "$$" > "$RB_ROOT/helper-ssh-pid"; fi
 while [ "$#" -gt 0 ]; do
  case "$1" in -F|-l|-p) shift; shift ;; *) break ;; esac
 done
 [ "$1" = remote.invalid ] || exit 91
 shift
 [ "$#" = 1 ] || exit 92
-exec /bin/sh -c "$1"
+exec /bin/sh -c "exec $1"
 "#,
         );
         executable(
@@ -147,8 +152,8 @@ printf '%s\0' "$@" > "$RB_ROOT/control-$$"
 case "$2" in
  'cat '*)
   if [ "$RB_MODE" = blocked ]; then printf '%s' "$$" > "$RB_ROOT/control-pid"; exec "$RB_ROOT/native/sleep" 60; fi
-  if [ "$RB_MODE" = early ] || [ "$RB_MODE" = signal ]; then "$RB_ROOT/native/sleep" 0.05; fi
-  if [ "$RB_MODE" != early ] && [ "$RB_MODE" != signal ]; then
+  if [ "$RB_MODE" = early ] || [ "$RB_MODE" = signal ] || [ "$RB_MODE" = exit143 ]; then "$RB_ROOT/native/sleep" 0.05; fi
+  if [ "$RB_MODE" != early ] && [ "$RB_MODE" != signal ] && [ "$RB_MODE" != exit143 ]; then
    while [ ! -e "$RB_ROOT/ready" ]; do "$RB_ROOT/native/sleep" 0.01; done
   fi
   if [ "$RB_MODE" = switching ] && [ ! -e "$RB_ROOT/first-read" ]; then : > "$RB_ROOT/first-read"; printf 'switching'; exit 0; fi
@@ -170,7 +175,8 @@ exec /bin/sh "$@"
 printf '%s\0' "$@" > "$RB_ROOT/helper-args"
 printf '%s' "$$" > "$RB_ROOT/helper-pid"
 if [ "$RB_MODE" = early ]; then exit 0; fi
-if [ "$RB_MODE" = signal ]; then kill -TERM "$$"; exit 93; fi
+if [ "$RB_MODE" = signal ]; then trap - TERM; kill -TERM "$$"; exit 93; fi
+if [ "$RB_MODE" = exit143 ]; then exit 143; fi
 path=$5
 if [ "$RB_MODE" = blocked ]; then
  while [ ! -s "$RB_ROOT/control-pid" ]; do "$RB_ROOT/native/sleep" 0.01; done
@@ -292,7 +298,7 @@ exit 0
             .unwrap_or(0)
     }
     fn assert_joined(&self) {
-        for name in ["helper-pid", "control-pid"] {
+        for name in ["helper-ssh-pid", "helper-pid", "control-pid"] {
             if let Ok(text) = fs::read_to_string(self.root.path().join(name)) {
                 let pid: u32 = text.parse().unwrap();
                 assert!(
@@ -474,6 +480,7 @@ async fn exhaustion_and_early_zero_or_signal_cannot_report_protocol_success() {
         "exhaust",
         "early",
         "signal",
+        "exit143",
         "partial",
         "partial-confirm",
         "partial-helper",
@@ -493,8 +500,46 @@ async fn exhaustion_and_early_zero_or_signal_cannot_report_protocol_success() {
                 assert!(text.contains("without successful confirmation"), "{text}");
                 assert_eq!(f.confirmations(), 0);
             }
-            "signal" => {
-                assert!(text.contains("signal Some(15)"), "{text}");
+            "signal" | "exit143" => {
+                let expected = if mode == "signal" {
+                    (None, Some(15))
+                } else {
+                    (Some(143), None)
+                };
+                let mut primary = &error;
+                while let ConfctlError::Cleanup { primary: inner, .. } = primary {
+                    primary = inner;
+                }
+                let ConfctlError::ProcessFailure { source, evidence } = primary else {
+                    panic!("{mode}: missing native failure evidence: {error:?}");
+                };
+                let ConfctlError::Child {
+                    description,
+                    code,
+                    signal,
+                    ..
+                } = source.as_ref()
+                else {
+                    panic!("{mode}: missing typed child failure: {error:?}");
+                };
+                assert_eq!(description, "rollback helper");
+                assert_eq!((*code, *signal), expected, "{mode}");
+                let status = evidence.status.expect("retained helper status");
+                assert_eq!((status.code(), status.signal()), expected, "{mode}");
+                assert!(evidence.stdout_complete && evidence.stderr_complete);
+                let ssh_pid = fs::read_to_string(f.root.path().join("helper-ssh-pid"))
+                    .unwrap()
+                    .parse::<u32>()
+                    .unwrap();
+                let helper_pid = fs::read_to_string(f.root.path().join("helper-pid"))
+                    .unwrap()
+                    .parse::<u32>()
+                    .unwrap();
+                assert!(ssh_pid > 0);
+                assert_eq!(
+                    ssh_pid, helper_pid,
+                    "{mode}: helper must exec as SSH leader"
+                );
                 assert_eq!(f.confirmations(), 0);
             }
             "partial" => {
@@ -520,6 +565,10 @@ async fn exhaustion_and_early_zero_or_signal_cannot_report_protocol_success() {
         f.runner.supervisor.shutdown().await.unwrap();
         drop(f);
         let events = consumer.await.unwrap();
+        assert!(
+            !events.iter().any(|event| matches!(event, UiEvent::Diagnostic { text, .. } if text.contains("protocol confirmed"))),
+            "{mode}: failed helper must not report protocol success"
+        );
         if mode == "exhaust" {
             assert!(events.iter().any(|e| matches!(e, UiEvent::Output { bytes, .. } if bytes.windows(b"natural helper completion".len()).any(|b| b == b"natural helper completion"))));
         }

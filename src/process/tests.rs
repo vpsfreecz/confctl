@@ -694,9 +694,21 @@ async fn echild_before_signal_disables_numeric_group_operations() {
 fn inherited_sigchld_ignore_is_replaced_before_spawn() {
     const MARKER: &str = "CONFCTL_TEST_INHERITED_SIGCHLD_IGN";
     if std::env::var_os(MARKER).is_none() {
-        let result = std::process::Command::new("sh")
-            .args(["-c", "trap '' CHLD; exec \"$1\" --exact process::tests::inherited_sigchld_ignore_is_replaced_before_spawn --nocapture", "fixture"])
-            .arg(std::env::current_exe().expect("test binary")).env(MARKER, "1").output().expect("isolated inherited-IGN fixture");
+        let result = std::process::Command::new("python3")
+            .args([
+                "-c",
+                "import os,signal,sys; signal.signal(signal.SIGCHLD,signal.SIG_IGN); assert signal.getsignal(signal.SIGCHLD)==signal.SIG_IGN; os.execv(sys.argv[1],sys.argv[1:])",
+            ])
+            .arg(std::env::current_exe().expect("test binary"))
+            .args([
+                "--exact",
+                "process::tests::inherited_sigchld_ignore_is_replaced_before_spawn",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(MARKER, "1")
+            .output()
+            .expect("Python isolated inherited-IGN fixture");
         assert!(
             result.status.success(),
             "{}{}",
