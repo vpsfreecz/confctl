@@ -4,12 +4,12 @@
 use crate::{
     app::Context,
     configuration::{ConfigEpoch, ConfigRoot, MutationGuard, MutationLock, NixSettings},
-    domain::{BuildRequest, Inventory, ManagedFilter, SelectionPolicy, select},
+    domain::{BuildRequest, Inventory, MachineId, ManagedFilter, SelectionPolicy, select},
     error::ConfctlError,
     events::{EventSink, OutputStream, Style, TaskId, TaskState, UiEvent},
     generation::{BuildGeneration, GcRoots, GenerationStore},
     nix::{InvocationSettings, NixClient, NixOptions, selected_apply},
-    process::ProcessRunner,
+    process::{ProcessRunner, Supervisor},
     terminal::ConfirmPrompt,
 };
 use chrono::{DateTime, FixedOffset};
@@ -89,26 +89,84 @@ pub(super) async fn run(
     )
     .await?;
     let guard = MutationLock::acquire(&root, &ctx.cancellation).await?;
+    let mut next_task = 1;
+    build_selected(
+        ctx,
+        &nix,
+        inventory,
+        &selected.machines,
+        &guard,
+        &mut next_task,
+    )
+    .await?;
+    Ok(())
+}
+
+pub(super) async fn build_selected(
+    ctx: &Context,
+    nix: &NixClient<Supervisor>,
+    inventory: &Inventory,
+    ids: &[MachineId],
+    guard: &MutationGuard,
+    next_task: &mut u64,
+) -> Result<Vec<(MachineId, BuildGeneration)>, ConfctlError> {
+    guard.require_root(nix.root())?;
+    if *next_task == 0 {
+        return Err(ConfctlError::State("Build task IDs must be nonzero".into()));
+    }
+    check_cancel(&ctx.cancellation)?;
     let settings = nix.settings().await?.value;
     let plan = nix.cached_json(".#confctl.buildPlan").await?.value;
-    let hosts = plan_hosts(&nix, inventory, &selected.machines, &plan).await?;
+    let hosts = plan_hosts(nix, inventory, ids, &plan).await?;
     let groups = groups(hosts, settings.nix.legacy_nix_path);
-    let roots = roots(&root, ctx).await?;
-    let store = GenerationStore::new(root, roots);
+    let first = TaskId(*next_task);
+    *next_task = next_task
+        .checked_add(
+            u64::try_from(groups.len())
+                .map_err(|_| ConfctlError::State("Build task IDs overflow".into()))?,
+        )
+        .ok_or_else(|| ConfctlError::State("Build task IDs overflow".into()))?;
+    let roots = roots(nix.root(), ctx).await?;
+    let store = GenerationStore::new(nix.root().clone(), roots);
     let publication = Publication {
         store: &store,
-        guard: &guard,
+        guard,
         events: &ctx.events,
         cancellation: &ctx.cancellation,
         time: chrono::Local::now().fixed_offset(),
     };
-    let saved = build_groups(&nix, &groups, &settings.nix, &publication, ctx.log_path()).await?;
-    report_saved(&publication, &saved).await
+    let saved = build_groups(
+        nix,
+        &groups,
+        &settings.nix,
+        &publication,
+        ctx.log_path(),
+        first,
+    )
+    .await?;
+    let mut returned = Vec::new();
+    for (host, generation) in &saved {
+        let id = ids
+            .iter()
+            .find(|id| inventory.get(**id).name == *host)
+            .ok_or_else(|| ConfctlError::State("Build returned an unselected host".into()))?;
+        if returned.iter().any(|(previous, _)| previous == id) {
+            return Err(ConfctlError::State("Build returned a host twice".into()));
+        }
+        returned.push((*id, generation.clone()));
+    }
+    if returned.len() != ids.len() {
+        return Err(ConfctlError::State(
+            "Build did not return every selected host".into(),
+        ));
+    }
+    report_saved(&publication, &saved).await?;
+    Ok(returned)
 }
 
 async fn report_saved(
     publication: &Publication<'_>,
-    saved: &[(String, String)],
+    saved: &[(String, BuildGeneration)],
 ) -> Result<(), ConfctlError> {
     check_cancel(publication.cancellation)?;
     diagnostic(
@@ -118,11 +176,11 @@ async fn report_saved(
     )
     .await?;
     check_cancel(publication.cancellation)?;
-    for (host, name) in saved {
+    for (host, generation) in saved {
         diagnostic(
             publication.events,
             OutputStream::Stdout,
-            format!("  {host}: {name}\n"),
+            format!("  {host}: {}\n", generation.name),
         )
         .await?;
         check_cancel(publication.cancellation)?;
@@ -136,10 +194,11 @@ async fn build_groups<P: ProcessRunner>(
     settings: &NixSettings,
     publication: &Publication<'_>,
     log_path: &std::path::Path,
-) -> Result<Vec<(String, String)>, ConfctlError> {
+    first: TaskId,
+) -> Result<Vec<(String, BuildGeneration)>, ConfctlError> {
     let mut saved = Vec::new();
     for (index, group) in groups.iter().enumerate() {
-        let task = TaskId(index as u64 + 1);
+        let task = TaskId(first.0 + index as u64);
         publication
             .events
             .emit(UiEvent::TaskPending {
@@ -156,7 +215,7 @@ async fn build_groups<P: ProcessRunner>(
             .await?;
     }
     for (index, group) in groups.iter().enumerate() {
-        let task = TaskId(index as u64 + 1);
+        let task = TaskId(first.0 + index as u64);
         let result = async {
             check_cancel(publication.cancellation)?;
             publication
@@ -197,7 +256,7 @@ async fn build_groups<P: ProcessRunner>(
                 if let Err(e) = publication
                     .events
                     .emit(UiEvent::TaskFinished {
-                        task: TaskId(next as u64 + 1),
+                        task: TaskId(first.0 + next as u64),
                         state,
                     })
                     .await
@@ -401,7 +460,7 @@ async fn build_group<P: ProcessRunner>(
     settings: &NixSettings,
     task: TaskId,
     publication: &Publication<'_>,
-    saved: &mut Vec<(String, String)>,
+    saved: &mut Vec<(String, BuildGeneration)>,
 ) -> Result<(), ConfctlError> {
     let legacy = legacy_args(nix, hosts, settings).await?;
     let installables = hosts
@@ -452,7 +511,7 @@ async fn build_group<P: ProcessRunner>(
             publication
                 .store
                 .set_current(publication.guard, &host.name, &generation.name)?;
-            saved.push((host.name.clone(), generation.name.clone()));
+            saved.push((host.name.clone(), generation.clone()));
             diagnostic(
                 publication.events,
                 OutputStream::Stdout,
@@ -494,7 +553,7 @@ async fn build_group<P: ProcessRunner>(
             publication
                 .store
                 .publish(publication.guard, &host.name, &generation)?;
-            saved.push((host.name.clone(), generation.name.clone()));
+            saved.push((host.name.clone(), generation.clone()));
             diagnostic(
                 publication.events,
                 OutputStream::Stdout,

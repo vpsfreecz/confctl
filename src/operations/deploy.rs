@@ -37,9 +37,7 @@ pub(super) async fn run(
     root: ConfigRoot,
     ctx: &Context,
 ) -> Result<(), ConfctlError> {
-    let selector = request.generation.as_ref().ok_or_else(|| {
-        ConfctlError::Configuration("deployment requires a saved generation".into())
-    })?;
+    let selector = request.generation.as_ref();
     let defaults = InvocationSettings::new(
         root.clone(),
         ctx.processes.clone(),
@@ -68,14 +66,7 @@ pub(super) async fn run(
         return Err(ConfctlError::Selection("No machines to deploy".into()));
     }
     let serial = request.one_by_one || request.interactive;
-    let limit = if serial {
-        1
-    } else {
-        usize::try_from(request.max_concurrent_copy)
-            .ok()
-            .filter(|n| *n > 0)
-            .ok_or_else(|| ConfctlError::Usage("max-concurrent-copy must be positive".into()))?
-    };
+    let limit = copy_limit(request)?;
     let settings = defaults.read().await?;
     confirm_targets(
         ctx,
@@ -88,7 +79,7 @@ pub(super) async fn run(
     .await?;
     check_cancel(&ctx.cancellation)?;
     let guard = MutationLock::acquire(&root, &ctx.cancellation).await?;
-    let first_task = refresh_selected(
+    let mut first_task = refresh_selected(
         ctx,
         &root,
         inventory,
@@ -100,26 +91,69 @@ pub(super) async fn run(
     if first_task > 1 {
         nix.invalidate_configuration();
     }
-    let (mut jobs, missing) = resolve(
-        &root,
-        inventory,
-        &selected.machines,
-        selector,
-        &ctx.events,
-        &ctx.cancellation,
-    )
-    .await?;
-    if jobs.is_empty() {
-        return Err(ConfctlError::State("No generation found".into()));
-    }
-    confirm_resolved(ctx, request, inventory, selector, &jobs, &missing).await?;
+    let mut jobs = if let Some(selector) = selector {
+        let (jobs, missing) = resolve(
+            &root,
+            inventory,
+            &selected.machines,
+            selector,
+            &ctx.events,
+            &ctx.cancellation,
+        )
+        .await?;
+        if jobs.is_empty() {
+            return Err(ConfctlError::State("No generation found".into()));
+        }
+        confirm_resolved(ctx, request, inventory, selector, &jobs, &missing).await?;
+        jobs
+    } else {
+        let build_nix = NixClient::configured(
+            root.clone(),
+            ctx.processes.clone(),
+            NixOptions {
+                show_trace: request.build.show_trace,
+                max_jobs: request.build.nix.max_jobs.clone(),
+                cores: request.build.nix.cores.clone(),
+            },
+            ctx.cancellation.clone(),
+            &defaults,
+            nix.epoch(),
+        )
+        .await?;
+        super::build::build_selected(
+            ctx,
+            &build_nix,
+            inventory,
+            &selected.machines,
+            &guard,
+            &mut first_task,
+        )
+        .await?
+        .into_iter()
+        .map(|(machine, generation)| Job {
+            machine,
+            generation,
+            task: TaskId(0),
+        })
+        .collect()
+    };
     check_cancel(&ctx.cancellation)?;
     if !request.copy_only {
-        return activate_saved(ctx, request, inventory, &root, jobs, first_task, limit).await;
+        return activate_generations(
+            ctx,
+            request,
+            inventory,
+            &root,
+            jobs,
+            &selected.machines,
+            first_task,
+        )
+        .await;
     }
     if !serial {
-        jobs = copy_order(inventory, jobs);
+        jobs = copy_order(inventory, selected_order(&jobs, &selected.machines));
     }
+    task_end(first_task, jobs.len())?;
     for (index, job) in jobs.iter_mut().enumerate() {
         job.task = TaskId(first_task + index as u64);
     }
@@ -145,13 +179,16 @@ pub(super) async fn run(
     }
     .await;
     if let Err(error) = result {
-        let later = ctx.events.emit(UiEvent::Diagnostic { stream: OutputStream::Stderr, style: Style::Failure, text: "Copy stopped; any copied store paths and earlier runtime-kernel state changes are retained. No activation was performed.\n".into() }).await;
+        let later = ctx.events.emit(UiEvent::Diagnostic { stream: OutputStream::Stderr, style: Style::Failure, text: "Copy stopped; any local build publications, copied store paths and earlier runtime-kernel state changes are retained. No activation was performed.\n".into() }).await;
         return Err(error.with_secondary(later.err().into_iter().collect()));
     }
     checked(
         &ctx.events,
         &ctx.cancellation,
-        diagnostic("Saved-generation copy phase completed; no activation was performed.\n"),
+        diagnostic(&format!(
+            "{} copy phase completed; no activation was performed.\n",
+            deployment_name(request)
+        )),
     )
     .await
 }
@@ -162,22 +199,25 @@ async fn confirm_targets(
     inventory: &Inventory,
     selected: &crate::domain::Selection,
     columns: &[String],
-    selector: &GenerationSelector,
+    selector: Option<&GenerationSelector>,
 ) -> Result<(), ConfctlError> {
     let action = action_name(request.action);
     if !ctx
         .ui
         .confirm(ConfirmPrompt {
             preview: vec![
-                diagnostic(if request.copy_only {
-                    "The following machines will have saved generations copied:\n"
-                } else {
-                    "The following machines will receive saved generations for activation:\n"
+                diagnostic(match (selector.is_some(), request.copy_only) {
+                    (true, true) => "The following machines will have saved generations copied:\n",
+                    (true, false) => {
+                        "The following machines will receive saved generations for activation:\n"
+                    }
+                    (false, true) => "The following machines will be BUILT and copied:\n",
+                    (false, false) => "The following machines will be BUILT and deployed:\n",
                 }),
                 super::machines::table(inventory, selected, columns, true),
                 diagnostic(&format!(
                     "Generation: {}\nTarget action: {action}{}{}\n",
-                    selector_text(selector),
+                    selector.map(selector_text).unwrap_or("new build"),
                     if request.reboot { " + reboot" } else { "" },
                     if request.copy_only {
                         " (copy only)"
@@ -806,15 +846,16 @@ async fn bulk_copy<P: ProcessRunner>(
     Ok(())
 }
 
-async fn activate_saved(
+async fn activate_generations(
     ctx: &Context,
     request: &DeployRequest,
     inventory: &Inventory,
     root: &ConfigRoot,
     mut jobs: Vec<Job>,
+    confirmed: &[MachineId],
     first_task: u64,
-    limit: usize,
 ) -> Result<(), ConfctlError> {
+    let limit = copy_limit(request)?;
     let ssh_opts = std::env::var_os("NIX_SSHOPTS");
     let ssh_config = std::env::var_os("CONFCTL_SSH_CONFIG");
     let copies = Copies {
@@ -893,7 +934,7 @@ async fn activate_saved(
             let copied = if request.interactive {
                 serial_copy(&copies, &remaining, Some(&ctx.ui)).await?
             } else {
-                let ordered = copy_order(inventory, remaining.clone());
+                let ordered = copy_order(inventory, selected_order(&remaining, confirmed));
                 bulk_copy(&copies, &ordered, limit).await?;
                 remaining.iter().map(|job| job.machine).collect()
             };
@@ -903,7 +944,7 @@ async fn activate_saved(
                 }
             }
             if matches!(request.action, SwitchAction::Test | SwitchAction::Switch) {
-                let hosts = completed.iter().map(|job| job.machine).collect::<Vec<_>>();
+                let hosts = confirmed.iter().copied().filter(|id| completed.iter().any(|job| job.machine == *id)).collect::<Vec<_>>();
                 health_outcomes.push(health::run(ctx, request, inventory, root, &hosts, &mut next_health_id).await?);
             }
         }
@@ -920,9 +961,9 @@ async fn activate_saved(
             } else {
                 "Carried hosts were copied only; no profile setting or reboot.".into()
             };
-            format!("Saved-generation {} completed: {} direct {} actions, {helpers} confirmed rollback-helper protocols. {} {effects} Helper protocols and health do not witness hidden switch or rollback status.\n", action_name(request.action), completed.len() - helpers - carried, action_name(request.action), health::summary(&health_outcomes))
+            format!("{} {} completed: {} direct {} actions, {helpers} confirmed rollback-helper protocols. {} {effects} Helper protocols and health do not witness hidden switch or rollback status.\n", deployment_name(request), action_name(request.action), completed.len() - helpers - carried, action_name(request.action), health::summary(&health_outcomes))
         } else {
-            format!("Saved-generation {} completed; carried hosts were copied only. No reboot or health check was performed.\n", action_name(request.action))
+            format!("{} {} completed; carried hosts were copied only. No reboot or health check was performed.\n", deployment_name(request), action_name(request.action))
         };
         checked(&ctx.events, &ctx.cancellation, diagnostic(&summary)).await
     }.await;
@@ -930,12 +971,38 @@ async fn activate_saved(
         let later = ctx.events.emit(UiEvent::Diagnostic {
             stream: OutputStream::Stderr, style: Style::Failure,
             text: if matches!(request.action, SwitchAction::Test | SwitchAction::Switch) {
-                format!("Saved-generation {} stopped; earlier refreshes, copies, script{} and health-program effects are retained. Remote watchdog state and hidden switch/rollback status may be unknown. Inspect the target before an explicit rerun; no compensating activation, confirmation or profile setting was requested.\n", action_name(request.action), if request.action == SwitchAction::Switch { ", profile, carrier callback" } else { "" })
-            } else { format!("Saved-generation {} stopped; earlier copies, runtime-kernel state and script effects{} are retained. Inspect target state before retrying; no rollback or reboot was performed.\n", action_name(request.action), if request.action == SwitchAction::Boot { ", including bootloader changes and profile updates," } else { "" }) },
+                format!("{} {} stopped; earlier local publications, refreshes, copies, script{} and health-program effects are retained. Remote watchdog state and hidden switch/rollback status may be unknown. Inspect the target before an explicit rerun; no compensating activation, confirmation or profile setting was requested.\n", deployment_name(request), action_name(request.action), if request.action == SwitchAction::Switch { ", profile, carrier callback" } else { "" })
+            } else { format!("{} {} stopped; earlier local publications, copies, runtime-kernel state and script effects{} are retained. Inspect target state before retrying; no rollback or reboot was performed.\n", deployment_name(request), action_name(request.action), if request.action == SwitchAction::Boot { ", including bootloader changes and profile updates," } else { "" }) },
         }).await;
         return Err(error.with_secondary(later.err().into_iter().collect()));
     }
     Ok(())
+}
+
+fn copy_limit(request: &DeployRequest) -> Result<usize, ConfctlError> {
+    if request.one_by_one || request.interactive {
+        Ok(1)
+    } else {
+        usize::try_from(request.max_concurrent_copy)
+            .ok()
+            .filter(|n| *n > 0)
+            .ok_or_else(|| ConfctlError::Usage("max-concurrent-copy must be positive".into()))
+    }
+}
+
+fn deployment_name(request: &DeployRequest) -> &'static str {
+    if request.generation.is_some() {
+        "Saved-generation"
+    } else {
+        "New-build"
+    }
+}
+fn selected_order(jobs: &[Job], confirmed: &[MachineId]) -> Vec<Job> {
+    confirmed
+        .iter()
+        .filter_map(|id| jobs.iter().find(|job| job.machine == *id))
+        .cloned()
+        .collect()
 }
 
 fn task_end(first: u64, count: usize) -> Result<u64, ConfctlError> {

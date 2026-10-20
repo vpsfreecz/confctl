@@ -62,8 +62,11 @@ Both modes read deployed uptime, profiles and inputs; saved status also reads
 the running system or carried profile path. Missing saved targets admit no task.
 Failed host observations fail their tasks and leave offline or unknown table
 cells; ordinary host failures still allow the completed command to exit 0.
-Cancellation and delivery failures join entered observations. Status with an
-omitted generation remains unavailable.
+Cancellation and delivery failures join entered observations. Default status
+first asks to BUILD and check, runs the existing build-group tasks under one
+guard, then admits observations in selected order with IDs above the build range.
+Returned objects supply target paths; current configured inputs are compared
+even for reused records. Saved/none modes retain their read-only behavior.
 
 `ssh` admits per-host tasks and reports actual completed and failed host counts
 for commands. Command stdout and stderr share one native pipe and capture.
@@ -102,7 +105,11 @@ deployment retry batch gets fresh IDs above all reserved activation IDs; attempt
 within a batch share their task. Earlier failed tasks and raw logs stay retained
 when a later batch passes or failures are explicitly accepted. Declined health
 rounds remain visibly unverified.
-New-build deploy without a generation selector and reboot remain unavailable; other
+New-build deploy first completes every build group, retaining the actual returned
+records and publication effects, before these status/copy/activation/health
+phases. IDs are reserved across all phases. Build failure admits no later phase,
+and copy-only builds make no status, activation or health request. Reboot remains
+unavailable outside copy-only, which performs no reboot; other
 operation producers are not wired to this lifecycle yet. Controlled route
 fixtures do not establish real-site activation or full live-terminal qualification.
 

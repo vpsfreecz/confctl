@@ -350,7 +350,7 @@ fn actual_none_status_reads_per_host_inputs_and_preserves_comparison_without_col
 }
 
 #[test]
-fn selection_consent_and_unavailable_routes_stop_before_observations() {
+fn selection_consent_and_missing_configuration_stop_before_observations() {
     for pattern in ["reference", "null", "false", "absent"] {
         let f = Fixture::new();
         let out = f.status(&[pattern]);
@@ -369,8 +369,12 @@ fn selection_consent_and_unavailable_routes_stop_before_observations() {
     fs::remove_file(f.root.join("flake.nix")).unwrap();
     let out = f.run(&["status"], &[]);
     assert!(!out.status.success());
-    assert!(!f.root.join(".confctl").exists());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("has no flake.nix"));
     assert!(!f.root.join("nix-args").exists());
+    assert!(!f.root.join("local-calls").exists());
+    let ssh = f.ssh_records(&out);
+    assert!(ssh.is_empty(), "{ssh:?}; {out:?}");
+    f.readonly();
 }
 
 #[test]

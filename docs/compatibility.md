@@ -73,12 +73,16 @@ profile change or reboot; carried hosts only receive copies.
 Action `switch` (also the default with a saved generation) switches standalone
 hosts, sets their profile after successful activation and runs health checks.
 Carried switch updates the carrier profile and runs its installed callback.
+Omitting the generation builds all confirmed hosts before the same four actions
+or copy-only policy; default switch is supported. Reboot remains unavailable
+outside copy-only, which performs no reboot.
 [`health-check`](health-checks.md) runs configured builder, machine and systemd
 checks with per-check retry budgets.
 [`status --generation <selector>`](status.md) compares a saved generation's
 toplevel and input revisions with deployed state. `--generation none` instead
 evaluates current target input revisions without building a target system.
-Status with an omitted generation remains unavailable.
+Status with an omitted generation builds first, then compares the returned
+toplevels and current configured inputs with deployed state.
 Other deploy modes and operation adapters remain unavailable. Help and version
 need no inventory, input broker or process supervisor.
 Static original help text is preserved in `src/cli/help.json`, with source
