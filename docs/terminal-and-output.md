@@ -87,19 +87,22 @@ retain it under the existing policy.
 Saved-generation copy-only deploys admit one task per resolved host, with bounded
 copying-count/path progress from native stderr and unknown totals when absent.
 Optional runtime-kernel refresh uses distinct preceding task IDs. Copy results do
-not claim activation. Saved-generation boot, dry-activate and test add separate bounded
-status-query tasks, copy tasks and standalone activation tasks. Activation covers
-a preliminary dry run when requested and the requested action; only boot sets
-the profile. Carried hosts have only the copy effect. Delivered task results
-remain actual observations if later output or cancellation fails the invocation.
-Saved test's activation task reports direct execution or the existing rollback
-helper protocol, without claiming its hidden inner switch status. After joined
-activation, eligible configured checks use the existing health runner. Each
+not claim activation. Saved-generation boot, dry-activate, test and switch add
+bounded status-query tasks, copy tasks and standalone activation tasks. Activation covers
+a preliminary dry run when requested and the requested action; boot and switch
+set the standalone profile after successful activation. Carried switch has one
+profile/callback task labelled for guest and carrier; other carried actions
+have only the copy effect. Delivered task results remain actual observations if
+later output or cancellation fails the invocation. Saved test and switch
+activation tasks report direct execution or the existing rollback helper
+protocol, without claiming its hidden inner switch status. After joined
+activation and required profile setting, eligible configured checks use the
+existing health runner. Each
 deployment retry batch gets fresh IDs above all reserved activation IDs; attempts
 within a batch share their task. Earlier failed tasks and raw logs stay retained
 when a later batch passes or failures are explicitly accepted. Declined health
 rounds remain visibly unverified.
-Default/new-build deploy, switch and reboot remain unavailable; other
+New-build deploy without a generation selector and reboot remain unavailable; other
 operation producers are not wired to this lifecycle yet. Controlled route
 fixtures do not establish real-site activation or full live-terminal qualification.
 

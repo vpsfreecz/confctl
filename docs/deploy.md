@@ -5,9 +5,10 @@ The Rust development binary supports `confctl-rust deploy --copy-only
 Ruby. This route copies existing store paths only, even when reboot, activation
 or health-check options are supplied. The non-copy-only route also supports
 `confctl-rust deploy --generation <selector> [machine-pattern] boot` without
-`--reboot`, and the same command with action `dry-activate` or `test`. Other actions, the
-default switch action, new builds and rebooting remain unavailable before
-application setup.
+`--reboot`, and the same command with action `dry-activate`, `test` or `switch`.
+Omitting the action with a saved generation also selects switch. New builds
+(including deploy without a generation selector) and rebooting remain
+unavailable before application setup.
 
 Selection includes managed machines of every spin, including carried machines;
 it does not apply the runnable filter. The command previews hosts, selector and
@@ -192,10 +193,63 @@ No compensating confirmation, rollback or profile command is sent on health
 failure. Inspect results and target state before an explicit rerun. Controlled
 fake-tool tests do not qualify real hosts or full live-terminal behavior.
 
+## Switch to a saved generation
+
+`confctl-rust deploy --generation <selector> [machine-pattern] switch` uses the
+same consent, guard, refresh, selection and copy policies. Omitting the action
+also selects switch. Standalone hosts skip only when both the known running
+toplevel and known current system profile match the exact saved native path
+bytes. Partial or unknown observations do not skip. Test and dry activation
+retain their running-only predicate.
+
+Standalone switch runs the optional preliminary dry activation and interactive
+choices, followed by direct native `switch` or the configured rollback-helper
+protocol. Only successful direct completion or confirmed and joined helper
+success permits `nix-env -p /nix/var/nix/profiles/system --set <saved-toplevel>`.
+The activation task covers both commands and succeeds only after profile
+setting. Profile failure stops later hosts and health. Helper success does not
+prove the hidden inner switch status; neither profile nor health failure
+requests rollback.
+
+Carried switch instead invokes the installed `carrier-env -p <profile> --set
+<saved-toplevel>` once on the explicit carrier, using root SSH, its port and
+nonempty `CONFCTL_SSH_CONFIG`. The existing profile route uses the carried
+alias, or cluster name when absent, with slashes replaced by colons. A null
+guest target is valid; an unmanaged carrier may supply the destination. Missing
+or invalid carrier destinations fail without a fallback. Carried hosts retain
+their known current-profile skip even if a later profile-list read fails.
+They retain initial, resolved and copy confirmations but bypass dry-first,
+activation choices, guest scripts, rollback helpers and health checks.
+
+The installed carrier tool sets the profile, then runs its configured on-change
+callback. A callback can rebuild netboot output or perform other configured
+effects; failure can leave the new profile and incomplete callback effects.
+Confctl does not decompose or retry this operation. Its one logical task names
+both guest and carrier. Success describes the carrier tool's result and does
+not establish that the carried machine booted. Summaries count these profile
+operations separately from standalone direct actions and helper protocols.
+
+Bulk mode completes all copies, then ordered activation/profile operations,
+then the same health policy as saved test for completed runnable hosts.
+One-by-one completes each host's profile and health policy before the next
+copy. Five health workers, retry choices, original check arguments, task IDs
+and failed-log retention have the same contract as test.
+
+Cancellation joins entered local requests and suppresses later profile,
+health and host commands. Earlier refresh, copy, running-system, profile,
+callback and check effects remain. Switch success followed by profile failure
+can leave running and persistent state different; a local join does not prove
+remote helper or callback closure. There is no compensating profile restore,
+cleanup or atomicity guarantee. Inspect target state and callback results,
+correct the cause and explicitly rerun or select an older saved generation.
+Local saved records, current links, roots, remote formats and the default Ruby
+entry remain unchanged. Confined fake-tool tests do not qualify real profiles,
+hosts or full live-terminal behavior.
+
 ## Rollback helper protocol
 
-Saved test uses the existing rollback-helper protocol. Switch remains unavailable
-through the Rust CLI. Copy, boot and dry-activate do not start this helper.
+Saved test and switch use the existing rollback-helper protocol. Copy, boot and
+dry-activate do not start this helper.
 
 Copying and activation share the same rollback policy: disable wins, otherwise
 explicit enable or the configured policy selects protection when a saved helper
@@ -205,7 +259,8 @@ missing or malformed values fail rather than receiving a default. Each invocatio
 uses a fresh `/run/confctl-confirm-<six random hex digits>` path and passes the
 saved helper native arguments `-t <timeout> <toplevel> <action> <check-file>`.
 Local commands run as the invoking user; remote commands use the existing root
-SSH, port and nonempty `CONFCTL_SSH_CONFIG` behavior. Carried hosts never activate.
+SSH, port and nonempty `CONFCTL_SSH_CONFIG` behavior. Carried hosts never run
+the guest activation script or this helper.
 
 One owned helper runs alongside serial marker reads and confirmation commands.
 Reads compare complete captured bytes after removing ASCII whitespace and NUL

@@ -1,4 +1,4 @@
-//! Copy saved generations or run saved boot, dry activation and test actions.
+//! Copy saved generations or run saved activation actions without reboot.
 //! Earlier copies, kernel refreshes and activation effects survive later failure.
 use crate::{
     app::Context,
@@ -878,7 +878,7 @@ async fn activate_saved(
                         request.interactive.then_some(&ctx.ui)).await?;
                     if !copied.is_empty() && activate_one(&activation, job, TaskId(first_activation + index as u64)).await? {
                         completed.push(job);
-                        if request.action == SwitchAction::Test {
+                        if matches!(request.action, SwitchAction::Test | SwitchAction::Switch) {
                             health_outcomes.push(health::run(ctx, request, inventory, root, &[job.machine], &mut next_health_id).await?);
                         }
                     }
@@ -902,17 +902,25 @@ async fn activate_saved(
                     completed.push(job);
                 }
             }
-            if request.action == SwitchAction::Test {
+            if matches!(request.action, SwitchAction::Test | SwitchAction::Switch) {
                 let hosts = completed.iter().map(|job| job.machine).collect::<Vec<_>>();
                 health_outcomes.push(health::run(ctx, request, inventory, root, &hosts, &mut next_health_id).await?);
             }
         }
-        let summary = if request.action == SwitchAction::Test {
+        let summary = if matches!(request.action, SwitchAction::Test | SwitchAction::Switch) {
             let mut helpers = 0;
+            let mut carried = 0;
             for job in &completed {
-                if rollback_enabled(inventory.get(job.machine), request.auto_rollback)? && job.generation.auto_rollback.is_some() { helpers += 1; }
+                let machine = inventory.get(job.machine);
+                if machine.carrier.is_some() { carried += 1; }
+                else if rollback_enabled(machine, request.auto_rollback)? && job.generation.auto_rollback.is_some() { helpers += 1; }
             }
-            format!("Saved-generation test completed: {} direct test actions, {helpers} confirmed rollback-helper protocols. {} Carried hosts were copied only; no profile setting or reboot. Helper protocols and health do not witness hidden switch or rollback status.\n", completed.len() - helpers, health::summary(&health_outcomes))
+            let effects = if request.action == SwitchAction::Switch {
+                format!("{carried} carried profile updates including their installed callbacks. Standalone profiles were set after successful actions; no reboot.")
+            } else {
+                "Carried hosts were copied only; no profile setting or reboot.".into()
+            };
+            format!("Saved-generation {} completed: {} direct {} actions, {helpers} confirmed rollback-helper protocols. {} {effects} Helper protocols and health do not witness hidden switch or rollback status.\n", action_name(request.action), completed.len() - helpers - carried, action_name(request.action), health::summary(&health_outcomes))
         } else {
             format!("Saved-generation {} completed; carried hosts were copied only. No reboot or health check was performed.\n", action_name(request.action))
         };
@@ -921,8 +929,8 @@ async fn activate_saved(
     if let Err(error) = result {
         let later = ctx.events.emit(UiEvent::Diagnostic {
             stream: OutputStream::Stderr, style: Style::Failure,
-            text: if request.action == SwitchAction::Test {
-                "Saved-generation test stopped; earlier refreshes, copies, script and health-program effects are retained. Remote watchdog state and hidden switch/rollback status may be unknown. Inspect the target before an explicit rerun; no compensating activation, confirmation or profile setting was requested.\n".into()
+            text: if matches!(request.action, SwitchAction::Test | SwitchAction::Switch) {
+                format!("Saved-generation {} stopped; earlier refreshes, copies, script{} and health-program effects are retained. Remote watchdog state and hidden switch/rollback status may be unknown. Inspect the target before an explicit rerun; no compensating activation, confirmation or profile setting was requested.\n", action_name(request.action), if request.action == SwitchAction::Switch { ", profile, carrier callback" } else { "" })
             } else { format!("Saved-generation {} stopped; earlier copies, runtime-kernel state and script effects{} are retained. Inspect target state before retrying; no rollback or reboot was performed.\n", action_name(request.action), if request.action == SwitchAction::Boot { ", including bootloader changes and profile updates," } else { "" }) },
         }).await;
         return Err(error.with_secondary(later.err().into_iter().collect()));
@@ -1162,8 +1170,9 @@ async fn activate_one<P: ProcessRunner>(
     task: TaskId,
 ) -> Result<bool, ConfctlError> {
     let copies = activation.copies;
-    let host = &copies.inventory.get(job.machine).name;
-    if copies.inventory.get(job.machine).carrier.is_some() {
+    let machine = copies.inventory.get(job.machine);
+    let host = &machine.name;
+    if machine.carrier.is_some() && activation.action != SwitchAction::Switch {
         checked(
             copies.events,
             copies.cancellation,
@@ -1175,18 +1184,22 @@ async fn activate_one<P: ProcessRunner>(
         .await?;
         return Ok(false);
     }
-    let description = format!(
-        "{}{} on {host}",
-        action_name(activation.action),
-        if matches!(activation.action, SwitchAction::Test | SwitchAction::Switch)
-            && rollback_enabled(copies.inventory.get(job.machine), copies.rollback)?
-            && job.generation.auto_rollback.is_some()
-        {
-            " rollback-helper protocol"
-        } else {
-            ""
-        }
-    );
+    let description = if let Some(carrier) = &machine.carrier {
+        format!("set carrier profile for {host} on {carrier}")
+    } else {
+        format!(
+            "{}{} on {host}",
+            action_name(activation.action),
+            if matches!(activation.action, SwitchAction::Test | SwitchAction::Switch)
+                && rollback_enabled(copies.inventory.get(job.machine), copies.rollback)?
+                && job.generation.auto_rollback.is_some()
+            {
+                " rollback-helper protocol"
+            } else {
+                ""
+            }
+        )
+    };
     copies
         .events
         .emit(UiEvent::TaskPending {
@@ -1205,6 +1218,18 @@ async fn activate_one<P: ProcessRunner>(
         )
         .await?;
         let mut entered = false;
+        if machine.carrier.is_some() {
+            activation_command(
+                activation,
+                job,
+                task,
+                &description,
+                &mut entered,
+                "set carrier profile",
+            )
+            .await?;
+            return Ok(TaskState::Succeeded);
+        }
         loop {
             if activation.dry_first {
                 activation_command(
@@ -1249,14 +1274,14 @@ async fn activate_one<P: ProcessRunner>(
                 action_name(activation.action),
             )
             .await?;
-            if activation.action == SwitchAction::Boot {
+            if matches!(activation.action, SwitchAction::Boot | SwitchAction::Switch) {
                 activation_command(
                     activation,
                     job,
                     task,
                     &description,
                     &mut entered,
-                    "set profile after boot",
+                    &format!("set profile after {}", action_name(activation.action)),
                 )
                 .await?;
             }
@@ -1309,7 +1334,11 @@ async fn activation_command<P: ProcessRunner>(
     checked(
         copies.events,
         copies.cancellation,
-        diagnostic(&format!("{}: {phase}\n", machine.name)),
+        diagnostic(&if phase == "set carrier profile" {
+            format!("{description}\n")
+        } else {
+            format!("{}: {phase}\n", machine.name)
+        }),
     )
     .await?;
     if matches!(activation.action, SwitchAction::Test | SwitchAction::Switch)
@@ -1324,24 +1353,42 @@ async fn activation_command<P: ProcessRunner>(
             machine.name
         ))).await?;
     }
-    let argv = if phase == "set profile after boot" {
-        vec![
-            "nix-env".into(),
-            "-p".into(),
-            "/nix/var/nix/profiles/system".into(),
-            "--set".into(),
-            job.generation.toplevel.as_os_str().into(),
-        ]
+    let (target, argv) = if phase == "set carrier profile" {
+        let (carrier, profile) = super::host_status::routing(copies.inventory, machine)?;
+        (
+            carrier,
+            vec![
+                "carrier-env".into(),
+                "-p".into(),
+                profile.into(),
+                "--set".into(),
+                job.generation.toplevel.as_os_str().into(),
+            ],
+        )
+    } else if matches!(phase, "set profile after boot" | "set profile after switch") {
+        (
+            machine,
+            vec![
+                "nix-env".into(),
+                "-p".into(),
+                "/nix/var/nix/profiles/system".into(),
+                "--set".into(),
+                job.generation.toplevel.as_os_str().into(),
+            ],
+        )
     } else {
-        vec![
-            job.generation
-                .toplevel
-                .join("bin/switch-to-configuration")
-                .into_os_string(),
-            phase.into(),
-        ]
+        (
+            machine,
+            vec![
+                job.generation
+                    .toplevel
+                    .join("bin/switch-to-configuration")
+                    .into_os_string(),
+                phase.into(),
+            ],
+        )
     };
-    let mut spec = super::connection::command_spec(machine, activation.ssh_config, &argv)?;
+    let mut spec = super::connection::command_spec(target, activation.ssh_config, &argv)?;
     spec.redacted_description = format!("{phase} on {}", machine.name);
     spec.cwd = Some(copies.root.path().into());
     spec.stdout = StreamPolicy::CaptureAndForward;

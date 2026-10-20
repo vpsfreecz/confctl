@@ -70,6 +70,9 @@ The same route with action `dry-activate` runs standalone dry activation without
 setting profiles; carried hosts again only receive copies.
 Action `test` uses configured rollback protection and health checks without a
 profile change or reboot; carried hosts only receive copies.
+Action `switch` (also the default with a saved generation) switches standalone
+hosts, sets their profile after successful activation and runs health checks.
+Carried switch updates the carrier profile and runs its installed callback.
 [`health-check`](health-checks.md) runs configured builder, machine and systemd
 checks with per-check retry budgets.
 [`status --generation <selector>`](status.md) compares a saved generation's

@@ -72,7 +72,7 @@ pub(super) async fn run(
             .confirm(ConfirmPrompt {
                 always: true,
                 preview: vec![diagnostic(&format!(
-                    "Run {} configured health checks for completed test actions.\n",
+                    "Run {} configured health checks for completed activation actions.\n",
                     all.len()
                 ))],
                 ..ConfirmPrompt::default()
