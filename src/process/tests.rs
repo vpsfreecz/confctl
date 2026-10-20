@@ -982,6 +982,7 @@ async fn child_input_and_output_are_not_subject_to_prompt_limit() {
 
 fn retained_fixture_error(directory: &Path) -> ConfctlError {
     use std::io::Write;
+    use std::os::unix::process::ExitStatusExt;
     let mut spool = NamedTempFile::new_in(directory).expect("owned evidence");
     spool.write_all(b"queued-private-prefix").expect("prefix");
     ConfctlError::ProcessFailure {
@@ -996,7 +997,7 @@ fn retained_fixture_error(directory: &Path) -> ConfctlError {
             ]),
         ),
         evidence: Box::new(PartialProcessEvidence {
-            status: None,
+            status: Some(ExitStatus::from_raw(7 << 8)),
             stdout: Captured::Spool {
                 file: spool,
                 length: 21,
@@ -1052,9 +1053,13 @@ async fn queued_process_error_drop_retains_captures_and_cleanup_order() {
         runner.owner.unobserved.lock().expect("sink").is_empty(),
         "queued reply still owns evidence"
     );
+    runner.shutdown().await.expect("join before caller drop");
+    assert!(runner.take_unobserved_errors().is_empty());
     drop(guard);
     assert_eq!(runner.owner.unobserved.lock().expect("sink").len(), 1);
-    let error = runner.shutdown().await.expect_err("queued error retained");
+    let mut errors = runner.take_unobserved_errors();
+    assert_eq!(errors.len(), 1);
+    let error = errors.remove(0);
     let path = failure_evidence(&error)
         .stdout
         .spool_path()
@@ -1065,6 +1070,13 @@ async fn queued_process_error_drop_retains_captures_and_cleanup_order() {
         capture_bytes(&failure_evidence(&error).stdout),
         b"queued-private-prefix"
     );
+    assert_eq!(
+        capture_bytes(&failure_evidence(&error).stderr),
+        b"private stderr"
+    );
+    assert!(!failure_evidence(&error).stdout_complete);
+    assert!(failure_evidence(&error).stderr_complete);
+    assert_eq!(failure_evidence(&error).status.unwrap().code(), Some(7));
     assert!(!format!("{error:?}").contains("queued-private-prefix"));
     let ConfctlError::ProcessFailure { source, .. } = &error else {
         panic!("failure evidence wrapper");
@@ -1077,6 +1089,10 @@ async fn queued_process_error_drop_retains_captures_and_cleanup_order() {
         secondary.as_slice(),
         [ConfctlError::InputEof, ConfctlError::EventDelivery(_)]
     ));
+    assert!(
+        runner.take_unobserved_errors().is_empty(),
+        "second drain empty"
+    );
     runner.shutdown().await.expect("no duplicate");
     drop(error);
     assert!(!path.exists());

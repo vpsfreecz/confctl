@@ -9,6 +9,8 @@ mod diagnostic;
 mod gen_data_tests;
 mod invocation_log;
 #[cfg(all(test, target_os = "linux"))]
+mod mutation_lifetime_tests;
+#[cfg(all(test, target_os = "linux"))]
 mod runtime_kernels_tests;
 mod signals;
 
@@ -279,9 +281,9 @@ async fn execute<O: Operations>(
             cancellation.cancel();renderer_early=Some(joined);None
         },
     };
-    // A failed presentation cannot leave operations awaiting acknowledgements.
-    // Dropping the caller preserves process/input errors for checked shutdown.
-    drop(operation);
+    // Keep an abandoned operation (and its mutation guard) alive but unpolled
+    // until every entered worker has joined. It may be awaiting an ack that
+    // the failed renderer can no longer provide.
     // Never cancel/drop shutdown futures: they carry owned IO and evidence.
     let mut cleanup = Vec::new();
     // Release queued and blocked suspension callers before any checked join.
@@ -295,6 +297,10 @@ async fn execute<O: Operations>(
     if let Err(error) = context.processes.shutdown().await {
         cleanup.push(error);
     }
+    drop(operation);
+    // A response still queued in the abandoned caller transfers its error on
+    // drop, after shutdown's first drain. All workers are already joined.
+    cleanup.extend(context.processes.take_unobserved_errors());
     if let Err(error) = context.ui.shutdown() {
         cleanup.push(error);
     }
