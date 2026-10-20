@@ -102,28 +102,10 @@ pub(super) async fn query<P: ProcessRunner>(
         spec.redacted_description = format!("query generations on {}", machine.name);
         Ok::<_, ConfctlError>(spec)
     };
-    let mut status = HostStatus::default();
-    match observe(
-        runner,
-        command(&["cat", "/proc/uptime"])?,
-        cancellation,
-        task,
-        "uptime",
-        |text| {
-            text.split_whitespace()
-                .next()
-                .unwrap_or("")
-                .parse::<f64>()
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
-        },
-    )
-    .await?
-    {
-        Ok(uptime) => status.uptime = Some(uptime),
-        Err(failure) => {
-            status.failure = Some(failure);
-            return Ok(status);
-        }
+    let mut status =
+        uptime_only(inventory, machine, runner, cancellation, task, ssh_config).await?;
+    if status.failure.is_some() {
+        return Ok(status);
     }
     if read_current {
         let path = if machine.carrier.is_some() {
@@ -174,6 +156,43 @@ pub(super) async fn query<P: ProcessRunner>(
             status.diagnostics = diagnostics;
         }
         Err(failure) => status.failure = Some(failure),
+    }
+    if cancellation.is_cancelled() {
+        return Err(ConfctlError::Cancelled);
+    }
+    Ok(status)
+}
+
+pub(super) async fn uptime_only<P: ProcessRunner>(
+    inventory: &Inventory,
+    machine: &Machine,
+    runner: &P,
+    cancellation: &CancellationToken,
+    task: TaskId,
+    ssh_config: Option<&OsStr>,
+) -> Result<HostStatus, ConfctlError> {
+    let (target, _) = routing(inventory, machine)?;
+    let mut spec = super::connection::command_spec(
+        target,
+        ssh_config,
+        &["cat".into(), "/proc/uptime".into()],
+    )?;
+    spec.redacted_description = format!("query generations on {}", machine.name);
+    let mut status = HostStatus::default();
+    match observe(runner, spec, cancellation, task, "uptime", |text| {
+        text.split_whitespace()
+            .next()
+            .unwrap_or("")
+            .parse::<f64>()
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+    })
+    .await?
+    {
+        Ok(uptime) => status.uptime = Some(uptime),
+        Err(failure) => {
+            status.failure = Some(failure);
+            return Ok(status);
+        }
     }
     if cancellation.is_cancelled() {
         return Err(ConfctlError::Cancelled);

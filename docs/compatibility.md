@@ -83,6 +83,10 @@ toplevel and input revisions with deployed state. `--generation none` instead
 evaluates current target input revisions without building a target system.
 Status with an omitted generation builds first, then compares the returned
 toplevels and current configured inputs with deployed state.
+[`diff` and `changelog`](changes.md) compare current or saved input revisions
+without system builds or profile enumeration. Only changelog clones or fetches
+Git mirrors; both use the [report pager](pager.md), with redirected output kept
+visible and later host/Git work stopped after an actual pager-pipe EPIPE.
 Other deploy modes and operation adapters remain unavailable. Help and version
 need no inventory, input broker or process supervisor.
 Static original help text is preserved in `src/cli/help.json`, with source
