@@ -3,12 +3,15 @@
 
 mod build;
 mod changes;
+mod collect_garbage;
 mod config_init;
 mod configuration;
 mod connection;
 mod cssh;
 mod deploy;
+mod generation_cleanup;
 mod generation_list;
+mod generation_selection;
 mod health_check;
 mod health_systemd;
 mod host_status;
@@ -35,7 +38,11 @@ impl Operations for CoreOperations {
         matches!(action, Action::Deploy(_))
             || matches!(
                 action,
-                Action::GenerationList { .. } | Action::Status { .. }
+                Action::GenerationList { .. }
+                    | Action::GenerationRemove { .. }
+                    | Action::GenerationRotate { .. }
+                    | Action::CollectGarbage { .. }
+                    | Action::Status { .. }
             )
             || matches!(
                 action,
@@ -97,6 +104,12 @@ impl Operations for CoreOperations {
             Action::Deploy(request) => deploy::run(request, root, context).await?,
             Action::TestConnection { .. } => {
                 connection::test(&invocation.action, root, context).await?
+            }
+            Action::GenerationRemove { .. } | Action::GenerationRotate { .. } => {
+                generation_cleanup::run(&invocation.action, root, context).await?
+            }
+            Action::CollectGarbage { .. } => {
+                collect_garbage::run(&invocation.action, root, context).await?
             }
             Action::GenerationList { .. } => {
                 generation_list::list(&invocation.action, root, context).await?

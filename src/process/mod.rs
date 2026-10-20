@@ -35,6 +35,9 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
+pub(crate) mod gc_output;
+use gc_output::GcOutput;
+
 const CHUNK: usize = 16 * 1024;
 
 #[derive(Debug)]
@@ -213,6 +216,7 @@ pub struct ProcessScope {
     pub phase: Option<Phase>,
     pub foreground: Option<ForegroundLease>,
     pub(crate) nix_progress: Option<crate::nix::progress::Kind>,
+    pub(crate) gc_output: Option<GcOutput>,
 }
 
 impl ProcessScope {
@@ -223,6 +227,7 @@ impl ProcessScope {
             phase: None,
             foreground: None,
             nix_progress: None,
+            gc_output: None,
         }
     }
 }
@@ -972,7 +977,7 @@ async fn execute(
             prepared,
             stdout,
             (OutputStream::Stdout, scope.task),
-            None,
+            (None, scope.gc_output.clone()),
             cancel.clone(),
             errors.clone(),
         );
@@ -987,7 +992,7 @@ async fn execute(
             prepared,
             stderr,
             (OutputStream::Stderr, scope.task),
-            scope.nix_progress,
+            (scope.nix_progress, scope.gc_output.clone()),
             cancel.clone(),
             errors.clone(),
         );
@@ -1295,7 +1300,7 @@ fn start_stream(
     prepared: PreparedStream,
     mut reader: impl AsyncRead + Send + Unpin + 'static,
     source: (OutputStream, TaskId),
-    nix_progress: Option<crate::nix::progress::Kind>,
+    output: (Option<crate::nix::progress::Kind>, Option<GcOutput>),
     cancel: CancellationToken,
     errors: mpsc::UnboundedSender<ConfctlError>,
 ) -> (Pump, Option<Relay>) {
@@ -1362,7 +1367,7 @@ fn start_stream(
                 observe,
                 events,
                 (task, stream),
-                nix_progress,
+                output,
                 cancel,
                 errors,
             )
@@ -1377,11 +1382,12 @@ async fn relay_stream(
     mut published: watch::Receiver<Published>,
     events: EventSink,
     source: (TaskId, OutputStream),
-    nix_progress: Option<crate::nix::progress::Kind>,
+    output: (Option<crate::nix::progress::Kind>, Option<GcOutput>),
     cancel: CancellationToken,
     errors: mpsc::UnboundedSender<ConfctlError>,
 ) {
     let (task, stream) = source;
+    let (nix_progress, gc_output) = output;
     let mut progress = nix_progress.map(crate::nix::progress::Progress::new);
     let mut offset = 0;
     loop {
@@ -1395,6 +1401,16 @@ async fn relay_stream(
                 return;
             }
             offset += length as u64;
+            if let Some(gc) = &gc_output {
+                if let Err(error) = gc
+                    .forward(&events, (task, stream), &bytes, false, &cancel)
+                    .await
+                {
+                    let _ = errors.send(error);
+                    return;
+                }
+                continue;
+            }
             let updates = progress
                 .as_mut()
                 .map(|decoder| decoder.feed(&bytes, task))
@@ -1418,6 +1434,14 @@ async fn relay_stream(
             }
         }
         if state.finished {
+            if let Some(gc) = &gc_output
+                && let Err(error) = gc
+                    .forward(&events, (task, stream), &[], true, &cancel)
+                    .await
+            {
+                let _ = errors.send(error);
+                return;
+            }
             if let Some(event) = progress.as_mut().and_then(|decoder| decoder.flush(task)) {
                 let line = progress
                     .as_ref()

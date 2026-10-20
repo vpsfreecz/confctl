@@ -275,6 +275,7 @@ impl GenerationInventory {
 #[derive(Clone, Debug)]
 pub struct GcRoots {
     directory: PathBuf,
+    configuration: PathBuf,
 }
 impl GcRoots {
     pub fn new(
@@ -284,6 +285,7 @@ impl GcRoots {
     ) -> Result<Self, ConfctlError> {
         let login = login.as_ref();
         Ok(Self {
+            configuration: root.path().into(),
             directory: login_directory(
                 per_user.as_ref().as_os_str(),
                 login,
@@ -307,6 +309,16 @@ impl GcRoots {
     pub fn directory(&self) -> &Path {
         &self.directory
     }
+    fn remove(&self, name: &str) -> Result<(), ConfctlError> {
+        component(name, "GC-root name")?;
+        let path = self.directory.join(name);
+        match fs::remove_file(&path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(io("unlink generation GC root", &path, error)),
+        }
+    }
+
     fn add(&self, name: &str, target: &Path) -> Result<(), ConfctlError> {
         fs::create_dir_all(&self.directory)
             .map_err(|source| io("create GC-root directory", &self.directory, source))?;
@@ -358,6 +370,115 @@ impl GenerationStore {
     pub fn load(&self, host: &str) -> Result<GenerationInventory, ConfctlError> {
         GenerationInventory::load_local(&self.root, host)
     }
+    /// Ordered irreversible unlinking; current and unknown entries are retained.
+    pub fn destroy(
+        &self,
+        guard: &MutationGuard,
+        host: &str,
+        generation: &BuildGeneration,
+        cancellation: &tokio_util::sync::CancellationToken,
+    ) -> Result<(), ConfctlError> {
+        guard.require_root(&self.root)?;
+        if self.roots.configuration != self.root.path() {
+            return Err(ConfctlError::Configuration(
+                "GC roots belong to a different configuration".into(),
+            ));
+        }
+        component(&generation.name, "generation name")?;
+        for role in generation.inputs.keys() {
+            component(role, "input role")?;
+        }
+        let host_name = safe_host(host)?;
+        let host_dir = self.host_directory(host)?;
+        let dir = host_dir.join(&generation.name);
+        for path in [
+            self.root.path().join(".confctl"),
+            self.root.path().join(".confctl/generations"),
+            host_dir,
+            dir.clone(),
+        ] {
+            let metadata = fs::symlink_metadata(&path)
+                .map_err(|error| io("inspect generation parent", &path, error))?;
+            if !metadata.is_dir() || metadata.file_type().is_symlink() {
+                return Err(ConfctlError::State(format!(
+                    "{} must be a real generation directory",
+                    path.display()
+                )));
+            }
+        }
+        match fs::symlink_metadata(&self.roots.directory) {
+            Ok(metadata) if !metadata.is_dir() || metadata.file_type().is_symlink() => {
+                return Err(ConfctlError::State(
+                    "GC-root namespace must be a real directory".into(),
+                ));
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(io(
+                    "inspect GC-root namespace",
+                    &self.roots.directory,
+                    error,
+                ));
+            }
+        }
+        let record = dir.join("generation.json");
+        let saved: Value = serde_json::from_slice(
+            &fs::read(&record).map_err(|error| io("read selected generation", &record, error))?,
+        )
+        .map_err(|source| ConfctlError::Decode {
+            context: record.display().to_string(),
+            source,
+        })?;
+        let saved = BuildGeneration::decode(&generation.name, saved)?;
+        if saved.encode() != generation.encode() {
+            return Err(ConfctlError::State(
+                "selected generation record changed before removal".into(),
+            ));
+        }
+        let checked = || {
+            if cancellation.is_cancelled() {
+                Err(ConfctlError::Cancelled)
+            } else {
+                Ok(())
+            }
+        };
+        for suffix in std::iter::once("toplevel".to_owned())
+            .chain(std::iter::once("auto_rollback".into()))
+            .chain(generation.inputs.keys().map(|role| format!("input.{role}")))
+        {
+            checked()?;
+            self.roots.remove(&format!(
+                "{host_name}-generation-{}-{suffix}",
+                generation.name
+            ))?;
+        }
+        checked()?;
+        fs::remove_file(dir.join("toplevel"))
+            .map_err(|error| io("unlink generation toplevel", &dir.join("toplevel"), error))?;
+        checked()?;
+        let rollback = dir.join("auto_rollback");
+        match fs::remove_file(&rollback) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(io("unlink generation rollback", &rollback, error)),
+        }
+        for role in generation.inputs.keys() {
+            checked()?;
+            let path = dir.join(format!("{role}.input"));
+            match fs::symlink_metadata(&path) {
+                Ok(_) => fs::remove_file(&path)
+                    .map_err(|error| io("unlink generation input", &path, error))?,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(io("inspect generation input", &path, error)),
+            }
+        }
+        checked()?;
+        fs::remove_file(&record).map_err(|error| io("unlink generation record", &record, error))?;
+        checked()?;
+        fs::remove_dir(&dir).map_err(|error| io("remove empty generation directory", &dir, error))
+    }
+
     pub fn publish(
         &self,
         guard: &MutationGuard,

@@ -596,7 +596,7 @@ async fn spool_write_fault_retains_confirmed_prefix_and_marks_incomplete() {
         prepared,
         &b"unwritten"[..],
         (OutputStream::Stdout, TaskId(16)),
-        None,
+        (None, None),
         CancellationToken::new(),
         errors,
     );
@@ -744,7 +744,7 @@ async fn canceled_open_reader_retains_incomplete_prefix_without_waiting_for_eof(
         prepared,
         reader,
         (OutputStream::Stdout, TaskId(18)),
-        None,
+        (None, None),
         cancel.clone(),
         errors,
     );
@@ -924,7 +924,7 @@ async fn drain_fault_retains_prefix_and_marks_incomplete() {
         prepared,
         PrefixThenDrainFault(false),
         (OutputStream::Stdout, TaskId(22)),
-        None,
+        (None, None),
         CancellationToken::new(),
         errors,
     );
@@ -1543,4 +1543,70 @@ async fn ordinary_bytes_file_epipe_and_source_failure_remain_failures() {
             .is_err()
     );
     runner.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn gc_labelled_relays_preserve_exact_raw_captures_and_log_without_ui_duplicate() {
+    let directory = tempfile::tempdir().unwrap();
+    let log_path = directory.path().join("native.log");
+    let log = ProcessLog::new(File::create(&log_path).await.unwrap());
+    let (runner, mut receiver) = owner(directory.path(), 64, Some(log));
+    let output = GcOutput::new("host");
+    let consumer = tokio::spawn(async move {
+        let mut events = Vec::new();
+        while let Some(delivery) = receiver.receive().await {
+            let (event, ack) = delivery.into_parts();
+            events.push(event);
+            ack.acknowledge(Ok(()));
+        }
+        events
+    });
+    let mut spec = shell(
+        "printf \"deleting '/nix/store/out'\\nordinary\\377\\n\"; printf \"deleting '/nix/store/err'\\n2 store paths deleted\\n\" >&2; exit 7",
+    );
+    spec.stdout = StreamPolicy::CaptureAndForward;
+    spec.stderr = StreamPolicy::CaptureAndForward;
+    let mut scope = ProcessScope::new(CancellationToken::new(), TaskId(12));
+    scope.gc_output = Some(output.clone());
+    let result = runner.run(spec, scope).await.unwrap();
+    assert_eq!(result.code(), Some(7));
+    assert_eq!(
+        crate::nix::bytes(&result.stdout).await.unwrap(),
+        b"deleting '/nix/store/out'\nordinary\xff\n"
+    );
+    assert_eq!(
+        crate::nix::bytes(&result.stderr).await.unwrap(),
+        b"deleting '/nix/store/err'\n2 store paths deleted\n"
+    );
+    assert_eq!(
+        output.summary().await.as_deref(),
+        Some("2 store paths deleted")
+    );
+    runner.shutdown().await.unwrap();
+    drop(runner);
+    let events = consumer.await.unwrap();
+    let counts = events
+        .iter()
+        .filter_map(|event| {
+            if let UiEvent::TaskProgress { completed, .. } = event {
+                Some(*completed)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(counts, [1, 2]);
+    assert!(
+        events
+            .iter()
+            .filter_map(|event| if let UiEvent::Output { bytes, .. } = event {
+                Some(bytes)
+            } else {
+                None
+            })
+            .all(|bytes| bytes.starts_with(b"host> "))
+    );
+    let raw = std::fs::read(log_path).unwrap();
+    assert!(!raw.windows(6).any(|b| b == b"host> "));
+    assert!(raw.windows(9).any(|b| b == b"ordinary\xff"));
 }

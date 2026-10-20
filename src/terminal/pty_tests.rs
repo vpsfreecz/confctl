@@ -497,3 +497,121 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
             .expect("footer after joins");
     });
 }
+
+#[test]
+fn gc_live_pty_labels_progress_prompt_cancel_and_restore_share_existing_owner() {
+    const TEST: &str = "terminal::pty_tests::gc_live_pty_labels_progress_prompt_cancel_and_restore_share_existing_owner";
+    if std::env::var_os(CASE_ENV).is_none() {
+        let result = run_fixture(TEST, "gc", b"y\n");
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.bytes)
+        );
+        let text = String::from_utf8_lossy(&result.bytes);
+        assert!(
+            text.contains("alpha> deleting")
+                && text.contains("beta> deleting")
+                && text.contains("Continue?")
+        );
+        return;
+    }
+    enter_controlling_session();
+    let original = rustix::termios::tcgetattr(io::stdin()).unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        use crate::{
+            domain::ColorMode,
+            events::{EventSink, TaskId, TaskState, UiEvent},
+            presentation::{OutputTargets, Presentation, PresentationConfig},
+            process::{
+                ProcessRunner, ProcessScope, ProcessSpec, StreamPolicy, Supervisor,
+                TerminationCause, gc_output::GcOutput,
+            },
+            terminal::{ConfirmPrompt, Ui},
+        };
+        let directory = tempfile::tempdir().unwrap();
+        let (events, receiver) = EventSink::channel(1);
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let ui = Ui::new(io::stdin(), events.clone(), cancel.clone(), None).unwrap();
+        ui.set_live(true).unwrap();
+        let config = PresentationConfig::for_process(
+            "collect-garbage".into(),
+            "collect-garbage".into(),
+            ColorMode::Never,
+            directory.path().into(),
+        );
+        assert!(config.policy.live);
+        let (control, presentation) = Presentation::new(
+            receiver,
+            ui.observe_state(),
+            OutputTargets::standard(),
+            config,
+            None,
+        )
+        .unwrap();
+        let consumer = tokio::spawn(presentation.run());
+        assert!(ui.confirm(ConfirmPrompt::default()).await.unwrap());
+        let runner = Supervisor::new(
+            events.clone(),
+            directory.path().into(),
+            64,
+            Duration::from_millis(30),
+            None,
+            None,
+        );
+        let mut jobs = Vec::new();
+        let mut outputs = Vec::new();
+        for (i, host) in ["alpha", "beta"].iter().enumerate() {
+            let task = TaskId(i as u64 + 1);
+            events.emit(UiEvent::TaskStarted {
+                task,
+                description: format!("GC {host}"),
+            }).await.unwrap();
+            let mut spec = ProcessSpec::new("sh", "fake GC PTY output");
+            spec.args = vec![
+                "-c".into(),
+                "printf \"deleting '/nix/store/out'\\n1 store paths deleted\\n\"; printf \"deleting '/nix/store/err'\\n\" >&2; exec sleep 30".into(),
+            ];
+            spec.stdout = StreamPolicy::CaptureAndForward;
+            spec.stderr = StreamPolicy::CaptureAndForward;
+            let output = GcOutput::new(host);
+            let mut scope = ProcessScope::new(cancel.clone(), task);
+            scope.gc_output = Some(output.clone());
+            outputs.push(output);
+            let runner = runner.clone();
+            jobs.push(tokio::spawn(async move { runner.run(spec, scope).await }));
+        }
+        let deadline = Instant::now();
+        for output in outputs {
+            while output.summary().await.is_none() {
+                assert!(deadline.elapsed() < Duration::from_secs(5));
+                tokio::task::yield_now().await;
+            }
+        }
+        assert!(jobs.iter().all(|job| !job.is_finished()));
+        cancel.cancel();
+        for (i, job) in jobs.into_iter().enumerate() {
+            match job.await.unwrap() {
+                Ok(outcome) => assert_eq!(outcome.termination, TerminationCause::Canceled),
+                Err(error) => assert!(error.is_cancelled(), "{error:?}"),
+            }
+            events.emit(UiEvent::TaskFinished {
+                task: TaskId(i as u64 + 1),
+                state: TaskState::Canceled,
+            }).await.unwrap();
+        }
+        runner.shutdown().await.unwrap();
+        ui.shutdown().unwrap();
+        control.finish().await.unwrap();
+        consumer.await.unwrap().unwrap();
+        assert_modes(&original, &rustix::termios::tcgetattr(io::stdin()).unwrap());
+        assert_eq!(
+            rustix::termios::tcgetpgrp(io::stdin()).unwrap(),
+            rustix::process::getpgrp(),
+        );
+    });
+}
