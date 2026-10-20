@@ -12,6 +12,116 @@ fn diagnostic_rows() -> Value {
     .unwrap()
 }
 
+// This fixed fixture has three generations and two current links. Directory
+// encounter order, not link creation order, controls the machine/spin order.
+fn fixture_order(profiles: &Path) -> Vec<(&'static str, &'static str)> {
+    let generations = [
+        ("confctl-node-9-link", ("node", "vpsadminos")),
+        ("confctl-node-7-link", ("node", "vpsadminos")),
+        ("confctl-nixos-3-link", ("nixos", "nixos")),
+    ];
+    let mut names = Vec::new();
+    let mut order = Vec::new();
+    for entry in std::fs::read_dir(profiles).unwrap() {
+        let name = entry.unwrap().file_name().into_string().unwrap();
+        if let Some((_, machine)) = generations.iter().find(|(file, _)| *file == name)
+            && !order.contains(machine)
+        {
+            order.push(*machine);
+        }
+        names.push(name);
+    }
+    names.sort();
+    assert_eq!(
+        names,
+        [
+            "confctl-nixos",
+            "confctl-nixos-3-link",
+            "confctl-node",
+            "confctl-node-7-link",
+            "confctl-node-9-link",
+        ]
+    );
+    assert_eq!(order.len(), 2);
+    order
+}
+
+fn assert_loaded_order(machines: &[model::Machine], order: &[(&str, &str)]) {
+    assert_eq!(
+        machines
+            .iter()
+            .map(|machine| (machine.name.as_str(), machine.spin.as_str()))
+            .collect::<Vec<_>>(),
+        order
+    );
+}
+
+// Move only the two complete retained fragments. Assert unique boundaries and
+// reconstruct the entire capture first; no candidate bytes enter this helper.
+fn project_pair(
+    capture: &str,
+    starts: [&str; 2],
+    end: &str,
+    separator: &str,
+    order: &[(&str, &str)],
+) -> String {
+    for boundary in starts.into_iter().chain((!end.is_empty()).then_some(end)) {
+        assert_eq!(capture.matches(boundary).count(), 1, "{boundary:?}");
+    }
+    let first = capture.find(starts[0]).unwrap();
+    let second = capture.find(starts[1]).unwrap();
+    let last = if end.is_empty() {
+        capture.len()
+    } else {
+        capture.find(end).unwrap()
+    };
+    assert!(first < second && second < last);
+    let prefix = &capture[..first];
+    let node = capture[first..second].strip_suffix(separator).unwrap();
+    let nixos = &capture[second..last];
+    let suffix = &capture[last..];
+    assert_eq!(format!("{prefix}{node}{separator}{nixos}{suffix}"), capture);
+    match order {
+        [("node", "vpsadminos"), ("nixos", "nixos")] => {
+            format!("{prefix}{node}{separator}{nixos}{suffix}")
+        }
+        [("nixos", "nixos"), ("node", "vpsadminos")] => {
+            format!("{prefix}{nixos}{separator}{node}{suffix}")
+        }
+        _ => panic!("unexpected fixed fixture order: {order:?}"),
+    }
+}
+
+fn project_files(files: &mut Value, order: &[(&str, &str)]) {
+    let text = files["http.abcdef/machines.json"]["text"].as_str().unwrap();
+    let projected = project_pair(
+        text,
+        [
+            "    {\n      \"url\": \"http://boot.fixture.invalid/node.invalid\",",
+            "    {\n      \"url\": \"http://boot.fixture.invalid/nixos.invalid\",",
+        ],
+        "\n  ]\n}",
+        ",\n",
+        order,
+    );
+    files["http.abcdef/machines.json"]["text"] = projected.into();
+    let text = files["tftp.abcdef/pxelinux.cfg/default"]["text"]
+        .as_str()
+        .unwrap();
+    let projected = project_pair(
+        text,
+        ["LABEL vpsadminos\n", "LABEL nixos\n"],
+        if text.contains("LABEL isoimages\n") {
+            "LABEL isoimages\n"
+        } else {
+            "LABEL local_boot\n"
+        },
+        "",
+        order,
+    );
+    files["tftp.abcdef/pxelinux.cfg/default"]["text"] = projected.into();
+}
+
 // Match the retained failure capture, including descendants reached through
 // the two top-level published aliases. Do not discard any of its 52 entries.
 fn captured_failure(root: &Path) -> BTreeMap<String, Value> {
@@ -165,6 +275,7 @@ fn helper_diag_01_first_publish_failure_keeps_exact_listing_and_all_52_entries()
     fixture.profile("node", 9, true, "vpsadminos");
     fixture.profile("node", 7, false, "vpsadminos");
     fixture.profile("nixos", 3, true, "nixos");
+    let order = fixture_order(&fixture.dir.path().join("profiles"));
     fixture.old_roots();
     let root = fixture.dir.path();
     let ln = root.join("tools/bin/ln");
@@ -185,6 +296,7 @@ fn helper_diag_01_first_publish_failure_keeps_exact_listing_and_all_52_entries()
         &mut out,
     )
     .unwrap();
+    assert_loaded_order(&machines, &order);
     let error = publish(&fixture.config, &machines, "abcdef").unwrap_err();
     let source = error
         .get_ref()
@@ -198,7 +310,20 @@ fn helper_diag_01_first_publish_failure_keeps_exact_listing_and_all_52_entries()
     let mut stderr = Vec::new();
     assert_eq!(finish(Err(error), &mut stderr), 1);
     let rows = diagnostic_rows();
-    let expected = &rows["rows"]["netboot-publish-failure"]["expected"];
+    let mut expected = rows["rows"]["netboot-publish-failure"]["expected"].clone();
+    expected["stdout"] = project_pair(
+        expected["stdout"].as_str().unwrap(),
+        ["node.invalid\n", "nixos.invalid\n"],
+        "",
+        "",
+        &order,
+    )
+    .into();
+    assert_eq!(
+        expected["observation"]["files"].as_object().unwrap().len(),
+        52
+    );
+    project_files(&mut expected["observation"]["files"], &order);
     assert_eq!(out, expected["stdout"].as_str().unwrap().as_bytes());
     assert_eq!(
         stderr,
@@ -371,19 +496,63 @@ fn full_http_tftp_tree_menus_variants_json_and_cleanup_match_original_m0_bytes()
     fixture.profile("node", 9, true, "vpsadminos");
     fixture.profile("node", 7, false, "vpsadminos");
     fixture.profile("nixos", 3, true, "nixos");
+    let order = fixture_order(&fixture.dir.path().join("profiles"));
     fixture.old_roots();
     let machines = fixture.machines();
-    publish(&fixture.config, &machines, "abcdef").unwrap();
-    let original: Value = serde_json::from_str(include_str!("ruby-full-tree.json")).unwrap();
+    assert_loaded_order(&machines, &order);
+    assert_full_publish(&fixture, &machines, &order);
+}
+
+fn assert_full_publish(fixture: &Fixture, machines: &[model::Machine], order: &[(&str, &str)]) {
+    publish(&fixture.config, machines, "abcdef").unwrap();
+    let mut original: Value = serde_json::from_str(include_str!("ruby-full-tree.json")).unwrap();
+    assert_eq!(original["files"].as_object().unwrap().len(), 51);
+    project_files(&mut original["files"], order);
     let expected = original["files"]
         .as_object()
         .unwrap()
         .iter()
         .map(|(key, value)| (key.clone(), value.clone()))
         .collect::<BTreeMap<_, _>>();
-    assert_eq!(captured(fixture.dir.path()), expected);
+    let files = captured(fixture.dir.path());
+    assert_eq!(files.len(), 51);
+    assert_eq!(files, expected);
     assert!(!fixture.dir.path().join("tftp.old").exists());
     assert!(!fixture.dir.path().join("http.old").exists());
+}
+
+#[test]
+fn publisher_preserves_both_explicit_machine_and_spin_input_orders() {
+    for order in [
+        [("node", "vpsadminos"), ("nixos", "nixos")],
+        [("nixos", "nixos"), ("node", "vpsadminos")],
+    ] {
+        let fixture = Fixture::new();
+        fixture.profile("node", 9, true, "vpsadminos");
+        fixture.profile("node", 7, false, "vpsadminos");
+        fixture.profile("nixos", 3, true, "nixos");
+        let observed = fixture_order(&fixture.dir.path().join("profiles"));
+        let machines = fixture.machines();
+        assert_loaded_order(&machines, &observed);
+        // Separate publisher inputs, after checking the real loader unchanged.
+        // Neither permutation is selected from actual rendered output.
+        let mut node = None;
+        let mut nixos = None;
+        for machine in machines {
+            match machine.name.as_str() {
+                "node" => node = Some(machine),
+                "nixos" => nixos = Some(machine),
+                _ => unreachable!(),
+            }
+        }
+        let mut inputs = vec![node.unwrap(), nixos.unwrap()];
+        if order[0].0 == "nixos" {
+            inputs.reverse();
+        }
+        assert_loaded_order(&inputs, &order);
+        fixture.old_roots();
+        assert_full_publish(&fixture, &inputs, &order);
+    }
 }
 
 #[test]
