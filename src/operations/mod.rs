@@ -3,6 +3,7 @@
 
 mod build;
 mod connection;
+mod cssh;
 mod deploy;
 mod generation_list;
 mod health_check;
@@ -38,6 +39,7 @@ impl Operations for CoreOperations {
                     | Action::Build(_)
                     | Action::TestConnection { .. }
                     | Action::Ssh(_)
+                    | Action::Cssh { .. }
                     | Action::HealthCheck { .. }
             )
     }
@@ -66,6 +68,7 @@ impl Operations for CoreOperations {
                 generation_list::list(&invocation.action, root, context).await?
             }
             Action::Ssh(_) => ssh::run(&invocation.action, root, context).await?,
+            Action::Cssh { .. } => cssh::run(&invocation.action, root, context).await?,
             Action::HealthCheck { .. } => {
                 health_check::run(&invocation.action, root, context).await?
             }

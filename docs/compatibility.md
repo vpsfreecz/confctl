@@ -61,7 +61,7 @@ entrypoint. The default `confctl` remains Ruby during development. Typed request
 cover the 29 original command actions and the built-in `runtime-kernels update`
 action. The concrete routes are `ls`, `inputs ls`, `inputs channel ls`,
 `runtime-kernels update`, `build`, [`test-connection`](connection-check.md),
-[`ssh`](ssh.md) and [`generation ls`](generation-listing.md) for default/local,
+[`ssh`](ssh.md), [`cssh`](cssh.md) and [`generation ls`](generation-listing.md) for default/local,
 remote or combined local/remote records.
 [`deploy --copy-only --generation <selector>`](deploy.md) copies saved generations.
 Saved-generation `deploy --generation <selector> <pattern> boot` also prepares
