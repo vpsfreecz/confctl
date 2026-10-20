@@ -88,3 +88,11 @@ mains disabled and ignored native tests left ignored. Toolchain/crate downloads
 are future hosted CI behavior. Local source checks do not establish an Ubuntu
 runner result, pinned production-coreutils parity, real Nix builds, site migration
 or operator acceptance. Ruby workflows and the self-hosted suite remain separate.
+
+The self-hosted native VM/GC job runs automatically only for default-branch
+pushes matching its existing path filters. Feature branches, including Ruby
+changes, and tags require deliberate `workflow_dispatch` with separate runner
+ownership and authorization. The guard skips the whole job before runner
+allocation, including GC reset and cleanup; a skipped job is not a native
+test pass. Older refs retain their existing scheduling until they adopt the
+guard. Hosted Rust, RuboCop and RSpec workflows keep their existing triggers.

@@ -29,6 +29,12 @@ permissions:
 jobs:
   test:
     name: Run ci-tagged tests
+    # Native VM/GC work is automatic only on the repository default branch.
+    # Feature branches and tags require deliberate workflow_dispatch.
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'push' &&
+           github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) }}
     runs-on: self-hosted
     timeout-minutes: 360
 
