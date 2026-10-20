@@ -213,6 +213,10 @@ an optional [pager](docs/pager.md).
 [`confctl-rust init`](docs/config-init.md) creates the Ruby-compatible starter
 templates without an existing flake, Nix evaluation or confirmation. Its guide
 lists permitted existing entries and recovery from partial initialization.
+[`add`, `rename` and `rediscover`](docs/configuration-commands.md) edit an existing
+flake configuration without confirmation or host contact. Their guide covers
+literal templates, preserved rename contents, path restrictions, netboot hook
+migration and recovery after partial edits.
 
 ## Machine metadata and inputs
 Machine configuration directory usually contains at least two files:
