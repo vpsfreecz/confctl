@@ -504,6 +504,16 @@ async fn protected_pty_cancel_and_dropped_future_restore_echo_and_flush_input() 
         let pending_broker = broker.clone();
         let pending = tokio::spawn(async move { pending_broker.line(true, &pending_cancel).await });
         echo_disabled(&slave).await;
+        // ECHO alone does not acknowledge that the worker installed Pending.
+        assert!(matches!(
+            tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                broker.line(true, &CancellationToken::new()),
+            )
+            .await
+            .expect("protected read installed before cancellation"),
+            Err(ConfctlError::TerminalBusy)
+        ));
         rustix::io::write(&master, b"partial-secret").expect("partial input");
         if drop_future {
             pending.abort();
@@ -605,17 +615,33 @@ async fn consumed_input_error_and_clean_canceled_reply_are_not_reported_again() 
 }
 
 #[tokio::test]
-async fn protected_pty_hangup_then_future_drop_retains_restore_failures() {
+async fn protected_pty_hangup_then_queued_reply_drop_retains_native_cleanup_failures() {
     let (master, slave) = local_pty();
     let broker = InputBroker::new(&slave).expect("broker");
-    let cancel = CancellationToken::new();
-    let mut pending = Box::pin(broker.line(true, &cancel));
-    let mut context = std::task::Context::from_waker(std::task::Waker::noop());
-    assert!(pending.as_mut().poll(&mut context).is_pending());
-    echo_disabled(&slave).await;
+    let original = rustix::termios::tcgetattr(&slave).expect("original termios");
+    let mut protected = original.clone();
+    protected
+        .local_modes
+        .remove(rustix::termios::LocalModes::ECHO);
+    rustix::termios::tcsetattr(&slave, rustix::termios::OptionalActions::Now, &protected)
+        .expect("protected termios installed before hangup");
+    assert!(
+        !rustix::termios::tcgetattr(&slave)
+            .expect("protected termios")
+            .local_modes
+            .contains(rustix::termios::LocalModes::ECHO)
+    );
+    let (send, receive) = oneshot::channel();
+    let pending = Pending {
+        id: 1,
+        bytes: b"partial-secret".to_vec(),
+        response: send,
+        original: Some(original),
+        unobserved: broker.unobserved.clone(),
+    };
     drop(master);
-    // A parallel fork may retain the CLOEXEC master until exec. Observe the
-    // hangup before cancellation so this case actually exercises failed restore.
+    // The idle worker has no Line request to complete before this precondition.
+    // A parallel fork may retain the CLOEXEC master until exec.
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
             match rustix::termios::tcgetattr(&slave) {
@@ -626,15 +652,39 @@ async fn protected_pty_hangup_then_future_drop_retains_restore_failures() {
         }
     })
     .await
-    .expect("PTY hangup before reply cancellation");
-    // Never poll the reply again. Its receiver remains live while PendingRead
-    // Drop joins cancellation; a queued cleanup error still has an owner.
-    drop(pending);
+    .expect("PTY hangup before native cleanup");
+    complete(&slave, pending, Err(ConfctlError::Cancelled));
+    assert!(broker.unobserved.lock().expect("sink").is_empty());
+    // The successfully queued reply owns the real flush/restore failures until
+    // its unconsumed receiver is dropped.
+    drop(receive);
+    assert_eq!(broker.unobserved.lock().expect("sink").len(), 1);
     let error = broker
         .shutdown()
         .expect_err("hung-up terminal restore failed");
-    assert_restoration_order(&error);
+    let ConfctlError::Cleanup { primary, secondary } = &error else {
+        panic!("missing native cleanup errors: {error:?}");
+    };
+    assert!(matches!(primary.as_ref(), ConfctlError::Cancelled));
+    assert!(matches!(
+        secondary.as_slice(),
+        [
+            ConfctlError::Io {
+                operation: "flush protected input",
+                source: flush,
+                ..
+            },
+            ConfctlError::Io {
+                operation: "restore terminal input",
+                source: restore,
+                ..
+            }
+        ] if flush.raw_os_error() == Some(rustix::io::Errno::IO.raw_os_error())
+            && restore.raw_os_error() == Some(rustix::io::Errno::IO.raw_os_error())
+    ));
     assert!(!format!("{error:?}").contains("partial-secret"));
+    assert!(broker.worker.lock().expect("worker").is_none());
+    assert!(broker.unobserved.lock().expect("sink").is_empty());
     broker.shutdown().expect("failure transferred once");
 }
 
