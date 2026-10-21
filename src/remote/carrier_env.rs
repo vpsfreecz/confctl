@@ -18,17 +18,16 @@ mod tests {
     use std::os::unix::{fs::PermissionsExt, process::ExitStatusExt};
 
     fn executable(path: &Path, body: &str) {
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(path)
+        // Keep the writer outside this multithreaded process: a concurrent
+        // fork can inherit a writable descriptor before its CLOEXEC takes effect.
+        let status = Command::new("/bin/sh")
+            .args(["-c", "set -C; printf '%s' \"$2\" > \"$1\"", "write-fixture"])
+            .arg(path)
+            .arg(format!("#!/bin/sh\n{body}\n"))
+            .status()
             .unwrap();
-        file.write_all(format!("#!/bin/sh\n{body}\n").as_bytes())
-            .unwrap();
-        file.set_permissions(std::fs::Permissions::from_mode(0o755))
-            .unwrap();
-        file.sync_all().unwrap();
-        drop(file); // No fixture writer remains open when its command starts.
+        assert!(status.success(), "fixture writer failed: {status}");
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
     }
 
     #[test]
