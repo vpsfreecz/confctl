@@ -102,13 +102,13 @@ The small `tests/fixtures/reference-options.json` is synthetic renderer data,
 not an evaluated options inventory. It must never replace
 `man/man8/confctl-options.nix.8.md`.
 
-To refresh the options manual, export `#moduleOptions` from this repository's
-locked inputs. This command uses locally available inputs and fails if an input
-is missing. A site's `#confctl.moduleOptions` is a different export.
+To refresh the options manual, export `#moduleOptions` from this repository using
+its locked inputs. A site's `#confctl.moduleOptions` is a different export.
 
 ```sh
-nix eval --offline --no-update-lock-file --no-write-lock-file \
-  --option allow-import-from-derivation false --json .#moduleOptions > module-options.json
+nix eval --no-update-lock-file --no-write-lock-file \
+  --option allow-import-from-derivation false --option accept-flake-config false \
+  --json .#moduleOptions > module-options.json
 ```
 
 Render the export into a temporary candidate before replacing the manual:
