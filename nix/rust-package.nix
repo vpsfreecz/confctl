@@ -32,6 +32,8 @@ let
 
     # Keep the lexical multicall entry: login.rs captures this at compile time.
     CONFCTL_LOGNAME = "${pkgs.coreutils}/bin/logname";
+    # Native-root HTTP clients also initialize in confined loopback tests.
+    SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
     dontUseCmakeConfigure = true;
     dontGzipMan = true;
     nativeBuildInputs = [
