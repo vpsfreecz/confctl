@@ -1,8 +1,0 @@
-PreCommit:
-  Nixfmt:
-    enabled: true
-  RuboCop:
-    enabled: true
-CommitMsg:
-  CapitalizedSubject:
-    enabled: false

@@ -118,6 +118,80 @@ fn excluded_records_and_invalid_current_are_never_removed() {
     );
 }
 #[tokio::test]
+async fn current_requires_the_local_generation_target_and_preserves_all_saved_entries() {
+    for spelling in ["relative", "absolute", "broken", "external"] {
+        let (dir, store) = fixture();
+        let guard = crate::configuration::MutationLock::acquire(
+            &store.root,
+            &tokio_util::sync::CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+        let older = generation("older");
+        let mut newer = generation("newer");
+        newer.date += chrono::Duration::days(1);
+        store.publish(&guard, "alpha", &older).unwrap();
+        store.publish(&guard, "alpha", &newer).unwrap();
+        let host = store.host_directory("alpha").unwrap();
+        let external = dir.path().join("external").join(&older.name);
+        fs::create_dir_all(&external).unwrap();
+        let raw = fs::read(host.join("older/generation.json")).unwrap();
+        fs::write(external.join("generation.json"), &raw).unwrap();
+        let target = match spelling {
+            "relative" => PathBuf::from("older"),
+            "absolute" => host.join("older"),
+            "broken" => PathBuf::from("missing-directory/older"),
+            "external" => external.clone(),
+            _ => unreachable!(),
+        };
+        fs::remove_file(host.join("current")).unwrap();
+        std::os::unix::fs::symlink(&target, host.join("current")).unwrap();
+        let saved = ["older", "newer"].map(|name| {
+            let path = host.join(name);
+            let links = ["toplevel", "auto_rollback", "nixpkgs.input"]
+                .map(|link| fs::read_link(path.join(link)).unwrap());
+            (fs::read(path.join("generation.json")).unwrap(), links)
+        });
+        let roots = || {
+            fs::read_dir(store.roots.directory())
+                .unwrap()
+                .map(|entry| {
+                    let entry = entry.unwrap();
+                    (entry.file_name(), fs::read_link(entry.path()).unwrap())
+                })
+                .collect::<std::collections::BTreeMap<_, _>>()
+        };
+        let original_roots = roots();
+        let inventory = store.load("alpha").unwrap();
+        if matches!(spelling, "relative" | "absolute") {
+            assert_eq!(inventory.current.as_deref(), Some("older"), "{spelling}");
+            assert!(inventory.current_error.is_none(), "{spelling}");
+            assert_eq!(
+                inventory.select("alpha", "current").unwrap().unwrap().name,
+                "older"
+            );
+        } else {
+            assert!(inventory.current.is_none(), "{spelling}");
+            assert!(inventory.current_error.is_some(), "{spelling}");
+            assert!(inventory.select("alpha", "current").is_err(), "{spelling}");
+        }
+        assert_eq!(fs::read_link(host.join("current")).unwrap(), target);
+        for (name, (bytes, links)) in ["older", "newer"].into_iter().zip(saved) {
+            let path = host.join(name);
+            assert_eq!(fs::read(path.join("generation.json")).unwrap(), bytes);
+            for (link, expected) in ["toplevel", "auto_rollback", "nixpkgs.input"]
+                .into_iter()
+                .zip(links)
+            {
+                assert_eq!(fs::read_link(path.join(link)).unwrap(), expected);
+            }
+        }
+        assert_eq!(roots(), original_roots);
+        assert_eq!(fs::read(external.join("generation.json")).unwrap(), raw);
+        assert!(!host.join("missing-directory").exists());
+    }
+}
+#[tokio::test]
 async fn gcroot_failure_preserves_previous_current_and_collision_does_not_overwrite() {
     let (dir, store) = fixture();
     let host = store.host_directory("alpha").unwrap();

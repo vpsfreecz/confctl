@@ -3,7 +3,7 @@
   inputs,
   channels ? { },
   system ? null,
-  rustHelpers ? false,
+  rustHelpers ? true,
 }:
 let
   resolvedSystem =
@@ -362,7 +362,7 @@ let
   helperPackageModule =
     { pkgs, ... }:
     {
-      _module.args.confctlRustPackage = if rustHelpers then rustPackageFor pkgs else null;
+      _module.args.confctlRustPackage = rustPackageFor pkgs;
     };
 
   confMachineFor =
@@ -434,27 +434,9 @@ let
 
   autoRollbackFor =
     pkgs:
-    let
-      args = {
-        src = confctlSrc + "/libexec/auto-rollback.rb";
-        isExecutable = true;
-      };
-
-      replacements = {
-        ruby = pkgs.ruby;
-      };
-    in
-    if rustHelpers then
-      pkgs.writeShellScript "confctl-auto-rollback" ''
-        exec -a "$0" ${rustPackageFor pkgs}/libexec/confctl/confctl-auto-rollback "$@"
-      ''
-    else if pkgs ? replaceVarsWith then
-      pkgs.replaceVarsWith {
-        inherit (args) src isExecutable;
-        inherit replacements;
-      }
-    else
-      pkgs.substituteAll ({ inherit (args) src isExecutable; } // replacements);
+    pkgs.writeShellScript "confctl-auto-rollback" ''
+      exec -a "$0" ${rustPackageFor pkgs}/libexec/confctl/confctl-auto-rollback "$@"
+    '';
 
   evalConfigFor =
     m:
@@ -525,6 +507,8 @@ let
 
   toplevelOutput = coreLib.mapAttrs (_: v: v.toplevel) buildOutputs;
 in
+assert coreLib.assertMsg rustHelpers
+  "mkConfctlOutputs rustHelpers=false is no longer supported; remove the old Ruby helper selection";
 {
   moduleOptions = import ../module-options.nix {
     nixpkgs = coreNixpkgs;

@@ -6,27 +6,19 @@
 # Modes:
 # - minimal: confctl comes from the flake package, no Bundler bootstrap
 # - tools: repo-local Bundler environment for repo tooling, confctl stays packaged
-# - bundled-confctl: repo-local Bundler environment and confctl runs via bundle exec
 
 {
   system,
   pkgs ? nixpkgs.legacyPackages.${system},
   mode ? "minimal",
-  implementation ? "ruby",
+  implementation ? "rust",
   extraPackages ? [ ],
   legacyCompat ? false,
 }:
 let
   lib = pkgs.lib;
-  confctlPackage =
-    if implementation == "rust" then
-      self.packages.${system}.confctl-rust
-    else
-      self.packages.${system}.confctl;
-  bundlerMode = builtins.elem mode [
-    "tools"
-    "bundled-confctl"
-  ];
+  confctlPackage = self.packages.${system}.confctl;
+  bundlerMode = mode == "tools";
 
   fail = message: ''
     echo ${lib.escapeShellArg message} >&2
@@ -69,7 +61,7 @@ let
       ''
         export PATH="${confctlPackage}/bin:$PATH"
       ''
-    else if mode == "tools" then
+    else
       ''
         if [ ! -f "$PWD/Gemfile" ]; then
           ${fail "mkConfigDevShell mode 'tools' requires ./Gemfile"}
@@ -84,65 +76,21 @@ let
         if "$bundle_bin" info rubocop >/dev/null 2>&1; then
           "$bundle_bin" binstubs rubocop --force >/dev/null
         fi
-      ''
-    else
-      ''
-        if [ ! -f "$PWD/Gemfile" ]; then
-          ${
-            if legacyCompat then
-              ''
-                  mkdir -p "$PWD/.confctl-shell"
-
-                  cat > "$PWD/.confctl-shell/Gemfile" <<EOF
-                source "https://rubygems.org"
-                gem "confctl", path: "$CONFCTL_SRC"
-                EOF
-
-                  export BUNDLE_GEMFILE="$PWD/.confctl-shell/Gemfile"
-                  export BUNDLE_APP_CONFIG="$PWD/.confctl-shell/.bundle"
-                  mkdir -p "$BUNDLE_APP_CONFIG"
-              ''
-            else
-              fail "mkConfigDevShell mode 'bundled-confctl' requires ./Gemfile containing `gem \"confctl\"`"
-          }
-        fi
-
-        ${bundlerBootstrap}
-
-        export PATH="$PWD/.bin:$GEM_HOME/bin:${confctlPackage}/bin:$PATH"
-
-        "$bundle_bin" config set --local "local.confctl" "$CONFCTL_SRC" >/dev/null
-
-        NIX_ENFORCE_PURITY=0 "$bundle_bin" install >/dev/null
-
-        if ! "$bundle_bin" info confctl >/dev/null 2>&1; then
-          ${fail "mkConfigDevShell mode 'bundled-confctl' requires ./Gemfile to include `gem \"confctl\"`"}
-        fi
-
-        if "$bundle_bin" info rubocop >/dev/null 2>&1; then
-          "$bundle_bin" binstubs rubocop --force >/dev/null
-        fi
-
-        cat > "$PWD/.bin/confctl" <<'EOF'
-        #!/usr/bin/env bash
-        bundle_bin="$GEM_HOME/bin/bundle"
-        exec "$bundle_bin" exec confctl "$@"
-        EOF
-
-        chmod +x "$PWD/.bin/confctl"
       '';
+
 in
-assert lib.assertMsg (builtins.elem implementation [
-  "ruby"
-  "rust"
-]) "mkConfigDevShell implementation must be 'ruby' or 'rust'";
-assert lib.assertMsg (!(implementation == "rust" && mode == "bundled-confctl"))
-  "mkConfigDevShell implementation 'rust' does not support bundled-confctl; use mode 'tools' for repository gems";
-assert builtins.elem mode [
-  "minimal"
-  "tools"
-  "bundled-confctl"
-];
+assert lib.assertMsg (
+  implementation == "rust"
+) "mkConfigDevShell only supports implementation 'rust'; remove the old Ruby selection";
+assert lib.assertMsg (
+  !legacyCompat
+) "mkConfigDevShell legacyCompat=true is no longer supported; use mode 'tools' for repository gems";
+assert lib.assertMsg
+  (builtins.elem mode [
+    "minimal"
+    "tools"
+  ])
+  "mkConfigDevShell supports 'minimal' and 'tools'; replace 'bundled-confctl' with 'tools' and remove confctl from the Gemfile";
 pkgs.mkShell {
   packages =
     (with pkgs; [
@@ -169,16 +117,7 @@ pkgs.mkShell {
 
     ${modeShellHook}
 
-    ${
-      if implementation == "rust" then
-        ''
-          export MANPATH="${confctlPackage}/share/man:$(man --path)"
-        ''
-      else
-        ''
-          export MANPATH="$CONFCTL_SRC/man:$(man --path)"
-        ''
-    }
+    export MANPATH="${confctlPackage}/share/man:$(man --path)"
     export PS1="(confctl) $PS1"
 
     echo

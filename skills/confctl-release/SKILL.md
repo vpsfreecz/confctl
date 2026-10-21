@@ -1,102 +1,84 @@
 ---
 name: confctl-release
-description: Prepare and publish confctl version releases, including changelog, dependency metadata, final release commit and verified RubyGems artifact. Use for confctl releases, not releases of configurations managed by confctl.
+description: Prepare and publish confctl version releases using Cargo and Nix metadata, generated references, reviewed source and verified packages. Use for confctl releases, not releases of configurations managed by confctl.
 ---
 
 # confctl releases
 
-Read the repository's `AGENTS.md` and applicable workspace instructions first.
-Distinguish release preparation from authorized publication. If the user asks
-to prepare a release and wait, stop before default-branch integration, tagging
-and RubyGems upload. Updating a release candidate does not expand that approval.
+Read the repository's `AGENTS.md`, [packaging guide](../../docs/rust-packaging.md)
+and applicable workspace instructions first. Separate release preparation from
+publication. If asked to prepare a candidate, stop before default-branch
+integration, tagging or uploading. The installed application does not use a gem
+or load Ruby extensions; repository-tools Ruby and immutable compatibility
+fixtures remain separate.
 
-## Prepare the changes
+## Prepare the source
 
-1. Confirm the target version and inspect the latest release tag, current remote
-   default branch and RubyGems versions. Summarize material operator-visible
-   changes from the previous tag to the selected source, checking current code
-   and project guides. Record runtime requirements, upgrade steps and explicit
-   deprecation decisions. Preserve the dated `CHANGELOG.md` format.
-2. Finish requested dependency updates and release-procedure changes before
-   the release commit. For a full lock refresh, run `bundle update` within the
-   existing Gemfile/gemspec constraints. Resolve using the minimum supported
-   Ruby from `confctl.gemspec`, not just the development shell's newer Ruby.
-   Inspect updates for runtime compatibility; changing declared constraints or
-   Ruby support is a separate compatibility decision.
-3. Regenerate `gemset.nix` with Bundix after lock changes:
-
-   ```sh
-   nix develop -c nix shell --inputs-from . nixpkgs#bundix -c bundix
-   nix develop -c nixfmt gemset.nix
-   ```
-
-   `gemset.nix` is generated dependency metadata. Do not maintain it by hand.
-   `nix/package.nix` and the flake RSpec check pass `gemdir` to `bundlerEnv`,
-   which imports that directory's `gemset.nix`. The development shell instead
-   runs Bundler directly, so passing shell tests does not validate the Nix
-   package's gemset. Keep a dependency refresh in its own commit.
-4. Update `lib/confctl/version.rb`, refresh the confctl path-gem version in
-   `Gemfile.lock` with Bundler, and regenerate `gemset.nix` with Bundix again.
-   Add the changelog entry. Verify all four release identifiers agree:
-   changelog, version constant, lockfile's `confctl` entry and gemset's
-   `confctl.version`. Other gems can legitimately have the old release's
-   version number; do not replace matching numbers globally.
-5. Commit this release unit with subject `Version <version>` and a concise
-   rationale. The release commit must be the final commit, after dependency
-   and procedure changes. If preparation needs a correction, consolidate the
-   unmerged history so this remains true; preserve published default-branch
-   history. Run the declared hooks rather than bypassing them.
+1. Confirm the target version and previous release tag. Review the actual
+   changes, compatibility constraints, operator steps and rollback boundaries.
+   Preserve the dated `CHANGELOG.md` format. Describe site script/settings/pin
+   migration and paired helper producer/backend rollback when applicable.
+2. Finish requested dependency or procedure changes before the release commit.
+   Preserve `Cargo.lock` and the declared MSRV unless a separate change is
+   approved. Use normal Cargo dependency resolution for an assigned update;
+   inspect the locked graph and licenses. Do not refresh dependencies merely
+   to make a release build pass.
+3. Update the version in `Cargo.toml`, the owning package entry in `Cargo.lock`
+   and `nix/rust-package.nix`, and add the changelog entry. Check that those
+   identities agree; do not replace every matching dependency version.
+4. Regenerate the CLI reference with the existing Cargo example into a complete
+   temporary candidate. Refresh the options manual only from an actual
+   `#moduleOptions` export, never synthetic fixture JSON. Follow the packaging
+   guide's locked-input export and generation procedure.
+5. Install `.githooks/pre-commit` through the documented local `core.hooksPath`
+   setting. Commit the coherent release unit with subject `Version <version>`
+   and a short rationale. Keep the release commit last after dependency and
+   procedure changes. Consolidate unmerged corrections under the workspace Git
+   policy and preserve published history. Run the declared hooks.
 
 ## Verify the candidate
 
-Run quick metadata, syntax, whitespace and hook checks, then follow the
-applicable independent final-review procedure for the complete committed
-branch. Provide its full commit series, final diff and migration inventory.
-After review, run the repository's RSpec, RuboCop and Nix formatting checks,
-including the minimum supported Ruby when dependencies changed. Build the
-flake's actual `confctl` package as well as the Ruby gem. Verify Nix's installed
-confctl gem metadata matches the release version.
+Run ordinary formatting, locked all-target/all-feature check and strict Clippy,
+plus reference renderer and CLI drift checks. Arrange independent final review
+of the complete committed history, final diff and migration inventory before
+longer checks. Then run the default suite and the assigned package/native gates.
+All-feature compilation is not permission to execute qualification mains.
 
-The gemspec uses a directory glob when `.git` is not a directory. In a Git
-worktree this can include local `.gems`, `.bin`, caches or the `.git` file.
-Build from a clean `git archive` export of the final commit, reusing the
-provisioned Bundler dependency paths, then run `bundle exec rake build` there.
-The rake build task generates the manual and HTML pages. Inspect the archive's
-file list against committed source plus those generated files. Verify version,
-Ruby requirement, executable and changelog, and retain the artifact's checksum.
-Do not run `rake release` to prepare a candidate: it also tags, pushes and uploads.
+Build the actual public Nix package, its smoke and shell-selection checks for
+both supported native platforms in the approved builder environment. Verify the
+installed CLI/helper names, manuals, license notices and runtime references.
+No Ruby application, Bundler, test source or compatibility archive belongs in
+the installed product closure. Preserve site tools-mode Ruby as a separate
+consumer. Prove the locked graph on the declared MSRV as well as the normal
+CI toolchain. A cross-build alone does not establish native execution.
 
-For a packaged CLI smoke test, extract the gem and load its libraries directly.
-Clear Bundler injection with `Bundler.with_unbundled_env` (or an equivalent
-clean child environment), retain dependency `GEM_HOME`/`GEM_PATH`, and set
-`RUBYLIB` to the extracted `lib`. Assert `ConfCtl.root` and the loaded
-`confctl.rb` come from the extracted tree before running `--help`. In the
-current CLI, GLI's `--version` is unset; inspect `ConfCtl::VERSION` and gemspec
-metadata rather than accepting a version check that only exercises source code.
+Release identity comes from the reviewed Cargo/lock/Nix package metadata and
+its exact source revision. Use installed executable `--help` for the public
+entrypoint smoke test. The parser deliberately retains its existing
+`--version` error; do not invent a successful version flag or use that error as
+release metadata proof. Installed wrappers execute the absolute compiled
+backend; the source `bin/confctl` launcher may compile and is not an installed
+artifact check.
 
-Publish the development branch according to repository/workspace policy and
-check CI for its exact final head. When replacing a published candidate,
-use the expected old head as the force-with-lease condition and handle
-superseded CI under the applicable workspace rules. Present the final head,
-diff, review/check results and artifact checksum for approval.
+Record exact source/package identities and any explicitly requested artifact
+checksums with the actual review/check results. Publish a development branch
+under workspace policy and check the exact head's CI when authorized. Keep
+native mixed-helper/transport, site migration and operator acceptance distinct
+from hosted Rust tests. Present remaining gaps honestly before publication.
 
 ## Publish after authorization
 
-Confirm authorization covers the repository's default branch, release tag and
-RubyGems upload. Recheck the remote default branch and existing tag/version.
-Integrate the approved branch under the repository/workspace Git policy. If
-the source changes, rebuild and verify the artifact and reconcile approval
-scope before publication. Keep the final release commit at the tip.
+Confirm authorization for each repository/default branch, release tag and any
+artifact destination. Recheck the final source, target branch and existing tag.
+Integrate only under the workspace Git policy. Rebuild and reconcile approval
+if the approved source or artifact changes.
 
 Create an annotated `v<version>` tag at the approved release commit and push
-the authorized branch and tag over SSH. Upload the exact verified gem with
-`gem push <artifact>` using the configured RubyGems authentication; never print
-credentials. Verify that RubyGems reports the expected version, Ruby requirement
-and artifact SHA-256, and that the remote tag resolves to the approved commit.
+only the authorized branch/tag over SSH. Publish the exact verified artifact
+only to an explicitly selected destination; no registry upload is implied by
+release preparation. Verify remote tag/source and artifact identities.
 
-If any publication step fails, inspect which branch, tag and gem writes
-succeeded before retrying. RubyGems versions cannot be overwritten. Do not
-delete a tag, yank a gem, substitute a rebuilt artifact or bump the version
-as an automatic recovery step. Record the partial result and obtain direction
-for any action outside the approved release. Keep the session available for
-follow-up under its lifecycle policy.
+If a step fails, inspect the actual partial effects before retrying. Do not
+rewrite a published release, delete a tag, replace an artifact or bump a version
+as automatic recovery. Report the partial result and obtain direction for any
+action outside the approved scope. Leave the development session open.

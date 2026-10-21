@@ -95,9 +95,20 @@ fn override_urls_keep_git_query_and_github_dir_without_encoding_revisions() {
 #[test]
 fn cached_github_warning_remains_failure_even_after_successful_nix_exit() {
     assert!(check_nix_output("", "unrelated warning").is_ok());
+    assert!(
+        check_nix_output(
+            "",
+            "warning: '--update-input' is a deprecated alias for 'flake update'\n"
+        )
+        .is_ok()
+    );
     let warning = "warning: unable to download 'https://api.github.com/repos/fixture/repo': rate limit exceeded;\nusing cached version";
     let error = check_nix_output("", warning).unwrap_err().to_string();
     assert!(error.starts_with("Nix could not refresh GitHub input metadata because"));
+    let warning = "warning: error: unable to download 'https://api.github.com/repos/example/project/commits/main': HTTP error 503\n; using cached version\n";
+    let error = check_nix_output("", warning).unwrap_err().to_string();
+    assert!(error.contains("used a cached version"));
+    assert!(!error.contains("rate limit"));
     assert!(
         check_nix_output(
             "unable to download 'https://other.invalid/' using cached version",

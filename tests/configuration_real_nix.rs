@@ -874,6 +874,30 @@ fn dirty_site(inputs: &Inputs, baseline: &Path) {
     }
     case.assert_feature(&after, "site-after-generated-list");
 }
+fn assert_missing_inventory_module(case: &Case<'_>, result: &Output, label: &str, module: &str) {
+    assert_eq!(result.status.code(), Some(1));
+    let stderr = std::str::from_utf8(&result.stderr).unwrap();
+    let missing = format!("/{module}' does not exist");
+    assert!(
+        stderr.lines().any(|line| {
+            let line = line.trim();
+            line.starts_with("error: path '/nix/store/") && line.ends_with(&missing)
+        }),
+        "expected the untracked inventory module diagnostic, got: {stderr}"
+    );
+    assert!(stderr.contains("core cluster list replaced; later netboot stage failed"));
+    assert_eq!(
+        parse_calls(&case.logs.join(format!("{label}.argv"))),
+        [
+            expected(false, true),
+            expected(false, false),
+            expected(true, false),
+        ]
+        .into_iter()
+        .map(|args| (case.root.clone(), args))
+        .collect::<Vec<_>>()
+    );
+}
 fn untracked_add(inputs: &Inputs, baseline: &Path) {
     let case = Case::new(inputs, baseline, "untracked-add", true, true);
     let old_feature = fs::read(case.root.join("cluster/netbootable.nix")).unwrap();
@@ -894,6 +918,12 @@ fn untracked_add(inputs: &Inputs, baseline: &Path) {
         );
         case.assert_feature(&machines, "untracked-add-generated-list");
     } else {
+        assert_missing_inventory_module(
+            &case,
+            &result,
+            "untracked-add",
+            "cluster/nested/new/module.nix",
+        );
         assert_eq!(
             fs::read(case.root.join("cluster/netbootable.nix")).unwrap(),
             old_feature
@@ -954,6 +984,12 @@ fn renamed(inputs: &Inputs, baseline: &Path) {
         assert!(machines.get("nested/beta").is_some());
         assert!(machines.get("nested/moved").is_none());
     } else {
+        assert_missing_inventory_module(
+            &case,
+            &result,
+            "rename-untracked-destination",
+            "cluster/nested/moved/module.nix",
+        );
         assert_eq!(
             fs::read(case.root.join("cluster/netbootable.nix")).unwrap(),
             old_feature
@@ -1036,9 +1072,16 @@ fn native_system_preflight_accepts_designated_system() {
 fn cases_root_preflight_rejects_git_and_symlink_before_copy() {
     // This regression uses filesystem operations only: no native tools, lock or
     // real-Nix phase. Mock baseline bytes must not authorize a redirected root.
+    // Local Cargo temp roots can be inside Git; Nix sandboxes may lack /var/tmp.
+    // Either choice must still pass the canonical outside-Git check below.
+    let temporary_root = if Path::new("/var/tmp").is_dir() {
+        PathBuf::from("/var/tmp")
+    } else {
+        std::env::temp_dir()
+    };
     let scratch = tempfile::Builder::new()
         .prefix("confctl-root-preflight-")
-        .tempdir_in("/var/tmp")
+        .tempdir_in(temporary_root)
         .unwrap();
     let scratch = scratch.path().canonicalize().unwrap();
     outside_git(&scratch);

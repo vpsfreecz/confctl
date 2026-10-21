@@ -74,5 +74,5 @@ run health-check explicitly again. Passing checks do not establish deployment
 or rollback safety. [Saved test deployment](deploy.md#test-a-saved-generation)
 uses this same compiler and runner, with five workers and borrowed subsets for
 deployment-level retries. Its failed assessments use the same raw-log retention.
-The default `confctl` entrypoint remains Ruby. Fake-tool command
+The public `confctl` entry point and `confctl-rust` alias both select Rust. Fake-tool command
 tests do not qualify real services, hosts or full live-terminal behavior.

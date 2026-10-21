@@ -41,5 +41,5 @@ outputs are explicitly unavailable captures. Callers must not infer successful
 display from a partial write or ordinary exit.
 
 This support does not change normal Bytes/File/SSH stdin handling, configuration
-formats, local generation records or the default Ruby entry point. A later read
+formats or local generation records. The public entry point selects Rust. A later read
 can use a corrected pager configuration; no state migration or repair is needed.

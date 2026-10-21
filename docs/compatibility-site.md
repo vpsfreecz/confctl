@@ -26,7 +26,7 @@ or turn historical fake-service captures into current product qualification.
 The two site scripts and four installed helpers have executable Ruby oracles
 under `tests/compat/site/` and `tests/compat/helpers/`. They complement the
 [main CLI contract](compatibility.md). These are test dependencies; no Ruby
-fallback is introduced into the future Rust runtime.
+fallback is introduced into the Rust runtime.
 
 `sources.json` in each directory records repository revision, original path and
 SHA256. The `.rb.txt` files are exact source bytes, including template tokens.
@@ -35,21 +35,41 @@ Do not update a snapshot to make a candidate pass. The site snapshot is from
 earlier inventoried site revision. The helper snapshot is from confctl
 `cc40679d267165aecfa569128438bb55fe910268`.
 
-Run from confctl's declared development environment:
+The current `nix develop` shell is for Rust development and does not provide
+the Ruby oracle's gems. Use a separate Ruby/Bundler test environment, with Python3,
+Ruby 3.4.9 and Bundler 2.5.7 as used by the retained observations. Provision the
+exported baseline's locked gems there. Keep these test dependencies outside the
+product and configuration-repository gem environments.
+
+From the current checkout, with Ruby, `gem` and Python3 on PATH:
 
 ```sh
-nix develop
-python3 tests/compat/core/run.py --export-baseline /tmp/confctl-ruby-oracle
-export CONFCTL_RUBY_ORACLE_ROOT=/tmp/confctl-ruby-oracle
-bundle exec rspec tests/compat/site/oracle_spec.rb tests/compat/helpers/oracle_spec.rb
+verification_root="$(mktemp -d)"
+python3 tests/compat/core/run.py --export-baseline "$verification_root/source"
+export CONFCTL_RUBY_ORACLE_ROOT="$verification_root/source"
+export BUNDLE_GEMFILE="$CONFCTL_RUBY_ORACLE_ROOT/Gemfile"
+export GEM_HOME="$verification_root/gems"
+export GEM_PATH="$GEM_HOME"
+export PATH="$GEM_HOME/bin:$PATH"
+export BUNDLE_APP_CONFIG="$verification_root/bundle-config"
+export BUNDLE_FROZEN=true
+gem install --no-document bundler --version 2.5.7
+bundle _2.5.7_ install
+bundle _2.5.7_ exec rspec \
+  "$PWD/tests/compat/site/oracle_spec.rb" \
+  "$PWD/tests/compat/helpers/oracle_spec.rb"
 ```
 
-The export destination must be empty and owned by this verification run. Use a
-fresh directory for each independent export. Before the Ruby source is retired,
-the site runner also accepts the current source root as its default; for
-differential verification always select the immutable export explicitly. Its
-Gemfile.lock dependencies must remain available in the declared test environment.
-This is separate from the installed CLI/helper runtime closure.
+The export directory starts empty and belongs to this verification run. The
+explicit `BUNDLE_GEMFILE` selects the immutable baseline's Gemfile, lock and
+path gemspec; it does not look for removed application gems in the current
+checkout. Frozen mode prevents lock updates. Provisioning can download those
+locked test dependencies, separately from oracle execution. Keep the baseline
+source, lock and captured expectations unchanged.
+
+The old environment instructions inside frozen fixture READMEs describe their
+historical setup. Use this owning procedure for current execution; do not edit
+the immutable archives or revive the Ruby application/default shell.
 
 Set `CONFCTL_COMPAT_CAPTURE_DIR` to an owned evidence directory to retain every
 scenario's independent raw stdout/stderr, exit/signal, command events, file

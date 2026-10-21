@@ -8,7 +8,7 @@ and confirm, or pass `--yes`. An empty selection fails.
 The `none` mode evaluates each machine's resolved input metadata without building
 a target system. `confctl-rust status --generation <current|offset|name>` compares
 against a saved local generation instead. Omitting generation builds a new
-target before comparing it. The default `confctl` entry point remains Ruby.
+target before comparing it. The public `confctl` entry point and `confctl-rust` alias both select Rust.
 
 Default `confctl-rust status [machine-pattern]` explicitly previews BUILD followed
 by status checking and asks once. After consent, one mutation guard covers the
@@ -76,4 +76,4 @@ records or current links. It creates no mutation lock or GC roots and performs
 no copy, activation, kernel refresh or profile write. The `none` mode does not
 read the current-system path. Normal inventory materialization, configured
 metadata evaluation in `none` or default mode and invocation logging still occur. Saved
-record formats and the Ruby entry point are unchanged.
+record formats are unchanged; the public entry point selects Rust.
