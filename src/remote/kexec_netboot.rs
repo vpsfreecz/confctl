@@ -341,11 +341,16 @@ mod tests {
         let record = dir.path().join("argv");
         let sentinel = dir.path().join("unexpected");
         let record_quote = format!("'{}'", record.to_str().unwrap().replace('\'', "'\\''"));
-        std::fs::write(
-            &executable,
-            format!("#!/bin/sh\nprintf '%s\\000' \"$@\" > {record_quote}\nexit 0\n"),
-        )
-        .unwrap();
+        let body = format!("#!/bin/sh\nprintf '%s\\000' \"$@\" > {record_quote}\nexit 0\n");
+        // A concurrent fork must not inherit a writable fixture descriptor from
+        // this multithreaded test process. The waited child owns that writer.
+        let status = Command::new("/bin/sh")
+            .args(["-c", "set -C; printf '%s' \"$2\" > \"$1\"", "write-fixture"])
+            .arg(&executable)
+            .arg(&body)
+            .status()
+            .unwrap();
+        assert!(status.success(), "fixture writer failed: {status}");
         std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o755)).unwrap();
         let params = format!(
             "literal=$HOME command=$(touch {}) backtick=`touch {}` quote=\"q\" backslash=\\ semi=; two words ",
