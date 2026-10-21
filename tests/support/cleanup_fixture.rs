@@ -35,7 +35,12 @@ impl Fixture {
             "f":{"name":"null","metaConfig":{"host":{"target":null}}}
         })).unwrap()).unwrap();
         fs::write(root.join("profiles.json"), b"{}").unwrap();
-        let source = r#"#!/usr/bin/env python3
+        // Nix sandboxes provide /bin/sh but need not provide /usr/bin/env.
+        // The shell trampoline keeps Python on PATH and preserves this tool's argv.
+        let source = r#"#!/bin/sh
+""":"
+exec python3 "$0" "$@"
+":"""
 import os,sys,json,shlex,pathlib,time,signal,select
 r=pathlib.Path(os.environ['CLEANUP_ROOT'])
 tool=pathlib.Path(sys.argv[0]).name
