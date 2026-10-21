@@ -57,5 +57,6 @@ indentation with a final newline. Ordinary output matches the Ruby fixture bytes
 It escapes Nix keys, quotes and interpolation and preserves Unicode as literal
 text; unusual strings can therefore differ from Ruby's string-dump output.
 NUL values or keys fail before replacement.
-Saved formats remain loadable by Nix and Ruby. The default executable remains Ruby.
+Saved formats remain loadable by Nix and the preceding Ruby implementation.
+The public executable selects Rust.
 No host, Git, profile, generation or configuration-input operation is performed.

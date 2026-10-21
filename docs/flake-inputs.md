@@ -188,7 +188,7 @@ without building machine systems.
 
 ## Rust input mutations and recovery
 
-The development `confctl-rust` implements update and set at root, channel and
+`confctl` implements update and set at root, channel and
 machine scope. These commands require a flake and run without confirmation.
 They hold one `.confctl/mutation.lock` advisory lock through selection, Nix,
 changelog preparation, Git hooks/editor and joined completion. Avoid concurrent
@@ -244,6 +244,6 @@ after commit may leave the commit in place. There is no automatic restoration,
 retry or rollback. Inspect the reported phase, `flake.lock`, the invocation log
 and Git state, then explicitly commit, retry or restore the chosen files.
 
-Lock formats remain readable by Ruby and Rust, and Ruby remains the default
-entry point. Confined fake-tool and local Git fixtures do not qualify real Nix
-input acquisition or site configuration behavior.
+Lock formats remain readable by the preceding Ruby implementation and Rust.
+The public entrypoint now selects Rust. Confined fake-tool and local Git
+fixtures do not qualify real Nix input acquisition or site configuration behavior.

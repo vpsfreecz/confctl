@@ -56,10 +56,10 @@ extension support are explicit changes. Exact parser quirks or baseline defects
 must be decided from captured evidence before changing behavior; they must not
 silently become the new parser's defaults.
 
-The `confctl-rust` development binary provides the Rust parser and application
-entrypoint. The default `confctl` remains Ruby during development. The additive
-[Rust package and helper selection](rust-packaging.md) requires an explicit
-opt-in; it does not change existing packages, module defaults or site pins. Typed requests
+The public `confctl` package and `confctl-rust` alias provide the Rust parser
+and application entrypoint. [Package and helper selection](rust-packaging.md)
+defaults to Rust; explicit Ruby selections fail before effects. A configuration
+repository still controls its pinned source and migration. Typed requests
 cover the 29 original command actions and the built-in `runtime-kernels update`
 action. The concrete routes are [`init`](config-init.md),
 [`add`, `rename` and `rediscover`](configuration-commands.md), `ls`, `inputs ls`, `inputs channel ls`,
@@ -107,9 +107,8 @@ visible and later host/Git work stopped after an actual pager-pipe EPIPE.
 and publish complete Nix data. The guide describes the same-origin, no-replay API
 subset, scalar conversion and server validation limits, and partial effects from
 sequential file replacements.
-All 30 parsed action leaves have concrete dispatch. Ruby remains the default;
-route-specific option limits and separate native and site acceptance gates still
-apply. Help and version need no inventory, input broker or process supervisor.
+All 30 parsed action leaves have concrete Rust dispatch. Route-specific option
+limits and separate native and site acceptance gates still apply. Help and version need no inventory, input broker or process supervisor.
 Static original help text is preserved in `src/cli/help.json`, with source
 provenance in that module; it does not load test snapshots or Ruby at runtime.
 The immutable M0 archive and expectations remain the differential oracle.
@@ -118,8 +117,9 @@ The immutable M0 archive and expectations remain the differential oracle.
 option and usage cases without executing operations. `cargo test --locked
 domain::selection::tests` checks ordered name/key/filter selection and the Ruby
 pattern adapter. Command side effects require separate differential checks.
-The declared development shell provides the pinned Rust tools alongside the
-Ruby tools and hooks while both implementations are under development.
+The declared development shell provides Rust tools. The repository-owned
+pre-commit hook checks Rust and Nix formatting; application development does not
+bootstrap Ruby gems. Configuration tools mode retains its separate Ruby tools.
 
 ## Observable CLI contract
 

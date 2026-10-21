@@ -24,64 +24,7 @@
 
       mkConfigDevShell = import ./nix/flake/mk-config-devshell.nix { inherit self nixpkgs; };
       mkConfctlDevShell = import ./nix/flake/mk-confctl-devshell.nix { inherit nixpkgs; };
-      mkConfctlPackage = import ./nix/package.nix;
       mkRustPackage = import ./nix/rust-package.nix;
-
-      mkRspecCheck =
-        system:
-        let
-          pkgs = import nixpkgs { inherit system; };
-          ruby = if pkgs ? ruby_3_4 then pkgs.ruby_3_4 else pkgs.ruby;
-          deps = pkgs.bundlerEnv {
-            name = "confctl-rspec-deps";
-            inherit ruby;
-            gemdir = self.outPath;
-            lockfile = "${self.outPath}/Gemfile.lock";
-            groups = [
-              "default"
-              "development"
-              "test"
-            ];
-          };
-          runtimePath = pkgs.lib.makeBinPath [
-            pkgs.git
-            pkgs.openssh
-            pkgs.nix
-          ];
-          gemBin = "${deps}/${ruby.gemPath}/bin";
-        in
-        pkgs.stdenv.mkDerivation {
-          pname = "confctl-rspec";
-          version = self.shortRev or (self.dirtyShortRev or "dev");
-          src = self;
-          dontUnpack = true;
-          dontBuild = true;
-          nativeBuildInputs = [
-            pkgs.git
-            pkgs.nix
-            pkgs.openssh
-          ];
-          installPhase = ''
-            export HOME="$TMPDIR/home"
-            mkdir -p "$HOME"
-            export GEM_HOME="${deps}/${ruby.gemPath}"
-            export GEM_PATH="${deps}/${ruby.gemPath}"
-            export RUBYLIB="$src/lib"
-            export PATH="${gemBin}:${runtimePath}:$PATH"
-            export CONFCTL_TTY=0
-            export NO_COLOR=1
-            export PAGER=
-            export CONFCTL_BIN="${self.packages.${system}.confctl}/bin/confctl"
-            export CONFCTL_RSPEC_SANDBOX=1
-            export CONFCTL_MAX_JOBS=auto
-
-            cd "$src"
-            ${ruby}/bin/ruby -S rspec
-
-            mkdir -p "$out"
-            echo ok > "$out/result"
-          '';
-        };
 
       mkTests =
         system:
@@ -132,10 +75,7 @@
           pkgs = import nixpkgs { inherit system; };
         in
         {
-          confctl = mkConfctlPackage {
-            inherit pkgs;
-            src = self.outPath;
-          };
+          confctl = self.packages.${system}.confctl-rust;
           confctl-rust = mkRustPackage {
             inherit pkgs;
             src = self.outPath;
@@ -166,13 +106,7 @@
 
       testsMeta = forTestSystems (system: mkTestsMeta system);
 
-      checks = forAllSystems (
-        system:
-        {
-          rspec = mkRspecCheck system;
-        }
-        // nixpkgs.lib.optionalAttrs (hasTestRunner system) (mkTests system)
-      );
+      checks = forAllSystems (system: nixpkgs.lib.optionalAttrs (hasTestRunner system) (mkTests system));
 
       checksMeta = forAllSystems (
         system:

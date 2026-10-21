@@ -8,9 +8,11 @@ switch programs under `tests/compat/helpers/qualification/` are separate test
 tools and are never installed.
 
 The [Rust package](rust-packaging.md) supplies private backends under
-`libexec/confctl`. `mkConfctlOutputs { rustHelpers = true; ...; }` selects their
-module wrappers independently of the CLI shell selection. Its default is false;
-standalone module imports without the private package argument keep Ruby.
+`libexec/confctl`. `mkConfctlOutputs` defaults to `rustHelpers = true` and
+selects their module wrappers with each target's pkgs. Explicit false fails
+with migration instructions. Standalone modules without the private package
+argument use the same-source Rust recipe with their target pkgs. CLI selection
+and helper enable options retain their existing roles.
 
 ## Package data
 

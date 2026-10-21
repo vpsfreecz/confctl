@@ -13,11 +13,12 @@ on:
       - .github/workflows/tests.yml
       - flake.nix
       - flake.lock
-      - Gemfile
-      - Gemfile.lock
+      - Cargo.toml
+      - Cargo.lock
+      - rust-toolchain.toml
+      - src/**
+      - man/**
       - bin/**
-      - lib/**
-      - libexec/**
       - example/**
       - nix/**
       - tests/**

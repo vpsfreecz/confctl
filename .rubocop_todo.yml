@@ -1,5 +1,0 @@
-Layout/LineLength:
-  Enabled: false
-
-Lint/UnusedMethodArgument:
-  Enabled: false

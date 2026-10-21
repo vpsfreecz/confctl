@@ -51,46 +51,31 @@ let
 
   httpRoot = "${baseDir}/http";
 
-  rustPackage = config._module.args.confctlRustPackage or null;
+  rustPackage =
+    config._module.args.confctlRustPackage or (import ../../../../rust-package.nix { inherit pkgs; });
 
-  builderConfig = builtins.toJSON (
-    {
-      coreutils = pkgs.coreutils;
-      syslinux = pkgs.syslinux;
-      inherit tftpRoot httpRoot;
-      hostName = config.networking.hostName;
-      httpUrl = "http://${cfg.host}";
-      memtest =
-        if cfg.memtest86.enable then
-          {
-            package = pkgs.memtest86plus;
-            params = cfg.memtest86.params;
-          }
-        else
-          null;
-      isoImages = cfg.isoImages;
-    }
-    // lib.optionalAttrs (rustPackage == null) { ruby = pkgs.ruby; }
-  );
+  builderConfig = builtins.toJSON ({
+    coreutils = pkgs.coreutils;
+    syslinux = pkgs.syslinux;
+    inherit tftpRoot httpRoot;
+    hostName = config.networking.hostName;
+    httpUrl = "http://${cfg.host}";
+    memtest =
+      if cfg.memtest86.enable then
+        {
+          package = pkgs.memtest86plus;
+          params = cfg.memtest86.params;
+        }
+      else
+        null;
+    isoImages = cfg.isoImages;
+  });
   jsonConfig = pkgs.writeText "netboot-server.json" builderConfig;
 
-  builder =
-    if rustPackage != null then
-      pkgs.writeShellScriptBin "build-netboot-server" ''
-        export CONFCTL_INTERNAL_NETBOOT_CONFIG=${lib.escapeShellArg (toString jsonConfig)}
-        exec -a "$0" ${rustPackage}/libexec/confctl/build-netboot-server "$@"
-      ''
-    else
-      pkgs.replaceVarsWith {
-        src = ./build-netboot-server.rb;
-        name = "build-netboot-server";
-        dir = "bin";
-        isExecutable = true;
-        replacements = {
-          ruby = pkgs.ruby;
-          inherit jsonConfig;
-        };
-      };
+  builder = pkgs.writeShellScriptBin "build-netboot-server" ''
+    export CONFCTL_INTERNAL_NETBOOT_CONFIG=${lib.escapeShellArg (toString jsonConfig)}
+    exec -a "$0" ${rustPackage}/libexec/confctl/build-netboot-server "$@"
+  '';
 in
 {
   options = {

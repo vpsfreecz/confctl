@@ -1,9 +1,8 @@
 # Build and deploy generations
 
-The Rust development binary supports `confctl-rust deploy --copy-only
---generation <selector> [machine-pattern] [action]`. The default `confctl` remains
-Ruby. This route copies existing store paths only, even when reboot, activation
-or health-check options are supplied. The non-copy-only route also supports
+Both `confctl` and its `confctl-rust` alias support `deploy --copy-only
+--generation <selector> [machine-pattern] [action]`. This route copies existing
+store paths only, even when reboot, activation or health-check options are supplied. The non-copy-only route also supports
 `confctl-rust deploy --generation <selector> [machine-pattern] boot` without
 `--reboot`, and the same command with action `dry-activate`, `test` or `switch`.
 Omitting the action selects switch. Without `--generation`, deploy builds the
@@ -104,7 +103,7 @@ deployment failure can also retain remote copies, scripts, profiles, callbacks
 and check effects. Inspect the reported saved names and target state, correct
 the cause and explicitly rerun or deploy an older saved generation. The guard
 does not coordinate with Ruby writers, and no local or remote restoration is
-implied. Formats, helper protocols and the default Ruby entry stay unchanged.
+implied. Formats and helper protocols stay unchanged; the public executable selects Rust.
 Confined fake-tool tests do not establish real builds, hosts or full terminal
 qualification.
 
@@ -153,8 +152,8 @@ Saved records, local current links, GC roots and remote formats stay unchanged.
 The mutation guard does not coordinate with Ruby or other deployment tools.
 Boot without reboot runs no rollback helper, reboot, wait-online or health check,
 regardless of their parsed options. Native success does not establish that a
-later reboot will succeed. The default Ruby entrypoint and production cutover
-are unchanged.
+later reboot will succeed. The public executable selects Rust; selecting the tool does not itself
+perform a production cutover.
 
 ## Reboot after boot activation
 
@@ -322,8 +321,8 @@ can leave running and persistent state different; a local join does not prove
 remote helper or callback closure. There is no compensating profile restore,
 cleanup or atomicity guarantee. Inspect target state and callback results,
 correct the cause and explicitly rerun or select an older saved generation.
-Local saved records, current links, roots, remote formats and the default Ruby
-entry remain unchanged. Confined fake-tool tests do not qualify real profiles,
+Local saved records, current links, roots and remote formats remain unchanged.
+The public executable selects Rust. Confined fake-tool tests do not qualify real profiles,
 hosts or full live-terminal behavior.
 
 ## Rollback helper protocol

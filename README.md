@@ -73,7 +73,6 @@ confctl init
       # Shell modes:
       # - minimal: no Gemfile, best default
       # - tools: Gemfile for repo tools such as overcommit or rubocop
-      # - bundled-confctl: Gemfile includes confctl and scripts/ can use bundle gems
       devShells.x86_64-linux.default = confctl.lib.mkConfigDevShell {
         system = "x86_64-linux";
         mode = "minimal";
@@ -94,9 +93,9 @@ nix develop
 This makes `confctl` available from the pinned flake input package and exposes
 its man pages on `MANPATH`.
 
-For the Bundler modes, commit `Gemfile.lock` whenever possible. `confctl` can
-bootstrap those shells without it, but the lockfile makes CI and local shells
-reproducible.
+In tools mode, commit the configuration repository's `Gemfile.lock` to make
+its Ruby tools reproducible. Those gems are separate from the packaged Rust
+CLI. `bundled-confctl` mode is no longer supported.
 
 Before the first build or deploy, make sure the per-user gcroot directory
 exists:
@@ -141,14 +140,27 @@ software-pin or migration commands.
 
 The [command manual](man/man8/confctl.8.md) and
 [option reference](man/man8/confctl-options.nix.8.md) are also installed as man pages.
-The Rust package also installs a [CLI reference](man/man8/confctl-reference.8.md)
+The package also installs a [CLI reference](man/man8/confctl-reference.8.md)
 and the [kexec-netboot manual](man/man8/kexec-netboot.8.md). A Cargo example
 [maintains the references](docs/rust-packaging.md#reference-maintenance) from
 the CLI schema or an explicit options JSON export.
 
-For development of confctl itself, the repository's `shell.nix` remains an
-optional Bundler shell using host `<nixpkgs>`. It does not evaluate a cluster;
-use `nix develop` for the configuration workflow above.
+For development of confctl itself, enter this repository's `nix develop` shell
+and install the repository hook:
+
+```sh
+git config --local core.hooksPath .githooks
+```
+
+The pre-commit hook checks Rust and tracked Nix source formatting without
+staging changes. Run it in the declared shell so `cargo`, `rustfmt` and `nixfmt`
+are available. It replaces the old Overcommit hook; install it in each clone.
+The optional `shell.nix` uses host `<nixpkgs>` for the same development workflow.
+
+`bin/confctl` runs the existing `confctl-rust` Cargo target with the source
+manifest. It preserves the caller's configuration directory, arguments and
+exit status. Use the declared shell first; Cargo can compile before starting
+the command. Installed package wrappers execute their compiled backend directly.
 
 ## Example configuration
 Example configuration, which can be used as a starting point, can be found in
@@ -175,11 +187,10 @@ See also existing configurations:
     ├── environments/           # Environment presets for various types of machines, optional
     ├── flake.nix               # Flake entrypoint
     ├── flake.lock              # Locked input sources
-    ├── Gemfile                 # Optional Bundler config for tools/bundled-confctl modes
-    ├── Gemfile.lock            # Recommended for Bundler modes
-    ├── modules/                # User-defined modules
-    │   └── cluster/default.nix # User-defined extensions of `cluster.` options used in `<machine>/module.nix` files
-    └── scripts/                # User-defined scripts
+    ├── Gemfile                 # Optional Ruby tools, used only in tools mode
+    ├── Gemfile.lock            # Recommended for tools mode
+    └── modules/                # User-defined modules
+        └── cluster/default.nix # User-defined extensions of `cluster.` options used in `<machine>/module.nix` files
 
 ## Inputs and channels
 
@@ -205,18 +216,18 @@ confctl inputs channel set --commit production nixpkgs <revision>
 
 Builds and deployments use the existing lock without updating inputs automatically. See [Flake inputs](docs/flake-inputs.md)
 for raw-source inputs, `follows`, path inputs and the optional NIX_PATH bridge.
-The development `confctl-rust` supports all six root/channel/machine update and
+`confctl` supports all six root/channel/machine update and
 set routes; the guide describes selection, optional Git commits and partial-failure recovery.
 
-The development `confctl-rust` binary supports [deployment](docs/deploy.md) from
+`confctl` supports [deployment](docs/deploy.md) from
 new builds or saved generations across boot, dry-activate, test and switch,
 with optional reboot/wait-online for boot. Its default [status](docs/status.md) builds a target before
-comparison; explicit saved/none modes remain read-only. The default `confctl`
-entry point remains Ruby, and real-site/terminal qualification is separate.
+comparison; explicit saved/none modes remain read-only. Both installed CLI
+names select the Rust implementation; site and terminal acceptance are separate.
 [`diff` and `changelog`](docs/changes.md) compare inputs without building systems;
 changelog can clone or fetch Git mirrors. Reports support redirected stdout and
 an optional [pager](docs/pager.md).
-[`confctl-rust init`](docs/config-init.md) creates the Ruby-compatible starter
+[`confctl init`](docs/config-init.md) creates the existing starter
 templates without an existing flake, Nix evaluation or confirmation. Its guide
 lists permitted existing entries and recovery from partial initialization.
 [`add`, `rename` and `rediscover`](docs/configuration-commands.md) edit an existing
@@ -227,14 +238,17 @@ migration and recovery after partial edits.
 remove saved records and profiles and collect store objects. Their guide explains
 retention, GC policy and recovery limits after irreversible partial cleanup.
 [`gen-data vpsadmin`](docs/gen-data.md) authenticates and replaces local container
-and network Nix data. All 30 parsed action leaves have concrete Rust dispatch;
-the default Ruby entry point and separate native and site acceptance gates remain.
+and network Nix data. All 30 parsed action leaves have concrete Rust dispatch.
+Native package and site acceptance remain separate from these route contracts.
 
-An additive [Rust package and helper opt-in](docs/rust-packaging.md) is available
-through `packages.<system>.confctl-rust`, `apps.<system>.confctl-rust`, explicit
-`mkConfigDevShell` implementation selection and independent `rustHelpers`.
-Ruby remains the default. Package builds, runtime closures and both target
-architectures require separate native qualification.
+The [package and helper backends](docs/rust-packaging.md) are selected by
+`packages.<system>.confctl` and its `confctl-rust` alias; the existing
+`apps.<system>.confctl-rust` remains available. Configuration shells default to
+`implementation = "rust"` and outputs default to `rustHelpers = true`.
+Explicit Ruby selection, disabled Rust helpers, `bundled-confctl` mode and
+`legacyCompat = true` fail with migration instructions. Minimal and tools
+modes remain supported. Package builds, runtime closures and both target
+architectures require native qualification.
 
 ## Machine metadata and inputs
 Machine configuration directory usually contains at least two files:
@@ -514,31 +528,25 @@ Then you can use it in machine module as:
 Note that these modules are self-contained. They are not evaluated with the full
 set of NixOS modules. You have to import modules that you need.
 
-## User-defined confctl commands
-User-defined Ruby scripts can be placed in directory `scripts`. Each script
-should create a subclass of `ConfCtl::UserScript` and call class-method `register`.
-Scripts can define their own `confctl` subcommands.
+## Migrating Ruby extensions
 
-### Example user script
+confctl no longer loads `ConfCtl::UserScript` classes, custom Ruby commands or
+Ruby hooks from `scripts/`. The following typed settings and commands cover
+runtime-kernel collection and netboot inventory generation:
 
-```ruby
-class MyScript < ConfCtl::UserScript
-  register
+* [`runtime-kernels update`](man/man8/confctl-reference.8.md) maintains the configured
+  kernel state. `confctl.runtimeKernels.refreshBeforeDeploy` refreshes that
+  state before a new deployment build.
+* [`netbootInventory`](docs/configuration-commands.md) publishes the configured
+  netboot machine list after add, rename and rediscover.
 
-  def setup_cli(app)
-    app.desc 'My CLI command'
-    app.command 'my-command' do |c|
-      c.action &ConfCtl::Cli::Command.run(c, MyCommand, :run)
-    end
-  end
-end
-
-class MyCommand < ConfCtl::Cli::Command
-  def run
-    puts 'Hello world'
-  end
-end
-```
+Pair the tool/module pin, settings and removal of the corresponding old script.
+Preserve existing state and generated files. Configuration edits reject remaining
+legacy scripts; move independent tools outside the confctl extension directory.
+For other custom behavior, migrate the caller explicitly; there is no Ruby
+extension loader in the CLI. Tools-mode gems remain available to separate
+configuration-repository programs. Rollback requires the matched old pin,
+settings and scripts, as described in the configuration guide.
 
 ## More information
 See the [man pages](./man/man8) and focused guides:

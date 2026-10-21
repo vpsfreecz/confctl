@@ -1,6 +1,6 @@
 # Add, rename and rediscover machines
 
-`confctl-rust add NAME`, `rename OLD NEW` and `rediscover` require a flake
+`confctl add NAME`, `rename OLD NEW` and `rediscover` require a flake
 configuration. They run without confirmation. Each command holds the existing
 advisory mutation lock through its local edits, Nix evaluation and netboot
 publication. This excludes cooperating Rust writers; Ruby and external editors
@@ -56,8 +56,26 @@ correct the configuration, then explicitly run `rediscover`. Blindly repeating
 add or rename can conflict with effects that already completed. There is no
 rollback, automatic repair or resume.
 
-The generated formats remain readable by Ruby and the default executable remains
-Ruby. Enabling netboot publication requires the module/tool pin defining
+In a Git-backed flake, Nix includes tracked files but excludes newly untracked
+files, even with impure evaluation. With netboot publication enabled, `add` or
+`rename` can therefore complete its local edits and then fail because the fresh
+inventory cannot import a new or moved `module.nix`. The old netboot list remains.
+Inspect the completed edits, explicitly stage only the intended configuration
+paths, then run `confctl rediscover`. For example:
+
+```sh
+git add -- cluster/NEW cluster/cluster.nix
+confctl rediscover
+```
+
+For a rename, stage both the old and new paths with
+`git add -A -- cluster/OLD cluster/NEW cluster/cluster.nix` before rediscovering.
+This is the same source-inclusion prerequisite as the former Ruby hook.
+Confctl never stages these files automatically. Do not repeat `add` or `rename`
+after their filesystem changes have completed.
+
+The generated formats remain readable by the preceding Ruby implementation.
+The public executable selects Rust. Enabling netboot publication requires the module/tool pin defining
 `netbootInventory`, explicit enable/outputFile settings and removal of the old
 hook script. Restore the matched old pin, settings and script together when
 rolling back that migration: reverting only the tool after removing the script

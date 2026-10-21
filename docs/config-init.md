@@ -1,6 +1,6 @@
 # Initialize a configuration
 
-Run `confctl-rust init` in an empty directory. The command creates the standard
+Run `confctl init` in an empty directory. The command creates the standard
 flake configuration without confirmation or external commands. It does not need
 an existing flake, evaluate Nix, initialize Git, generate a lock file or build a
 system.
@@ -10,9 +10,10 @@ The directory may already contain `shell.nix`, `.confctl`, `.gems` and
 including `.git`, `flake.nix` and `cluster`. A second init therefore fails.
 
 Init creates `cluster`, `configs`, `data`, `environments` and `modules`, their
-starter Nix files, and finally `flake.nix`. The templates match Ruby confctl,
-including the `nixos-unstable` channel and commented vpsAdminOS input. New
-directories use mode 0755 and files use 0644, restricted by the process umask.
+starter Nix files, and finally `flake.nix`. The templates retain the existing
+`nixos-unstable` channel and commented vpsAdminOS input; their omitted package
+and helper selectors now use the Rust defaults. New directories use mode 0755
+and files use 0644, restricted by the process umask.
 The normal invocation log and advisory mutation lock live in `.confctl`.
 Ruby writers do not participate in that lock.
 

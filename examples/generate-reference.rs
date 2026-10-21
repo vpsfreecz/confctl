@@ -569,6 +569,62 @@ mod tests {
     }
 
     #[test]
+    fn declaration_origins_keep_owned_labels_and_foreign_paths_distinct() {
+        for (path, expected) in [
+            (
+                "/nix/store/hash-one-source/nix/modules/confctl/nix.nix",
+                "<confctl/nix/modules/confctl/nix.nix>",
+            ),
+            (
+                "/nix/store/hash-two-source/nix/modules/confctl/nix.nix",
+                "<confctl/nix/modules/confctl/nix.nix>",
+            ),
+            (
+                "/nix/store/hash-source/nix/modules/cluster/default.nix",
+                "<confctl/nix/modules/cluster/default.nix>",
+            ),
+            (
+                "/nix/store/hash-source/nix/modules/cluster",
+                "<confctl/nix/modules/cluster>",
+            ),
+            (
+                "/nix/store/hash-source/nix/modules/confctl",
+                "<confctl/nix/modules/confctl>",
+            ),
+            (
+                "/nix/store/hash-source/nix/modules/confctl/kexec-netboot",
+                "<confctl/nix/modules/confctl/kexec-netboot>",
+            ),
+            (
+                concat!(env!("CARGO_MANIFEST_DIR"), "/nix/modules/confctl/nix.nix"),
+                "<confctl/nix/modules/confctl/nix.nix>",
+            ),
+            (
+                "/nix/store/custom-source/modules/cluster/default.nix",
+                "/nix/store/custom-source/modules/cluster/default.nix",
+            ),
+            (
+                "/nix/store/nixpkgs-source/nixos/modules/services/example.nix",
+                "/nix/store/nixpkgs-source/nixos/modules/services/example.nix",
+            ),
+            (
+                "/tmp/foreign-source/nix/modules/cluster/default.nix",
+                "/tmp/foreign-source/nix/modules/cluster/default.nix",
+            ),
+            (
+                "/nix/store/custom-source/nix/custom/module.nix",
+                "/nix/store/custom-source/nix/custom/module.nix",
+            ),
+            (
+                "/nix/store/custom-source/nix/modules/cluster-extra/default.nix",
+                "/nix/store/custom-source/nix/modules/cluster-extra/default.nix",
+            ),
+        ] {
+            assert_eq!(declaration(path), expected, "{path}");
+        }
+    }
+
+    #[test]
     fn malformed_exports_are_rejected_before_any_stdout_and_check_never_writes() {
         let scratch = tempfile::tempdir().unwrap();
         let input = scratch.path().join("options.json");

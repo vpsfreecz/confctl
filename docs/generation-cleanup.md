@@ -67,7 +67,7 @@ the guard. Raw captures and logs retain the undecorated native bytes.
 
 The Rust route deliberately fixes Ruby's ordinary-output Progress#line exception
 and its counting of non-path lines. Historical Ruby fixtures remain unchanged.
-The default executable remains Ruby and the saved record format is unchanged.
+The public executable selects Rust. The saved record format is unchanged.
 
 Removal and GC can leave irreversible partial effects. An error stops later
 removals and optional GC; earlier root, record, profile, callback or store changes

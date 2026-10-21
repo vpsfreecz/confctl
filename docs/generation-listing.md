@@ -10,7 +10,7 @@ selection rules. Unmanaged and carried machines are included. Listing reads
 existing generation records and current links without acquiring the mutation
 lock, resolving the login name or creating GC roots. The application still
 writes its normal invocation log. Remote-only listing does not read local
-generation storage. The default `confctl` entry point remains Ruby.
+generation storage. The public `confctl` entry point and `confctl-rust` alias both select Rust.
 
 Remote listing queries uptime, then reads profile generations with a script sent
 to `bash --norc` on stdin. Standalone machines use the system profile; carried

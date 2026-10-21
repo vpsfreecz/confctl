@@ -21,13 +21,17 @@ not update inputs automatically.
 Software-pin configurations must be migrated using confctl v3 before upgrading.
 See the repository's `docs/swpins-to-flakes.md` for migration and rollback.
 
-## RUST PACKAGE SELECTION
-The additive `confctl-rust` flake package provides `confctl` and `confctl-rust`
-without changing the existing Ruby package. Configuration shells select it with
-`implementation = "rust"` in `mkConfigDevShell`, using minimal or tools mode.
-Rust rejects bundled-confctl before bootstrap. Target helper selection uses
-`rustHelpers = true` in `mkConfctlOutputs` independently; its default is false.
-See `docs/rust-packaging.md` for package, rollback and qualification limits.
+## PACKAGE SELECTION
+The public `confctl` flake package and its `confctl-rust` alias select the same
+Rust package. Configuration shells default to `implementation = "rust"` with
+minimal or tools mode. Tools mode retains independent repository gems; confctl
+does not load them. Explicit Ruby selection, `bundled-confctl` and
+`legacyCompat = true` fail with migration instructions.
+
+`mkConfctlOutputs` defaults to `rustHelpers = true`; explicit false fails.
+Standalone helper modules use the same-source Rust package with their target
+pkgs. Existing helper enable settings still control installation. See
+`docs/rust-packaging.md` for package, rollback and qualification limits.
 
 ## PATTERNS
 `confctl` commands accept patterns instead of names. These patterns work
@@ -661,34 +665,21 @@ edits if later settings or inventory publication fails. Migrate old scripts to
 these explicit settings before using the Rust routes. Do not run Ruby and Rust
 writers concurrently: only Rust participates in the advisory mutation lock.
 
-## USER-DEFINED COMMANDS
-This extension interface belongs to the Ruby CLI. The Rust CLI does not load
-Ruby scripts or offer a runtime fallback.
+## MIGRATING RUBY EXTENSIONS
+Confctl does not load `ConfCtl::UserScript` classes, custom Ruby commands or
+hooks from `scripts/`. Use the typed runtime-kernel and netboot settings above
+for those built-ins. Other custom behavior must be moved to a separate caller;
+there is no Ruby extension loader or application fallback.
 
-User-defined Ruby scripts can be placed in directory `scripts`. Each script
-should create a subclass of `ConfCtl::UserScript` and call class-method `register`.
-Scripts can define their own `confctl` subcommands.
+Pair the tool/module pin, typed settings and removal of the corresponding old
+script. Preserve existing state and generated files. Configuration edits reject
+remaining legacy scripts. Independent tools can still use a configuration
+repository's tools-mode gems outside the extension directory.
 
-### Example user script
-
-```
-class MyScript < ConfCtl::UserScript
-  register
-
-  def setup_cli(app)
-    app.desc 'My CLI command'
-    app.command 'my-command' do |c|
-      c.action &ConfCtl::Cli::Command.run(c, MyCommand, :run)
-    end
-  end
-end
-
-class MyCommand < ConfCtl::Cli::Command
-  def run
-    puts 'Hello world'
-  end
-end
-```
+Rollback requires the matched old tool/module pin, settings and scripts. If
+remote helper packages are also reverted, restore each old wrapper with its
+matching helper JSON. Do not run old Ruby and Rust writers concurrently against
+the same checkout. Tool rollback does not undo completed operational effects.
 
 ## SEE ALSO
 confctl-reference(8), confctl-options.nix(8)

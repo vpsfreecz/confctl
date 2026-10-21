@@ -94,12 +94,11 @@ let
     passthru.tests.shellSelection =
       let
         system = pkgs.stdenv.hostPlatform.system;
-        rubyPackage = import ./package.nix { inherit pkgs src; };
         shell = import ./flake/mk-config-devshell.nix {
           self = {
             outPath = src;
             packages.${system} = {
-              confctl = rubyPackage;
+              confctl = package;
               confctl-rust = package;
             };
           };
@@ -109,7 +108,19 @@ let
         includes =
           expected: value: builtins.elem (toString expected) (map toString value.nativeBuildInputs);
       in
-      assert includes rubyPackage (select { });
+      assert includes package (select { });
+      assert includes package (select {
+        legacyCompat = false;
+      });
+      assert includes pkgs.ruby (select {
+        mode = "tools";
+      });
+      assert includes (lib.getDev pkgs.openssl) (select {
+        mode = "tools";
+      });
+      assert lib.hasInfix
+        (builtins.unsafeDiscardStringContext "${package}/bin:$PWD/.bin:$GEM_HOME/bin:$PATH")
+        (select { mode = "tools"; }).shellHook;
       assert includes package (select {
         implementation = "rust";
       });
@@ -117,6 +128,18 @@ let
         implementation = "rust";
         mode = "tools";
       });
+      assert
+        !(builtins.tryEval (select {
+          implementation = "ruby";
+        })).success;
+      assert
+        !(builtins.tryEval (select {
+          legacyCompat = true;
+        })).success;
+      assert
+        !(builtins.tryEval (select {
+          mode = "bundled-confctl";
+        })).success;
       assert
         !(builtins.tryEval (select {
           implementation = "unknown";
@@ -130,7 +153,7 @@ let
         mkdir "$out"
       '';
     meta = {
-      description = "Opt-in Rust confctl CLI and private remote helper backends";
+      description = "confctl CLI and private remote helper backends";
       license = lib.licenses.gpl3Only;
       platforms = [
         "x86_64-linux"
