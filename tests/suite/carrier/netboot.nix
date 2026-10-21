@@ -17,6 +17,29 @@ import ../../make-test.nix (
         "${confctlPackage}/bin/confctl";
 
     confctlSource = if confctlSrc == null then throw "suiteArgs.confctlSrc is required" else confctlSrc;
+    legacyBuilder = import ../../support/legacy-netboot-builder.nix {
+      inherit pkgs;
+      src = ../../compat/helpers/baseline/build-netboot-server.rb.txt;
+    };
+    testTLS = pkgs.runCommand "confctl-m5-test-tls" { nativeBuildInputs = [ pkgs.openssl ]; } ''
+      mkdir "$out"
+      openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 3650 \
+        -config /dev/null -subj /CN=confctl-m5-test-ca \
+        -addext basicConstraints=critical,CA:TRUE \
+        -addext keyUsage=critical,keyCertSign,cRLSign \
+        -keyout ca-key.pem -out "$out/ca.pem"
+      openssl req -new -newkey rsa:2048 -nodes -sha256 -config /dev/null \
+        -subj /CN=confctl-m5-test-server -keyout "$out/key.pem" -out server.csr
+      cat > server.ext <<'EOF'
+      basicConstraints = critical,CA:FALSE
+      keyUsage = critical,digitalSignature,keyEncipherment
+      extendedKeyUsage = serverAuth
+      subjectAltName = IP:192.168.100.1
+      EOF
+      openssl x509 -req -sha256 -days 3650 -in server.csr \
+        -CA "$out/ca.pem" -CAkey ca-key.pem -set_serial 1 \
+        -extfile server.ext -out "$out/server.pem"
+    '';
     carrierMgmtMac = "52:54:00:10:00:01";
     carrierPxeMac = "52:54:00:10:00:02";
     nixosPxeMac = "52:54:00:10:00:11";
@@ -193,6 +216,7 @@ import ../../make-test.nix (
                 confctlOutputs = confctl.lib.mkConfctlOutputs {
                   confDir = ./.;
                   inherit inputs channels;
+                  rustHelpers = true;
                 };
               in
               {
@@ -201,6 +225,7 @@ import ../../make-test.nix (
                 devShells.x86_64-linux.default = confctl.lib.mkConfigDevShell {
                   system = "x86_64-linux";
                   mode = "minimal";
+                  implementation = "rust";
                 };
               };
           }
@@ -228,7 +253,17 @@ import ../../make-test.nix (
         write_hardware_config!(conf_dir, 'carrier')
 
         File.write(File.join(conf_dir, 'cluster/carrier/config.nix'), <<~NIX)
-          { inputs, lib, ... }:
+          { config, flakeInputs, inputs, lib, pkgs, ... }:
+          let
+            legacyBuilder = (${builtins.readFile ../../support/legacy-netboot-builder.nix}) {
+              inherit pkgs;
+              # Copy the same single baseline file as the outer fixture.
+              src = builtins.path {
+                path = flakeInputs.confctl + "/tests/compat/helpers/baseline/build-netboot-server.rb.txt";
+                name = "build-netboot-server.rb.txt";
+              };
+            };
+          in
           {
             imports = [
               ../../environments/base.nix
@@ -283,6 +318,21 @@ import ../../make-test.nix (
               };
             };
             systemd.services.logrotate-checkconf.enable = false;
+
+            environment.etc."confctl-test-rust-package".text = toString config._module.args.confctlRustPackage;
+            environment.systemPackages = [ legacyBuilder ];
+            services.nginx.virtualHosts."confctl-m5-tls" = {
+              onlySSL = true;
+              listen = [ { addr = "0.0.0.0"; port = 8443; ssl = true; } ];
+              sslCertificate = "${testTLS}/server.pem";
+              sslCertificateKey = "${testTLS}/key.pem";
+              root = "/var/lib/confctl/carrier/netboot/http";
+            };
+            services.nginx.virtualHosts."confctl-m5-fixed-origin" = {
+              listen = [ { addr = "0.0.0.0"; port = 8088; } ];
+              root = "/var/lib/confctl/carrier/netboot/http";
+              extraConfig = "access_log /var/log/nginx/confctl-m5-proxy.log combined;";
+            };
 
             confctl.carrier.netboot = {
               enable = true;
@@ -339,6 +389,9 @@ import ../../make-test.nix (
             ];
 
             confctl.programs.kexec-netboot.enable = true;
+
+            environment.etc."confctl-test-rust-package".text = toString config._module.args.confctlRustPackage;
+            environment.etc."confctl-m5-ca.pem".source = ../../data/confctl-m5-ca.pem;
 
             environment.etc."confctl-marker".text = "#{marker}\n";
 
@@ -405,6 +458,8 @@ import ../../make-test.nix (
 
             confctl.programs.kexec-netboot.enable = true;
 
+            environment.etc."confctl-test-rust-package".text = toString config._module.args.confctlRustPackage;
+
             environment.etc."confctl-marker".text = "#{marker}\n";
 
             system.distBuilderCommands = '''
@@ -414,6 +469,27 @@ import ../../make-test.nix (
             system.stateVersion = "20.09";
           }
         NIX
+      end
+
+      def paired_builder_contents(root)
+        _, raw = carrier.succeeds("cat #{root}/http/machines.json")
+        _, menus = carrier.succeeds("find -L #{root}/tftp/pxeserver #{root}/tftp/pxelinux.cfg -name '*.cfg' -type f | sort")
+        content = menus.lines.to_h do |path|
+          path = path.strip
+          _, body = carrier.succeeds("cat #{Shellwords.escape(path)}")
+          [path.delete_prefix(root), body]
+        end
+        index = JSON.parse(raw)
+        records = index.fetch('machines').to_h do |machine|
+          fqdn = machine.fetch('fqdn')
+          files = ["#{root}/http/#{fqdn}/machine.json"]
+          files.concat(machine.fetch('generations').map { |generation| "#{root}/http/#{fqdn}/#{generation.fetch('generation')}/generation.json" })
+          [fqdn, files.to_h do |path|
+            _, body = carrier.succeeds("cat #{Shellwords.escape(path)}")
+            [path.delete_prefix(root), JSON.parse(body)]
+          end]
+        end
+        { 'index' => index, 'records' => records, 'menus' => content }
       end
 
       def write_machine_modules!(conf_dir, carrier_port:)
@@ -500,6 +576,7 @@ import ../../make-test.nix (
 
       def prepare_fixture!(conf_dir:, carrier_port:, pubkey:)
         prepare_fixture_dir!(conf_dir)
+        FileUtils.cp('${testTLS}/ca.pem', File.join(conf_dir, 'data/confctl-m5-ca.pem'))
         write_flake_root!(conf_dir)
         FileUtils.rm_f(File.join(conf_dir, 'flake.lock'))
         run_local!(['nix', 'flake', 'lock', "path:#{conf_dir}"], chdir: conf_dir)
@@ -742,6 +819,9 @@ import ../../make-test.nix (
         it 'deploys the carrier machine for netboot' do
           carrier_generation = build_generation!(CARRIER_MACHINE)
           confctl!('deploy', '--yes', CARRIER_MACHINE)
+          assert_rust_helper!(carrier, 'carrier-env')
+          @rust_builder = assert_rust_helper!(carrier, 'build-netboot-server')
+          assert_rust_helper!(carrier, 'confctl-auto-rollback', wrapper: carrier_generation.fetch('auto_rollback'))
           wait_for_carrier_netboot_services!
           expect(carrier_realpath('/nix/var/nix/profiles/system')).to eq(carrier_generation['toplevel'])
         end
@@ -774,6 +854,7 @@ import ../../make-test.nix (
           boot_pxe_client!(nixos, timeout: NIXOS_BOOT_TIMEOUT)
           assert_marker!(nixos, 'A')
           wait_for_netboot_http!(nixos, timeout: NETBOOT_HTTP_TIMEOUT)
+          assert_rust_helper!(nixos, 'kexec-netboot')
 
           _, cmdline = nixos.succeeds('cat /proc/cmdline')
           expect(cmdline).to include('httproot=http://192.168.100.1/')
@@ -783,6 +864,7 @@ import ../../make-test.nix (
           boot_pxe_client!(vpsadminos, timeout: VPSADMINOS_BOOT_TIMEOUT)
           assert_marker!(vpsadminos, 'A')
           wait_for_netboot_http!(vpsadminos, timeout: NETBOOT_HTTP_TIMEOUT)
+          assert_rust_helper!(vpsadminos, 'kexec-netboot')
 
           _, cmdline = vpsadminos.succeeds('cat /proc/cmdline')
           expect(cmdline).to include('httproot=http://192.168.100.1/')
@@ -852,6 +934,74 @@ import ../../make-test.nix (
           )
           assert_marker!(vpsadminos, 'A')
           wait_for_netboot_http!(vpsadminos, timeout: NETBOOT_HTTP_TIMEOUT)
+        end
+        it 'pairs the immutable old builder JSON with old and installed Rust backends' do
+          _, wrapper = carrier.succeeds('cat "$(command -v build-netboot-server)"')
+          path = wrapper[%r{/nix/store/[0-9a-z]{32}-netboot-server\.json}]
+          raise "builder JSON missing from #{wrapper.inspect}" unless path
+          _, raw = carrier.succeeds("cat #{Shellwords.escape(path)}")
+          config = JSON.parse(raw)
+          root = '/var/lib/confctl/m5-paired-builder'
+          config['tftpRoot'] = "#{root}/tftp"
+          config['httpRoot'] = "#{root}/http"
+          config['ruby'] = '${pkgs.ruby}'
+          carrier.succeeds("test ! -e #{root} && mkdir #{root}")
+          carrier.succeeds("printf %s #{Shellwords.escape(JSON.generate(config))} > #{root}/config.json")
+          carrier.succeeds('${legacyBuilder}/bin/confctl-m5-old-builder')
+          old = paired_builder_contents(root)
+          expect(old.fetch('index').fetch('machines').size).to eq(2)
+          carrier.succeeds("CONFCTL_INTERNAL_NETBOOT_CONFIG=#{root}/config.json #{Shellwords.escape(@rust_builder)}")
+          expect(paired_builder_contents(root)).to eq(old)
+          config.delete('ruby')
+          carrier.succeeds("printf %s #{Shellwords.escape(JSON.generate(config))} > #{root}/config.json")
+          _, before = carrier.succeeds("find #{root} -mindepth 1 -maxdepth 1 -printf '%f %l\\n' | sort")
+          status, diagnostic = carrier.execute('${legacyBuilder}/bin/confctl-m5-old-builder 2>&1')
+          expect(status).not_to eq(0)
+          expect(diagnostic).to match(/key not found.*ruby/)
+          _, after = carrier.succeeds("find #{root} -mindepth 1 -maxdepth 1 -printf '%f %l\\n' | sort")
+          expect(after).to eq(before)
+          expect(paired_builder_contents(root)).to eq(old)
+        end
+
+        it 'uses child-only TLS trust and fixed-origin proxy selection without rebooting' do
+          _, previous_boot = nixos.succeeds('cat /proc/sys/kernel/random/boot_id')
+          _, previous_marker = nixos.succeeds('cat /etc/confctl-marker')
+          nixos.succeeds('test "$(cat /sys/kernel/kexec_loaded)" = 0')
+          clean = ['env', '-u', 'http_proxy', '-u', 'https_proxy', '-u', 'all_proxy', '-u', 'no_proxy',
+                   '-u', 'HTTP_PROXY', '-u', 'HTTPS_PROXY', '-u', 'ALL_PROXY', '-u', 'NO_PROXY',
+                   '-u', 'SSL_CERT_FILE', '-u', 'SSL_CERT_DIR', '-u', 'NIX_SSL_CERT_FILE']
+          begin
+            status, diagnostic = nixos.execute(Shellwords.join([*clean, 'kexec-netboot', '--server-url', "https://#{PXE_ADDRESS}:8443"]) + ' 2>&1')
+            expect(status).to eq(1), diagnostic
+            expect(diagnostic).to include("error sending request for url (https://#{PXE_ADDRESS}:8443/machines.json)")
+            nixos.succeeds('test "$(cat /sys/kernel/kexec_loaded)" = 0')
+            nixos.succeeds(Shellwords.join([*clean, 'SSL_CERT_FILE=/etc/confctl-m5-ca.pem', 'kexec-netboot', '--server-url', "https://#{PXE_ADDRESS}:8443"]))
+            nixos.succeeds('test "$(cat /sys/kernel/kexec_loaded)" = 1')
+            nixos.succeeds('kexec-netboot --unload')
+
+            server = 'm5-netboot.invalid'
+            log = '/var/log/nginx/confctl-m5-proxy.log'
+            _, before = carrier.succeeds("cat #{log} 2>/dev/null || true")
+            proxy = "http_proxy=http://#{PXE_ADDRESS}:8088"
+            nixos.succeeds(Shellwords.join([*clean, proxy, 'kexec-netboot', '--server-url', "http://#{server}"]))
+            nixos.succeeds('test "$(cat /sys/kernel/kexec_loaded)" = 1')
+            nixos.succeeds('kexec-netboot --unload')
+            _, accessed = carrier.succeeds("cat #{log}")
+            expect(accessed.delete_prefix(before)).to include("GET http://#{server}/machines.json ")
+            status, diagnostic = nixos.execute(Shellwords.join([*clean, proxy, "no_proxy=#{server}", 'kexec-netboot', '--server-url', "http://#{server}"]) + ' 2>&1')
+            expect(status).not_to eq(0), diagnostic
+            nixos.fails("getent hosts #{server}")
+            _, bypassed = carrier.succeeds("cat #{log}")
+            expect(bypassed).to eq(accessed)
+            nixos.succeeds('test "$(cat /sys/kernel/kexec_loaded)" = 0')
+          ensure
+            _, loaded = nixos.succeeds('cat /sys/kernel/kexec_loaded')
+            nixos.succeeds('kexec-netboot --unload') if loaded.strip == '1'
+          end
+          _, current_boot = nixos.succeeds('cat /proc/sys/kernel/random/boot_id')
+          _, current_marker = nixos.succeeds('cat /etc/confctl-marker')
+          expect(current_boot).to eq(previous_boot)
+          expect(current_marker).to eq(previous_marker)
         end
       end
     '';

@@ -154,6 +154,7 @@ import ../../make-test.nix (
                 confctlOutputs = confctl.lib.mkConfctlOutputs {
                   confDir = ./.;
                   inherit inputs channels;
+                  rustHelpers = true;
                 };
               in
               {
@@ -162,6 +163,7 @@ import ../../make-test.nix (
                 devShells.x86_64-linux.default = confctl.lib.mkConfigDevShell {
                   system = "x86_64-linux";
                   mode = "minimal";
+                  implementation = "rust";
                 };
               };
           }
@@ -281,6 +283,8 @@ import ../../make-test.nix (
               fsType = "ext4";
             };
 
+            environment.etc."confctl-test-rust-package".text = toString config._module.args.confctlRustPackage;
+
             environment.etc."confctl-marker".text = "#{marker}\n";
 
             #{dist_config}
@@ -326,6 +330,8 @@ import ../../make-test.nix (
             boot.supportedFilesystems = [ "zfs" ];
             boot.kernelParams = [ "nolive" ];
             boot.zfs.pools = { };
+
+            environment.etc."confctl-test-rust-package".text = toString config._module.args.confctlRustPackage;
 
             environment.etc."confctl-marker".text = "#{marker}\n";
 
@@ -542,6 +548,8 @@ import ../../make-test.nix (
           confctl!('deploy', '--yes', CARRIER_MACHINE)
           confctl!('deploy', '--yes', NIXOS_MACHINE)
           confctl!('deploy', '--yes', VPSADMINOS_MACHINE)
+          assert_rust_helper!(carrier, 'carrier-env')
+          assert_rust_helper!(carrier, 'confctl-auto-rollback', wrapper: @carrier_gen_a.fetch('auto_rollback'))
 
           assert_machine_state(
             CARRIER_MACHINE,

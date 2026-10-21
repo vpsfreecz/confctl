@@ -58,6 +58,7 @@ import ../make-test.nix (
 
     testScript = ''
       require 'fileutils'
+      require 'shellwords'
 
       NIXOS_MACHINE = 'nixos-machine'
 
@@ -150,6 +151,8 @@ import ../make-test.nix (
               fsType = "ext4";
             };
 
+            environment.etc."confctl-test-rust-package".text = toString config._module.args.confctlRustPackage;
+
             environment.etc."confctl-marker".text = "#{marker}\n";
             #{breaker}
           }
@@ -181,6 +184,7 @@ import ../make-test.nix (
                 confctlOutputs = confctl.lib.mkConfctlOutputs {
                   confDir = ./.;
                   inherit inputs channels;
+                  rustHelpers = true;
                 };
               in
               {
@@ -189,6 +193,7 @@ import ../make-test.nix (
                 devShells.x86_64-linux.default = confctl.lib.mkConfigDevShell {
                   system = "x86_64-linux";
                   mode = "minimal";
+                  implementation = "rust";
                 };
               };
           }
@@ -307,6 +312,7 @@ import ../make-test.nix (
           deploy_with_retry!(NIXOS_MACHINE)
           @baseline_gen = confctl_generation_info(NIXOS_MACHINE)
           @baseline_state = machine_state(NIXOS_MACHINE)
+          assert_rust_helper!(nixos, 'confctl-auto-rollback', wrapper: @baseline_gen.fetch('auto_rollback'))
 
           expect(@baseline_gen['toplevel']).to eq(@baseline_state[:current])
           expect(@baseline_gen['toplevel']).to eq(@baseline_state[:profile])
@@ -337,6 +343,121 @@ import ../make-test.nix (
             baseline_state: @baseline_state,
             baseline_gen: @baseline_gen
           )
+        end
+        it 'confirms a new CLI deployment using the immutable old rollback helper' do
+          original = File.binread(File.join(@conf_dir, 'flake.nix'))
+          override = <<~NIX.strip
+            packages.x86_64-linux.m5-legacy-rollback =
+              let pkgs = inputs.nixpkgs.legacyPackages.x86_64-linux;
+              in pkgs.replaceVarsWith {
+                src = confctl + "/tests/compat/helpers/baseline/auto-rollback.rb.txt";
+                isExecutable = true;
+                replacements.ruby = pkgs.ruby;
+              };
+            confctl = confctlOutputs // {
+              build = builtins.mapAttrs (key: generation:
+                if key == confctlOutputs.machineKeys."nixos-machine" then
+                  generation // { autoRollback = self.packages.x86_64-linux.m5-legacy-rollback; }
+                else generation) confctlOutputs.build;
+            };
+          NIX
+          expect(original.scan('confctl = confctlOutputs;').size).to eq(1)
+          begin
+            File.write(File.join(@conf_dir, 'flake.nix'), original.sub('confctl = confctlOutputs;', override))
+            write_nixos_config!(@conf_dir, marker: 'legacy-confirm')
+            confctl!('build', '--yes', NIXOS_MACHINE)
+            saved = confctl_generation_info(NIXOS_MACHINE)
+            legacy_helper, = run_local!(
+              ['nix', 'eval', '--raw', '--no-write-lock-file', '.#packages.x86_64-linux.m5-legacy-rollback.outPath'],
+              chdir: @conf_dir, env: confctl_env
+            )
+            expect(saved.fetch('auto_rollback')).to eq(legacy_helper)
+            out, = confctl!('deploy', '--yes', '--generation', saved.fetch('name'), NIXOS_MACHINE)
+            assert_machine_state(NIXOS_MACHINE, profile: saved.fetch('toplevel'), current: saved.fetch('toplevel'))
+            _, marker = nixos.succeeds('cat /etc/confctl-marker')
+            expect(marker).to eq("legacy-confirm\n")
+            checks = out.scan(%r{/run/confctl-confirm-[0-9a-f]+}).uniq
+            expect(checks).not_to be_empty
+            checks.each { |path| nixos.succeeds("test ! -e #{Shellwords.escape(path)}") }
+          ensure
+            File.binwrite(File.join(@conf_dir, 'flake.nix'), original)
+          end
+        end
+
+        it 'rolls back after the owned SSH transport closes beyond the switched boundary' do
+          deploy_with_retry!('--generation', @baseline_gen.fetch('name'), NIXOS_MACHINE, 'switch')
+          write_nixos_config!(@conf_dir, marker: 'ssh-disconnect')
+          confctl!('build', '--yes', NIXOS_MACHINE)
+          changed = confctl_generation_info(NIXOS_MACHINE)
+          confctl!('deploy', '--yes', '--copy-only', '--generation', changed.fetch('name'), NIXOS_MACHINE)
+          backend = assert_rust_helper!(nixos, 'confctl-auto-rollback', wrapper: changed.fetch('auto_rollback'))
+          check = '/run/confctl-m5-disconnect'
+          nixos.succeeds("test ! -e #{check}")
+          remote = Shellwords.join([changed.fetch('auto_rollback'), '--timeout', '90', changed.fetch('toplevel'), 'test', check])
+          ssh = ['ssh', '-F', File.join(home_dir, '.ssh/config'), '-p', @port.to_s, 'root@127.0.0.1', remote]
+          worker = nil
+          transcript = []
+          Open3.popen3(confctl_env, *ssh) do |input, output, error, wait|
+            input.close
+            readers = [output, error].map { |stream| Thread.new { stream.read } }
+            begin
+              wait_for_block(name: 'detached worker switched while SSH is live', timeout: 60) do
+                raise "SSH exited before switched: #{wait.value.inspect}" unless wait.alive?
+                _, token = nixos.execute("cat #{check} 2>/dev/null")
+                _, current = nixos.succeeds('readlink -e /run/current-system')
+                next false unless token == 'switched' && current.strip == changed.fetch('toplevel')
+
+                _, candidates = nixos.succeeds(<<~SH)
+                  for proc in /proc/[0-9]*; do
+                    [ "$(readlink "$proc/exe" 2>/dev/null)" = #{Shellwords.escape(backend)} ] || continue
+                    tr '\\000' '\\n' < "$proc/cmdline" | grep -Fx -- #{check} >/dev/null || continue
+                    tr '\\000' '\\n' < "$proc/cmdline" | grep -Fx -- --__confctl-auto-rollback-worker >/dev/null || continue
+                    cat "$proc/stat"
+                  done
+                SH
+                rows = candidates.lines
+                raise "expected one detached worker: #{candidates.inspect}" unless rows.size == 1
+                row = rows.fetch(0)
+                worker = [Integer(row.split.first), row.rpartition(')').last.split.fetch(19)]
+                true
+              end
+              Process.kill('TERM', wait.pid)
+              raise 'owned SSH did not terminate after TERM' unless wait.join(10)
+              puts "disconnected SSH pid=#{wait.pid} status=#{wait.value.inspect}; worker=#{worker.inspect}"
+            ensure
+              if wait.alive?
+                begin
+                  Process.kill('TERM', wait.pid)
+                rescue Errno::ESRCH
+                  # The owned SSH child exited before this cleanup signal.
+                end
+                unless wait.join(10)
+                  begin
+                    Process.kill('KILL', wait.pid)
+                  rescue Errno::ESRCH
+                    # Its wait thread still owns the direct-child reap.
+                  end
+                  raise 'owned SSH cleanup did not reap' unless wait.join(10)
+                end
+              end
+              readers.each do |reader|
+                raise 'SSH stream did not finish after child reap' unless reader.join(10)
+                transcript << reader.value
+              end
+              puts "SSH stdout/stderr: #{transcript.inspect}; worker=#{worker.inspect}"
+            end
+          end
+          expect(worker).not_to be_nil
+          wait_for_block(name: 'post-disconnect rollback and worker termination', timeout: 150) do
+            _, current = nixos.succeeds('readlink -e /run/current-system')
+            _, stat = nixos.execute("cat /proc/#{worker.fetch(0)}/stat 2>/dev/null")
+            gone = stat.empty? || stat.rpartition(')').last.split.fetch(19) != worker.fetch(1)
+            current.strip == @baseline_state.fetch(:current) && gone
+          end
+          assert_machine_state(NIXOS_MACHINE, profile: @baseline_state.fetch(:profile), current: @baseline_state.fetch(:current))
+          _, marker = nixos.succeeds('cat /etc/confctl-marker')
+          expect(marker).to eq("baseline\n")
+          expect(wait_for_confctl_connectivity!(expected_successes: 1, timeout: 120)).to include('1 successful')
         end
       end
     '';

@@ -183,6 +183,8 @@ import ../../make-test.nix (
               fsType = "ext4";
             };
 
+            environment.etc."confctl-test-rust-package".text = toString config._module.args.confctlRustPackage;
+
             environment.etc."confctl-marker-nixos".text = "#{marker}\n";
           }
         NIX
@@ -214,6 +216,8 @@ import ../../make-test.nix (
             boot.supportedFilesystems = [ "zfs" ];
             boot.kernelParams = [ "nolive" ];
             boot.zfs.pools = { };
+
+            environment.etc."confctl-test-rust-package".text = toString config._module.args.confctlRustPackage;
 
             environment.etc."confctl-marker-vpsadminos".text = "#{marker}\n";
 
@@ -247,6 +251,7 @@ import ../../make-test.nix (
                 confctlOutputs = confctl.lib.mkConfctlOutputs {
                   confDir = ./.;
                   inherit inputs channels;
+                  rustHelpers = true;
                 };
               in
               {
@@ -255,6 +260,7 @@ import ../../make-test.nix (
                 devShells.x86_64-linux.default = confctl.lib.mkConfigDevShell {
                   system = "x86_64-linux";
                   mode = "minimal";
+                  implementation = "rust";
                 };
               };
           }
@@ -426,6 +432,8 @@ import ../../make-test.nix (
           expect(out).not_to match(/\e\[/)
 
           @nixos_state_a = machine_state(NIXOS_MACHINE)
+          assert_rust_helper!(nixos, 'confctl-auto-rollback', wrapper: @nixos_gen_a.fetch('auto_rollback'))
+          assert_rust_helper!(vpsadminos, 'confctl-auto-rollback', wrapper: @vps_gen_a.fetch('auto_rollback'))
         end
 
         it 'deploys baseline generation on both machines' do

@@ -3,6 +3,7 @@
 require 'fileutils'
 require 'json'
 require 'open3'
+require 'shellwords'
 
 module ConfctlTestHelpers
   STORE_PATH_RE = %r{/nix/store/[0-9a-z]{32}-[^\s'"]+}
@@ -13,6 +14,16 @@ module ConfctlTestHelpers
     @conf_dir = conf_dir
     @home_dir = home_dir
     @nix_path = nix_path
+
+    package = File.dirname(File.dirname(bin))
+    backend = File.join(package, 'libexec/confctl/confctl-rust')
+    unless File.executable?(backend) && File.binread(backend, 4) == "\x7fELF".b && File.read(bin).include?(backend)
+      raise "expected installed Rust CLI wrapper #{bin} -> #{backend}"
+    end
+    out, = run_local!([bin, '--help'])
+    raise "empty CLI help from #{bin}" if out.empty?
+
+    puts "confctl candidate: #{bin} -> #{backend}; source=#{src}"
   end
 
   def confctl_bin
@@ -216,6 +227,25 @@ module ConfctlTestHelpers
 
       sleep(2)
     end
+  end
+
+  def assert_rust_helper!(machine, name, wrapper: nil)
+    _, package = machine.succeeds('cat /etc/confctl-test-rust-package')
+    package = package.strip
+    unless package.match?(%r{\A/nix/store/[0-9a-z]{32}-[^/]+\z})
+      raise "invalid target Rust package on #{machine.name}: #{package.inspect}"
+    end
+    if wrapper.nil?
+      _, wrapper = machine.succeeds("command -v #{Shellwords.escape(name)}")
+      wrapper = wrapper.strip
+    end
+    backend = "#{package}/libexec/confctl/#{name}"
+    _, body = machine.succeeds("cat -- #{Shellwords.escape(wrapper)}")
+    raise "expected #{machine.name}:#{wrapper} to exec #{backend}; got #{body.inspect}" unless body.include?(backend)
+
+    machine.succeeds("test -x #{Shellwords.escape(backend)} && test \"$(od -An -tx1 -N4 #{Shellwords.escape(backend)} | tr -d ' \\n')\" = 7f454c46")
+    puts "#{machine.name} helper: #{wrapper} -> #{backend}"
+    backend
   end
 
   def confctl_generation_info(host, selector = 'current')
