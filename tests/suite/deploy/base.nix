@@ -93,7 +93,9 @@ import ../../make-test.nix (
     };
 
     testScript = ''
+      require 'digest'
       require 'fileutils'
+      require 'rbconfig'
 
       NIXPKGS_PATH = '${pkgs.path}'
       VPSADMINOS_PATH = '${vpsadminosSource}'
@@ -383,6 +385,42 @@ import ../../make-test.nix (
         confctl_generation_info(host)
       end
 
+      def assert_generation_b_valid!(phase)
+        generation = @nixos_gen_b
+        root = File.realpath(conf_dir)
+        # Use the qualified Ruby login contract in the same child environment as
+        # confctl, and hash its canonical configuration root, not the runner cwd.
+        login, = run_local!(
+          [RbConfig.ruby, '-retc', '-e', 'print(Etc.getlogin || ENV["USER"] || abort("no login identity"))'],
+          chdir: conf_dir, env: confctl_env
+        )
+        host = NIXOS_MACHINE.tr('/', ':')
+        local_link = File.join(root, '.confctl/generations', host, generation.fetch('name'), 'toplevel')
+        root_link = File.join(
+          '/nix/var/nix/gcroots/per-user', login, "confctl-#{Digest::SHA256.hexdigest(root)[0, 8]}",
+          "#{host}-generation-#{generation.fetch('name')}-toplevel"
+        )
+        toplevel = generation.fetch('toplevel')
+        puts "generation B validity: phase=#{phase.inspect} name=#{generation.fetch('name').inspect} toplevel=#{toplevel.inspect}"
+        failures = []
+        { root_link => local_link, local_link => toplevel }.each do |path, expected|
+          begin
+            target = File.readlink(path)
+            puts "generation B link: phase=#{phase.inspect} path=#{path.inspect} target=#{target.inspect} expected=#{expected.inspect}"
+            failures << "link #{path.inspect} has unexpected target" unless target == expected
+          rescue SystemCallError => error
+            puts "generation B link: phase=#{phase.inspect} path=#{path.inspect} errno=#{error.errno} error=#{error.message.inspect} expected=#{expected.inspect}"
+            failures << "link #{path.inspect} errno=#{error.errno}"
+          end
+        end
+        out, err, status = run_local(['nix', 'path-info', toplevel], chdir: conf_dir, env: confctl_env)
+        puts "generation B path-info: phase=#{phase.inspect} path=#{toplevel.inspect} exit=#{status.exitstatus.inspect} signal=#{status.termsig.inspect} stdout=#{out.inspect} stderr=#{err.inspect}"
+        failures << "path-info failed for #{toplevel.inspect}" unless status.success?
+        unless failures.empty?
+          raise "generation B validity precondition failed: phase=#{phase.inspect} #{failures.join('; ')}; path-info exit=#{status.exitstatus.inspect} signal=#{status.termsig.inspect}"
+        end
+      end
+
       before(:suite) do
         @nixos_port = ConfctlHostfwdPorts.reserve('net1')
         @vpsadminos_port = ConfctlHostfwdPorts.reserve('net2')
@@ -469,6 +507,7 @@ import ../../make-test.nix (
         it 'builds second generation for activation-target tests' do
           write_nixos_config!(@conf_dir, marker: 'B')
           @nixos_gen_b = build_generation!(NIXOS_MACHINE)
+          assert_generation_b_valid!('B publication')
           expect(@nixos_gen_b['toplevel']).not_to eq(@nixos_gen_a['toplevel'])
         end
 
@@ -558,6 +597,7 @@ import ../../make-test.nix (
 
           write_nixos_config!(@conf_dir, marker: 'C')
           @nixos_gen_c = build_generation!(NIXOS_MACHINE)
+          assert_generation_b_valid!('after C publication')
           expect(@nixos_gen_c['toplevel']).not_to eq(@nixos_gen_b['toplevel'])
         end
 
@@ -586,6 +626,7 @@ import ../../make-test.nix (
         it 'deploys selected generation by numeric offset' do
           expect(@nixos_gen_b).not_to be_nil
 
+          assert_generation_b_valid!('before numeric offset deploy')
           confctl!('deploy', '--yes', '--generation', '-1', NIXOS_MACHINE, 'switch')
           assert_machine_state(
             NIXOS_MACHINE,
