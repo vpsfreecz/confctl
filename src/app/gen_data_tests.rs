@@ -867,14 +867,37 @@ fn gen_data_protected_password_challenge_cancel_eof_restore_existing_pty_owner()
             }
             thread::sleep(Duration::from_millis(5));
         };
-        assert_eq!(status.success(), mode == "pty-success");
-        if mode == "pty-cancel" {
-            assert_eq!(status.code(), Some(130));
+        // Reaping is not an output barrier: retain every final PTY byte before
+        // checking privacy, including a child restoration failure diagnostic.
+        loop {
+            let mut buf = [0; 8192];
+            match rustix::io::read(&master, &mut buf) {
+                Ok(0) | Err(rustix::io::Errno::AGAIN | rustix::io::Errno::IO) => break,
+                Ok(n) => bytes.extend_from_slice(&buf[..n]),
+                Err(rustix::io::Errno::INTR) => continue,
+                Err(e) => panic!("PTY final read: {e}"),
+            }
         }
-        for secret in [PASSWORD, CODE, STEP, TOKEN] {
+        let expected = match mode {
+            "pty-success" => 0,
+            "pty-cancel" => 130,
+            "pty-eof" => 1,
+            _ => unreachable!(),
+        };
+        assert_eq!(
+            status.code(),
+            Some(expected),
+            "{mode}: public stage {stage}"
+        );
+        for (category, secret) in [
+            ("password", PASSWORD),
+            ("challenge", CODE),
+            ("intermediate-token", STEP),
+            ("final-token", TOKEN),
+        ] {
             assert!(
                 !bytes.windows(secret.len()).any(|b| b == secret.as_bytes()),
-                "protected value echoed (withheld)"
+                "{mode}: public stage {stage}: protected {category} appeared (withheld)"
             );
         }
         let calls = server.events();

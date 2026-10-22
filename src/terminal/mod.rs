@@ -271,13 +271,22 @@ impl Ui {
 
     pub async fn protected_line(&self, prompt: String) -> Result<Vec<u8>, ConfctlError> {
         let _lease = self.acquire(TerminalState::Prompt).await?;
-        self.emit(UiEvent::PromptFrame {
-            preview: Vec::new(),
-            text: prompt,
-        })
-        .await?;
+        let prepared = self
+            .session
+            .broker
+            .prepare_protected(&self.cancellation)
+            .await?;
+        if let Err(error) = self
+            .emit(UiEvent::PromptFrame {
+                preview: Vec::new(),
+                text: prompt,
+            })
+            .await
+        {
+            return Err(prepared.abort(error).await);
+        }
         let _wait = self.timing.as_ref().map(Timing::prompt);
-        self.session.broker.line(true, &self.cancellation).await
+        prepared.read(&self.cancellation).await
     }
 
     pub async fn foreground(&self) -> Result<ForegroundLease, ConfctlError> {
@@ -325,7 +334,11 @@ enum Request {
     Line {
         id: u64,
         protected: bool,
+        prepared: Option<oneshot::Sender<()>>,
         response: oneshot::Sender<InputReply>,
+    },
+    Activate {
+        id: u64,
     },
     Cancel {
         id: u64,
@@ -334,8 +347,15 @@ enum Request {
     Shutdown,
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum ReadPhase {
+    Prepared,
+    Reading,
+}
+
 struct Pending {
     id: u64,
+    phase: ReadPhase,
     bytes: Vec<u8>,
     response: oneshot::Sender<InputReply>,
     original: Option<rustix::termios::Termios>,
@@ -392,10 +412,86 @@ struct PendingRead<'a> {
     broker: &'a InputBroker,
     id: u64,
     armed: bool,
+    receive: oneshot::Receiver<InputReply>,
+    abort_primary: Option<InputReply>,
+}
+
+impl PendingRead<'_> {
+    async fn wait(mut self, cancel: &CancellationToken) -> Result<Vec<u8>, ConfctlError> {
+        let result = tokio::select! {
+            result = &mut self.receive => result.map_err(|_| input_error(io::Error::other("input broker lost response")))?.consume(),
+            _ = cancel.cancelled() => {
+                self.broker.send(Request::Cancel { id: self.id, restored: None })?;
+                let result = (&mut self.receive).await.map_err(|_| input_error(io::Error::other("input cancellation lost response")))?.consume();
+                match result {
+                    Err(error) if !matches!(error, ConfctlError::Cancelled) => Err(error),
+                    _ => Err(ConfctlError::Cancelled),
+                }
+            },
+        };
+        self.armed = false;
+        result
+    }
+
+    async fn read(self, cancel: &CancellationToken) -> Result<Vec<u8>, ConfctlError> {
+        if cancel.is_cancelled() {
+            return Err(self.abort(ConfctlError::Cancelled).await);
+        }
+        self.broker.send(Request::Activate { id: self.id })?;
+        self.wait(cancel).await
+    }
+
+    fn abort(mut self, primary: ConfctlError) -> impl std::future::Future<Output = ConfctlError> {
+        // Retain failure ownership even if this cleanup future is never polled.
+        self.abort_primary = Some(InputReply {
+            result: Some(Err(primary)),
+            unobserved: self.broker.unobserved.clone(),
+        });
+        async move {
+            let sent = self.broker.send(Request::Cancel {
+                id: self.id,
+                restored: None,
+            });
+            let result = match sent {
+                Ok(()) => {
+                    let result = (&mut self.receive)
+                        .await
+                        .map_err(|_| {
+                            input_error(io::Error::other("input cancellation lost response"))
+                        })
+                        .and_then(InputReply::consume);
+                    self.armed = false;
+                    result
+                }
+                Err(error) => Err(error),
+            };
+            // Consume cleanup exactly once, keeping presentation/cancellation
+            // primary even if the broker already completed with an error.
+            let primary = self
+                .abort_primary
+                .take()
+                .expect("abort owns its primary")
+                .consume()
+                .expect_err("abort primary is a failure");
+            let secondary = match result {
+                Ok(_) | Err(ConfctlError::Cancelled) => Vec::new(),
+                Err(ConfctlError::Cleanup { primary, secondary })
+                    if matches!(*primary, ConfctlError::Cancelled) =>
+                {
+                    secondary
+                }
+                Err(error) => vec![error],
+            };
+            primary.with_secondary(secondary)
+        }
+    }
 }
 
 impl Drop for PendingRead<'_> {
     fn drop(&mut self) {
+        // Preserve an abandoned presentation primary before any cleanup errors
+        // retained by dropping the response below.
+        drop(self.abort_primary.take());
         if self.armed {
             let (restored, receive) = mpsc::sync_channel(1);
             if self
@@ -470,38 +566,69 @@ impl InputBroker {
             .map_err(input_error)
     }
 
-    pub async fn line(
+    fn start(
         &self,
         protected: bool,
+        prepared: Option<oneshot::Sender<()>>,
         cancel: &CancellationToken,
-    ) -> Result<Vec<u8>, ConfctlError> {
+    ) -> Result<PendingRead<'_>, ConfctlError> {
         self.check_available()?;
         if cancel.is_cancelled() {
             return Err(ConfctlError::Cancelled);
         }
         let id = self.next.fetch_add(1, Ordering::Relaxed);
-        let (response, mut receive) = oneshot::channel();
-        self.send(Request::Line {
-            id,
-            protected,
-            response,
-        })?;
-        let mut pending = PendingRead {
+        let (response, receive) = oneshot::channel();
+        // Arm before enqueue: even a failed wake or an abandoned preparation
+        // must synchronously stop the worker before its UI lease is released.
+        let pending = PendingRead {
             broker: self,
             id,
             armed: true,
+            receive,
+            abort_primary: None,
         };
-        let result = tokio::select! {
-            result = &mut receive => result.map_err(|_| input_error(io::Error::other("input broker lost response")))?.consume(),
-            _ = cancel.cancelled() => {
-                self.send(Request::Cancel { id, restored: None })?;
-                // Await restoration/ack before releasing terminal ownership.
-                let result = receive.await.map_err(|_| input_error(io::Error::other("input cancellation lost response")))?.consume();
-                match result { Err(error) if !matches!(error, ConfctlError::Cancelled) => Err(error), _ => Err(ConfctlError::Cancelled) }
+        self.send(Request::Line {
+            id,
+            protected,
+            prepared,
+            response,
+        })?;
+        Ok(pending)
+    }
+
+    async fn prepare_protected(
+        &self,
+        cancel: &CancellationToken,
+    ) -> Result<PendingRead<'_>, ConfctlError> {
+        let (prepared, ready) = oneshot::channel();
+        let pending = self.start(true, Some(prepared), cancel)?;
+        tokio::select! {
+            result = ready => {
+                if result.is_ok() {
+                    if cancel.is_cancelled() {
+                        Err(pending.abort(ConfctlError::Cancelled).await)
+                    } else {
+                        Ok(pending)
+                    }
+                } else {
+                    // Setup failures have the existing InputReply as their sole
+                    // error owner; the readiness channel carries no second copy.
+                    pending.wait(cancel).await?;
+                    Err(input_error(io::Error::other("input preparation lost response")))
+                }
             },
-        };
-        pending.armed = false;
-        result
+            _ = cancel.cancelled() => {
+                Err(pending.abort(ConfctlError::Cancelled).await)
+            },
+        }
+    }
+
+    pub async fn line(
+        &self,
+        protected: bool,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<u8>, ConfctlError> {
+        self.start(protected, None, cancel)?.wait(cancel).await
     }
 
     /// Call after joining/dropping prompt futures. Joins the input worker and
@@ -588,7 +715,11 @@ fn broker(
             &wake,
             rustix::event::PollFlags::IN,
         )];
-        if pending.is_some() {
+        let reading_id = pending
+            .as_ref()
+            .filter(|pending| pending.phase == ReadPhase::Reading)
+            .map(|pending| pending.id);
+        if reading_id.is_some() {
             descriptors.push(rustix::event::PollFd::new(
                 &input,
                 rustix::event::PollFlags::IN,
@@ -622,6 +753,13 @@ fn broker(
                         }
                         return;
                     }
+                    Request::Activate { id } => {
+                        if let Some(pending) = &mut pending
+                            && pending.id == id
+                        {
+                            pending.phase = ReadPhase::Reading;
+                        }
+                    }
                     Request::Cancel { id, restored } => {
                         if pending.as_ref().is_some_and(|pending| pending.id == id)
                             && let Some(pending) = pending.take()
@@ -635,6 +773,7 @@ fn broker(
                     Request::Line {
                         id,
                         protected,
+                        prepared,
                         response,
                     } => {
                         if poisoned.load(Ordering::Acquire) {
@@ -680,16 +819,33 @@ fn broker(
                         }
                         pending = Some(Pending {
                             id,
+                            phase: if prepared.is_some() {
+                                ReadPhase::Prepared
+                            } else {
+                                ReadPhase::Reading
+                            },
                             bytes: Vec::new(),
                             response,
                             original,
                             unobserved: unobserved.clone(),
                         });
+                        if let Some(prepared) = prepared
+                            && prepared.send(()).is_err()
+                            && let Some(pending) = pending.take()
+                        {
+                            complete(&input, pending, Err(ConfctlError::Cancelled));
+                        }
                     }
                 }
             }
         }
-        if input_ready && pending.is_some() {
+        // Wake messages may cancel/replace the request observed by poll. A
+        // stale input readiness must never read a newly prepared request.
+        if input_ready
+            && pending.as_ref().is_some_and(|pending| {
+                reading_id == Some(pending.id) && pending.phase == ReadPhase::Reading
+            })
+        {
             let mut byte = [0];
             match rustix::io::read(&input, &mut byte) {
                 Ok(0) => {

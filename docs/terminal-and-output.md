@@ -256,6 +256,14 @@ them from background diagnostics without guessing from their content. The
 input broker remains confctl's only reader and does not read ahead into a later
 prompt or child.
 
+The broker reserves a protected read and disables terminal echo before any prompt
+bytes are written. It starts reading only after the presentation consumer
+acknowledges the prompt, so queued input cannot complete the read and restore echo
+before the prompt appears. If the prompt is cancelled, dropped or cannot be
+delivered, the broker attempts to flush protected terminal input and restore the
+saved modes before releasing ownership. Non-terminal input uses the same
+acknowledgment barrier without changing terminal modes.
+
 An `OperationGroup` carries a concrete table/diagnostic prelude. The consumer
 validates the whole prelude before deduplicating a group and acknowledges its
 first delivery only after required bytes have transferred to output ownership.
