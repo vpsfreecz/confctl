@@ -122,8 +122,17 @@ active.unlink(missing_ok=True)
 sys.exit(7 if (r/(host+'.fail')).exists() else 0)
 "#;
         for tool in ["nix", "ssh", "nix-collect-garbage"] {
-            fs::write(bin.join(tool), source).unwrap();
-            fs::set_permissions(bin.join(tool), fs::Permissions::from_mode(0o755)).unwrap();
+            // Only the writer child owns the writable executable descriptor, so
+            // concurrent parent forks cannot inherit it.
+            let path = bin.join(tool);
+            let status = Command::new("/bin/sh")
+                .args(["-c", "set -C; printf '%s' \"$2\" > \"$1\"", "write-fixture"])
+                .arg(&path)
+                .arg(source)
+                .status()
+                .unwrap();
+            assert!(status.success(), "fixture writer failed: {status}");
+            fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
         }
         Self {
             _scratch: std::cell::RefCell::new(Some(scratch)),
