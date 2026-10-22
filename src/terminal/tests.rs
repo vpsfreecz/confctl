@@ -415,6 +415,344 @@ fn local_pty() -> (OwnedFd, OwnedFd) {
     (master, slave)
 }
 
+#[tokio::test]
+async fn protected_prompt_disables_echo_before_frame_and_reads_only_after_ack() {
+    let (master, slave) = local_pty();
+    let original = rustix::termios::tcgetattr(&slave).expect("termios");
+    let (events, mut receiver) = EventSink::channel(1);
+    let ui = Ui::new(&slave, events, CancellationToken::new(), None).expect("UI");
+    ui.set_live(true).expect("live");
+    let prompt_ui = ui.clone();
+    let prompt = tokio::spawn(async move { prompt_ui.protected_line("Private: ".into()).await });
+    receiver.receive().await.expect("park").acknowledge(Ok(()));
+    let frame = receiver.receive().await.expect("protected frame");
+    assert!(matches!(frame.event, UiEvent::PromptFrame { .. }));
+    // This is the publication boundary, with ACK deliberately held. The old
+    // prompt-then-protect ordering deterministically leaves ECHO on here.
+    assert!(
+        !rustix::termios::tcgetattr(&slave)
+            .expect("prepared modes")
+            .local_modes
+            .contains(rustix::termios::LocalModes::ECHO),
+        "protected frame published before ECHO was disabled"
+    );
+    assert!(matches!(
+        ui.foreground().await,
+        Err(ConfctlError::TerminalBusy)
+    ));
+    let answer = b"private-answer\n";
+    rustix::io::write(&master, answer).expect("answer before ACK");
+    // The refused second request also establishes a worker wake boundary.
+    assert!(matches!(
+        ui.session
+            .broker
+            .line(false, &CancellationToken::new())
+            .await,
+        Err(ConfctlError::TerminalBusy)
+    ));
+    assert!(!prompt.is_finished(), "read completed before frame ACK");
+    assert_eq!(
+        rustix::io::ioctl_fionread(&slave).expect("queued answer"),
+        answer.len() as u64
+    );
+    let mut ready = [rustix::event::PollFd::new(
+        &master,
+        rustix::event::PollFlags::IN,
+    )];
+    let zero = rustix::event::Timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    assert_eq!(
+        rustix::event::poll(&mut ready, Some(&zero)).expect("echo poll"),
+        0,
+        "private input echoed"
+    );
+    assert!(
+        !rustix::termios::tcgetattr(&slave)
+            .expect("still prepared")
+            .local_modes
+            .contains(rustix::termios::LocalModes::ECHO)
+    );
+    frame.acknowledge(Ok(()));
+    let actual = prompt.await.expect("prompt joined").expect("answer");
+    assert!(actual == answer, "private answer bytes changed (withheld)");
+    pty_tests::assert_modes(
+        &original,
+        &rustix::termios::tcgetattr(&slave).expect("restored"),
+    );
+    assert_eq!(ui.state(), TerminalState::Live);
+    ui.shutdown().expect("checked shutdown");
+}
+
+#[tokio::test]
+async fn protected_non_tty_prompt_keeps_all_input_queued_until_ack() {
+    let (input, mut peer) = UnixStream::pair().expect("input");
+    let (events, mut receiver) = EventSink::channel(1);
+    let ui = Ui::new(&input, events, CancellationToken::new(), None).expect("UI");
+    let prompt_ui = ui.clone();
+    let prompt = tokio::spawn(async move { prompt_ui.protected_line("Private: ".into()).await });
+    receiver.receive().await.expect("park").acknowledge(Ok(()));
+    let frame = receiver.receive().await.expect("frame");
+    let answer = b"private-pipe-answer\n";
+    peer.write_all(answer).expect("queued input");
+    assert!(matches!(
+        ui.session
+            .broker
+            .line(false, &CancellationToken::new())
+            .await,
+        Err(ConfctlError::TerminalBusy)
+    ));
+    assert!(!prompt.is_finished());
+    assert_eq!(
+        rustix::io::ioctl_fionread(&input).expect("queued input"),
+        answer.len() as u64
+    );
+    frame.acknowledge(Ok(()));
+    assert!(
+        prompt.await.expect("join").expect("answer") == answer,
+        "private answer bytes changed (withheld)"
+    );
+    ui.shutdown().expect("checked shutdown");
+}
+
+#[tokio::test]
+async fn protected_prompt_cancel_drop_and_failed_ack_restore_before_lease_release() {
+    for action in [
+        "cancel",
+        "drop",
+        "missing-ack",
+        "failed-ack",
+        "active-cancel",
+        "active-drop",
+    ] {
+        let (master, slave) = local_pty();
+        let original = rustix::termios::tcgetattr(&slave).expect("modes");
+        let cancel = CancellationToken::new();
+        let (events, mut receiver) = EventSink::channel(1);
+        let ui = Ui::new(&slave, events, cancel.clone(), None).expect("UI");
+        ui.set_live(true).expect("live");
+        let prompt_ui = ui.clone();
+        let prompt =
+            tokio::spawn(async move { prompt_ui.protected_line("Private: ".into()).await });
+        receiver.receive().await.expect("park").acknowledge(Ok(()));
+        let frame = receiver.receive().await.expect("frame");
+        rustix::io::write(&master, b"private-partial").expect("partial input");
+        if action.starts_with("active-") {
+            frame.acknowledge(Ok(()));
+            tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                while rustix::io::ioctl_fionread(&slave).expect("partial input") != 0 {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .expect("active read consumes the partial answer");
+        } else if action == "missing-ack" {
+            drop(frame);
+        } else if action == "failed-ack" {
+            frame.acknowledge(Err("fixture output failure".into()));
+        }
+        if action.ends_with("drop") {
+            prompt.abort();
+            assert!(prompt.await.expect_err("dropped future").is_cancelled());
+        } else {
+            if action.ends_with("cancel") {
+                cancel.cancel();
+            }
+            let error = prompt.await.expect("joined").expect_err("aborted prompt");
+            if action.ends_with("cancel") {
+                assert!(matches!(error, ConfctlError::Cancelled));
+            } else {
+                assert!(matches!(error, ConfctlError::EventDelivery(_)));
+            }
+        }
+        assert_eq!(ui.state(), TerminalState::Live);
+        pty_tests::assert_modes(
+            &original,
+            &rustix::termios::tcgetattr(&slave).expect("restored"),
+        );
+        assert_echo_restored_and_input_empty(&slave);
+        // The operation token remains canceled; check the released lease
+        // without trying to publish another event through that canceled UI.
+        assert!(!ui.session.owned.load(Ordering::Acquire));
+        ui.shutdown().expect("checked shutdown");
+    }
+}
+
+#[tokio::test]
+async fn abandoned_preparation_and_readiness_restore_and_release_input() {
+    for abandoned_ready in [false, true] {
+        let (_master, slave) = local_pty();
+        let original = rustix::termios::tcgetattr(&slave).expect("modes");
+        let broker = InputBroker::new(&slave).expect("broker");
+        let (ready, receive) = oneshot::channel();
+        let pending = broker
+            .start(true, Some(ready), &CancellationToken::new())
+            .expect("enqueued");
+        if abandoned_ready {
+            drop(receive);
+        } else {
+            receive.await.expect("prepared");
+        }
+        // Drop also covers cancellation while the readiness reply is in flight.
+        drop(pending);
+        pty_tests::assert_modes(
+            &original,
+            &rustix::termios::tcgetattr(&slave).expect("restored"),
+        );
+        assert_echo_restored_and_input_empty(&slave);
+        broker.shutdown().expect("checked shutdown");
+    }
+}
+
+#[tokio::test]
+async fn canceled_preparation_restores_input_before_returning() {
+    let (_master, slave) = local_pty();
+    let original = rustix::termios::tcgetattr(&slave).expect("modes");
+    let broker = InputBroker::new(&slave).expect("broker");
+    let cancel = CancellationToken::new();
+    let mut preparation = Box::pin(broker.prepare_protected(&cancel));
+    let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+    let initial = preparation.as_mut().poll(&mut context);
+    cancel.cancel();
+    match initial {
+        std::task::Poll::Ready(Ok(prepared)) => drop(prepared),
+        std::task::Poll::Ready(Err(_)) => panic!("uncanceled preparation failed"),
+        std::task::Poll::Pending => {
+            assert!(matches!(preparation.await, Err(ConfctlError::Cancelled)))
+        }
+    }
+    pty_tests::assert_modes(
+        &original,
+        &rustix::termios::tcgetattr(&slave).expect("restored"),
+    );
+    broker.shutdown().expect("checked shutdown");
+}
+
+#[tokio::test]
+async fn protected_prompt_failure_keeps_primary_before_native_cleanup_errors_once() {
+    let (master, slave) = local_pty();
+    let (events, mut receiver) = EventSink::channel(1);
+    let ui = Ui::new(&slave, events, CancellationToken::new(), None).expect("UI");
+    let prompt_ui = ui.clone();
+    let prompt = tokio::spawn(async move { prompt_ui.protected_line("Private: ".into()).await });
+    receiver.receive().await.expect("park").acknowledge(Ok(()));
+    let frame = receiver.receive().await.expect("prepared frame");
+    drop(master);
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while rustix::termios::tcgetattr(&slave).is_ok() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("native terminal hangup");
+    frame.acknowledge(Err("fixture output failure".into()));
+    let error = prompt
+        .await
+        .expect("join")
+        .expect_err("presentation failed");
+    let ConfctlError::Cleanup { primary, secondary } = error else {
+        panic!("missing cleanup failures");
+    };
+    assert!(
+        matches!(*primary, ConfctlError::EventDelivery(ref message) if message == "fixture output failure")
+    );
+    assert!(matches!(
+        secondary.as_slice(),
+        [
+            ConfctlError::Io {
+                operation: "flush protected input",
+                ..
+            },
+            ConfctlError::Io {
+                operation: "restore terminal input",
+                ..
+            },
+        ]
+    ));
+    assert_eq!(ui.state(), TerminalState::Idle);
+    ui.shutdown().expect("consumed cleanup not reported again");
+}
+
+#[tokio::test]
+async fn unpolled_protected_abort_retains_presentation_before_cleanup_once() {
+    let (master, slave) = local_pty();
+    let broker = InputBroker::new(&slave).expect("broker");
+    let prepared = broker
+        .prepare_protected(&CancellationToken::new())
+        .await
+        .expect("prepared");
+    drop(master);
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match rustix::termios::tcgetattr(&slave) {
+                Err(rustix::io::Errno::IO) => break,
+                Ok(_) => tokio::task::yield_now().await,
+                Err(error) => panic!("observe terminal hangup: {error}"),
+            }
+        }
+    })
+    .await
+    .expect("native hangup");
+    let abort = prepared.abort(ConfctlError::EventDelivery("fixture output failure".into()));
+    drop(abort);
+    let error = broker
+        .shutdown()
+        .expect_err("unconsumed presentation and cleanup");
+    let ConfctlError::Cleanup { primary, secondary } = error else {
+        panic!("missing retained errors");
+    };
+    assert!(
+        matches!(*primary, ConfctlError::EventDelivery(ref message) if message == "fixture output failure")
+    );
+    assert_eq!(secondary.len(), 1, "one unconsumed cleanup reply");
+    assert_restoration_order(&secondary[0]);
+    broker.shutdown().expect("errors transferred once");
+}
+
+#[tokio::test]
+async fn protected_preparation_failure_publishes_no_frame_and_retains_one_error_owner() {
+    let (input, _peer) = UnixStream::pair().expect("input");
+    let (events, mut receiver) = EventSink::channel(1);
+    let ui = Ui::new(&input, events, CancellationToken::new(), None).expect("UI");
+    let prompt_ui = ui.clone();
+    let prompt = tokio::spawn(async move { prompt_ui.protected_line("Private: ".into()).await });
+    let park = receiver.receive().await.expect("park");
+    ui.session.broker.poisoned.store(true, Ordering::Release);
+    park.acknowledge(Ok(()));
+    assert!(matches!(
+        prompt.await.expect("join"),
+        Err(ConfctlError::InputTooLong { .. })
+    ));
+    assert_eq!(ui.state(), TerminalState::Idle);
+    drop(ui);
+    assert!(
+        receiver.receive().await.is_none(),
+        "no prompt after failed preparation"
+    );
+
+    let broker = InputBroker::new(&input).expect("broker");
+    let (ready, receive) = oneshot::channel();
+    broker.poisoned.store(true, Ordering::Release);
+    let (response, reply_receive) = oneshot::channel();
+    broker
+        .send(Request::Line {
+            id: 0,
+            protected: true,
+            prepared: Some(ready),
+            response,
+        })
+        .expect("request");
+    assert!(receive.await.is_err(), "failed setup has no success ACK");
+    assert!(matches!(
+        reply_receive.await.expect("failure reply").consume(),
+        Err(ConfctlError::InputTooLong { .. })
+    ));
+    broker
+        .shutdown()
+        .expect("consumed error not reported twice");
+}
+
 async fn echo_disabled(slave: &OwnedFd) {
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         while rustix::termios::tcgetattr(slave)
@@ -634,6 +972,7 @@ async fn protected_pty_hangup_then_queued_reply_drop_retains_native_cleanup_fail
     let (send, receive) = oneshot::channel();
     let pending = Pending {
         id: 1,
+        phase: ReadPhase::Reading,
         bytes: b"partial-secret".to_vec(),
         response: send,
         original: Some(original),
@@ -699,6 +1038,7 @@ fn successful_read_with_failed_restore_uses_cleanup_error_as_primary() {
         &slave,
         Pending {
             id: 1,
+            phase: ReadPhase::Reading,
             bytes: Vec::new(),
             response: send,
             original: Some(original),
