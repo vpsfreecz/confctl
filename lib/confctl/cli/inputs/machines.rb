@@ -3,9 +3,12 @@ require 'confctl/conf_dir'
 require 'confctl/nix'
 require 'confctl/inputs/setter'
 require 'confctl/inputs/updater'
+require 'confctl/cli/inputs/update_result'
 
 module ConfCtl::Cli
   class Inputs::Machines < Command
+    include Inputs::UpdateResult
+
     def update
       ensure_flake_config!
       require_args!('machine', 'role')
@@ -23,14 +26,16 @@ module ConfCtl::Cli
 
       raise ConfCtl::Error, "machine '#{machine_name}' has no role '#{role}'" unless input
 
-      ConfCtl::Inputs::Updater.run!(
+      res = ConfCtl::Inputs::Updater.run!(
         conf_dir: ConfCtl::ConfDir.path,
         inputs: [input],
         commit: opts[:commit],
         changelog: opts[:changelog],
         downgrade: opts[:downgrade],
-        editor: opts[:editor]
+        editor: opts[:editor],
+        forward_only: opts[:'forward-only'] || false
       )
+      ensure_update_success!(res)
 
       lock = ConfCtl::FlakeLock.load(File.join(ConfCtl::ConfDir.path, 'flake.lock'))
       info = lock.input_info(input)

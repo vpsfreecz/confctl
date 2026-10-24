@@ -1,7 +1,8 @@
 # Flake inputs
 
-confctl requires a configuration flake whose outputs use
-`confctl.lib.mkConfctlOutputs`:
+Root input commands work in any Git checkout with a `flake.nix`; they do not
+require cluster outputs. Channel and machine commands require a configuration
+flake whose outputs use `confctl.lib.mkConfctlOutputs`:
 
 - inputs are normal flake inputs locked in `flake.lock`
 - machines select “channels” via `inputs.channels`
@@ -142,6 +143,117 @@ confctl inputs machine update --commit <machine> nixpkgs
 
 - `--no-changelog` disables including `git log --oneline old..new` in the commit message.
 - `--downgrade` is useful when you intentionally move to an older revision and still want the changelog direction to make sense.
+
+`confctl inputs ls --json [input-pattern]` prints an array of rows with fields
+`input`, `type`, `ref`, `rev` and `url`. JSON revisions are full locked revisions;
+sources without a revision have `rev: null`. Input aliases use the same complete
+`follows` resolution as other input commands. The default table still shows
+eight-character revisions. An unmatched pattern produces an empty array.
+
+## Guarded automated updates
+
+Use `--forward-only` in publishing workflows to retain manually pinned commits
+until the upstream branch contains them:
+
+```bash
+confctl inputs update --forward-only nixpkgs
+confctl inputs update --forward-only --all
+confctl inputs channel update --forward-only --commit --no-changelog \
+  '{production,staging}' nixpkgs
+confctl inputs machine update --forward-only --commit build.example.org nixpkgs
+```
+
+Options must come before positional arguments. The guard requires an existing
+version-7 `flake.lock` tracked in Git and a clean tracked checkout and index.
+Use a checkout with one writer. Cooperating guarded confctl updates use a
+process lock; other tools must not write to the checkout concurrently.
+
+Guarded updates require Nix 2.19 or newer, including
+`--reference-lock-file` and `--output-lock-file` support. The transaction and
+nested selection have been exercised with Nix 2.34.9. The packaged confctl uses
+its bundled Nix; installing another Nix in CI does not necessarily change that
+runtime. Unsupported flags or unmatched selectors fail without updating the
+real lock. There is no fallback to an update in place.
+
+confctl resolves requested `follows` aliases to their terminal input paths and
+deduplicates shared targets. For example, a root `nixpkgs` following
+`vpsadminos/nixpkgs`, where `vpsadminos` follows `vpsadmin/vpsadminos`, updates
+`vpsadmin/vpsadminos/nixpkgs`. It leaves both parent revisions unchanged.
+
+Nix writes a candidate lock beside the original flake, using a separate snapshot
+of the old lock as its reference. confctl validates the complete reachable
+graph before atomically installing the candidate. It compares logical dependency
+paths, including descendants and aliases, rather than generated node IDs. A
+forward root update that regresses a nested dependency is rejected as a whole.
+Local lock bytes, root `flake.nix`, Git HEAD, index entries and tracked checkout
+state are checked again before installation. No commit runs before acceptance.
+
+Each existing Git revision must equal or be an ancestor of its replacement in
+the same supported source. Currently the ancestry provider supports
+`github.com` sources with full immutable Git revisions, including
+`flake = false` sources. It uses GitHub's compare API with `GITHUB_TOKEN`, or
+`GH_TOKEN` when `GITHUB_TOKEN` is absent. Nix's `access-tokens` configuration is
+separate; workflows must pass a token to confctl's provider explicitly. The
+provider uses fixed HTTPS API endpoints without redirects, a 10-second connect
+timeout and a 30-second read timeout; it does not retry failed requests.
+
+Source, fetcher or extraction changes require manual review. A change to locked
+attributes at the same revision also rejects, including a changed `narHash`.
+Previously reachable paths cannot disappear. New paths must contain supported
+immutable Git sources. Unchanged unsupported sources may remain; changed path,
+tarball, indirect or other unsupported sources fail with an evidence error.
+The check does not prove that live path-source contents stayed unchanged.
+Changing the original branch/ref declaration alone is not a source-content
+change when the locked source is identical.
+
+A rejection or evidence error leaves the original lock, index and HEAD
+untouched by confctl. Nix failures, malformed candidates, cached GitHub metadata
+fallback warnings and unavailable ancestry evidence all stop the update.
+Concurrent checkout changes stop installation and are left for the writer to
+reconcile. A commit-hook failure after installation returns failure and leaves
+the validated candidate in place; hook side effects are not rolled back.
+Each invocation is a separate transaction: earlier local commits from a
+multi-command job are not undone when a later invocation fails.
+
+Exit status is `0` for an accepted update or no change, `3` for a known policy
+rejection, and `1` for missing or unsupported evidence and tool errors. Both
+nonzero statuses must stop publication. `--downgrade` only changes changelog
+direction and cannot bypass `--forward-only`. Unflagged manual updates and
+`inputs set` retain their existing behavior for deliberate revision changes.
+
+Ancestry preservation retains the pinned commit in history. It does not detect
+later reverts, prove patch equivalence after a cherry pick, or establish software
+compatibility. Keep the repository's existing tests. When a pin is ahead of or
+diverges from its upstream branch, retain it until the branch contains it, or
+make a reviewed manual transition. Do not fall back to an unguarded update when
+the check fails.
+
+### Check the final lock before publishing
+
+Save the workflow's original lock outside the checkout. After commit hooks and
+tests have run, export `HEAD:flake.lock` and compare that committed snapshot
+against the same baseline. This checks the lockfile that Git will publish:
+
+```bash
+set -euo pipefail
+baseline=$(mktemp)
+cp flake.lock "$baseline"
+confctl inputs update --forward-only --commit --no-changelog nixpkgs
+# Run the repository's required checks here.
+final_lock=$(mktemp)
+git show HEAD:flake.lock > "$final_lock"
+confctl inputs check-update --old-lock "$baseline" --new-lock "$final_lock"
+# Publish only after every preceding command succeeded.
+```
+
+`check-update` reads both lock files and applies the same complete-graph policy.
+It does not invoke Nix, install a lock or commit. Its exit statuses are the same
+as guarded update statuses. It can run without confctl cluster outputs.
+
+Use an ordinary non-force Git push after successful checks. If the target branch
+moved, retry in a new checkout from a fresh baseline so a
+concurrent manual pin is included in the next check. An ancestry check against a
+stale local baseline does not establish safety against a changed remote branch.
 
 ## Nested inputs and `follows`
 

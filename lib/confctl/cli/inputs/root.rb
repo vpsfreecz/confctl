@@ -4,9 +4,12 @@ require 'confctl/flake_lock'
 require 'confctl/pattern'
 require 'confctl/inputs/setter'
 require 'confctl/inputs/updater'
+require 'confctl/cli/inputs/update_result'
 
 module ConfCtl::Cli
   class Inputs::Root < Command
+    include Inputs::UpdateResult
+
     def list
       ensure_flake_config!
 
@@ -17,13 +20,18 @@ module ConfCtl::Cli
           input: input_name,
           type: info[:type],
           ref: info[:ref],
-          rev: info[:short_rev],
+          rev: opts[:json] ? info[:rev] : info[:short_rev],
           url: info[:url]
         }
       end
 
       if args[0]
         rows.select! { |r| ConfCtl::Pattern.match?(args[0], r[:input]) }
+      end
+
+      if opts[:json]
+        puts JSON.pretty_generate(rows)
+        return
       end
 
       OutputFormatter.print(rows, %i[input type ref rev url], layout: :columns)
@@ -52,10 +60,23 @@ module ConfCtl::Cli
         commit: opts[:commit],
         changelog: opts[:changelog],
         downgrade: opts[:downgrade],
-        editor: opts[:editor]
+        editor: opts[:editor],
+        forward_only: opts[:'forward-only'] || false
       )
+      ensure_update_success!(res)
 
       print_update_summary(res[:changes])
+    end
+
+    def check_update
+      require_args!
+      old_lock = ConfCtl::FlakeLock.load(opts['old-lock'])
+      new_lock = ConfCtl::FlakeLock.load(opts['new-lock'])
+      result = ConfCtl::Inputs::ForwardGuard.new.validate(old_lock, new_lock)
+      ensure_update_success!(status: result.status, issues: result.issues)
+      print_update_summary(ConfCtl::FlakeLockDiff.from_guard(result.changes, old_lock, new_lock))
+    rescue JSON::ParserError
+      raise ConfCtl::Error, 'Invalid lock JSON'
     end
 
     def set

@@ -3,13 +3,23 @@ require 'confctl/flake_lock_diff'
 require 'confctl/inputs/commit_message'
 require 'confctl/inputs/git_commit'
 require 'confctl/inputs/nix_output_guard'
+require 'confctl/inputs/guarded_update'
 require 'confctl/system_command'
 
 module ConfCtl
   module Inputs
     class Updater
-      def self.run!(conf_dir:, inputs:, commit:, changelog:, downgrade:, editor:)
+      def self.run!(conf_dir:, inputs:, commit:, changelog:, downgrade:, editor:, forward_only: false)
         raise ArgumentError, 'inputs empty' if inputs.nil? || inputs.empty?
+
+        if forward_only
+          after_install = if commit
+                            proc { |changes| commit_changes!(conf_dir, changes, changelog, downgrade, editor) }
+                          end
+          return GuardedUpdate.new(conf_dir: conf_dir, inputs: inputs).run!(after_install: after_install) do |reference, output, targets|
+            run_nix_flake_update!(conf_dir, targets, reference: reference, output: output)
+          end
+        end
 
         lock_path = File.join(conf_dir, 'flake.lock')
         old_lock = ConfCtl::FlakeLock.load_optional(lock_path)
@@ -22,23 +32,18 @@ module ConfCtl
         return { changed: false, changes: [] } if changes.empty?
 
         if commit
-          msg = ConfCtl::Inputs::CommitMessage.build(
-            changes: changes,
-            changelog: changelog,
-            downgrade: downgrade
-          )
-          ConfCtl::Inputs::GitCommit.commit!(
-            conf_dir: conf_dir,
-            message: msg,
-            editor: editor,
-            files: ['flake.lock']
-          )
+          commit_changes!(conf_dir, changes, changelog, downgrade, editor)
         end
 
         { changed: true, changes: changes }
       end
 
-      def self.run_nix_flake_update!(conf_dir, inputs)
+      def self.commit_changes!(conf_dir, changes, changelog, downgrade, editor)
+        msg = ConfCtl::Inputs::CommitMessage.build(changes: changes, changelog: changelog, downgrade: downgrade)
+        ConfCtl::Inputs::GitCommit.commit!(conf_dir: conf_dir, message: msg, editor: editor, files: ['flake.lock'])
+      end
+
+      def self.run_nix_flake_update!(conf_dir, inputs, reference: nil, output: nil)
         cmd = ConfCtl::SystemCommand.new
         extra_experimental = false
 
@@ -49,11 +54,16 @@ module ConfCtl
             args << '--extra-experimental-features' << 'flakes'
           end
           args << 'flake' << 'update'
+          args.push('--reference-lock-file', reference, '--output-lock-file', output) if reference && output
           args.concat(inputs) if inputs
 
           begin
             result = Dir.chdir(conf_dir) { cmd.run(*args) }
             ConfCtl::Inputs::NixOutputGuard.check!(result)
+            if output && [result.stdout, result.stderr].compact.join("\n").match?(/does not match any input/i)
+              raise ConfCtl::Error, 'Nix did not match the requested update input; no lock was installed'
+            end
+
             break
           rescue TTY::Command::ExitError => e
             if !extra_experimental && experimental_error?(e.message)
@@ -70,7 +80,7 @@ module ConfCtl
         message.match?(/experimental/i) && message.match?(/nix-command|flakes/i)
       end
 
-      private_class_method :run_nix_flake_update!, :experimental_error?
+      private_class_method :run_nix_flake_update!, :experimental_error?, :commit_changes!
     end
   end
 end

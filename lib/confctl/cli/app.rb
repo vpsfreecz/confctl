@@ -61,6 +61,8 @@ module ConfCtl::Cli
         inputs.desc 'List root-level flake inputs and their locked revisions'
         inputs.arg_name '[input-pattern]'
         inputs.command :ls do |c|
+          c.desc 'Print input rows as JSON with full revisions'
+          c.switch :json, default_value: false
           c.action(&Command.run(c, Inputs::Root, :list))
         end
 
@@ -82,7 +84,17 @@ module ConfCtl::Cli
           c.desc 'Update all root inputs (dangerous; normally specify names)'
           c.switch :all, default_value: false
 
+          c.desc 'Require every existing Git revision to remain an ancestor'
+          c.switch :'forward-only', default_value: false
+
           c.action(&Command.run(c, Inputs::Root, :update))
+        end
+
+        inputs.desc 'Check lock graph ancestry without updating or committing'
+        inputs.command :'check-update' do |c|
+          c.flag 'old-lock', arg_name: 'file', required: true
+          c.flag 'new-lock', arg_name: 'file', required: true
+          c.action(&Command.run(c, Inputs::Root, :check_update))
         end
 
         inputs.desc 'Set a flake input to a specific revision'
@@ -118,6 +130,9 @@ module ConfCtl::Cli
             c.switch :changelog, default_value: true
             c.switch :editor, default_value: true
             c.switch %i[d downgrade], default_value: false
+            c.desc 'Require every existing Git revision to remain an ancestor'
+            c.switch :'forward-only', default_value: false
+
             c.action(&Command.run(c, Inputs::Channels, :update))
           end
 
@@ -143,6 +158,9 @@ module ConfCtl::Cli
             c.switch :changelog, default_value: true
             c.switch :editor, default_value: true
             c.switch %i[d downgrade], default_value: false
+            c.desc 'Require every existing Git revision to remain an ancestor'
+            c.switch :'forward-only', default_value: false
+
             c.action(&Command.run(c, Inputs::Machines, :update))
           end
 

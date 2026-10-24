@@ -5,9 +5,12 @@ require 'confctl/nix'
 require 'confctl/pattern'
 require 'confctl/inputs/setter'
 require 'confctl/inputs/updater'
+require 'confctl/cli/inputs/update_result'
 
 module ConfCtl::Cli
   class Inputs::Channels < Command
+    include Inputs::UpdateResult
+
     def list
       ensure_flake_config!
 
@@ -62,14 +65,16 @@ module ConfCtl::Cli
 
       raise ConfCtl::Error, 'no inputs selected (check role name?)' if inputs.empty?
 
-      ConfCtl::Inputs::Updater.run!(
+      res = ConfCtl::Inputs::Updater.run!(
         conf_dir: ConfCtl::ConfDir.path,
         inputs: inputs,
         commit: opts[:commit],
         changelog: opts[:changelog],
         downgrade: opts[:downgrade],
-        editor: opts[:editor]
+        editor: opts[:editor],
+        forward_only: opts[:'forward-only'] || false
       )
+      ensure_update_success!(res)
 
       lock = ConfCtl::FlakeLock.load(File.join(ConfCtl::ConfDir.path, 'flake.lock'))
       targets.each do |t|

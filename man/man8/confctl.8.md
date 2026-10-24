@@ -523,6 +523,12 @@ Use retained confctl v3 for old software-pin generations.
   List root-level flake inputs and their locked revisions. Available only in
   flake configs.
 
+    `--json`
+      Print an array of rows with fields `input`, `type`, `ref`, `rev` and `url`.
+      Revisions are full locked revisions, or null when absent. Resolves follows
+      aliases. An unmatched pattern produces an empty array. The default table
+      continues to show eight-character revisions.
+
 `confctl inputs update` [*input-name ...*]
   Update flake inputs in `flake.lock`. Available only in flake configs.
 
@@ -542,6 +548,23 @@ Use retained confctl v3 for old software-pin generations.
 
     `--all`
       Update all root inputs.
+
+    `--forward-only`
+      Validate the complete lock graph before installation. Every existing Git
+      revision must remain an ancestor in the same supported source. Requires
+      Nix 2.19 or newer, an existing tracked version-7 lock and a clean tracked
+      checkout and index. Resolves follows aliases to terminal update paths.
+      Exit 3 means policy rejection; exit 1 means unknown evidence or tool error.
+      Both statuses stop publication. `--downgrade` does not bypass this guard.
+
+`confctl inputs check-update` `--old-lock` *file* `--new-lock` *file*
+  Read two locks and apply the same complete-graph ancestry policy as
+  `--forward-only`. Does not update, install or commit a lock, and does not
+  require cluster outputs. Returns 0 on acceptance, 3 on policy rejection and
+  1 on evidence or tool errors. After hooks and tests, export `HEAD:flake.lock`
+  and check that committed snapshot against the original workflow baseline
+  before publishing. See `docs/flake-inputs.md` for supported sources,
+  credentials, transaction guarantees and limitations.
 
 `confctl inputs set` *input-name* *rev*
   Set a flake input to a specific revision in `flake.lock` while keeping the
@@ -583,6 +606,14 @@ Use retained confctl v3 for old software-pin generations.
       Use when the new version is older than the previously set version. Used for
       generating the commit changelog direction.
 
+    `--forward-only`
+      Validate the complete lock graph before installation. Every existing Git
+      revision must remain an ancestor in the same supported source. Requires
+      Nix 2.19 or newer, an existing tracked version-7 lock and a clean tracked
+      checkout and index. Resolves follows aliases to terminal update paths.
+      Exit 3 means policy rejection; exit 1 means unknown evidence or tool error.
+      Both statuses stop publication. `--downgrade` does not bypass this guard.
+
 `confctl inputs channel set` *channels* *role* *rev*
   Set inputs referenced by selected channels for a specific role to *rev*.
   Available only in flake configs.
@@ -622,6 +653,14 @@ Use retained confctl v3 for old software-pin generations.
     `-d`, `--downgrade`
       Use when the new version is older than the previously set version. Used for
       generating the commit changelog direction.
+
+    `--forward-only`
+      Validate the complete lock graph before installation. Every existing Git
+      revision must remain an ancestor in the same supported source. Requires
+      Nix 2.19 or newer, an existing tracked version-7 lock and a clean tracked
+      checkout and index. Resolves follows aliases to terminal update paths.
+      Exit 3 means policy rejection; exit 1 means unknown evidence or tool error.
+      Both statuses stop publication. `--downgrade` does not bypass this guard.
 
 `confctl inputs machine set` *machine* *role* *rev*
   Set the input used by a specific machine for a specific role to *rev*.
