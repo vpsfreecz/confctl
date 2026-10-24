@@ -175,6 +175,11 @@ its bundled Nix; installing another Nix in CI does not necessarily change that
 runtime. Unsupported flags or unmatched selectors fail without updating the
 real lock. There is no fallback to an update in place.
 
+The Nix package starts confctl with its packaged Ruby gems and ignores inherited
+`RUBYOPT` options for that Ruby process. It retains `RUBYOPT` and `BUNDLE_*`
+environment variables for child commands, including Git hooks. User scripts
+that explicitly load Bundler remain subject to their bundle configuration.
+
 confctl resolves requested `follows` aliases to their terminal input paths and
 deduplicates shared targets. For example, a root `nixpkgs` following
 `vpsadminos/nixpkgs`, where `vpsadminos` follows `vpsadmin/vpsadminos`, updates

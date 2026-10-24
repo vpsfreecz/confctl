@@ -27,7 +27,8 @@ in
   export RUBYLIB="${src}/lib"
   export PATH="${runtimePath}:$PATH"
 
-  exec ${ruby}/bin/ruby ${src}/bin/confctl "$@"
+  # Ignore caller preloads at startup while retaining their environment for hooks.
+  exec ${ruby}/bin/ruby --disable=rubyopt ${src}/bin/confctl "$@"
 '').overrideAttrs
   (_old: {
     passthru = {
