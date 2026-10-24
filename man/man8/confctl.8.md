@@ -10,6 +10,11 @@
 `confctl` is a Nix deployment configuration management tool. It can be used to
 build and deploy *NixOS* and *vpsAdminOS* machines.
 
+The Nix package uses its packaged Ruby gems and ignores inherited `RUBYOPT`
+options when starting confctl. It retains `RUBYOPT` and `BUNDLE_*` environment
+variables for child commands, including Git hooks. User scripts that explicitly
+load Bundler remain subject to their bundle configuration.
+
 ## FLAKE INPUTS
 Configurations require `flake.nix` with outputs from
 `confctl.lib.mkConfctlOutputs` and inputs locked in `flake.lock`. Channels map dependency roles to root inputs;
