@@ -1,4 +1,5 @@
 require 'json'
+require 'confctl/inputs/lock_graph'
 
 module ConfCtl
   class FlakeLock
@@ -20,26 +21,22 @@ module ConfCtl
     end
 
     def root_inputs
-      inputs_map = data.dig('nodes', 'root', 'inputs') || {}
+      inputs_map = data.dig('nodes', data.fetch('root', 'root'), 'inputs') || {}
       inputs_map.keys.sort
     end
 
     def node_for_input(input_name)
-      node_id = data.dig('nodes', 'root', 'inputs', input_name)
+      return nil unless root_inputs.include?(input_name.split('/').first)
 
-      if node_id.is_a?(String)
-        return data.dig('nodes', node_id)
-      end
-
-      if node_id.is_a?(Array) && node_id[0].is_a?(String)
-        return data.dig('nodes', node_id[0])
-      end
-
-      nil
+      ConfCtl::Inputs::LockGraph.new(self).resolve_path(input_name).node
     end
 
     def input_info(input_name)
-      node = node_for_input(input_name) || {}
+      node_info(node_for_input(input_name))
+    end
+
+    def node_info(node)
+      node ||= {}
       locked = node['locked'] || {}
       original = node['original'] || {}
 

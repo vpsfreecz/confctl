@@ -1527,8 +1527,10 @@ module ConfCtl::Cli
       log_opts << '--max-count=50' unless opts[:verbose] || opts[:patch]
 
       mirror = ConfCtl::GitRepoMirror.new(url, quiet: true)
-      mirror.setup
-      mirror.log(old_rev, new_rev, opts: log_opts)
+      mirror.synchronize do
+        mirror.setup
+        mirror.log(old_rev, new_rev, opts: log_opts)
+      end
     end
 
     def format_inputs_state(state, deployed_info)

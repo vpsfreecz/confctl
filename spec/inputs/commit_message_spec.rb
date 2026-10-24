@@ -16,6 +16,7 @@ RSpec.describe ConfCtl::Inputs::CommitMessage do
     mirror = instance_double(ConfCtl::GitRepoMirror)
 
     expect(ConfCtl::GitRepoMirror).to receive(:new).with(url, quiet: true).and_return(mirror)
+    expect(mirror).to receive(:synchronize).and_yield
     expect(mirror).to receive(:setup)
     expect(mirror).to receive(:log).with(from, to, opts: ['--oneline']).and_return(output)
   end
@@ -165,6 +166,14 @@ RSpec.describe ConfCtl::Inputs::CommitMessage do
       git log for #{old_os_staging_rev}..#{new_rev}
       > 222222222 os staging change
     MSG
+  end
+
+  it 'keeps changelog evidence failures soft after a guarded update was accepted' do
+    changes = [build_change(name: 'source', old_rev: 'a' * 40, new_rev: 'b' * 40, url: 'https://github.com/owner/repo')]
+    mirror = instance_double(ConfCtl::GitRepoMirror)
+    allow(ConfCtl::GitRepoMirror).to receive(:new).and_return(mirror)
+    allow(mirror).to receive(:synchronize).and_raise(ConfCtl::GitRepoMirror::Error, 'Git mirror operation failed')
+    expect(described_class.build(changes: changes, changelog: true)).to include('changelog unavailable: Git mirror operation failed')
   end
 
   it 'does not include the revision in title for changes from different sources' do

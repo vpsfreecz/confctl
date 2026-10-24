@@ -16,6 +16,16 @@ module ConfCtl
       end
     end
 
+    def self.from_guard(changes, old_lock, new_lock)
+      changes.map do |change|
+        Change.new(
+          name: change.path,
+          old_info: old_lock.node_info(change.old_node),
+          new_info: new_lock.node_info(change.new_node)
+        )
+      end
+    end
+
     def self.diff(old_lock, new_lock, inputs: nil)
       return [] if new_lock.nil?
 

@@ -46,8 +46,10 @@ module ConfCtl
 
         begin
           mirror = ConfCtl::GitRepoMirror.new(reference.url, quiet: true)
-          mirror.setup
-          body << mirror.log(from, to, opts: ['--oneline'])
+          mirror.synchronize do
+            mirror.setup
+            body << mirror.log(from, to, opts: ['--oneline'])
+          end
         rescue StandardError => e
           body << "(changelog unavailable: #{e})"
         end
