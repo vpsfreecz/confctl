@@ -147,8 +147,11 @@ Groups run serially; a shared Nix build does not prove that each host executed
 separately. Stderr streams through the existing checked output relay while stdout
 stays captured for JSON decoding. Bounded incremental parsing recognizes Nix's
 build/fetch summaries and activity lines; unknown output remains visible and raw
-captures are unchanged. Counts describe activity, with an indeterminate total
-until both totals are known, and reset for each native attempt. A successful
+captures are unchanged. Separate Building, Fetching and Total rows show observed
+starts, with labels and counts outside the filled bar. Total combines build and
+fetch activity and stays indeterminate until both totals are known. Unknown or
+zero totals do not produce a percentage. Counts reset for each native attempt,
+including retries; a full bar never establishes successful completion. A successful
 group includes generation reuse/publication. On failure, later groups are skipped
 or canceled and earlier saved generations and partial roots remain in place.
 Task log locators refer to the app-owned invocation log. Successful finalization
@@ -193,30 +196,44 @@ requests retention of the raw invocation log before diagnostics or cooldown.
 The final summary reports actual passed and failed checks. Cancellation and
 delivery failures join entered work and preserve already delivered results.
 
-Live tail fragments and task rows share a compact source key: @ followed by
-the complete TaskId in base 36. Tail suffixes /o and /e identify stdout and
-stderr. A source change starts a separate displayed fragment, so partial lines
-from different sources do not merge. Keys encode the supplied ID directly;
-host and stage descriptions still come from the operation.
+The live header shows the invocation, current operation, local start time and
+whole-second elapsed time. The log locator has its own wrapped line, using a
+configuration-relative path when possible. Horizontal separators bound the live
+tail without adding vertical characters to copied output. A tiny terminal may
+show the full locator in normal scrollback when it cannot fit in the panel.
 
-Narrow views keep complete keys when they can fit beside useful message text.
-An ellipsis marks shortened text or omitted fields. Tiny views omit a whole
-key rather than showing an ambiguous prefix. Final summaries retain the key,
-full decimal TaskId, description, outcome and counts for tasks omitted or
-shortened by the final layout. Retained output without a registered task gets
-a source association with an explicit missing description, without inventing a
-task state. Tail content and its source metadata remain bounded.
+Native activity updates the sanitized live tail without also printing a raw
+transcript outside the view. Plain mode forwards the same activity bytes on
+their original streams and retains the existing host-attributed copy-progress
+lines on stdout. Those derived copy lines use a plain-only event, so they do not
+duplicate native activity in the live tail. Reports, tables, diagnostics and
+prompt frames keep their required-delivery behavior. Raw process captures and
+invocation logs remain independent of the bounded display; completion and cancellation do not replay
+the live activity history.
 
-Each retained task/log locator is also summarized at group finalization, even
-if its header was visible. Paths use one quoted, single-line display encoding:
-backslashes and quotes are escaped; LF, CR and tab use visible escapes; other
-ASCII controls and non-UTF8 bytes use two-digit byte escapes. Unicode controls,
-line separators and directional controls are escaped, while printable Unicode,
-including wide and combining text, remains readable. A header locator that
-cannot fit is replaced by an ellipsis; the final summary retains it in full.
-Native PathBuf values remain unchanged. Display labels affect only the view.
-Returned sanitized child output and original captures retain their existing
-bytes and stream roles.
+Single-command output has no source prefix. Mixed sources use readable command
+or host labels so interleaved fragments remain attributable. Source changes keep
+partial lines separate. Task IDs and stream identities remain internal metadata;
+registering several pending serial tasks does not make their output concurrent.
+Tail text and source metadata remain bounded.
+
+The presented process runner announces attempted commands before spawning them
+and before any child output. An accepted announcement does not assert that spawn
+succeeded. Quiet startup and settings commands therefore appear immediately.
+Audited producers supply a shell-readable, redacted display; other commands show
+their safe description with arguments omitted. The display never derives from
+arbitrary environment values or stdin, and native argv remains unchanged. Plain
+mode adds no command announcement to stdout. Foreground commands keep exclusive
+terminal ownership.
+
+Log paths keep one safe display encoding: backslashes and quotes are escaped;
+LF, CR and tab use visible escapes; other ASCII controls and non-UTF8 bytes use
+byte escapes. Unicode controls, line separators and directional controls are
+escaped, while printable wide and combining text remains readable. Wrapping
+changes only the display; native PathBuf values remain unchanged. Successful
+logs are removed unless an operation already requests retention. Failure and
+cancellation retain logs under the existing policy, and final locators refer to
+retained evidence rather than a deleted successful log.
 
 Both output streams must be usable terminals for live mode. `CONFCTL_TTY=0` or a
 redirected stream selects plain mode. Color policy is separate: `always` forces
@@ -228,9 +245,13 @@ confctl styling, `never` disables it, and `auto` follows the destination and
 Ratatui widgets render into a `Buffer`. The writer paints it with output-only
 Crossterm move/clear commands in the normal screen. It establishes a known line
 anchor through its own output, reserves a terminal column to avoid soft wrapping,
-and invalidates its geometry after resize or terminal handoff. It never asks the
-terminal for cursor coordinates, enters an alternate screen, changes raw mode,
-or reads keys. Resize comes from SIGWINCH and terminal-size ioctl.
+and invalidates its geometry after resize or terminal handoff. It compares the
+previous and current buffers, writes changed rows in one batch and skips identical
+frames. Ordinary activity updates coalesce to at most ten paints per second;
+elapsed text changes once per displayed second. It does not add blank space above
+the header or reserve a fixed empty panel. It never asks the terminal for cursor
+coordinates, enters an alternate screen, changes raw mode or reads keys. Resize
+comes from SIGWINCH and terminal-size ioctl.
 
 The locked dependencies explain this choice:
 
@@ -343,17 +364,15 @@ readiness while parked.
 
 ## Verification boundary
 
-The renderer and controlling-TTY integration are additive development work.
-Native attachment primitives, real Supervisor worker fixtures, app self-stop
-and the full app/worker path have passed focused checks. The notification-poll
-ownership correction described above also passed owned-zombie, external-reap
-and initial-attachment exit regressions. Interactive operation routes and the
-default package remain unreleased.
-A PTY without a controlling session cannot establish job-control correctness.
-Required tests cover input typeahead, no cursor query/raw mutation, narrow screens
-and resize, prompt and foreground
-handoff, stop/continue and Ctrl-C, parent exit around suspension, final panel and
-footer order, and capture/cleanup retention after output faults.
+Buffer tests check layout, independent activity counters and long log paths.
+Painter tests check that identical frames write nothing and a changed row does
+not rewrite the static header. Controlling-PTY fixtures exercise burst activity,
+quiet command starts, resize, prompt and foreground handoff, stop/continue and
+Ctrl-C, terminal restoration, final-panel/footer order and capture retention after
+output faults. These traces check routing and redraw behavior; they do not prove
+visual comfort in every terminal. A PTY without a controlling session cannot
+establish job-control correctness. Real-site builds and host operations require
+their own qualification.
 
 Checked application shutdown joins operation/input/process/presentation owners
 before the single final stderr timing appendix. Presentation does not own timing

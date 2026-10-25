@@ -78,6 +78,12 @@ impl Default for TableFormat {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ActivityCount {
+    pub observed: u64,
+    pub total: Option<u64>,
+}
+
 #[derive(Debug, PartialEq)]
 pub enum UiEvent {
     /// The consumer acknowledges only after it parks any live repaint.
@@ -97,6 +103,25 @@ pub enum UiEvent {
         task: TaskId,
         stream: OutputStream,
         bytes: Vec<u8>,
+    },
+    ActivityOutput {
+        task: TaskId,
+        stream: OutputStream,
+        bytes: Vec<u8>,
+    },
+    /// Compatibility bytes required only by the plain presentation.
+    PlainOutput {
+        stream: OutputStream,
+        bytes: Vec<u8>,
+    },
+    CommandStarting {
+        task: TaskId,
+        display: String,
+    },
+    BuildProgress {
+        task: TaskId,
+        building: ActivityCount,
+        fetching: ActivityCount,
     },
     Table {
         stream: OutputStream,

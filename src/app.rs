@@ -237,12 +237,15 @@ async fn execute<O: Operations>(
             return report_error(error, Some(invocation_log), &stderr);
         }
     };
-    let config = PresentationConfig::for_process(
+    let mut config = PresentationConfig::for_process(
         command,
         invocation.action.name().into(),
         invocation.global.color,
         spool.path().into(),
     );
+    config.configuration_dir = Some(cwd.clone());
+    config.invocation_log = Some(invocation_log.path().to_owned());
+    let live_output = config.policy.live;
     if let Err(error) = ui.set_live(config.policy.live) {
         drop(process_log);
         return report_error(
@@ -271,7 +274,7 @@ async fn execute<O: Operations>(
             );
         }
     };
-    let processes = Supervisor::new(
+    let processes = Supervisor::new_presented(
         events.clone(),
         spool.path().into(),
         1024 * 1024,
@@ -391,10 +394,10 @@ async fn execute<O: Operations>(
                 }]);
             }
         }
-        report_error(error, Some(invocation_log), &stderr);
+        report_error_mode(error, Some(invocation_log), &stderr, live_output);
     } else if let Err(failure) = invocation_log.finish(None, keep_requested) {
         disposition = ExitDisposition::failed(1);
-        report_retained_error(failure.source, failure.locator, false, &stderr);
+        report_retained_error_mode(failure.source, failure.locator, false, &stderr, live_output);
     }
     // All child/input/renderer owners have joined before freezing the report.
     if let Some(report) = timing.finish(disposition) {
@@ -453,7 +456,15 @@ fn diagnose(error: &ConfctlError, stderr: &SharedWriter) -> i32 {
     1
 }
 
-fn report_error(mut error: ConfctlError, log: Option<InvocationLog>, stderr: &SharedWriter) -> i32 {
+fn report_error(error: ConfctlError, log: Option<InvocationLog>, stderr: &SharedWriter) -> i32 {
+    report_error_mode(error, log, stderr, false)
+}
+fn report_error_mode(
+    mut error: ConfctlError,
+    log: Option<InvocationLog>,
+    stderr: &SharedWriter,
+    live: bool,
+) -> i32 {
     let mut covered = false;
     let mut locator = log.as_ref().map(|log| log.path().to_owned());
     if let Some(log) = log {
@@ -465,13 +476,14 @@ fn report_error(mut error: ConfctlError, log: Option<InvocationLog>, stderr: &Sh
             }
         }
     }
-    report_retained_error(error, locator, covered, stderr)
+    report_retained_error_mode(error, locator, covered, stderr, live)
 }
-fn report_retained_error(
+fn report_retained_error_mode(
     error: ConfctlError,
     locator: Option<PathBuf>,
     covered: bool,
     stderr: &SharedWriter,
+    live: bool,
 ) -> i32 {
     let (error, paths) = retain_error_evidence_with_coverage(error, covered);
     let result = (|| {
@@ -480,13 +492,30 @@ fn report_retained_error(
             .map_err(|_| io::Error::other("output writer poisoned"))?;
         if let Some(path) = &locator {
             writer.write_all(b"\nLog file: ")?;
-            writer.write_all(path.as_os_str().as_encoded_bytes())?;
+            if live {
+                writer.write_all(crate::presentation::display_path(path).as_bytes())?;
+            } else {
+                writer.write_all(path.as_os_str().as_encoded_bytes())?;
+            }
             writer.write_all(b"\n")?;
         }
-        diagnostic::write_error(&mut *writer, &error)?;
+        if live {
+            let mut message = Vec::new();
+            diagnostic::write_redacted(&mut message, &error)?;
+            writer.write_all(
+                crate::presentation::model::sanitize_text(&String::from_utf8_lossy(&message))
+                    .as_bytes(),
+            )?;
+        } else {
+            diagnostic::write_error(&mut *writer, &error)?;
+        }
         for path in paths {
             writer.write_all(b"Process evidence: ")?;
-            writer.write_all(path.as_os_str().as_encoded_bytes())?;
+            if live {
+                writer.write_all(crate::presentation::display_path(&path).as_bytes())?;
+            } else {
+                writer.write_all(path.as_os_str().as_encoded_bytes())?;
+            }
             writer.write_all(b"\n")?;
         }
         writer.flush()
@@ -1111,6 +1140,28 @@ mod diagnostic_boundary_tests {
                 .unwrap()
                 .windows(9)
                 .any(|s| s == b"Log file:")
+        );
+    }
+    #[test]
+    fn live_failure_keeps_raw_log_but_does_not_replay_capture_bytes() {
+        let scratch = tempfile::tempdir().unwrap();
+        let (log, process) = InvocationLog::open(scratch.path(), "ls").unwrap();
+        let path = log.path().to_owned();
+        drop(process);
+        let (_, err, buffer) = outputs();
+        report_error_mode(diagnostic::tests::failure(), Some(log), &err, true);
+        let displayed = buffer.0.lock().unwrap();
+        assert!(String::from_utf8_lossy(&displayed).contains("Log file:"));
+        assert!(
+            !displayed
+                .windows(b"failure\xff".len())
+                .any(|b| b == b"failure\xff")
+        );
+        let retained = std::fs::read(path).unwrap();
+        assert!(
+            retained
+                .windows(b" \0failure\xff \n".len())
+                .any(|b| b == b" \0failure\xff \n")
         );
     }
     #[tokio::test]

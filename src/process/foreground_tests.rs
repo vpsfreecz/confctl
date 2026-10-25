@@ -548,7 +548,7 @@ fn supervisor_foreground_relay_fault_retains_evidence_and_restores_terminal() {
                 while let Some(delivery) = receiver.receive().await {
                     // libtest can emit its banner in an earlier pipe chunk.
                     // Inject only after the asserted capture prefix is real.
-                    let fail = if let UiEvent::Output {
+                    let fail = if let UiEvent::ActivityOutput {
                         stream: OutputStream::Stdout,
                         bytes,
                         ..

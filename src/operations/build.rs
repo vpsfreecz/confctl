@@ -203,7 +203,7 @@ async fn build_groups<P: ProcessRunner>(
             .events
             .emit(UiEvent::TaskPending {
                 task,
-                description: description(index, group),
+                description: description(index, groups.len(), group),
             })
             .await?;
         publication
@@ -222,7 +222,7 @@ async fn build_groups<P: ProcessRunner>(
                 .events
                 .emit(UiEvent::TaskStarted {
                     task,
-                    description: description(index, group),
+                    description: description(index, groups.len(), group),
                 })
                 .await?;
             build_group(nix, group, settings, task, publication, &mut saved).await
@@ -271,10 +271,13 @@ async fn build_groups<P: ProcessRunner>(
     Ok(saved)
 }
 
-fn description(index: usize, group: &[Host]) -> String {
+fn description(index: usize, total: usize, group: &[Host]) -> String {
     format!(
-        "build group {}: {}",
+        "build group {}/{} ({} machine{}): {}",
         index + 1,
+        total,
+        group.len(),
+        if group.len() == 1 { "" } else { "s" },
         group
             .iter()
             .map(|host| host.name.as_str())

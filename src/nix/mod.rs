@@ -346,19 +346,77 @@ impl<P: ProcessRunner> NixClient<P> {
                 experimental,
                 no_update,
             ));
+            // Only this producer's known options/targets are eligible for display.
+            // Never infer a safe command from a generic ProcessSpec's argv.
+            let count = |value: &str| {
+                if value == "auto"
+                    || (!value.is_empty() && value.bytes().all(|b| b.is_ascii_digit()))
+                {
+                    value.to_owned()
+                } else {
+                    "<value omitted>".into()
+                }
+            };
+            let display_jobs = max_jobs.map(count);
+            let display_options = NixOptions {
+                show_trace: options.show_trace,
+                max_jobs: None,
+                cores: options.cores.as_deref().map(count),
+            };
+            let mut display: Vec<String> = if build {
+                vec!["build".into(), "--json".into(), "--no-link".into()]
+            } else {
+                vec!["eval".into(), "--json".into()]
+            };
+            display.extend(common_args(
+                &display_options,
+                impure,
+                display_jobs.as_deref(),
+                experimental,
+                no_update,
+            ));
             if build {
                 if let Some(inputs) = &build_inputs {
                     args.extend(inputs.legacy_args.iter().cloned());
                     args.extend(inputs.installables.iter().cloned());
+                    if !inputs.legacy_args.is_empty() {
+                        display.push("<legacy input arguments omitted>".into());
+                    }
+                    display.extend(
+                        inputs
+                            .installables
+                            .iter()
+                            .map(|value| display_target(value)),
+                    );
                 }
             } else {
                 if let Some(apply) = apply {
                     args.extend(["--apply".into(), apply.into()]);
+                    display.extend(["--apply".into(), "<expression omitted>".into()]);
                 }
                 args.push(installable.into());
+                display.push(display_target(installable));
             }
             let mut spec = ProcessSpec::new("nix", if build { "nix build" } else { "nix eval" });
             spec.args = args.into_iter().map(Into::into).collect();
+            spec.display_command = Some(format!(
+                "nix {}",
+                display
+                    .iter()
+                    .map(|value| {
+                        if !value.is_empty()
+                            && value
+                                .bytes()
+                                .all(|b| b.is_ascii_alphanumeric() || b"_-.=/+".contains(&b))
+                        {
+                            value.clone()
+                        } else {
+                            format!("'{}'", value.replace('\'', "'\\''"))
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ));
             spec.cwd = Some(self.root.path().into());
             let context = NixCommandContext {
                 cwd: self.root.path().into(),
@@ -435,6 +493,16 @@ impl<P: ProcessRunner> NixClient<P> {
                 ),
             ));
         }
+    }
+}
+fn display_target(value: &str) -> String {
+    if value.starts_with(".#confctl.")
+        && !value.contains("://")
+        && !value.chars().any(char::is_control)
+    {
+        value.into()
+    } else {
+        "<target omitted>".into()
     }
 }
 fn nix_failure(context: NixCommandContext, source: ConfctlError) -> ConfctlError {

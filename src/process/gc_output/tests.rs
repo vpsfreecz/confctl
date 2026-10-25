@@ -88,7 +88,7 @@ async fn both_streams_keep_bounded_fragments_bytes_and_shared_monotone_activity(
     let lines = observed
         .iter()
         .filter_map(|event| {
-            if let UiEvent::Output { bytes, .. } = event {
+            if let UiEvent::ActivityOutput { bytes, .. } = event {
                 assert!(bytes.starts_with(b"node> "));
                 assert!(bytes.len() <= LINE_LIMIT + 30);
                 Some(bytes.as_slice())

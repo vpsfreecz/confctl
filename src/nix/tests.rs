@@ -191,6 +191,82 @@ async fn ordinary_failure_is_not_retried_and_retains_capture() {
 }
 
 #[tokio::test]
+async fn audited_command_display_keeps_options_and_local_targets_but_redacts_expressions_urls_and_legacy_values()
+ {
+    let fixture = Fixture::new(vec![(0, "{}", ""), (0, "[]", ""), (0, "[]", "")]);
+    let client = fixture
+        .configured(
+            NixOptions {
+                max_jobs: Some("2".into()),
+                show_trace: true,
+                cores: Some("3".into()),
+            },
+            ConfigEpoch(0),
+        )
+        .await;
+    client
+        .eval_apply(
+            "https://user:url-secret@example.invalid/source",
+            Some("x: expression-secret"),
+        )
+        .await
+        .unwrap();
+    client
+        .build_json_for_task(
+            &[
+                ".#confctl.build.alpha.toplevel".into(),
+                "git+ssh://url-secret@example.invalid/source".into(),
+            ],
+            &["-I".into(), "private=legacy-secret".into()],
+            TaskId(4),
+        )
+        .await
+        .unwrap();
+    let calls = fixture.runner.calls.lock().unwrap();
+    assert_eq!(calls.len(), 3);
+    assert!(calls[1].args.iter().any(|a| a == "x: expression-secret"));
+    assert!(
+        calls[1]
+            .args
+            .iter()
+            .any(|a| a == "https://user:url-secret@example.invalid/source")
+    );
+    assert!(calls[2].args.iter().any(|a| a == "private=legacy-secret"));
+    for call in calls.iter() {
+        let display = call.display_command.as_deref().unwrap();
+        assert!(display.starts_with("nix "));
+        for secret in ["expression-secret", "url-secret", "legacy-secret"] {
+            assert!(!display.contains(secret), "{display}");
+        }
+        assert!(
+            display.contains("--show-trace")
+                && display.contains("--option max-jobs 2")
+                && display.contains("--option cores 3")
+        );
+    }
+    assert!(
+        calls[0]
+            .display_command
+            .as_ref()
+            .unwrap()
+            .contains(".#confctl.settings")
+    );
+    assert!(
+        calls[1]
+            .display_command
+            .as_ref()
+            .unwrap()
+            .contains("--apply '<expression omitted>' '<target omitted>'")
+    );
+    let build = calls[2].display_command.as_ref().unwrap();
+    assert!(
+        build.contains("build --json --no-link")
+            && build.contains(".#confctl.build.alpha.toplevel")
+            && build.contains("<legacy input arguments omitted>")
+    );
+}
+
+#[tokio::test]
 async fn invalidation_preserves_invocation_defaults_and_jobs_and_rejects_prior_views() {
     let fixture = Fixture::new(vec![
         (
