@@ -51,9 +51,11 @@ fn writer(remaining: Option<usize>, flush_fault: bool) -> (OutputWriter, Recorde
 }
 fn config(directory: &Path, live: bool) -> PresentationConfig {
     PresentationConfig {
-        command: "build node".into(),
+        command: "confctl build -t api".into(),
         operation: "build".into(),
         spool_dir: directory.into(),
+        configuration_dir: None,
+        invocation_log: None,
         policy: OutputPolicy {
             live,
             stdout_color: false,
@@ -244,6 +246,108 @@ async fn plain_streams_are_exact_and_finish_ignores_retained_sender_clones() {
             .count(),
         0
     );
+}
+
+#[tokio::test]
+async fn plain_compatibility_bytes_preserve_stdout_and_native_stderr_exactly() {
+    let directory = tempfile::tempdir().unwrap();
+    let (stdout, out) = writer(None, false);
+    let (stderr, err) = writer(None, false);
+    let (sink, receiver) = EventSink::channel(1);
+    let (_state, observe) = watch::channel(TerminalState::Idle);
+    let (control, presentation) = Presentation::new(
+        receiver,
+        observe,
+        OutputTargets { stdout, stderr },
+        config(directory.path(), false),
+        None,
+    )
+    .unwrap();
+    let running = tokio::spawn(presentation.run());
+    let compatibility = b"[alpha] [1/?] copy 1/?; copying path\n";
+    let native = b"native \0\xff\r\n";
+    sink.emit(UiEvent::ActivityOutput {
+        task: TaskId(1),
+        stream: OutputStream::Stderr,
+        bytes: native.to_vec(),
+    })
+    .await
+    .unwrap();
+    sink.emit(UiEvent::PlainOutput {
+        stream: OutputStream::Stdout,
+        bytes: compatibility.to_vec(),
+    })
+    .await
+    .unwrap();
+    sink.emit(UiEvent::Diagnostic {
+        stream: OutputStream::Stdout,
+        style: Style::Plain,
+        text: "ordinary diagnostic\n".into(),
+    })
+    .await
+    .unwrap();
+    control.finish().await.unwrap();
+    running.await.unwrap().unwrap();
+    assert_eq!(
+        &*out.lock().unwrap(),
+        &[compatibility.as_slice(), b"ordinary diagnostic\n"].concat()
+    );
+    assert_eq!(&*err.lock().unwrap(), native);
+}
+
+#[tokio::test]
+async fn live_plain_output_has_no_effect_but_ordinary_diagnostics_remain_required() {
+    let directory = tempfile::tempdir().unwrap();
+    let (stdout, out) = writer(None, false);
+    let (stderr, err) = writer(None, false);
+    let (sink, receiver) = EventSink::channel(1);
+    let (_state, observe) = watch::channel(TerminalState::Idle);
+    let (control, mut presentation) = Presentation::new(
+        receiver,
+        observe,
+        OutputTargets { stdout, stderr },
+        config(directory.path(), true),
+        None,
+    )
+    .unwrap();
+    for stream in [OutputStream::Stdout, OutputStream::Stderr] {
+        presentation
+            .event(UiEvent::PlainOutput {
+                stream,
+                bytes: b"plain-only \x1b[31m\xff\n".to_vec(),
+            })
+            .unwrap();
+    }
+    assert!(presentation.model.rows().is_empty());
+    assert!(presentation.model.logs().is_empty());
+    assert!(presentation.model.display_tail().is_empty());
+    assert_eq!(
+        (presentation.stdout.length, presentation.stderr.length),
+        (0, 0)
+    );
+    assert!(!presentation.active_view);
+    assert!(presentation.last_paint.is_none());
+    assert!(presentation.last_geometry.is_none());
+    assert!(out.lock().unwrap().is_empty());
+    assert!(err.lock().unwrap().is_empty());
+    let running = tokio::spawn(presentation.run());
+    sink.emit(UiEvent::PlainOutput {
+        stream: OutputStream::Stdout,
+        bytes: b"acknowledged but hidden\n".to_vec(),
+    })
+    .await
+    .unwrap();
+    sink.emit(UiEvent::Diagnostic {
+        stream: OutputStream::Stderr,
+        style: Style::Plain,
+        text: "required live diagnostic\n".into(),
+    })
+    .await
+    .unwrap();
+    control.finish().await.unwrap();
+    running.await.unwrap().unwrap();
+    assert!(out.lock().unwrap().is_empty());
+    assert_eq!(&*err.lock().unwrap(), b"required live diagnostic\n");
 }
 
 #[tokio::test]
@@ -459,9 +563,12 @@ async fn concurrent_finish_transfers_evidence_once_and_preserves_source_cleanup_
     )
     .expect("presentation");
     let running = tokio::spawn(presentation.run());
-    sink.emit(output(OutputStream::Stdout, b"first fault"))
-        .await
-        .expect("owned stdout");
+    sink.emit(UiEvent::PlainOutput {
+        stream: OutputStream::Stdout,
+        bytes: b"first fault".to_vec(),
+    })
+    .await
+    .expect("owned stdout");
     sink.emit(output(OutputStream::Stderr, b"second fault"))
         .await
         .expect("owned stderr");
@@ -600,74 +707,264 @@ fn path_display_escapes_native_bytes_without_losing_printable_unicode() {
 }
 
 #[tokio::test]
-async fn live_log_locators_keep_task_ids_for_shared_and_clipped_paths() {
-    use std::{ffi::OsString, os::unix::ffi::OsStringExt};
-    let long = format!("/logs/{}", "long".repeat(30));
-    for (path, escaped, clipped) in [
-        (
-            PathBuf::from("/logs/shared"),
-            "/logs/shared".to_owned(),
-            false,
-        ),
-        (PathBuf::from(long.clone()), long, true),
-        (
-            PathBuf::from("/logs/界e\u{301}\n\r\t\u{1b}\\tail"),
-            concat!("/logs/界e\u{301}", r"\n\r\t\x1b\\tail").to_owned(),
-            false,
-        ),
-        (
-            PathBuf::from(OsString::from_vec(b"/logs/\xff\\tail".to_vec())),
-            r"/logs/\xff\\tail".to_owned(),
-            false,
-        ),
-    ] {
-        let directory = tempfile::tempdir().expect("directory");
+async fn live_log_wraps_or_uses_scrollback_without_promising_success_retention() {
+    let directory = tempfile::tempdir().unwrap();
+    for size in [(80, 24), (19, 8)] {
         let (stdout, out) = writer(None, false);
         let (stderr, _) = writer(None, false);
+        let (_sink, receiver) = EventSink::channel(1);
+        let (_state, observe) = watch::channel(TerminalState::Idle);
+        let mut settings = config(directory.path(), true);
+        settings.initial_size = size;
+        settings.configuration_dir = Some("/configuration".into());
+        let path = PathBuf::from(format!(
+            "/configuration/.confctl/logs/{}",
+            "full-name-".repeat(8)
+        ));
+        settings.invocation_log = Some(path.clone());
+        let (control, mut presentation) = Presentation::new(
+            receiver,
+            observe,
+            OutputTargets { stdout, stderr },
+            settings,
+            None,
+        )
+        .unwrap();
+        presentation
+            .command_starting(TaskId(0), "nix eval --json .#settings".into())
+            .await
+            .unwrap();
+        let active = String::from_utf8(out.lock().unwrap().clone()).unwrap();
+        let display = display_path(path.strip_prefix("/configuration").unwrap());
+        if size.0 == 80 {
+            for piece in live::wrap(&format!("Full log: {display}"), 79) {
+                assert!(active.contains(&piece));
+            }
+        } else {
+            assert!(active.contains(&format!("Full log: {display}\n")));
+        }
+        let before = out.lock().unwrap().len();
+        let running = tokio::spawn(presentation.run());
+        control.finish().await.unwrap();
+        running.await.unwrap().unwrap();
+        let bytes = out.lock().unwrap();
+        let final_output = String::from_utf8_lossy(&bytes[before..]);
+        assert!(!final_output.contains("Log file:"));
+        assert!(!final_output.contains("Output source"));
+        assert!(!final_output.contains("task 0"));
+    }
+}
+
+#[tokio::test]
+async fn command_context_has_no_phantom_task_and_activity_never_replays_in_live_mode() {
+    for live in [false, true] {
+        let directory = tempfile::tempdir().unwrap();
+        let (stdout, out) = writer(None, false);
+        let (stderr, err) = writer(None, false);
         let (sink, receiver) = EventSink::channel(1);
         let (_state, observe) = watch::channel(TerminalState::Idle);
         let (control, presentation) = Presentation::new(
             receiver,
             observe,
             OutputTargets { stdout, stderr },
-            config(directory.path(), true),
+            config(directory.path(), live),
             None,
         )
-        .expect("presentation");
+        .unwrap();
         let running = tokio::spawn(presentation.run());
-        for id in [1, 2] {
-            sink.emit(UiEvent::TaskStarted {
-                task: TaskId(id),
-                description: format!("node-{id} build"),
-            })
-            .await
-            .expect("task");
-            sink.emit(UiEvent::LogAvailable {
-                task: TaskId(id),
-                path: path.clone(),
-            })
-            .await
-            .expect("log");
-        }
-        control.finish().await.expect("finish");
-        running.await.expect("join").expect("run");
-        let rendered = String::from_utf8(out.lock().expect("stdout").clone()).expect("UTF-8");
-        for id in [1, 2] {
-            let summary = format!("Log: @{id} (task {id}): \"{escaped}\"\n");
-            assert_eq!(rendered.matches(&summary).count(), 1);
-        }
-        if clipped {
-            assert!(rendered.contains("Log: …"));
+        sink.emit(UiEvent::CommandStarting {
+            task: TaskId(0),
+            display: "nix eval [arguments redacted]".into(),
+        })
+        .await
+        .unwrap();
+        let first = out.lock().unwrap().clone();
+        if live {
+            assert!(String::from_utf8_lossy(&first).contains("nix eval [arguments redacted]"));
         } else {
-            assert!(rendered.contains(&format!("Log: @2: \"{escaped}\"")));
+            assert!(first.is_empty());
+        }
+        for chunk in b"\x1b[31mactivity-fragment\x1b[0m\n".chunks(3) {
+            sink.emit(UiEvent::ActivityOutput {
+                task: TaskId(0),
+                stream: OutputStream::Stderr,
+                bytes: chunk.to_vec(),
+            })
+            .await
+            .unwrap();
+        }
+        sink.emit(output(OutputStream::Stdout, b"required report\n"))
+            .await
+            .unwrap();
+        control.finish().await.unwrap();
+        running.await.unwrap().unwrap();
+        let out = out.lock().unwrap();
+        let err = err.lock().unwrap();
+        assert_eq!(
+            out.windows(16)
+                .filter(|w| *w == b"required report\n")
+                .count(),
+            1
+        );
+        if live {
+            assert!(err.is_empty());
+            let text = String::from_utf8_lossy(&out);
+            assert!(!text.contains("Output source"));
+            assert!(!text.contains("task 0"));
+            assert!(!text.contains("succeeded"));
+            assert!(text.contains("activity-fragment"));
+        } else {
+            assert_eq!(&*err, b"\x1b[31mactivity-fragment\x1b[0m\n");
         }
     }
 }
 
 #[tokio::test]
-async fn unrelated_prefix_text_cannot_suppress_a_final_log_locator() {
-    let directory = tempfile::tempdir().expect("directory");
+async fn each_live_command_is_flushed_before_acknowledgement_and_fast_activity() {
+    let directory = tempfile::tempdir().unwrap();
     let (stdout, out) = writer(None, false);
+    let (stderr, err) = writer(None, false);
+    let (sink, receiver) = EventSink::channel(1);
+    let (_state, observe) = watch::channel(TerminalState::Live);
+    let mut settings = config(directory.path(), true);
+    settings.tail_rows = 2;
+    let (control, presentation) = Presentation::new(
+        receiver,
+        observe,
+        OutputTargets { stdout, stderr },
+        settings,
+        None,
+    )
+    .unwrap();
+    let running = tokio::spawn(presentation.run());
+    for (id, display) in [
+        (0, "nix eval .#settings"),
+        (1, "nix build .#first"),
+        (2, "nix build .#second"),
+    ] {
+        let start = out.lock().unwrap().len();
+        sink.emit(UiEvent::CommandStarting {
+            task: TaskId(id),
+            display: display.into(),
+        })
+        .await
+        .unwrap();
+        // This is the actual spawn acknowledgement, before any child output.
+        let written = out.lock().unwrap().clone();
+        let admitted = String::from_utf8_lossy(&written[start..]);
+        assert_eq!(admitted.matches(&format!("$ {display}")).count(), 1);
+        if id != 0 {
+            sink.emit(UiEvent::ActivityOutput {
+                task: TaskId(id),
+                stream: OutputStream::Stderr,
+                bytes: "fast native activity\n".repeat(32).into_bytes(),
+            })
+            .await
+            .unwrap();
+        }
+    }
+    control.finish().await.unwrap();
+    running.await.unwrap().unwrap();
+    assert!(err.lock().unwrap().is_empty(), "activity stays in the view");
+}
+
+#[tokio::test]
+async fn live_command_admission_rechecks_parking_after_waiting_for_a_paint_slot() {
+    let directory = tempfile::tempdir().unwrap();
+    let (stdout, out) = writer(None, false);
+    let (stderr, _) = writer(None, false);
+    let (_sink, receiver) = EventSink::channel(1);
+    let (state, observe) = watch::channel(TerminalState::Live);
+    let (_control, mut presentation) = Presentation::new(
+        receiver,
+        observe,
+        OutputTargets { stdout, stderr },
+        config(directory.path(), true),
+        None,
+    )
+    .unwrap();
+    presentation
+        .command_starting(TaskId(0), "quiet first command".into())
+        .await
+        .unwrap();
+    let before = out.lock().unwrap().len();
+    let mut attempt = Box::pin(presentation.command_starting(TaskId(1), "later command".into()));
+    assert!(
+        attempt
+            .as_mut()
+            .poll(&mut Context::from_waker(Waker::noop()))
+            .is_pending()
+    );
+    state.send_replace(TerminalState::Prompt);
+    attempt.await.unwrap();
+    {
+        // Parking clears only the owned panel; no announcement reaches the prompt.
+        let bytes = out.lock().unwrap();
+        assert!(!String::from_utf8_lossy(&bytes[before..]).contains("later command"));
+    }
+    assert!(
+        !presentation
+            .model
+            .tail()
+            .iter()
+            .any(|line| line.contains("later command"))
+    );
+    state.send_replace(TerminalState::Live);
+    let before_resume = out.lock().unwrap().len();
+    presentation.transition(TerminalState::Live).unwrap();
+    assert_eq!(&out.lock().unwrap()[before_resume..], b"$ later command\n");
+    presentation.paint_now().unwrap();
+    let bytes = out.lock().unwrap();
+    assert_eq!(
+        String::from_utf8_lossy(&bytes)
+            .matches("$ later command")
+            .count(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn tiny_or_bounded_tail_commands_transfer_once_to_required_output() {
+    for (size, tail_bytes) in [((3, 4), 100), ((80, 24), 8), ((2, 3), 100)] {
+        let directory = tempfile::tempdir().unwrap();
+        let (stdout, out) = writer(None, false);
+        let (stderr, _) = writer(None, false);
+        let (sink, receiver) = EventSink::channel(1);
+        let (_state, observe) = watch::channel(TerminalState::Idle);
+        let mut settings = config(directory.path(), true);
+        settings.initial_size = size;
+        settings.tail_line_bytes = tail_bytes;
+        let (control, presentation) = Presentation::new(
+            receiver,
+            observe,
+            OutputTargets { stdout, stderr },
+            settings,
+            None,
+        )
+        .unwrap();
+        let running = tokio::spawn(presentation.run());
+        sink.emit(UiEvent::CommandStarting {
+            task: TaskId(0),
+            display: "nix build .#node".into(),
+        })
+        .await
+        .unwrap();
+        assert!(out.lock().unwrap().starts_with(b"$ nix build .#node\n"));
+        control.finish().await.unwrap();
+        running.await.unwrap().unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&out.lock().unwrap())
+                .matches("$ nix build .#node")
+                .count(),
+            1
+        );
+    }
+}
+
+#[tokio::test]
+async fn command_paint_failure_rejects_admission_and_retains_checked_failure() {
+    let directory = tempfile::tempdir().unwrap();
+    let (stdout, _) = writer(Some(0), false);
     let (stderr, _) = writer(None, false);
     let (sink, receiver) = EventSink::channel(1);
     let (_state, observe) = watch::channel(TerminalState::Idle);
@@ -678,37 +975,58 @@ async fn unrelated_prefix_text_cannot_suppress_a_final_log_locator() {
         config(directory.path(), true),
         None,
     )
-    .expect("presentation");
+    .unwrap();
     let running = tokio::spawn(presentation.run());
-    sink.emit(UiEvent::TaskStarted {
-        task: TaskId(2),
-        description: "task 1: /logs/a.more @1: \"/logs/a\"".into(),
-    })
-    .await
-    .expect("misleading description");
-    sink.emit(UiEvent::Output {
-        task: TaskId(2),
-        stream: OutputStream::Stdout,
-        bytes: b"task 1: /logs/a.more @1: \"/logs/a\"\n".to_vec(),
-    })
-    .await
-    .expect("unrelated tail");
-    for (id, path) in [(1, "/logs/a"), (2, "/logs/b")] {
-        sink.emit(UiEvent::LogAvailable {
-            task: TaskId(id),
-            path: path.into(),
+    assert!(
+        sink.emit(UiEvent::CommandStarting {
+            task: TaskId(0),
+            display: "must not spawn".into(),
         })
         .await
-        .expect("log");
-    }
-    control.finish().await.expect("finish");
-    running.await.expect("join").expect("run");
-    let rendered = String::from_utf8(out.lock().expect("stdout").clone()).expect("UTF-8");
-    for expected in [
-        "Log: @1 (task 1): \"/logs/a\"\n",
-        "Log: @2 (task 2): \"/logs/b\"\n",
-    ] {
-        assert_eq!(rendered.matches(expected).count(), 1);
+        .is_err()
+    );
+    assert!(running.await.unwrap().is_err());
+    let (source, _) = pending(control.finish().await.unwrap_err());
+    assert!(source.to_string().contains("paint live presentation"));
+}
+
+#[tokio::test]
+async fn required_chunks_without_lf_survive_the_next_live_anchor_on_either_stream() {
+    for stream in [OutputStream::Stdout, OutputStream::Stderr] {
+        let directory = tempfile::tempdir().unwrap();
+        let (terminal, bytes) = writer(None, false);
+        let (sink, receiver) = EventSink::channel(1);
+        let (_state, observe) = watch::channel(TerminalState::Idle);
+        let (control, presentation) = Presentation::new(
+            receiver,
+            observe,
+            OutputTargets {
+                stdout: terminal.clone(),
+                stderr: terminal,
+            },
+            config(directory.path(), true),
+            None,
+        )
+        .unwrap();
+        let running = tokio::spawn(presentation.run());
+        sink.emit(output(stream, b"unfinished report chunk"))
+            .await
+            .unwrap();
+        assert_eq!(&*bytes.lock().unwrap(), b"unfinished report chunk");
+        sink.emit(UiEvent::CommandStarting {
+            task: TaskId(0),
+            display: "next command".into(),
+        })
+        .await
+        .unwrap();
+        let written = bytes.lock().unwrap().clone();
+        let next = &written[b"unfinished report chunk".len()..];
+        assert!(
+            next.iter().position(|b| *b == b'\n').unwrap()
+                < next.windows(4).position(|b| b == b"\x1b[2K").unwrap()
+        );
+        control.finish().await.unwrap();
+        running.await.unwrap().unwrap();
     }
 }
 
@@ -752,12 +1070,8 @@ async fn omitted_and_shortened_task_rows_keep_full_final_source_associations() {
     running.await.expect("join").expect("run");
     let rendered = String::from_utf8(out.lock().expect("stdout").clone()).expect("UTF-8");
     assert!(rendered.contains("2 tasks not shown in full\n"));
-    assert!(rendered.contains(
-        "@3w5e11264sgse (task 18446744073709551614): node-a activation with detailed error: failed 0\n"
-    ));
-    assert!(rendered.contains(
-        "@3w5e11264sgsf (task 18446744073709551615): node-b activation with detailed error: failed 0\n"
-    ));
+    assert!(rendered.contains("node-a activation with detailed error: failed 0\n"));
+    assert!(rendered.contains("node-b activation with detailed error: failed 0\n"));
 }
 
 #[tokio::test]
@@ -794,8 +1108,8 @@ async fn checked_finish_keeps_missing_pending_and_executing_results_incomplete()
     // Every paint begins with Hide. Earlier timer paints may truthfully show
     // execution; only the checked final panel must show incomplete results.
     let final_panel = rendered.rsplit("\x1b[?25l").next().unwrap();
-    assert!(final_panel.contains("incomplete (last pending) @1 0 node-a"));
-    assert!(final_panel.contains("incomplete (last running) @2 0 node-b"));
+    assert!(final_panel.contains("incomplete (last pending) 0 node-a"));
+    assert!(final_panel.contains("incomplete (last running) 0 node-b"));
     assert!(!final_panel.contains("succeeded"));
     assert!(!final_panel.contains("canceled"));
     assert!(!final_panel.contains("running @2"));
@@ -830,9 +1144,7 @@ async fn tiny_unregistered_output_retains_source_without_inventing_task_state() 
     running.await.expect("join").expect("run");
     assert_eq!(*err.lock().expect("stderr"), b"failure\n");
     let rendered = String::from_utf8(out.lock().expect("stdout").clone()).expect("UTF-8");
-    assert!(rendered.contains(
-        "Output source @3w5e11264sgsf/e (task 18446744073709551615, stderr): no registered task description\n"
-    ));
+    assert!(!rendered.contains("Output source"));
     assert!(!rendered.contains("tasks not shown"));
     assert!(!rendered.contains("succeeded"));
 }
@@ -976,7 +1288,7 @@ async fn frame_style_shape_is_checked_before_any_prelude_output_even_for_duplica
 }
 
 #[tokio::test]
-async fn gc_labels_and_unknown_progress_keep_required_both_stream_output_once() {
+async fn gc_plain_labels_and_unknown_progress_keep_both_stream_output_once() {
     let directory = tempfile::tempdir().unwrap();
     let (stdout, out) = writer(None, false);
     let (stderr, err) = writer(None, false);
@@ -986,7 +1298,7 @@ async fn gc_labels_and_unknown_progress_keep_required_both_stream_output_once() 
         receiver,
         observe,
         OutputTargets { stdout, stderr },
-        config(directory.path(), true),
+        config(directory.path(), false),
         None,
     )
     .unwrap();

@@ -101,7 +101,7 @@ impl GcOutput {
         emit(
             events,
             cancel,
-            UiEvent::Output {
+            UiEvent::ActivityOutput {
                 task,
                 stream,
                 bytes: output,

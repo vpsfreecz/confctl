@@ -8,9 +8,9 @@ use crate::{
 use serde_json::{Value, json};
 use std::{
     fs,
-    os::unix::fs::PermissionsExt,
+    os::{fd::OwnedFd, unix::fs::PermissionsExt},
     path::{Path, PathBuf},
-    process::{Command, Output, Stdio},
+    process::{Child, Command, ExitStatus, Output, Stdio},
     time::Instant,
 };
 const ROLE: &str = "CONFCTL_BUILD_APP_ROLE";
@@ -21,6 +21,9 @@ fn actual_build_application_fixture() {
     let Some(role) = std::env::var_os(ROLE) else {
         return;
     };
+    if role == "quiet-start" {
+        crate::terminal::pty_tests::enter_controlling_session();
+    }
     let root = PathBuf::from(std::env::var_os(ROOT).unwrap());
     let config = ConfigRoot::new(&root).unwrap();
     crate::operations::set_build_test_roots(
@@ -137,6 +140,15 @@ case "$last" in
   count=0
   if [ -f "$CONFCTL_BUILD_APP_ROOT/settings-count" ]; then read -r count < "$CONFCTL_BUILD_APP_ROOT/settings-count"; fi
   count=$((count+1)); printf '%s\n' "$count" > "$CONFCTL_BUILD_APP_ROOT/settings-count"
+  if [ "$count" = 1 ] && { [ "$CONFCTL_BUILD_APP_ROLE" = quiet-start ] || [ "$CONFCTL_BUILD_APP_ROLE" = quiet-start-unwind ]; }; then
+   printf '%s' "$$" > "$CONFCTL_BUILD_APP_ROOT/quiet-eval-pid"
+   remaining=${CONFCTL_BUILD_APP_EVAL_WAIT_STEPS:-500}
+   while [ ! -f "$CONFCTL_BUILD_APP_ROOT/release-eval" ]; do
+    if [ "$remaining" -eq 0 ]; then printf 'quiet evaluation fixture timed out\n' >&2; exit 124; fi
+    remaining=$((remaining-1))
+    "$CONFCTL_BUILD_APP_ROOT/native/sleep" 0.01 || exit 125
+   done
+  fi
   if [ "$count" -lt 3 ]; then "$CONFCTL_BUILD_APP_ROOT/native/cat" "$CONFCTL_BUILD_APP_ROOT/replies/defaults.json"; else "$CONFCTL_BUILD_APP_ROOT/native/cat" "$CONFCTL_BUILD_APP_ROOT/replies/build-settings.json"; fi
   ;;
  '.#confctl.machinesJson') printf '[{"outputs":{"out":"%s/replies/machines.json"}}]\n' "$CONFCTL_BUILD_APP_ROOT" ;;
@@ -450,6 +462,268 @@ printf 'ok\n'"#,
 fn native(path: &Path, body: &str) {
     fs::write(path, format!("#!/bin/sh\n{body}\n")).unwrap();
     fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+}
+
+// This guard is scoped inside Fixture, so unwinding joins the app and its
+// independent native group before the fake executable/directory can disappear.
+struct QuietStartupChild<'a> {
+    app: Child,
+    fixture: &'a Fixture,
+    native: Option<(u32, OwnedFd)>,
+}
+impl QuietStartupChild<'_> {
+    fn native_pid(&mut self) -> io::Result<Option<u32>> {
+        if let Some((pid, _)) = &self.native {
+            return Ok(Some(*pid));
+        }
+        let text = match fs::read_to_string(self.fixture.root.join("quiet-eval-pid")) {
+            Ok(text) => text,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        // The shell may have opened its pid file but not written it yet.
+        if text.is_empty() {
+            return Ok(None);
+        }
+        let pid = text
+            .parse::<i32>()
+            .ok()
+            .and_then(rustix::process::Pid::from_raw)
+            .ok_or_else(|| io::Error::other("invalid quiet evaluation pid"))?;
+        match rustix::process::pidfd_open(pid, rustix::process::PidfdFlags::empty()) {
+            Ok(fd) => self.native = Some((pid.as_raw_nonzero().get() as u32, fd)),
+            Err(rustix::io::Errno::SRCH) => return Ok(None),
+            Err(error) => return Err(error.into()),
+        }
+        Ok(self.native.as_ref().map(|(pid, _)| *pid))
+    }
+
+    fn cancel_and_join(&mut self) -> io::Result<ExitStatus> {
+        // Let the app's Supervisor signal the native group and join its pipes.
+        // Only the fixture watchdog fallback bypasses that ordinary shutdown.
+        if self.app.try_wait()?.is_none() {
+            let pid = rustix::process::Pid::from_raw(self.app.id() as i32).unwrap();
+            match rustix::process::kill_process(pid, rustix::process::Signal::INT) {
+                Ok(()) | Err(rustix::io::Errno::SRCH) => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+        let until = Instant::now() + Duration::from_secs(10);
+        let status = loop {
+            if let Some(status) = self.app.try_wait()? {
+                break status;
+            }
+            if Instant::now() >= until {
+                // The pidfd cannot signal a reused numeric pid. The fake phase
+                // is independently finite even if it never published its pid.
+                if let Some((_, fd)) = &self.native {
+                    let _ = rustix::process::pidfd_send_signal(fd, rustix::process::Signal::KILL);
+                }
+                self.app.kill()?;
+                break self.app.wait()?;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        };
+        if let Some((_, fd)) = &self.native {
+            let mut ready = [rustix::event::PollFd::new(fd, rustix::event::PollFlags::IN)];
+            let zero = rustix::event::Timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            };
+            if rustix::event::poll(&mut ready, Some(&zero))? == 0 {
+                rustix::process::pidfd_send_signal(fd, rustix::process::Signal::KILL)?;
+                let deadline = rustix::event::Timespec {
+                    tv_sec: 10,
+                    tv_nsec: 0,
+                };
+                if rustix::event::poll(&mut ready, Some(&deadline))? == 0 {
+                    return Err(io::Error::other("quiet evaluation child did not exit"));
+                }
+            }
+        }
+        Ok(status)
+    }
+}
+impl Drop for QuietStartupChild<'_> {
+    fn drop(&mut self) {
+        let _ = self.cancel_and_join();
+    }
+}
+
+#[test]
+fn quiet_startup_evaluation_is_announced_by_the_production_app_before_native_output() {
+    let f = Fixture::new();
+    let (master, slave) = crate::terminal::pty_tests::open_pty();
+    let modes = rustix::termios::tcgetattr(&slave).unwrap();
+    let observer = slave.try_clone().unwrap();
+    let flags = rustix::fs::fcntl_getfl(&master).unwrap();
+    rustix::fs::fcntl_setfl(&master, flags | rustix::fs::OFlags::NONBLOCK).unwrap();
+    let app = f
+        .command_args("quiet-start", None)
+        .env("TERM", "xterm-256color")
+        .env("CONFCTL_TTY", "1")
+        .stdin(Stdio::from(slave.try_clone().unwrap()))
+        .stdout(Stdio::from(slave.try_clone().unwrap()))
+        .stderr(Stdio::from(slave))
+        .spawn()
+        .unwrap();
+    let mut child = QuietStartupChild {
+        app,
+        fixture: &f,
+        native: None,
+    };
+    let until = Instant::now() + Duration::from_secs(15);
+    let mut transcript = Vec::new();
+    let mut released = false;
+    let mut native_pid = None;
+    let status = loop {
+        // Own the native handle even when the announcement never arrives.
+        if native_pid.is_none() {
+            native_pid = child.native_pid().unwrap();
+        }
+        loop {
+            let mut bytes = [0; 8192];
+            match rustix::io::read(&master, &mut bytes) {
+                Ok(0) | Err(rustix::io::Errno::AGAIN | rustix::io::Errno::IO) => break,
+                Ok(count) => {
+                    transcript.extend_from_slice(&bytes[..count]);
+                    assert!(transcript.len() < 1024 * 1024);
+                }
+                Err(rustix::io::Errno::INTR) => continue,
+                Err(error) => panic!("read owned PTY: {error}"),
+            }
+        }
+        if !released
+            && transcript
+                .windows(b"nix eval".len())
+                .any(|b| b == b"nix eval")
+            && native_pid.is_some()
+        {
+            assert!(!f.root.join("build-pid").exists());
+            fs::write(f.root.join("release-eval"), b"go").unwrap();
+            released = true;
+        }
+        if let Some(status) = child.app.try_wait().unwrap() {
+            break status;
+        }
+        if Instant::now() >= until {
+            let cleanup = child.cancel_and_join();
+            panic!(
+                "quiet startup lacked a command announcement or failed to complete ({cleanup:?}): {}",
+                String::from_utf8_lossy(&transcript)
+            );
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    };
+    assert!(
+        released && status.success(),
+        "{}",
+        String::from_utf8_lossy(&transcript)
+    );
+    assert!(
+        !Path::new("/proc")
+            .join(native_pid.unwrap().to_string())
+            .exists()
+    );
+    crate::terminal::pty_tests::assert_modes(
+        &modes,
+        &rustix::termios::tcgetattr(&observer).unwrap(),
+    );
+    assert!(!transcript.windows(4).any(|b| b == b"\x1b[6n"));
+    assert!(!transcript.windows(8).any(|b| b == b"\x1b[?1049h"));
+    f.unchanged();
+}
+
+#[test]
+fn quiet_startup_unreleased_native_phase_expires_without_supervisor_cancellation() {
+    let f = Fixture::new();
+    // Invoke the existing fake directly: its own bound must work without an app
+    // cancellation handler or the success test creating release-eval.
+    let app = Command::new(f.fake.join("nix"))
+        .arg(".#confctl.settings")
+        .env(ROLE, "quiet-start")
+        .env(ROOT, &f.root)
+        .env("CONFCTL_BUILD_APP_EVAL_WAIT_STEPS", "2")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let mut child = QuietStartupChild {
+        app,
+        fixture: &f,
+        native: None,
+    };
+    let until = Instant::now() + Duration::from_secs(5);
+    let status = loop {
+        if let Some(status) = child.app.try_wait().unwrap() {
+            break status;
+        }
+        assert!(
+            Instant::now() < until,
+            "fake evaluation ignored its independent bound"
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    };
+    assert_eq!(status.code(), Some(124));
+    assert!(!f.root.join("release-eval").exists());
+    let pid = fs::read_to_string(f.root.join("quiet-eval-pid")).unwrap();
+    assert!(!Path::new("/proc").join(pid).exists());
+    f.unchanged();
+}
+
+#[test]
+fn quiet_startup_failure_unwinds_and_joins_unreleased_native_child() {
+    let f = Fixture::new();
+    let mut native_pid = None;
+    let mut app_pid = None;
+    let failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let app = f
+            .command_args("quiet-start-unwind", None)
+            // No live terminal is needed to test the watchdog's cleanup owner.
+            .env("CONFCTL_TTY", "0")
+            .spawn()
+            .unwrap();
+        app_pid = Some(app.id());
+        let mut child = QuietStartupChild {
+            app,
+            fixture: &f,
+            native: None,
+        };
+        let until = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(pid) = child.native_pid().unwrap() {
+                native_pid = Some(pid);
+                break;
+            }
+            assert!(
+                child.app.try_wait().unwrap().is_none(),
+                "app exited before evaluation"
+            );
+            assert!(
+                Instant::now() < until,
+                "quiet evaluation readiness watchdog"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        panic!("intentional quiet-start assertion failure");
+    }));
+    assert_eq!(
+        failure.unwrap_err().downcast_ref::<&str>(),
+        Some(&"intentional quiet-start assertion failure")
+    );
+    assert!(
+        !Path::new("/proc")
+            .join(app_pid.unwrap().to_string())
+            .exists()
+    );
+    assert!(
+        !Path::new("/proc")
+            .join(native_pid.unwrap().to_string())
+            .exists()
+    );
+    assert!(!f.root.join("release-eval").exists());
+    assert!(!f.root.join("build-pid").exists());
+    f.unchanged();
 }
 
 #[test]

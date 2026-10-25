@@ -107,6 +107,8 @@ pub struct PresentationConfig {
     pub command: String,
     pub operation: String,
     pub spool_dir: PathBuf,
+    pub configuration_dir: Option<PathBuf>,
+    pub invocation_log: Option<PathBuf>,
     pub policy: OutputPolicy,
     pub initial_size: (u16, u16),
     pub terminal: Option<OwnedFd>,
@@ -149,6 +151,8 @@ impl PresentationConfig {
             command,
             operation,
             spool_dir,
+            configuration_dir: None,
+            invocation_log: None,
             policy,
             initial_size: dimensions.unwrap_or((80, 24)),
             terminal,
@@ -208,9 +212,9 @@ impl DeferredStream {
         file.flush()
     }
 
-    fn replay(&mut self, writer: &OutputWriter) -> io::Result<()> {
+    fn replay(&mut self, writer: &OutputWriter) -> io::Result<Option<u8>> {
         if self.replayed == self.length {
-            return Ok(());
+            return Ok(None);
         }
         let file = self
             .file
@@ -220,6 +224,7 @@ impl DeferredStream {
         file.seek(SeekFrom::Start(self.replayed))?;
         let mut output = lock_writer(writer)?;
         let mut bytes = [0; 16 * 1024];
+        let mut last = None;
         while self.replayed < self.length {
             let remaining = (self.length - self.replayed).min(bytes.len() as u64) as usize;
             let read = file.read(&mut bytes[..remaining])?;
@@ -232,6 +237,7 @@ impl DeferredStream {
                     Ok(0) => return Err(io::Error::from(io::ErrorKind::WriteZero)),
                     Ok(count) => {
                         self.replayed += count as u64;
+                        last = Some(chunk[count - 1]);
                         chunk = &chunk[count..];
                     }
                     Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
@@ -245,7 +251,7 @@ impl DeferredStream {
         file.rewind()?;
         self.length = 0;
         self.replayed = 0;
-        Ok(())
+        Ok(last)
     }
 
     fn capture(&mut self) -> Captured {
@@ -369,6 +375,8 @@ pub struct Presentation {
     active_view: bool,
     seen_groups: HashSet<u64>,
     last_geometry: Option<(u16, u16)>,
+    last_paint: Option<Instant>,
+    scrollback_logs: HashSet<PathBuf>,
 }
 
 impl Presentation {
@@ -397,9 +405,17 @@ impl Presentation {
         };
         let started = timing
             .as_ref()
-            .map(|timing| timing.started().to_rfc3339())
-            .unwrap_or_else(|| chrono::Local::now().to_rfc3339());
-        let model = model::Model::new(config.tail_rows, config.tail_line_bytes);
+            .map(|timing| timing.started().with_timezone(&chrono::Local))
+            .unwrap_or_else(chrono::Local::now)
+            .format("%Y-%m-%d %H:%M:%S %:z")
+            .to_string();
+        let mut model = model::Model::new(config.tail_rows, config.tail_line_bytes);
+        if let Some(path) = &config.invocation_log {
+            model.apply(&UiEvent::LogAvailable {
+                task: crate::events::TaskId(0),
+                path: path.clone(),
+            })?;
+        }
         let (finish, finish_requests) = watch::channel(false);
         let (done, _) = watch::channel(false);
         let completion = Arc::new(Completion {
@@ -435,6 +451,8 @@ impl Presentation {
                 active_view: false,
                 seen_groups: HashSet::new(),
                 last_geometry: None,
+                last_paint: None,
+                scrollback_logs: HashSet::new(),
             },
         ))
     }
@@ -476,7 +494,7 @@ impl Presentation {
             }
             tokio::select! {
                 delivery = self.receiver.receive(), if events_open => {
-                    if let Some(delivery) = delivery { self.deliver(delivery)?; }
+                    if let Some(delivery) = delivery { self.deliver(delivery).await?; }
                     else { events_open = false; }
                 },
                 change = self.state.changed(), if state_open => {
@@ -488,7 +506,7 @@ impl Presentation {
                 },
                 _ = resize_notification(&mut self.resize) => {
                     if let Some(painter) = &mut self.painter { painter.invalidate(); }
-                    self.paint()?;
+                    self.paint_now()?;
                 },
                 _ = timer.tick(), if self.config.policy.live && !self.parked() && self.active_view => { self.paint()?; },
             }
@@ -497,7 +515,7 @@ impl Presentation {
         // events are still processed, rather than waiting for every clone.
         self.receiver.close();
         while let Some(delivery) = self.receiver.receive().await {
-            self.deliver(delivery)?;
+            self.deliver(delivery).await?;
         }
         self.current_state = *self.state.borrow();
         if self.parked() {
@@ -508,11 +526,62 @@ impl Presentation {
         self.flush_outputs()
     }
 
-    fn deliver(&mut self, delivery: crate::events::Delivery) -> Result<(), ConfctlError> {
+    async fn deliver(&mut self, delivery: crate::events::Delivery) -> Result<(), ConfctlError> {
         let (event, acknowledgement) = delivery.into_parts();
-        let result = self.event(event);
+        let result = match event {
+            UiEvent::CommandStarting { task, display } if self.config.policy.live => {
+                self.command_starting(task, display).await
+            }
+            event => self.event(event),
+        };
         acknowledgement.acknowledge(result.as_ref().map(|_| ()).map_err(ToString::to_string));
         result
+    }
+
+    async fn command_starting(
+        &mut self,
+        task: crate::events::TaskId,
+        display: String,
+    ) -> Result<(), ConfctlError> {
+        if !self.parked()
+            && let Some(last) = self.last_paint
+        {
+            // Admission provides bounded backpressure: flush this attempt's
+            // announcement before acknowledging the producer's spawn barrier.
+            tokio::time::sleep(Duration::from_millis(100).saturating_sub(last.elapsed())).await;
+        }
+        // A prompt/child may have acquired ownership during the paint-slot wait.
+        let state = *self.state.borrow_and_update();
+        self.transition(state)?;
+        let display = model::sanitize_text(&display).replace(['\n', '\r'], " ");
+        let announcement = format!("$ {display}");
+        let (columns, rows) = self.dimensions();
+        let width = columns.saturating_sub(1);
+        let log = self.log_display();
+        let wrapped = live::wrap(&announcement, usize::from(width));
+        let fits = !self.parked()
+            && width > 0
+            && wrapped.concat() == announcement
+            && announcement.len() <= self.config.tail_line_bytes
+            && self.config.tail_rows > 0
+            && wrapped.len()
+                <= live::tail_capacity(
+                    &self.model,
+                    &self.frame_info(log.as_deref()),
+                    width,
+                    rows.saturating_sub(2),
+                );
+        self.model.command_starting(task, &display, fits);
+        self.active_view = true;
+        if !fits {
+            // Parked/tiny views transfer the safe announcement to existing
+            // required-output ownership, without duplicating it in the tail.
+            self.required(
+                OutputStream::Stdout,
+                format!("{announcement}\n").into_bytes(),
+            )?;
+        }
+        self.paint_now()
     }
 
     fn event(&mut self, event: UiEvent) -> Result<(), ConfctlError> {
@@ -560,6 +629,12 @@ impl Presentation {
                 self.config.operation =
                     model::sanitize_text(&description).replace(['\n', '\r'], " ");
                 self.model = model::Model::new(self.config.tail_rows, self.config.tail_line_bytes);
+                if let Some(path) = &self.config.invocation_log {
+                    self.model.apply(&UiEvent::LogAvailable {
+                        task: crate::events::TaskId(0),
+                        path: path.clone(),
+                    })?;
+                }
                 Ok(())
             }
             UiEvent::Output {
@@ -568,12 +643,38 @@ impl Presentation {
                 bytes,
             } => {
                 let bytes = if self.config.policy.live {
-                    self.model.output(task, stream, &bytes).into_bytes()
+                    self.model
+                        .sanitize_output(task, stream, &bytes)
+                        .into_bytes()
                 } else {
                     bytes
                 };
-                self.active_view = true;
                 self.required(stream, bytes)
+            }
+            UiEvent::PlainOutput { stream, bytes } => {
+                if self.config.policy.live {
+                    Ok(())
+                } else {
+                    self.required(stream, bytes)
+                }
+            }
+            UiEvent::ActivityOutput {
+                task,
+                stream,
+                bytes,
+            } => {
+                if self.config.policy.live {
+                    self.model.output(task, stream, &bytes);
+                    self.active_view = true;
+                    Ok(())
+                } else {
+                    self.required(stream, bytes)
+                }
+            }
+            event @ UiEvent::CommandStarting { .. } => {
+                self.model.apply(&event)?;
+                self.active_view = true;
+                Ok(())
             }
             event @ (UiEvent::Table { .. } | UiEvent::Diagnostic { .. }) => {
                 let (stream, bytes) = self.formatted(event)?;
@@ -693,17 +794,28 @@ impl Presentation {
     }
 
     fn replay(&mut self) -> Result<(), ConfctlError> {
-        let had_bytes =
-            self.stdout.replayed < self.stdout.length || self.stderr.replayed < self.stderr.length;
         let mut errors = Vec::new();
-        if let Err(source) = self.stdout.replay(&self.outputs.stdout) {
-            errors.push(output_io("replay deferred stdout", source));
-        }
-        if let Err(source) = self.stderr.replay(&self.outputs.stderr) {
-            errors.push(output_io("replay deferred stderr", source));
-        }
-        if had_bytes && let Some(painter) = &mut self.painter {
-            painter.invalidate();
+        for (spool, writer, operation) in [
+            (
+                &mut self.stdout,
+                &self.outputs.stdout,
+                "replay deferred stdout",
+            ),
+            (
+                &mut self.stderr,
+                &self.outputs.stderr,
+                "replay deferred stderr",
+            ),
+        ] {
+            match spool.replay(writer) {
+                Ok(Some(last)) => {
+                    if let Some(painter) = &mut self.painter {
+                        painter.output_ended(last);
+                    }
+                }
+                Ok(None) => {}
+                Err(source) => errors.push(output_io(operation, source)),
+            }
         }
         combine(errors)
     }
@@ -726,7 +838,7 @@ impl Presentation {
             self.flush_outputs()?;
         } else if was_parked {
             if let Some(painter) = &mut self.painter {
-                painter.invalidate();
+                painter.foreign_output();
             }
             self.replay()?;
         }
@@ -766,43 +878,118 @@ impl Presentation {
         }
         self.last_geometry = Some(size);
     }
-    fn frame(&self) -> ratatui::buffer::Buffer {
-        let (columns, rows) = self.dimensions();
-        let log =
-            self.model.logs().last().map(|(task, path)| {
-                format!("{}: {}", model::source_label(*task), display_path(path))
-            });
-        let info = live::FrameInfo {
+    fn log_display(&self) -> Option<String> {
+        self.model.logs().last().map(|(_, path)| {
+            let relative = self
+                .config
+                .configuration_dir
+                .as_ref()
+                .and_then(|root| path.strip_prefix(root).ok());
+            display_path(relative.unwrap_or(path))
+        })
+    }
+    fn frame_info<'a>(&'a self, log: Option<&'a str>) -> live::FrameInfo<'a> {
+        live::FrameInfo {
             command: &self.config.command,
             operation: &self.config.operation,
             started: &self.started,
-            log: log.as_deref(),
+            log,
             elapsed: self
                 .timing
                 .as_ref()
                 .map_or_else(|| self.origin.elapsed(), Timing::elapsed),
             color: self.config.policy.stdout_color,
             max_tasks: self.config.max_tasks,
-        };
-        // A spare terminal column avoids implicit wrapping, including wide cells.
+        }
+    }
+    fn frame(&self, log: Option<&str>) -> ratatui::buffer::Buffer {
+        let (columns, rows) = self.dimensions();
         live::render(
             &self.model,
-            &info,
+            &self.frame_info(log),
             columns.saturating_sub(1),
             rows.saturating_sub(2),
         )
     }
     fn paint(&mut self) -> Result<(), ConfctlError> {
+        if self
+            .last_paint
+            .is_some_and(|last| last.elapsed() < Duration::from_millis(100))
+        {
+            return Ok(());
+        }
+        self.paint_now()
+    }
+    fn paint_now(&mut self) -> Result<(), ConfctlError> {
         if !self.config.policy.live || self.parked() || !self.active_view {
             return Ok(());
         }
         self.refresh_geometry();
-        let frame = self.frame();
+        let mut log = if self.model.finalized() {
+            None
+        } else {
+            self.log_display()
+        };
+        if let Some(display) = &log {
+            let (columns, rows) = self.dimensions();
+            // Tiny panels cannot hold an entire wrapped locator plus useful
+            // status. Publish it once in normal scrollback, never an ellipsis.
+            let width = usize::from(columns.saturating_sub(1));
+            let elapsed = self
+                .timing
+                .as_ref()
+                .map_or_else(|| self.origin.elapsed(), Timing::elapsed);
+            let header_rows = [
+                format!(
+                    "Command: {}",
+                    model::sanitize_text(&self.config.command).replace(['\n', '\r'], " ")
+                ),
+                format!(
+                    "Started: {}  Elapsed: {}",
+                    self.started,
+                    crate::timing::format_elapsed(elapsed)
+                ),
+                format!("Operation: {}", self.config.operation),
+                format!("Full log: {display}"),
+            ]
+            .iter()
+            .map(|text| live::wrap(text, width).len())
+            .sum::<usize>();
+            let task_rows = self
+                .model
+                .visible_rows(
+                    self.config
+                        .max_tasks
+                        .min(usize::from(rows.saturating_sub(3))),
+                )
+                .iter()
+                .map(|row| if row.build.is_some() { 4 } else { 1 })
+                .sum::<usize>()
+                .min(usize::from(rows.saturating_sub(3)));
+            if columns <= 2 || header_rows + task_rows > usize::from(rows.saturating_sub(2)) {
+                let path = self
+                    .model
+                    .logs()
+                    .last()
+                    .map(|(_, p)| p.clone())
+                    .expect("log display has path");
+                if !self.scrollback_logs.contains(&path) {
+                    self.required(
+                        OutputStream::Stdout,
+                        format!("Full log: {display}\n").into_bytes(),
+                    )?;
+                    self.scrollback_logs.insert(path);
+                }
+                log = None;
+            }
+        }
+        let frame = self.frame(log.as_deref());
         if let Some(painter) = &mut self.painter {
             painter
                 .paint(&frame)
                 .map_err(|source| output_io("paint live presentation", source))?;
         }
+        self.last_paint = Some(Instant::now());
         Ok(())
     }
     fn finalize_group(&mut self) -> Result<(), ConfctlError> {
@@ -810,37 +997,23 @@ impl Presentation {
         if !self.config.policy.live || !self.active_view {
             return Ok(());
         }
-        self.paint()?;
+        self.paint_now()?;
         let (columns, rows) = self.dimensions();
-        let columns = usize::from(columns.saturating_sub(1));
-        let height = rows.saturating_sub(2);
-        let headers = usize::from(height.saturating_sub(1)).min(3);
-        let minimum_tail = if height >= 8 { 3 } else { 0 };
-        let capacity = self
-            .config
-            .max_tasks
-            .min(self.model.rows().len())
-            .min(usize::from(height).saturating_sub(headers + minimum_tail));
-        let visible: HashSet<_> = if self.parked() {
-            HashSet::new()
-        } else {
-            self.model
-                .visible_rows(capacity)
-                .iter()
-                .map(|row| row.id)
-                .collect()
-        };
+        let visible: HashSet<_> =
+            live::displayed_tasks(&self.model, self.config.max_tasks, rows.saturating_sub(2))
+                .into_iter()
+                .collect();
         let omitted: Vec<_> = self
             .model
             .rows()
             .iter()
-            .filter(|row| !visible.contains(&row.id) || live::task_label(row, columns).1)
+            .filter(|row| {
+                !visible.contains(&row.id)
+                    || live::task_label(row, usize::from(columns.saturating_sub(1))).1
+            })
             .map(live::task_summary)
             .collect();
-        // Leave final panel in scrollback without destroying the painter object.
-        if !self.parked()
-            && let Some(painter) = &mut self.painter
-        {
+        if let Some(painter) = &mut self.painter {
             painter
                 .finish()
                 .map_err(|source| output_io("retain final live panel", source))?;
@@ -855,48 +1028,8 @@ impl Presentation {
         for line in omitted {
             self.required(OutputStream::Stdout, line.into_bytes())?;
         }
-        // Output may precede registration; retain its source without inventing a task.
-        let mut sources_seen = HashSet::new();
-        let sources: Vec<_> = self
-            .model
-            .tail_sources()
-            .filter(|(task, stream)| {
-                !self.model.rows().iter().any(|row| row.id == *task)
-                    && sources_seen.insert((*task, *stream == OutputStream::Stderr))
-            })
-            .map(|(task, stream)| {
-                format!(
-                    "Output source {}/{} (task {}, {}): no registered task description\n",
-                    model::source_label(task),
-                    if stream == OutputStream::Stderr {
-                        "e"
-                    } else {
-                        "o"
-                    },
-                    task.0,
-                    stream.name()
-                )
-            })
-            .collect();
-        for source in sources {
-            self.required(OutputStream::Stdout, source.into_bytes())?;
-        }
-        let logs: Vec<_> = self
-            .model
-            .logs()
-            .iter()
-            .map(|(task, path)| {
-                format!(
-                    "Log: {} (task {}): {}\n",
-                    model::source_label(*task),
-                    task.0,
-                    display_path(path)
-                )
-            })
-            .collect();
-        for log in logs {
-            self.required(OutputStream::Stdout, log.into_bytes())?;
-        }
+        // Native IDs and log ownership remain in the model/log/evidence. Final
+        // retained locators are printed by the app only after retention succeeds.
         Ok(())
     }
     fn pending(&mut self) -> PendingOutput {
@@ -912,7 +1045,7 @@ impl Presentation {
 }
 
 /// A display locator only: native path bytes remain in the model unchanged.
-fn display_path(path: &Path) -> String {
+pub(crate) fn display_path(path: &Path) -> String {
     use std::os::unix::ffi::OsStrExt;
     let mut display = String::from("\"");
     let mut bytes = path.as_os_str().as_bytes();

@@ -2,7 +2,7 @@
 
 use crate::{
     error::ConfctlError,
-    events::{OutputStream, TaskId, TaskState, UiEvent},
+    events::{ActivityCount, OutputStream, TaskId, TaskState, UiEvent},
 };
 use ratatui::{style::Style, text::Span};
 use std::{
@@ -29,6 +29,7 @@ pub struct TaskRow {
     pub total: Option<u64>,
     pub detail: String,
     pub phase: TaskPhase,
+    pub build: Option<(ActivityCount, ActivityCount)>,
     original_description: String,
 }
 
@@ -63,6 +64,8 @@ pub struct Model {
     logs: Vec<(TaskId, PathBuf)>,
     tail: Tail,
     parsers: HashMap<(u64, bool), Sanitizer>,
+    commands: Vec<(TaskId, String)>,
+    finalized: bool,
 }
 
 impl Model {
@@ -72,6 +75,8 @@ impl Model {
             logs: Vec::new(),
             tail: Tail::new(tail_rows, tail_line_bytes),
             parsers: HashMap::new(),
+            commands: Vec::new(),
+            finalized: false,
         }
     }
     pub fn rows(&self) -> &[TaskRow] {
@@ -94,8 +99,45 @@ impl Model {
             .chain(self.tail.source.filter(|_| !self.tail.current.is_empty()))
     }
 
+    pub(super) fn command_starting(&mut self, task: TaskId, display: &str, in_tail: bool) {
+        let display = sanitize_text(display).replace(['\n', '\r'], " ");
+        self.commands.retain(|(id, _)| *id != task);
+        if !self.tail.current.is_empty() {
+            self.tail.finish_line();
+        }
+        if in_tail {
+            self.tail.append(
+                task,
+                OutputStream::Stderr,
+                &format!("$ {display}\n"),
+                false,
+                true,
+            );
+        }
+        self.commands.push((task, display));
+    }
+
     pub fn apply(&mut self, event: &UiEvent) -> Result<(), ConfctlError> {
         match event {
+            UiEvent::CommandStarting { task, display } => {
+                self.command_starting(*task, display, true)
+            }
+            UiEvent::BuildProgress {
+                task,
+                building,
+                fetching,
+            } => {
+                let row = self
+                    .rows
+                    .iter_mut()
+                    .find(|row| row.id == *task)
+                    .ok_or_else(|| invalid("build activity for unregistered task"))?;
+                if row.phase != TaskPhase::Executing {
+                    return Err(invalid("build activity requires an executing task"));
+                }
+                row.build = Some((*building, *fetching));
+            }
+
             UiEvent::TaskPending { task, description } => {
                 if self.rows.iter().any(|row| row.id == *task) {
                     return Err(invalid("task registered twice"));
@@ -156,8 +198,18 @@ impl Model {
                     state: Some(*state),
                     entered,
                 };
+                if self.tail.source.is_some_and(|(id, _)| id == *task)
+                    && !self.tail.current.is_empty()
+                {
+                    self.tail.finish_line();
+                }
             }
             UiEvent::Output {
+                task,
+                stream,
+                bytes,
+            }
+            | UiEvent::ActivityOutput {
                 task,
                 stream,
                 bytes,
@@ -185,11 +237,13 @@ impl Model {
             total: None,
             detail: String::new(),
             phase,
+            build: None,
         });
     }
 
     /// End only the observation scope; a missing result stays unknown.
     pub fn finalize(&mut self) {
+        self.finalized = true;
         for row in &mut self.rows {
             let entered = match row.phase {
                 TaskPhase::Pending => false,
@@ -203,15 +257,69 @@ impl Model {
         }
     }
 
-    /// The same incremental sanitizer feeds reliable live output and the tail.
-    /// Captures/logs keep their original input; only this returned view changes.
-    pub fn output(&mut self, task: TaskId, stream: OutputStream, bytes: &[u8]) -> String {
-        let text = self
-            .parsers
+    pub fn finalized(&self) -> bool {
+        self.finalized
+    }
+    pub fn description(&self, task: TaskId) -> &str {
+        self.rows
+            .iter()
+            .find(|row| row.id == task)
+            .map(|row| row.description.as_str())
+            .or_else(|| {
+                self.commands
+                    .iter()
+                    .find(|(id, _)| *id == task)
+                    .map(|(_, display)| display.as_str())
+            })
+            .unwrap_or("command")
+    }
+    /// Source identity stays separate from text. Pending serial work does not
+    /// create prefixes; mixed retained fragments remain attributable afterward.
+    pub fn display_tail(&self) -> Vec<String> {
+        let label = self.tail.labels.iter().any(|value| *value) || self.tail.needs_label;
+        self.tail
+            .lines
+            .iter()
+            .map(String::as_str)
+            .chain((!self.tail.current.is_empty()).then_some(self.tail.current.as_str()))
+            .zip(self.tail_sources())
+            .zip(
+                self.tail
+                    .announcements
+                    .iter()
+                    .copied()
+                    .chain((!self.tail.current.is_empty()).then_some(self.tail.announcement)),
+            )
+            .map(|((text, (task, _)), announcement)| {
+                let description = self.description(task);
+                let already_labelled = text
+                    .split_once("> ")
+                    .is_some_and(|(prefix, _)| !prefix.is_empty() && description.ends_with(prefix));
+                if label && !announcement && !already_labelled {
+                    format!("{description}> {text}")
+                } else {
+                    text.to_owned()
+                }
+            })
+            .collect()
+    }
+    /// Required output and activity share incremental sanitization, but only
+    /// activity enters the tail. Captures and native logs remain untouched.
+    pub fn sanitize_output(&mut self, task: TaskId, stream: OutputStream, bytes: &[u8]) -> String {
+        self.parsers
             .entry((task.0, stream == OutputStream::Stderr))
             .or_default()
-            .feed(bytes);
-        self.tail.append(task, stream, &text);
+            .feed(bytes)
+    }
+    pub fn output(&mut self, task: TaskId, stream: OutputStream, bytes: &[u8]) -> String {
+        let text = self.sanitize_output(task, stream, bytes);
+        let concurrent = self
+            .rows
+            .iter()
+            .filter(|row| row.phase == TaskPhase::Executing)
+            .count()
+            > 1;
+        self.tail.append(task, stream, &text, concurrent, false);
         text
     }
 
@@ -317,29 +425,16 @@ pub fn sanitize_text(text: &str) -> String {
     Sanitizer::default().feed(text.as_bytes())
 }
 
-/// A reversible, group-independent display key, not a host or registry lookup.
-pub(super) fn source_label(task: TaskId) -> String {
-    let mut value = task.0;
-    let mut digits = Vec::with_capacity(13);
-    loop {
-        digits.push(char::from(
-            b"0123456789abcdefghijklmnopqrstuvwxyz"[(value % 36) as usize],
-        ));
-        value /= 36;
-        if value == 0 {
-            break;
-        }
-    }
-    format!("@{}", digits.into_iter().rev().collect::<String>())
-}
-
 struct Tail {
     lines: VecDeque<String>,
     sources: VecDeque<(TaskId, OutputStream)>,
+    labels: VecDeque<bool>,
+    announcements: VecDeque<bool>,
+    needs_label: bool,
+    announcement: bool,
     current: String,
     content: String,
     source: Option<(TaskId, OutputStream)>,
-    prefix: String,
     rows: usize,
     line_bytes: usize,
 }
@@ -348,35 +443,45 @@ impl Tail {
         Self {
             lines: VecDeque::new(),
             sources: VecDeque::new(),
+            labels: VecDeque::new(),
+            announcements: VecDeque::new(),
+            needs_label: false,
+            announcement: false,
             current: String::new(),
             content: String::new(),
             source: None,
-            prefix: String::new(),
             rows,
             line_bytes,
         }
     }
-    fn append(&mut self, task: TaskId, stream: OutputStream, text: &str) {
+    fn append(
+        &mut self,
+        task: TaskId,
+        stream: OutputStream,
+        text: &str,
+        concurrent: bool,
+        announcement: bool,
+    ) {
         if text.is_empty() {
             return;
         }
         if self.source != Some((task, stream)) {
             // Keep interleaved partial lines distinct without changing output bytes.
             if !self.current.is_empty() {
+                if !announcement
+                    && !self.announcement
+                    && self.source.is_some_and(|(id, _)| id != task)
+                {
+                    self.needs_label = true;
+                }
                 self.finish_line();
             }
             self.source = Some((task, stream));
-            self.prefix = format!(
-                "{}/{} ",
-                source_label(task),
-                if stream == OutputStream::Stderr {
-                    "e"
-                } else {
-                    "o"
-                }
-            );
         }
+        self.announcement = announcement;
+        self.needs_label |= concurrent;
         for part in text.split_inclusive(['\n', '\r']) {
+            self.needs_label |= concurrent;
             let (value, ending) = part
                 .strip_suffix(['\n', '\r'])
                 .map_or((part, None), |value| {
@@ -384,8 +489,7 @@ impl Tail {
                 });
             self.content.push_str(value);
             trim_front(&mut self.content, self.line_bytes);
-            self.current.clone_from(&self.prefix);
-            self.current.push_str(&self.content);
+            self.current.clone_from(&self.content);
             match ending {
                 Some(b'\n') => self.finish_line(),
                 Some(b'\r') => {
@@ -401,13 +505,18 @@ impl Tail {
             self.lines.push_back(std::mem::take(&mut self.current));
             self.sources
                 .push_back(self.source.expect("display fragment has a source"));
+            self.labels.push_back(self.needs_label);
+            self.announcements.push_back(self.announcement);
         } else {
             self.current.clear();
         }
         self.content.clear();
+        self.needs_label = false;
         while self.lines.len() > self.rows {
             self.lines.pop_front();
             self.sources.pop_front();
+            self.labels.pop_front();
+            self.announcements.pop_front();
         }
     }
 }
@@ -682,7 +791,7 @@ mod tests {
         }
         assert_eq!(
             model.tail().iter().map(String::as_str).collect::<Vec<_>>(),
-            ["@1/o red 界", "@1/o last"]
+            ["red 界", "last"]
         );
         assert_eq!(bytes[4], 0x1b, "raw source is unchanged");
         model
@@ -692,7 +801,7 @@ mod tests {
                 bytes: vec![b'x'; 10_000],
             })
             .expect("long line");
-        assert_eq!(model.current_tail_line(), "@1/o xxxxxxxxxxxxxxxx");
+        assert_eq!(model.current_tail_line(), "xxxxxxxxxxxxxxxx");
     }
     #[test]
     fn interleaved_partial_lines_keep_task_and_stream_without_changing_output() {
@@ -707,9 +816,9 @@ mod tests {
         }
         assert_eq!(
             model.tail().iter().map(String::as_str).collect::<Vec<_>>(),
-            ["@1/o node-a ", "@2/e failed", "@1/e warn",]
+            ["node-a ", "failed", "warn",]
         );
-        assert_eq!(model.current_tail_line(), "@1/o continued");
+        assert_eq!(model.current_tail_line(), "continued");
         assert_eq!(
             model.tail_sources().collect::<Vec<_>>(),
             [
@@ -723,16 +832,13 @@ mod tests {
             model.output(TaskId(2), OutputStream::Stderr, b"\x1b[0m"),
             ""
         );
-        assert_eq!(model.current_tail_line(), "@1/o continued");
+        assert_eq!(model.current_tail_line(), "continued");
         assert_eq!(
             model.output(TaskId(1), OutputStream::Stdout, b"\rreplacement\n"),
             "\rreplacement\n"
         );
         assert_eq!(model.tail().len(), 3);
-        assert_eq!(
-            model.tail().back().map(String::as_str),
-            Some("@1/o replacement")
-        );
+        assert_eq!(model.tail().back().map(String::as_str), Some("replacement"));
         assert_eq!(
             model.tail_sources().collect::<Vec<_>>(),
             [
@@ -743,16 +849,80 @@ mod tests {
         );
     }
     #[test]
-    fn compact_source_keys_retain_the_entire_u64_identity() {
-        for (id, key) in [
-            (0, "@0"),
-            (35, "@z"),
-            (36, "@10"),
-            (u64::MAX - 1, "@3w5e11264sgse"),
-            (u64::MAX, "@3w5e11264sgsf"),
-        ] {
-            assert_eq!(source_label(TaskId(id)), key);
-        }
+    fn startup_announcements_and_completed_serial_groups_do_not_force_prefixes() {
+        let mut model = Model::new(12, 128);
+        model
+            .apply(&UiEvent::CommandStarting {
+                task: TaskId(0),
+                display: "nix eval --json settings".into(),
+            })
+            .unwrap();
+        model.apply(&start(1)).unwrap();
+        model.apply(&pending(2)).unwrap();
+        model
+            .apply(&UiEvent::CommandStarting {
+                task: TaskId(1),
+                display: "nix build group-one".into(),
+            })
+            .unwrap();
+        model.output(TaskId(1), OutputStream::Stderr, b"first build\n");
+        model
+            .apply(&UiEvent::TaskFinished {
+                task: TaskId(1),
+                state: TaskState::Succeeded,
+            })
+            .unwrap();
+        model.apply(&start(2)).unwrap();
+        model
+            .apply(&UiEvent::CommandStarting {
+                task: TaskId(2),
+                display: "nix build group-two".into(),
+            })
+            .unwrap();
+        model.output(TaskId(2), OutputStream::Stderr, b"second build\n");
+        assert_eq!(
+            model.display_tail(),
+            [
+                "$ nix eval --json settings",
+                "$ nix build group-one",
+                "first build",
+                "$ nix build group-two",
+                "second build"
+            ]
+        );
+    }
+    #[test]
+    fn serial_pending_tasks_do_not_prefix_activity_but_mixed_sources_do() {
+        let mut model = Model::new(4, 80);
+        model.apply(&start(1)).unwrap();
+        model.apply(&pending(2)).unwrap();
+        model.output(TaskId(1), OutputStream::Stderr, b"first fragment");
+        assert_eq!(model.display_tail(), ["first fragment"]);
+        model.apply(&start(2)).unwrap();
+        model.output(TaskId(2), OutputStream::Stderr, b"second fragment");
+        assert_eq!(
+            model.display_tail(),
+            ["task1> first fragment", "task2> second fragment"]
+        );
+        assert_eq!(model.rows()[0].id, TaskId(1));
+    }
+    #[test]
+    fn command_only_context_never_registers_work_or_loses_native_log_identity() {
+        let mut model = Model::new(4, 80);
+        model
+            .apply(&UiEvent::CommandStarting {
+                task: TaskId(0),
+                display: "nix eval [arguments redacted]".into(),
+            })
+            .unwrap();
+        model.output(TaskId(0), OutputStream::Stderr, b"notice\n");
+        assert!(model.rows().is_empty());
+        assert_eq!(
+            model.display_tail(),
+            ["$ nix eval [arguments redacted]", "notice"]
+        );
+        model.finalize();
+        assert!(model.rows().is_empty());
     }
     #[test]
     fn narrow_clipping_keeps_graphemes_and_display_width() {

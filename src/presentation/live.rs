@@ -1,13 +1,16 @@
 //! Ratatui widgets render a bounded frame; native painting has no input reader.
 
-use super::model::{Model, TaskPhase, TaskRow, clip, sanitize_text, source_label};
-use crate::{events::TaskState, timing::format_elapsed};
+use super::model::{Model, TaskPhase, TaskRow, clip, sanitize_text};
+use crate::{
+    events::{ActivityCount, TaskState},
+    timing::format_elapsed,
+};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph, Widget},
+    widgets::Widget,
 };
 use std::time::Duration;
 
@@ -21,89 +24,70 @@ pub struct FrameInfo<'a> {
     pub max_tasks: usize,
 }
 
+/// Wrap at display/grapheme boundaries without discarding any path bytes in
+/// the sanitized display. Native PathBuf values never pass through this helper.
+pub(super) fn wrap(text: &str, columns: usize) -> Vec<String> {
+    if columns == 0 {
+        return Vec::new();
+    }
+    let mut lines = Vec::new();
+    let mut line = String::new();
+    let mut width = 0;
+    let span = Span::raw(text);
+    for grapheme in span.styled_graphemes(Style::default()) {
+        let next = Span::raw(grapheme.symbol).width();
+        if width + next > columns && !line.is_empty() {
+            lines.push(std::mem::take(&mut line));
+            width = 0;
+        }
+        // A terminal narrower than one wide grapheme cannot display it, but
+        // the full locator is also available through the scrollback fallback.
+        if next <= columns {
+            line.push_str(grapheme.symbol);
+            width += next;
+        }
+    }
+    if !line.is_empty() || lines.is_empty() {
+        lines.push(line);
+    }
+    lines
+}
+
+pub(super) fn headers(info: &FrameInfo<'_>, width: u16) -> Vec<String> {
+    let mut lines = Vec::new();
+    for text in [
+        format!("Command: {}", single_line(info.command)),
+        format!(
+            "Started: {}  Elapsed: {}",
+            info.started,
+            format_elapsed(info.elapsed)
+        ),
+        format!("Operation: {}", single_line(info.operation)),
+    ] {
+        lines.extend(wrap(&text, usize::from(width)));
+    }
+    if let Some(log) = info.log {
+        lines.extend(wrap(&format!("Full log: {log}"), usize::from(width)));
+    }
+    lines
+}
+
 pub fn render(model: &Model, info: &FrameInfo<'_>, width: u16, height: u16) -> Buffer {
-    let area = Rect::new(0, 0, width, height);
-    let mut buffer = Buffer::empty(area);
     if width == 0 || height == 0 {
-        return buffer;
+        return Buffer::empty(Rect::new(0, 0, width, 0));
     }
     let heading = if info.color {
         Style::default().add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
-    let header_count = usize::from(height.saturating_sub(1)).min(3);
-    let tail_minimum = if height >= 8 { 3 } else { 0 };
-    let task_count = info
-        .max_tasks
-        .min(model.rows().len())
-        .min(usize::from(height).saturating_sub(header_count + tail_minimum));
-    let tail_height = usize::from(height).saturating_sub(header_count + task_count);
-    let operation = format!("Operation: {}", single_line(info.operation));
-    let operation = if let Some(log) = info.log {
-        let complete = format!("{operation}  Log: {}", single_line(log));
-        if Span::raw(&complete).width() <= usize::from(width) {
-            complete
-        } else {
-            let omitted = format!("{operation}  Log: …");
-            if Span::raw(&omitted).width() <= usize::from(width) {
-                omitted
-            } else {
-                "Log: …".into()
-            }
-        }
-    } else {
-        operation
-    };
-    let headers = [
-        format!("Command: {}", info.command),
-        format!(
-            "Started: {}  Elapsed: {}",
-            info.started,
-            format_elapsed(info.elapsed)
-        ),
-        operation,
-    ];
-    for (index, text) in headers.iter().take(header_count).enumerate() {
-        Line::styled(clipped(&single_line(text), usize::from(width)), heading)
-            .render(Rect::new(0, index as u16, width, 1), &mut buffer);
-    }
-    if tail_height > 0 {
-        let y = header_count as u16;
-        let tail_area = Rect::new(0, y, width, tail_height as u16);
-        let bordered = tail_height >= 3 && width >= 3;
-        let inner_height = tail_height.saturating_sub(if bordered { 2 } else { 0 });
-        let mut lines: Vec<_> = model.tail().iter().map(|line| line.as_str()).collect();
-        if !model.current_tail_line().is_empty() {
-            lines.push(model.current_tail_line());
-        }
-        let start = lines.len().saturating_sub(inner_height);
-        let lines: Vec<Line<'_>> = lines[start..]
-            .iter()
-            .map(|line| {
-                Line::raw(tail_line(
-                    line,
-                    usize::from(width.saturating_sub(if bordered { 2 } else { 0 })),
-                ))
-            })
-            .collect();
-        let text = Paragraph::new(lines);
-        if bordered {
-            text.block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title("Output")
-                    .border_style(heading),
-            )
-            .render(tail_area, &mut buffer);
-        } else {
-            text.render(tail_area, &mut buffer);
-        }
-    }
-    for (index, row) in model.visible_rows(task_count).iter().enumerate() {
-        let y = header_count + tail_height + index;
-        let row_area = Rect::new(0, y as u16, width, 1);
-        let (label, _) = task_label(row, usize::from(width));
+    let mut lines: Vec<(String, Style)> = headers(info, width)
+        .into_iter()
+        .map(|text| (text, heading))
+        .collect();
+    let selected = model.visible_rows(info.max_tasks.min(usize::from(height).saturating_sub(1)));
+    let mut tasks = Vec::new();
+    for row in selected {
         let color = match row.phase {
             TaskPhase::Final {
                 state: Some(TaskState::Succeeded),
@@ -121,18 +105,101 @@ pub fn render(model: &Model, info: &FrameInfo<'_>, width: u16, height: u16) -> B
         } else {
             Style::default()
         };
-        if let Some(fraction) = row.fraction().filter(|_| width >= 40) {
-            Gauge::default()
-                .ratio(fraction)
-                .label(clip(&label, usize::from(width)))
-                .gauge_style(style)
-                .render(row_area, &mut buffer);
-        } else {
-            Line::from(Span::styled(clip(&label, usize::from(width)), style))
-                .render(row_area, &mut buffer);
+        tasks.push((task_label(row, usize::from(width)).0, style));
+        if let Some((building, fetching)) = row.build {
+            let total = ActivityCount {
+                observed: building.observed.saturating_add(fetching.observed),
+                total: building
+                    .total
+                    .zip(fetching.total)
+                    .and_then(|(a, b)| a.checked_add(b)),
+            };
+            for (label, count) in [
+                ("Building", building),
+                ("Fetching", fetching),
+                ("Total", total),
+            ] {
+                tasks.push((activity_bar(label, count, usize::from(width)), style));
+            }
         }
     }
+    // On a tiny terminal keep outcomes first. The caller publishes the full log
+    // in scrollback before the panel if its header cannot fit.
+    let task_space = tasks.len().min(usize::from(height).saturating_sub(1));
+    lines.truncate(usize::from(height).saturating_sub(task_space));
+    let available = usize::from(height).saturating_sub(lines.len() + task_space);
+    let tail: Vec<_> = model
+        .display_tail()
+        .into_iter()
+        .flat_map(|text| wrap(&text, usize::from(width)))
+        .collect();
+    if available > 0 {
+        let title = clipped("─ Live view ", usize::from(width));
+        let title_width = Span::raw(&title).width();
+        lines.push((
+            format!(
+                "{title}{}",
+                "─".repeat(usize::from(width).saturating_sub(title_width))
+            ),
+            heading,
+        ));
+        if available > 1 {
+            let count = tail.len().min(tail_capacity(model, info, width, height));
+            for text in &tail[tail.len() - count..] {
+                lines.push((text.clone(), Style::default()));
+            }
+            lines.push(("─".repeat(usize::from(width)), heading));
+        }
+    }
+    lines.extend(tasks.into_iter().take(task_space));
+    let mut buffer = Buffer::empty(Rect::new(
+        0,
+        0,
+        width,
+        lines.len().min(usize::from(height)) as u16,
+    ));
+    for (y, (text, style)) in lines.into_iter().take(usize::from(height)).enumerate() {
+        Line::styled(text, style).render(Rect::new(0, y as u16, width, 1), &mut buffer);
+    }
     buffer
+}
+
+fn activity_bar(label: &str, count: ActivityCount, columns: usize) -> String {
+    let counts = count.total.map_or_else(
+        || format!("{} / ?", count.observed),
+        |total| format!("{} / {total}", count.observed),
+    );
+    let prefix = format!("{label:<8} {counts}");
+    let Some(total) = count.total.filter(|n| *n > 0) else {
+        return clipped(&prefix, columns);
+    };
+    let space = columns.saturating_sub(Span::raw(&prefix).width() + 3);
+    if space < 3 {
+        return clipped(&prefix, columns);
+    }
+    let filled =
+        ((u128::from(count.observed.min(total)) * space as u128) / u128::from(total)) as usize;
+    format!(
+        "{prefix} [{}{}]",
+        "=".repeat(filled),
+        " ".repeat(space - filled)
+    )
+}
+
+/// Screen rows available to the newest tail entry, including wrapped lines.
+pub(super) fn tail_capacity(model: &Model, info: &FrameInfo<'_>, width: u16, height: u16) -> usize {
+    if width == 0 || height == 0 {
+        return 0;
+    }
+    let height = usize::from(height);
+    let task_space = model
+        .visible_rows(info.max_tasks.min(height.saturating_sub(1)))
+        .iter()
+        .map(|row| if row.build.is_some() { 4 } else { 1 })
+        .sum::<usize>()
+        .min(height.saturating_sub(1));
+    let heading = headers(info, width).len().min(height - task_space);
+    height.saturating_sub(heading + task_space + 2)
 }
 
 fn clipped(text: &str, columns: usize) -> String {
@@ -142,20 +209,6 @@ fn clipped(text: &str, columns: usize) -> String {
         String::new()
     } else {
         format!("{}…", clip(text, columns - 1))
-    }
-}
-
-fn tail_line(line: &str, columns: usize) -> String {
-    // Split only the prefix made by Tail, never interpret child text as an ID.
-    let Some((source, content)) = line.split_once(' ') else {
-        return clipped(line, columns);
-    };
-    let message_space = Span::raw(content).width().min(6);
-    if source.len() + 1 + message_space <= columns {
-        format!("{source} {}", clipped(content, columns - source.len() - 1))
-    } else {
-        // No partial source key: final task/log summaries retain the association.
-        clipped(&format!("… {content}"), columns)
     }
 }
 
@@ -179,43 +232,63 @@ fn task_description(row: &TaskRow) -> String {
 
 /// The boolean marks a shortened view, which needs a full final task summary.
 pub(super) fn task_label(row: &TaskRow, columns: usize) -> (String, bool) {
-    let state = phase_label(&row.phase);
-    let source = source_label(row.id);
-    let description = task_description(row);
-    let prefix = format!("{state} {source} {} ", task_counts(row));
-    let complete = format!("{prefix}{description}");
-    if Span::raw(&complete).width() <= columns {
-        return (complete, false);
-    }
-    let message_space = Span::raw(&description).width().min(6);
-    if prefix.len() + message_space <= columns {
-        return (
-            format!("{prefix}{}", clipped(&description, columns - prefix.len())),
-            true,
-        );
-    }
-    let prefix = format!("{state} {source} ");
-    if prefix.len() + message_space.max(1) <= columns {
-        return (
-            format!(
-                "{prefix}{}…",
-                clip(&description, columns - prefix.len() - 1)
-            ),
-            true,
-        );
-    }
-    (clipped(&format!("{state} … {description}"), columns), true)
-}
-
-pub(super) fn task_summary(row: &TaskRow) -> String {
-    format!(
-        "{} (task {}): {}: {} {}\n",
-        source_label(row.id),
-        row.id.0,
-        task_description(row),
+    let counts = if row.build.is_some() {
+        String::new()
+    } else {
+        format!("{} ", task_counts(row))
+    };
+    let label = format!(
+        "{} {counts}{}",
         phase_label(&row.phase),
-        task_counts(row)
-    )
+        task_description(row)
+    );
+    let shortened = Span::raw(&label).width() > columns;
+    (clipped(&label, columns), shortened)
+}
+pub(super) fn task_summary(row: &TaskRow) -> String {
+    let mut summary = format!("{}: {}", task_description(row), phase_label(&row.phase));
+    if let Some((building, fetching)) = row.build {
+        let total = ActivityCount {
+            observed: building.observed.saturating_add(fetching.observed),
+            total: building
+                .total
+                .zip(fetching.total)
+                .and_then(|(a, b)| a.checked_add(b)),
+        };
+        for (label, count) in [
+            ("Building", building),
+            ("Fetching", fetching),
+            ("Total", total),
+        ] {
+            let total = count.total.map_or_else(|| "?".into(), |n| n.to_string());
+            summary.push_str(&format!("; {label} {}/{total}", count.observed));
+        }
+    } else {
+        summary.push_str(&format!(" {}", task_counts(row)));
+    }
+    summary.push('\n');
+    summary
+}
+/// Match status-row visibility when a task also occupies three activity rows.
+pub(super) fn displayed_tasks(
+    model: &Model,
+    limit: usize,
+    height: u16,
+) -> Vec<crate::events::TaskId> {
+    let budget = usize::from(height).saturating_sub(1);
+    let mut used = 0;
+    let mut ids = Vec::new();
+    for row in model.visible_rows(limit.min(budget)) {
+        if used >= budget {
+            break;
+        }
+        let cost = if row.build.is_some() { 4 } else { 1 };
+        if used + cost <= budget {
+            ids.push(row.id);
+        }
+        used += cost;
+    }
+    ids
 }
 
 fn phase_label(phase: &TaskPhase) -> &'static str {
@@ -278,172 +351,201 @@ pub fn state_label(state: TaskState) -> &'static str {
 /// Resize/handoff invalidates geometry; it never moves into unrelated history.
 pub struct RelativePainter<W: std::io::Write> {
     writer: W,
-    rows: Option<u16>,
+    previous: Option<Buffer>,
     color: bool,
-    fresh_line: bool,
     hidden: bool,
+    unfinished_line: bool,
 }
-
 impl<W: std::io::Write> RelativePainter<W> {
     pub fn new(writer: W, color: bool) -> Self {
         Self {
             writer,
-            rows: None,
+            previous: None,
             color,
-            fresh_line: false,
             hidden: false,
+            unfinished_line: false,
         }
     }
     pub fn writer_mut(&mut self) -> &mut W {
         &mut self.writer
     }
     pub fn invalidate(&mut self) {
-        self.rows = None;
-        self.fresh_line = false;
+        self.previous = None;
     }
-
+    pub(super) fn output_ended(&mut self, byte: u8) {
+        self.invalidate();
+        self.unfinished_line = byte != b'\n';
+    }
+    pub(super) fn foreign_output(&mut self) {
+        self.invalidate();
+        // Prompt echo and foreground children can leave the cursor midline.
+        // Their bytes do not pass through this output-only painter.
+        self.unfinished_line = true;
+    }
     pub fn paint(&mut self, buffer: &Buffer) -> std::io::Result<()> {
         use crossterm::{
             QueueableCommand,
-            cursor::{Hide, MoveDown, MoveToColumn, MoveUp},
+            cursor::{Hide, MoveToColumn},
             terminal::{Clear, ClearType},
         };
-        let height = buffer.area.height;
-        if height == 0 || buffer.area.width == 0 {
+        if buffer.area.height == 0
+            || buffer.area.width == 0
+            || self.previous.as_ref() == Some(buffer)
+        {
             return Ok(());
         }
-        self.writer.queue(Hide)?;
-        self.hidden = true;
-        self.writer.queue(MoveToColumn(0))?;
-        let previous = self.rows.unwrap_or(height);
-        if let Some(rows) = self.rows {
-            if rows > 1 {
-                self.writer.queue(MoveUp(rows - 1))?;
-            }
-        } else {
-            if !self.fresh_line {
-                self.writer.write_all(b"\n")?;
-            }
-            for _ in 1..height {
-                self.writer.write_all(b"\n")?;
-            }
-            if height > 1 {
-                self.writer.queue(MoveUp(height - 1))?;
-            }
+        let height = buffer.area.height;
+        let old_height = self.previous.as_ref().map_or(0, |p| p.area.height);
+        let mut batch = Vec::new();
+        if !self.hidden {
+            batch.queue(Hide)?;
         }
-        let total = previous.max(height);
-        for y in 0..total {
-            self.writer
+        let mut at = old_height.saturating_sub(1);
+        if self.previous.is_none() {
+            if self.unfinished_line {
+                batch.extend_from_slice(b"\n");
+            }
+            // The current line is the first owned line, not a blank top margin.
+            batch.queue(MoveToColumn(0))?;
+            for _ in 1..height {
+                batch.extend_from_slice(b"\n");
+            }
+            at = height - 1;
+        } else if height > old_height {
+            for _ in old_height..height {
+                batch.extend_from_slice(b"\n");
+            }
+            at = height - 1;
+        }
+        for y in 0..old_height.max(height) {
+            let unchanged = self.previous.as_ref().is_some_and(|old| {
+                old.area.width == buffer.area.width
+                    && y < old.area.height
+                    && y < height
+                    && (0..buffer.area.width).all(|x| old[(x, y)] == buffer[(x, y)])
+            });
+            if unchanged {
+                continue;
+            }
+            move_row(&mut batch, &mut at, y)?;
+            batch
                 .queue(MoveToColumn(0))?
                 .queue(Clear(ClearType::CurrentLine))?;
             if y < height {
-                self.write_row(buffer, y)?;
-            }
-            if y + 1 < total {
-                if self.rows.is_none() || y + 1 >= previous {
-                    self.writer.write_all(b"\n")?;
-                } else {
-                    self.writer.queue(MoveDown(1))?;
-                }
+                write_row(&mut batch, buffer, y, self.color)?;
             }
         }
-        if total > height {
-            self.writer.queue(MoveUp(total - height))?;
-        }
+        move_row(&mut batch, &mut at, height - 1)?;
+        self.hidden = true;
+        self.writer.write_all(&batch)?;
         self.writer.flush()?;
-        self.rows = Some(height);
-        self.fresh_line = false;
+        self.previous = Some(buffer.clone());
+        self.unfinished_line = false;
         Ok(())
     }
-
-    fn write_row(&mut self, buffer: &Buffer, y: u16) -> std::io::Result<()> {
-        use crossterm::{
-            QueueableCommand,
-            style::{Attribute, SetAttribute, SetBackgroundColor, SetForegroundColor},
-        };
-        let mut x = 0;
-        let mut prior = None;
-        while x < buffer.area.width {
-            let cell = &buffer[(x, y)];
-            if self.color && prior != Some((cell.fg, cell.bg, cell.modifier)) {
-                self.writer
-                    .queue(SetAttribute(Attribute::Reset))?
-                    .queue(SetForegroundColor(terminal_color(cell.fg)))?
-                    .queue(SetBackgroundColor(terminal_color(cell.bg)))?;
-                for (flag, attribute) in [
-                    (Modifier::BOLD, Attribute::Bold),
-                    (Modifier::DIM, Attribute::Dim),
-                    (Modifier::ITALIC, Attribute::Italic),
-                    (Modifier::UNDERLINED, Attribute::Underlined),
-                    (Modifier::REVERSED, Attribute::Reverse),
-                    (Modifier::HIDDEN, Attribute::Hidden),
-                    (Modifier::CROSSED_OUT, Attribute::CrossedOut),
-                ] {
-                    if cell.modifier.contains(flag) {
-                        self.writer.queue(SetAttribute(attribute))?;
-                    }
-                }
-                prior = Some((cell.fg, cell.bg, cell.modifier));
-            }
-            let symbol = cell.symbol();
-            self.writer.write_all(symbol.as_bytes())?;
-            x = x.saturating_add(Span::raw(symbol).width().max(1).min(u16::MAX as usize) as u16);
-        }
-        if self.color {
-            self.writer.queue(SetAttribute(Attribute::Reset))?;
-        }
-        Ok(())
-    }
-
-    /// Park at the known top line so prompts/children have exclusive output.
     pub fn park(&mut self) -> std::io::Result<()> {
         use crossterm::{
             QueueableCommand,
-            cursor::{MoveDown, MoveToColumn, MoveUp, Show},
+            cursor::{MoveToColumn, Show},
             terminal::{Clear, ClearType},
         };
-        if let Some(rows) = self.rows.take() {
-            self.writer.queue(MoveToColumn(0))?;
-            if rows > 1 {
-                self.writer.queue(MoveUp(rows - 1))?;
-            }
-            for y in 0..rows {
-                self.writer.queue(Clear(ClearType::CurrentLine))?;
-                if y + 1 < rows {
-                    self.writer.queue(MoveDown(1))?;
-                }
-            }
-            if rows > 1 {
-                self.writer.queue(MoveUp(rows - 1))?;
-            }
-            self.fresh_line = true;
+        if self.previous.is_none() && !self.hidden {
+            return Ok(());
         }
-        self.writer.queue(Show)?;
+        let mut batch = Vec::new();
+        if let Some(previous) = &self.previous {
+            let mut at = previous.area.height.saturating_sub(1);
+            for y in 0..previous.area.height {
+                move_row(&mut batch, &mut at, y)?;
+                batch
+                    .queue(MoveToColumn(0))?
+                    .queue(Clear(ClearType::CurrentLine))?;
+            }
+            move_row(&mut batch, &mut at, 0)?;
+        }
+        batch.queue(MoveToColumn(0))?.queue(Show)?;
+        self.writer.write_all(&batch)?;
         self.writer.flush()?;
+        self.previous = None;
         self.hidden = false;
         Ok(())
     }
-
-    /// Leave the final panel in normal scrollback, then release cursor ownership.
     pub fn finish(&mut self) -> std::io::Result<()> {
         use crossterm::{
             QueueableCommand,
             cursor::{MoveToColumn, Show},
         };
-        let had_rows = self.rows.take().is_some();
-        if had_rows {
-            self.writer.queue(MoveToColumn(0))?;
-            self.writer.write_all(b"\n")?;
+        if self.previous.is_none() && !self.hidden {
+            return Ok(());
         }
-        if self.hidden || had_rows {
-            self.writer.queue(Show)?;
+        let mut batch = Vec::new();
+        if self.previous.is_some() {
+            batch.queue(MoveToColumn(0))?;
+            batch.extend_from_slice(b"\n");
         }
+        batch.queue(Show)?;
+        self.writer.write_all(&batch)?;
         self.writer.flush()?;
+        self.previous = None;
         self.hidden = false;
         Ok(())
     }
 }
-
+fn move_row(batch: &mut Vec<u8>, at: &mut u16, to: u16) -> std::io::Result<()> {
+    use crossterm::{
+        QueueableCommand,
+        cursor::{MoveDown, MoveUp},
+    };
+    if to > *at {
+        batch.queue(MoveDown(to - *at))?;
+    } else if to < *at {
+        batch.queue(MoveUp(*at - to))?;
+    }
+    *at = to;
+    Ok(())
+}
+fn write_row(batch: &mut Vec<u8>, buffer: &Buffer, y: u16, color: bool) -> std::io::Result<()> {
+    use crossterm::{
+        QueueableCommand,
+        style::{Attribute, SetAttribute, SetBackgroundColor, SetForegroundColor},
+    };
+    let mut x = 0;
+    let mut prior = None;
+    while x < buffer.area.width {
+        let cell = &buffer[(x, y)];
+        if color && prior != Some((cell.fg, cell.bg, cell.modifier)) {
+            batch
+                .queue(SetAttribute(Attribute::Reset))?
+                .queue(SetForegroundColor(terminal_color(cell.fg)))?
+                .queue(SetBackgroundColor(terminal_color(cell.bg)))?;
+            for (flag, attribute) in [
+                (Modifier::BOLD, Attribute::Bold),
+                (Modifier::DIM, Attribute::Dim),
+                (Modifier::ITALIC, Attribute::Italic),
+                (Modifier::UNDERLINED, Attribute::Underlined),
+                (Modifier::REVERSED, Attribute::Reverse),
+                (Modifier::HIDDEN, Attribute::Hidden),
+                (Modifier::CROSSED_OUT, Attribute::CrossedOut),
+            ] {
+                if cell.modifier.contains(flag) {
+                    batch.queue(SetAttribute(attribute))?;
+                }
+            }
+            prior = Some((cell.fg, cell.bg, cell.modifier));
+        }
+        batch.extend_from_slice(cell.symbol().as_bytes());
+        x = x.saturating_add(
+            Span::raw(cell.symbol())
+                .width()
+                .max(1)
+                .min(u16::MAX as usize) as u16,
+        );
+    }
+    if color {
+        batch.queue(SetAttribute(Attribute::Reset))?;
+    }
+    Ok(())
+}
 impl<W: std::io::Write> Drop for RelativePainter<W> {
     fn drop(&mut self) {
         use crossterm::{QueueableCommand, cursor::Show};
@@ -485,8 +587,8 @@ mod tests {
     use crate::events::{TaskId, UiEvent};
     fn info() -> FrameInfo<'static> {
         FrameInfo {
-            command: "build node",
-            started: "2026-10-18T12:00:00+02:00",
+            command: "confctl build -t api",
+            started: "2026-10-18 12:00:00 +02:00",
             operation: "build",
             log: Some("/logs/full-log"),
             elapsed: Duration::from_secs(61),
@@ -498,7 +600,7 @@ mod tests {
         buffer.content().iter().map(|cell| cell.symbol()).collect()
     }
     #[test]
-    fn normal_frame_reserves_twelve_tail_rows_and_bounded_tasks() {
+    fn frame_uses_only_content_height_horizontal_separators_and_bounded_tasks() {
         let mut model = Model::new(20, 100);
         for id in 0..8 {
             model
@@ -511,10 +613,11 @@ mod tests {
         let buffer = render(&model, &info(), 80, 22);
         let output = text(&buffer);
         assert!(output.contains("Elapsed: 1m 1s"));
-        assert!(output.contains("Output"));
+        assert!(output.contains("─"));
+        assert!(!output.contains(['│', '┌', '┐']));
         assert!(output.contains("task4"));
         assert!(!output.contains("task5"));
-        assert_eq!(buffer.area.height, 22);
+        assert!(buffer.area.height < 22);
     }
     #[test]
     fn pending_and_executing_tasks_have_distinct_labels_without_native_claims() {
@@ -532,8 +635,8 @@ mod tests {
             })
             .unwrap();
         let output = text(&render(&model, &info(), 80, 10));
-        assert!(output.contains("pending @1 0 node-a"));
-        assert!(output.contains("running @2 0 node-b"));
+        assert!(output.contains("pending 0 node-a"));
+        assert!(output.contains("running 0 node-b"));
         model
             .apply(&UiEvent::TaskFinished {
                 task: TaskId(1),
@@ -593,7 +696,7 @@ mod tests {
     }
 
     #[test]
-    fn tail_source_id_matches_task_description_without_color() {
+    fn single_source_is_clean_and_keeps_task_description_without_color() {
         let mut model = Model::new(2, 80);
         model
             .apply(&UiEvent::TaskStarted {
@@ -613,12 +716,13 @@ mod tests {
             })
             .expect("result");
         let output = text(&render(&model, &info(), 80, 12));
-        assert!(output.contains("@7/e failed to switch"));
-        assert!(output.contains("failed @7 0 node-a activation"));
+        assert!(output.contains("failed to switch"));
+        assert!(!output.contains("@7"));
+        assert!(output.contains("failed 0 node-a activation"));
     }
 
     #[test]
-    fn narrow_two_task_frames_keep_large_keys_outcomes_and_messages_without_color() {
+    fn narrow_mixed_sources_use_readable_labels_and_hide_internal_ids() {
         let mut model = Model::new(4, 80);
         for (id, description, message) in [
             (u64::MAX - 1, "node-a activation", "failed to switch\n"),
@@ -644,18 +748,16 @@ mod tests {
         }
         for width in [32, 39, 40] {
             let output = text(&render(&model, &info(), width, 14));
-            for key in ["@3w5e11264sgse", "@3w5e11264sgsf"] {
-                assert!(output.matches(key).count() >= 2, "row and tail keep {key}");
-            }
+            assert!(!output.contains("@3w5e11264sg"));
             assert!(output.contains("node-a"));
             assert!(output.contains("node-b"));
             assert!(output.matches("failed to").count() >= 2);
-            assert!(output.matches("failed @").count() >= 2);
+            assert!(output.matches("failed 0").count() >= 2);
         }
     }
 
     #[test]
-    fn tiny_layout_omits_whole_keys_and_retains_full_summary_identity() {
+    fn tiny_layout_keeps_full_readable_summary_without_internal_ids() {
         let mut model = Model::new(2, 80);
         model
             .apply(&UiEvent::TaskStarted {
@@ -690,8 +792,211 @@ mod tests {
         assert!(!output.contains('@'));
         assert!(output.contains('…'));
         let summary = task_summary(row);
-        assert!(summary.contains("@3w5e11264sgsf (task 18446744073709551615)"));
+        assert!(!summary.contains("18446744073709551615"));
         assert!(summary.contains("node-a activation: running"));
+    }
+
+    #[test]
+    fn full_log_wraps_and_build_activity_has_three_honest_rows() {
+        let mut model = Model::new(2, 256);
+        model
+            .apply(&UiEvent::TaskStarted {
+                task: TaskId(7),
+                description: "Build group 1/2 (3 machines)".into(),
+            })
+            .unwrap();
+        model
+            .apply(&UiEvent::BuildProgress {
+                task: TaskId(7),
+                building: ActivityCount {
+                    observed: 2,
+                    total: Some(5),
+                },
+                fetching: ActivityCount {
+                    observed: 3,
+                    total: None,
+                },
+            })
+            .unwrap();
+        let long = format!(".confctl/logs/{}", "long-name-".repeat(8));
+        let mut info = info();
+        info.log = Some(&long);
+        assert!(headers(&info, 32).concat().contains(&long));
+        let buffer = render(&model, &info, 80, 24);
+        let rendered = text(&buffer);
+        for value in ["Building 2 / 5", "Fetching 3 / ?", "Total    5 / ?"] {
+            assert!(rendered.contains(value), "{rendered}");
+        }
+        assert_eq!(model.rows()[0].phase, TaskPhase::Executing);
+        assert!(!rendered.contains('%'));
+        assert!(rendered.contains("2026-10-18 12:00:00 +02:00"));
+        model
+            .apply(&UiEvent::BuildProgress {
+                task: TaskId(7),
+                building: ActivityCount {
+                    observed: 0,
+                    total: None,
+                },
+                fetching: ActivityCount {
+                    observed: 0,
+                    total: Some(0),
+                },
+            })
+            .unwrap();
+        let reset = text(&render(&model, &info, 80, 24));
+        assert!(reset.contains("Total    0 / ?"));
+
+        // A separate representative frame keeps the unknown/reset cases above
+        // intact and exposes the actual widgets through this existing fixture.
+        let mut representative = Model::new(12, 512);
+        representative
+            .apply(&UiEvent::TaskStarted {
+                task: TaskId(7),
+                description: "Build group 1/2 (3 machines)".into(),
+            })
+            .unwrap();
+        let command = "nix build --json --no-link .#machines";
+        representative
+            .apply(&UiEvent::CommandStarting {
+                task: TaskId(7),
+                display: command.into(),
+            })
+            .unwrap();
+        representative.apply(&UiEvent::ActivityOutput {
+            task: TaskId(7), stream: crate::events::OutputStream::Stderr,
+            bytes: concat!(
+                "these 5 derivations will be built:\n",
+                "  /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-api-system.drv\n",
+                "these 8 paths will be fetched:\n",
+                "  /nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-bash-5.3\n",
+                "building '/nix/store/cccccccccccccccccccccccccccccccc-api-service.drv'...\n",
+                "copying path '/nix/store/dddddddddddddddddddddddddddddddd-openssl-3.6.3' from 'https://cache.nixos.org'...\n",
+            ).as_bytes().to_vec(),
+        }).unwrap();
+        representative
+            .apply(&UiEvent::BuildProgress {
+                task: TaskId(7),
+                building: ActivityCount {
+                    observed: 2,
+                    total: Some(5),
+                },
+                fetching: ActivityCount {
+                    observed: 3,
+                    total: Some(8),
+                },
+            })
+            .unwrap();
+        let locator = r#"".confctl/logs/2026-10-25_12-00-00_build_api-and-storage_6b8b038f-qualified-invocation.log""#;
+        let tail = representative.display_tail();
+        assert_eq!(tail.first().unwrap(), &format!("$ {command}"));
+        assert!(tail[1].starts_with("these 5 derivations"));
+        assert!(
+            tail.iter()
+                .all(|line| !line.contains("Build group 1/2 (3 machines)>"))
+        );
+        assert_eq!(representative.rows()[0].phase, TaskPhase::Executing);
+        for width in [80, 120] {
+            let sample = FrameInfo {
+                log: Some(locator),
+                ..info
+            };
+            let frame = render(&representative, &sample, width, 24);
+            let visible = text(&frame);
+            assert!(
+                visible.find(&format!("$ {command}")).unwrap()
+                    < visible.find("these 5 derivations").unwrap()
+            );
+            assert_eq!(visible.matches(&format!("$ {command}")).count(), 1);
+            for label in ["Building 2 / 5", "Fetching 3 / 8", "Total    5 / 13"] {
+                assert!(visible.contains(label), "{visible}");
+            }
+            assert!(visible.contains(locator));
+            assert!(headers(&sample, width).concat().contains(locator));
+            assert!(!visible.contains("@7"));
+            assert!(visible.contains("Command: confctl build -t api"));
+            assert!(frame.area.height <= 24);
+            if std::env::var_os("CONFCTL_TUI_SNAPSHOT").is_some() {
+                for y in 0..frame.area.height {
+                    let line: String = (0..frame.area.width)
+                        .map(|x| frame[(x, y)].symbol())
+                        .collect();
+                    println!("{}", line.trim_end());
+                }
+                println!();
+            }
+        }
+    }
+
+    #[test]
+    fn painter_batches_changes_and_identical_frames_do_not_flush() {
+        #[derive(Default)]
+        struct Count {
+            writes: usize,
+            flushes: usize,
+            bytes: Vec<u8>,
+        }
+        impl std::io::Write for Count {
+            fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+                self.writes += 1;
+                self.bytes.extend_from_slice(b);
+                Ok(b.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                self.flushes += 1;
+                Ok(())
+            }
+        }
+        let mut painter = RelativePainter::new(Count::default(), false);
+        let buffer = Buffer::with_lines(["header", "body"]);
+        painter.paint(&buffer).unwrap();
+        assert_eq!(
+            (painter.writer_mut().writes, painter.writer_mut().flushes),
+            (1, 1)
+        );
+        painter.paint(&buffer).unwrap();
+        assert_eq!(
+            (painter.writer_mut().writes, painter.writer_mut().flushes),
+            (1, 1)
+        );
+        let narrow = Buffer::with_lines(["tiny"]);
+        painter.invalidate();
+        painter.paint(&narrow).unwrap();
+        assert_eq!(
+            (painter.writer_mut().writes, painter.writer_mut().flushes),
+            (2, 2)
+        );
+        painter.finish().unwrap();
+    }
+
+    #[test]
+    fn fresh_anchors_preserve_unfinished_output_without_a_blank_initial_line() {
+        let mut painter = RelativePainter::new(Vec::new(), false);
+        let buffer = Buffer::with_lines(["view"]);
+        painter.paint(&buffer).unwrap();
+        assert!(!painter.writer_mut().contains(&b'\n'));
+        for ending in [b"report fragment".as_slice(), b"complete report\n"] {
+            painter.park().unwrap();
+            painter.writer_mut().extend_from_slice(ending);
+            painter.output_ended(*ending.last().unwrap());
+            // Geometry changes must not discard the unfinished-line state.
+            painter.invalidate();
+            let start = painter.writer_mut().len();
+            painter.paint(&buffer).unwrap();
+            let fresh = &painter.writer_mut()[start..];
+            assert_eq!(fresh.contains(&b'\n'), !ending.ends_with(b"\n"));
+            if !ending.ends_with(b"\n") {
+                assert!(
+                    fresh.iter().position(|b| *b == b'\n').unwrap()
+                        < fresh.windows(4).position(|b| b == b"\x1b[2K").unwrap()
+                );
+            }
+        }
+        painter.park().unwrap();
+        painter.writer_mut().extend_from_slice(b"foreign fragment");
+        painter.foreign_output();
+        let start = painter.writer_mut().len();
+        painter.paint(&buffer).unwrap();
+        assert!(painter.writer_mut()[start..].starts_with(b"\x1b[?25l\n"));
     }
 
     #[test]
@@ -701,6 +1006,18 @@ mod tests {
             let mut painter = RelativePainter::new(&mut bytes, false);
             let buffer = Buffer::with_lines(["first", "last"]);
             painter.paint(&buffer).expect("paint");
+            let first = painter.writer_mut().len();
+            painter.paint(&buffer).expect("identical");
+            assert_eq!(
+                painter.writer_mut().len(),
+                first,
+                "unchanged buffer writes nothing"
+            );
+            let changed = Buffer::with_lines(["first", "next"]);
+            painter.paint(&changed).expect("one changed row");
+            let delta = &painter.writer_mut()[first..];
+            assert!(!delta.windows(5).any(|w| w == b"first"));
+            assert_eq!(delta.windows(4).filter(|w| *w == b"\x1b[2K").count(), 1);
             painter.park().expect("park");
             painter.writer_mut().extend_from_slice(b"prompt\n");
             painter.invalidate();

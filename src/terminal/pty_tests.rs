@@ -2,7 +2,7 @@
 //! the reexecuted test owns fd0/the slave. No test helper reads application stdin.
 
 use std::{
-    io,
+    io::{self, Write},
     os::fd::OwnedFd,
     process::{ExitStatus, Stdio},
     time::{Duration, Instant},
@@ -10,6 +10,7 @@ use std::{
 
 pub(crate) const CASE_ENV: &str = "CONFCTL_NATIVE_PTY_CASE";
 pub(crate) const CHILD_ENV: &str = "CONFCTL_NATIVE_PTY_CHILD";
+const PAINT_ACK_ENV: &str = "CONFCTL_NATIVE_PTY_PAINT_ACK";
 
 pub(crate) struct Transcript {
     pub bytes: Vec<u8>,
@@ -56,16 +57,23 @@ pub(crate) fn run_fixture_after_output(
     after: Option<(&[u8], &[u8])>,
 ) -> Transcript {
     let (master, slave) = open_pty();
-    let mut child = std::process::Command::new(std::env::current_exe().expect("test executable"))
+    // This live fixture advances only after its outer PTY owner has observed
+    // both rendered sources. No input bytes or production paint timing change.
+    let paint_ack = matches!(case, "live" | "live-cancel")
+        .then(|| tempfile::tempdir().expect("owned paint phase"));
+    let mut command = std::process::Command::new(std::env::current_exe().expect("test executable"));
+    command
         .args(["--exact", test, "--nocapture"])
         .env(CASE_ENV, case)
         .env("TERM", "xterm-256color")
         .env("CONFCTL_TTY", "1")
         .stdin(Stdio::from(slave.try_clone().expect("stdin")))
         .stdout(Stdio::from(slave.try_clone().expect("stdout")))
-        .stderr(Stdio::from(slave))
-        .spawn()
-        .expect("controlling fixture");
+        .stderr(Stdio::from(slave));
+    if let Some(directory) = &paint_ack {
+        command.env(PAINT_ACK_ENV, directory.path().join("burst-painted"));
+    }
+    let mut child = command.spawn().expect("controlling fixture");
     let mut remaining = input;
     while !remaining.is_empty() {
         let count = rustix::io::write(&master, remaining).expect("typeahead");
@@ -78,8 +86,20 @@ pub(crate) fn run_fixture_after_output(
     let started = Instant::now();
     let mut bytes = Vec::new();
     let mut after = after;
+    let mut paint_observed = false;
     loop {
         drain(&master, &mut bytes);
+        if !paint_observed && let Some(directory) = &paint_ack {
+            let text = String::from_utf8_lossy(&bytes);
+            if let Some((_, phase)) = text.split_once("PHASE-BURST-BEGIN")
+                && phase.contains("node-task>")
+                && phase.contains("other-host>")
+            {
+                std::fs::write(directory.path().join("burst-painted"), b"")
+                    .expect("acknowledge observed parallel paint");
+                paint_observed = true;
+            }
+        }
         if let Some((marker, send)) = after
             && bytes.windows(marker.len()).any(|bytes| bytes == marker)
         {
@@ -294,41 +314,76 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
     const TEST: &str = "terminal::pty_tests::live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes";
     if std::env::var_os(CHILD_ENV).is_some() {
         child_read_line();
-        return;
+        print!("FOREGROUND-NO-LF");
+        io::stdout().flush().expect("midline child output");
+        // Do not let the test harness append a result line after this marker.
+        std::process::exit(0);
     }
     if std::env::var_os(CASE_ENV).is_none() {
-        let transcript = run_fixture(TEST, "live", b"y\nqueued-child\n");
-        assert!(
-            transcript.status.success(),
-            "{}",
-            String::from_utf8_lossy(&transcript.bytes)
-        );
-        assert!(
-            !transcript.bytes.windows(4).any(|bytes| bytes == b"\x1b[6n"),
-            "no cursor query"
-        );
-        assert!(
-            !transcript
-                .bytes
-                .windows(8)
-                .any(|bytes| bytes == b"\x1b[?1049h"),
-            "normal screen"
-        );
-        assert!(
-            transcript
-                .bytes
-                .windows(b"CHILD_READ:queued-child".len())
-                .any(|bytes| bytes == b"CHILD_READ:queued-child"),
-            "child typeahead retained"
-        );
-        let text = String::from_utf8_lossy(&transcript.bytes);
-        assert_eq!(text.matches("PRELUDE node").count(), 1);
-        assert_eq!(text.matches("Timing: completed (exit 0)").count(), 1);
-        assert!(
-            text.rfind("succeeded").expect("final task panel")
-                < text.find("Timing: completed").expect("final footer")
-        );
-        assert!(text.contains("Continue? [y/N]: "));
+        for cancelled in [false, true] {
+            let transcript = if cancelled {
+                run_fixture_after_output(
+                    TEST,
+                    "live-cancel",
+                    b"y\nqueued-child\n",
+                    Some((b"READY-CANCEL", b"\x03")),
+                )
+            } else {
+                run_fixture(TEST, "live", b"y\nqueued-child\n")
+            };
+            assert!(
+                transcript.status.success(),
+                "{}",
+                String::from_utf8_lossy(&transcript.bytes)
+            );
+            assert!(!transcript.bytes.windows(4).any(|b| b == b"\x1b[6n"));
+            assert!(!transcript.bytes.windows(8).any(|b| b == b"\x1b[?1049h"));
+            let text = String::from_utf8_lossy(&transcript.bytes);
+            assert!(text.contains("CHILD_READ:queued-child"));
+            for marker in ["REQUIRED-NO-LF", "FOREGROUND-NO-LF"] {
+                let after = text.split_once(marker).expect("midline output marker").1;
+                let clear = after.find("\x1b[2K").expect("next live paint");
+                assert!(after[..clear].contains('\n'), "next anchor erased {marker}");
+            }
+            assert!(
+                text.contains("$ nix build .#node"),
+                "later fast command was never shown"
+            );
+            assert_eq!(text.matches("PRELUDE node").count(), 1);
+            let footer = if cancelled {
+                "Timing: canceled (exit 130)"
+            } else {
+                "Timing: completed (exit 0)"
+            };
+            assert_eq!(text.matches(footer).count(), 1);
+            assert!(
+                text[..text.find(footer).unwrap()]
+                    .rfind(if cancelled { "canceled" } else { "succeeded" })
+                    .is_some(),
+                "final outcome must precede the single footer"
+            );
+            assert!(text.contains("Continue? [y/N]: "));
+            let phase = text
+                .split("PHASE-BURST-BEGIN")
+                .nth(1)
+                .unwrap()
+                .split("PHASE-BURST-END")
+                .next()
+                .unwrap();
+            assert!(
+                !phase.contains("BURST 0\r\n"),
+                "activity must not escape as raw terminal lines"
+            );
+            assert!(
+                phase.matches("Command:").count() <= 2,
+                "static header repainted per activity chunk"
+            );
+            assert!(!phase.contains("\x1b[2J"));
+            assert!(
+                phase.contains("node-task>") && phase.contains("other-host>"),
+                "parallel phase transcript: {phase:?}"
+            );
+        }
         return;
     }
     enter_controlling_session();
@@ -346,6 +401,9 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
             timing::Timing,
         };
         use std::os::unix::process::CommandExt;
+        let cancelled = std::env::var(CASE_ENV).unwrap() == "live-cancel";
+        let mut interrupt =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt()).unwrap();
         let timing = Timing::start();
         timing.admit(&Action::CollectGarbage {
             targets: Targets::default(),
@@ -390,6 +448,21 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
             .await
             .expect("prelude");
         events
+            .emit(UiEvent::Output {
+                task: TaskId(0),
+                stream: OutputStream::Stdout,
+                bytes: b"REQUIRED-NO-LF".to_vec(),
+            })
+            .await
+            .expect("arbitrary required report chunk");
+        events
+            .emit(UiEvent::CommandStarting {
+                task: TaskId(0),
+                display: "nix eval --json .#settings".into(),
+            })
+            .await
+            .unwrap();
+        events
             .emit(UiEvent::TaskStarted {
                 task: TaskId(1),
                 description: "node-task".into(),
@@ -406,14 +479,74 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
             .await
             .expect("progress");
         events
-            .emit(UiEvent::Output {
+            .emit(UiEvent::CommandStarting {
+                task: TaskId(1),
+                display: "nix build .#node".into(),
+            })
+            .await
+            .expect("later command displayed before native output");
+        events
+            .emit(UiEvent::ActivityOutput {
+                task: TaskId(1),
+                stream: OutputStream::Stderr,
+                bytes: "fast output evicts the entire tail\n"
+                    .repeat(128)
+                    .into_bytes(),
+            })
+            .await
+            .expect("fast multiline output");
+        events
+            .emit(UiEvent::ActivityOutput {
                 task: TaskId(1),
                 stream: OutputStream::Stderr,
                 bytes: b"log-before\n".to_vec(),
             })
             .await
             .expect("reliable stderr");
-        tokio::time::sleep(Duration::from_millis(120)).await;
+        events
+            .emit(UiEvent::Diagnostic {
+                stream: OutputStream::Stdout,
+                style: Style::Plain,
+                text: "PHASE-BURST-BEGIN\n".into(),
+            })
+            .await
+            .unwrap();
+        events
+            .emit(UiEvent::TaskStarted {
+                task: TaskId(2),
+                description: "other-host".into(),
+            })
+            .await
+            .unwrap();
+        for index in 0..32 {
+            events
+                .emit(UiEvent::ActivityOutput {
+                    task: TaskId(if index % 2 == 0 { 1 } else { 2 }),
+                    stream: OutputStream::Stderr,
+                    bytes: format!("BURST {index}\n").into_bytes(),
+                })
+                .await
+                .unwrap();
+        }
+        let paint_ack = std::path::PathBuf::from(
+            std::env::var_os(PAINT_ACK_ENV).expect("outer paint observer"),
+        );
+        let paint_deadline = Instant::now();
+        while !paint_ack.is_file() {
+            assert!(
+                paint_deadline.elapsed() < Duration::from_secs(5),
+                "outer PTY did not observe both rendered sources"
+            );
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        events
+            .emit(UiEvent::Diagnostic {
+                stream: OutputStream::Stdout,
+                style: Style::Plain,
+                text: "PHASE-BURST-END\n".into(),
+            })
+            .await
+            .unwrap();
         assert_modes(
             &original,
             &rustix::termios::tcgetattr(io::stdin()).expect("live did not change raw mode"),
@@ -480,18 +613,51 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
             &original,
             &rustix::termios::tcgetattr(io::stdin()).expect("parent restored"),
         );
-        events
-            .emit(UiEvent::TaskFinished {
-                task: TaskId(1),
-                state: TaskState::Succeeded,
-            })
-            .await
-            .expect("result");
+        rustix::termios::tcsetwinsize(
+            io::stdin(),
+            rustix::termios::Winsize {
+                ws_row: 24,
+                ws_col: 80,
+                ws_xpixel: 0,
+                ws_ypixel: 0,
+            },
+        )
+        .expect("restore original geometry");
+        if cancelled {
+            events
+                .emit(UiEvent::CommandStarting {
+                    task: TaskId(0),
+                    display: "READY-CANCEL".into(),
+                })
+                .await
+                .unwrap();
+            tokio::time::timeout(Duration::from_secs(5), interrupt.recv())
+                .await
+                .unwrap()
+                .unwrap();
+        }
+        for task in [TaskId(1), TaskId(2)] {
+            events
+                .emit(UiEvent::TaskFinished {
+                    task,
+                    state: if cancelled {
+                        TaskState::Canceled
+                    } else {
+                        TaskState::Succeeded
+                    },
+                })
+                .await
+                .expect("result");
+        }
         ui.shutdown().expect("input join");
         control.finish().await.expect("checked presentation finish");
         consumer.await.expect("presentation join").expect("run");
         timing
-            .finish(ExitDisposition::completed())
+            .finish(if cancelled {
+                ExitDisposition::canceled(130)
+            } else {
+                ExitDisposition::completed()
+            })
             .expect("one footer")
             .write(&mut io::stderr())
             .expect("footer after joins");

@@ -26,6 +26,15 @@ fn build_groups_keep_first_seen_input_equivalence_and_safe_attributes() {
         .map(|g| g.iter().map(|h| h.name.clone()).collect::<Vec<_>>())
         .collect::<Vec<_>>();
     assert_eq!(actual, [vec!["a", "c"], vec!["b"]]);
+    let grouped = groups(hosts.clone(), true);
+    assert_eq!(
+        description(0, grouped.len(), &grouped[0]),
+        "build group 1/2 (2 machines): a, c"
+    );
+    assert_eq!(
+        description(1, grouped.len(), &grouped[1]),
+        "build group 2/2 (1 machine): b"
+    );
     assert_eq!(groups(hosts, false).len(), 1);
     assert_eq!(attr("alpha-key"), "alpha-key");
     assert_eq!(attr("nested/name.\"\\"), "\"nested/name.\\\"\\\\\"");

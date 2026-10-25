@@ -1,7 +1,7 @@
 //! Bounded, per-native-attempt interpretation of Nix's human stderr. Raw bytes
 //! always retain their independent output/capture path. Counts are activity.
 
-use crate::events::{OutputStream, Style, TaskId, UiEvent};
+use crate::events::{ActivityCount, OutputStream, TaskId, UiEvent};
 
 const LINE_LIMIT: usize = 8192;
 
@@ -39,9 +39,7 @@ impl Progress {
         let mut events = Vec::new();
         for byte in bytes {
             if *byte == b'\n' {
-                if let Some(event) = self.flush(task) {
-                    events.push(event);
-                }
+                events.extend(self.flush(task));
             } else if !self.overflow {
                 if self.line.len() == LINE_LIMIT {
                     self.line.clear();
@@ -54,41 +52,33 @@ impl Progress {
         events
     }
 
-    pub(crate) fn flush(&mut self, task: TaskId) -> Option<UiEvent> {
+    pub(crate) fn flush(&mut self, task: TaskId) -> Vec<UiEvent> {
         let line = std::mem::take(&mut self.line);
         if std::mem::take(&mut self.overflow) {
-            return None;
+            return Vec::new();
         }
-        self.parse(
-            std::str::from_utf8(&line).ok()?.trim_end_matches('\r'),
-            task,
-        )
+        let Ok(line) = std::str::from_utf8(&line) else {
+            return Vec::new();
+        };
+        self.parse(line.trim_end_matches('\r'), task)
     }
 
-    /// Only recognized copy activity gets an extra plain, host-attributed line.
-    /// Raw native output retains its separate checked stream unchanged.
-    pub(crate) fn copy_line(&self, event: &UiEvent) -> Option<UiEvent> {
-        let Kind::Copy { host } = &self.kind else {
-            return None;
-        };
-        let UiEvent::TaskProgress {
-            completed,
-            total: count,
-            detail,
-            ..
-        } = event
-        else {
-            return None;
-        };
-        Some(UiEvent::Diagnostic {
-            stream: OutputStream::Stdout,
-            style: Style::Plain,
-            text: format!("[{host}] [{completed}/{}] {detail}\n", total(*count)),
+    pub(crate) fn snapshot(&self, task: TaskId) -> Option<UiEvent> {
+        matches!(self.kind, Kind::Build).then(|| UiEvent::BuildProgress {
+            task,
+            building: ActivityCount {
+                observed: self.built,
+                total: self.build_total,
+            },
+            fetching: ActivityCount {
+                observed: self.fetched,
+                total: self.fetch_total,
+            },
         })
     }
 
-    fn parse(&mut self, line: &str, task: TaskId) -> Option<UiEvent> {
-        if matches!(self.kind, Kind::Copy { .. }) {
+    fn parse(&mut self, line: &str, task: TaskId) -> Vec<UiEvent> {
+        if let Kind::Copy { host } = &self.kind {
             if self.copy_total.is_none()
                 && let Some(rest) = line.strip_prefix("copying ")
                 && let Some((count, _)) = rest.split_once(" paths")
@@ -100,14 +90,22 @@ impl Progress {
             } else if line.starts_with("copying path '") {
                 self.fetched = self.fetched.saturating_add(1);
             } else {
-                return None;
+                return Vec::new();
             }
-            return Some(UiEvent::TaskProgress {
-                task,
-                completed: self.fetched,
-                total: self.copy_total,
-                detail: format!("copy {}/{}; {line}", self.fetched, total(self.copy_total)),
-            });
+            let count = total(self.copy_total);
+            let detail = format!("copy {}/{count}; {line}", self.fetched);
+            return vec![
+                UiEvent::PlainOutput {
+                    stream: OutputStream::Stdout,
+                    bytes: format!("[{host}] [{}/{count}] {detail}\n", self.fetched).into_bytes(),
+                },
+                UiEvent::TaskProgress {
+                    task,
+                    completed: self.fetched,
+                    total: self.copy_total,
+                    detail: format!("{host}: {detail}"),
+                },
+            ];
         }
         if line.starts_with("this derivation will be built:") {
             self.build_total = Some(1);
@@ -120,11 +118,11 @@ impl Progress {
         } else if line.starts_with("these derivations will be built:") {
             self.build_total = Some(0);
             self.list = Some(true);
-            return None;
+            return Vec::new();
         } else if line.starts_with("these paths will be fetched ") {
             self.fetch_total = Some(0);
             self.list = Some(false);
-            return None;
+            return Vec::new();
         } else {
             if let Some(build) = self.list {
                 let total = if build {
@@ -136,7 +134,7 @@ impl Progress {
                     && line.trim_start().starts_with("/nix/store/")
                 {
                     *total = Some(total.unwrap_or(0).saturating_add(1));
-                    return None;
+                    return Vec::new();
                 }
                 *total = Some(total.unwrap_or(0).saturating_add(if build {
                     self.built
@@ -150,24 +148,10 @@ impl Progress {
             } else if line.starts_with("copying path '") {
                 self.fetched = self.fetched.saturating_add(1);
             } else {
-                return None;
+                return Vec::new();
             }
         }
-        Some(UiEvent::TaskProgress {
-            task,
-            completed: self.built.saturating_add(self.fetched),
-            total: self
-                .build_total
-                .zip(self.fetch_total)
-                .map(|(a, b)| a.saturating_add(b)),
-            detail: format!(
-                "build {}/{}; fetch {}/{}; {line}",
-                self.built,
-                total(self.build_total),
-                self.fetched,
-                total(self.fetch_total)
-            ),
-        })
+        self.snapshot(task).into_iter().collect()
     }
 }
 
@@ -187,22 +171,48 @@ mod tests {
     fn build_progress_is_incremental_bounded_and_attempt_local() {
         let task = TaskId(7);
         let mut decoder = Progress::default();
+        assert!(matches!(
+            decoder.snapshot(task),
+            Some(UiEvent::BuildProgress {
+                building: ActivityCount {
+                    observed: 0,
+                    total: None
+                },
+                fetching: ActivityCount {
+                    observed: 0,
+                    total: None
+                },
+                ..
+            })
+        ));
         assert!(decoder.feed(b"build", task).is_empty());
         let first = decoder.feed(b"ing '/nix/store/a.drv'...\n", task);
         assert!(matches!(
             first.as_slice(),
-            [UiEvent::TaskProgress {
-                completed: 1,
-                total: None,
+            [UiEvent::BuildProgress {
+                building: ActivityCount {
+                    observed: 1,
+                    total: None
+                },
+                fetching: ActivityCount {
+                    observed: 0,
+                    total: None
+                },
                 ..
             }]
         ));
         let known = decoder.feed(b"these 2 derivations will be built:\nthis path will be fetched (1 MiB)\ncopying path '/nix/store/b'\n",task);
         assert!(matches!(
             known.last(),
-            Some(UiEvent::TaskProgress {
-                completed: 2,
-                total: Some(3),
+            Some(UiEvent::BuildProgress {
+                building: ActivityCount {
+                    observed: 1,
+                    total: Some(2)
+                },
+                fetching: ActivityCount {
+                    observed: 1,
+                    total: Some(1)
+                },
                 ..
             })
         ));
@@ -212,12 +222,32 @@ mod tests {
         assert!(decoder.feed(b"unknown raw output\n\xff\n", task).is_empty());
         let mut next_attempt = Progress::default();
         assert!(matches!(
+            next_attempt.snapshot(task),
+            Some(UiEvent::BuildProgress {
+                building: ActivityCount {
+                    observed: 0,
+                    total: None
+                },
+                fetching: ActivityCount {
+                    observed: 0,
+                    total: None
+                },
+                ..
+            })
+        ));
+        assert!(matches!(
             next_attempt
                 .feed(b"copying path '/nix/store/c'\n", task)
                 .as_slice(),
-            [UiEvent::TaskProgress {
-                completed: 1,
-                total: None,
+            [UiEvent::BuildProgress {
+                building: ActivityCount {
+                    observed: 0,
+                    total: None
+                },
+                fetching: ActivityCount {
+                    observed: 1,
+                    total: None
+                },
                 ..
             }]
         ));
@@ -231,12 +261,18 @@ mod tests {
             TaskId(1),
         );
         assert!(matches!(
-            decoder.flush(TaskId(1)),
-            Some(UiEvent::TaskProgress {
-                completed: 2,
-                total: Some(3),
+            decoder.flush(TaskId(1)).as_slice(),
+            [UiEvent::BuildProgress {
+                building: ActivityCount {
+                    observed: 1,
+                    total: Some(2)
+                },
+                fetching: ActivityCount {
+                    observed: 1,
+                    total: Some(1)
+                },
                 ..
-            })
+            }]
         ));
     }
 }
@@ -255,27 +291,52 @@ mod copy_tests {
                 .feed(b"copying path '/store/early", task)
                 .is_empty()
         );
-        assert!(matches!(
-            progress.feed(b"'...\n", task).as_slice(),
-            [UiEvent::TaskProgress {
-                completed: 1,
-                total: None,
-                ..
-            }]
-        ));
-        assert!(matches!(
-            progress
-                .feed(b"copying 3 paths...\ncopying path '/store/next'...\n", task)
-                .last(),
-            Some(UiEvent::TaskProgress {
-                completed: 2,
-                total: Some(3),
-                ..
-            })
-        ));
+        assert_eq!(
+            progress.feed(b"'...\n", task),
+            vec![
+                UiEvent::PlainOutput {
+                    stream: OutputStream::Stdout,
+                    bytes: b"[node] [1/?] copy 1/?; copying path '/store/early'...\n".to_vec()
+                },
+                UiEvent::TaskProgress {
+                    task,
+                    completed: 1,
+                    total: None,
+                    detail: "node: copy 1/?; copying path '/store/early'...".into()
+                },
+            ]
+        );
+        assert_eq!(
+            progress.feed(
+                b"copying 3 paths...\r\ncopying path '/store/next'...\n",
+                task
+            ),
+            vec![
+                UiEvent::PlainOutput {
+                    stream: OutputStream::Stdout,
+                    bytes: b"[node] [1/3] copy 1/3; copying 3 paths...\n".to_vec()
+                },
+                UiEvent::TaskProgress {
+                    task,
+                    completed: 1,
+                    total: Some(3),
+                    detail: "node: copy 1/3; copying 3 paths...".into()
+                },
+                UiEvent::PlainOutput {
+                    stream: OutputStream::Stdout,
+                    bytes: b"[node] [2/3] copy 2/3; copying path '/store/next'...\n".to_vec()
+                },
+                UiEvent::TaskProgress {
+                    task,
+                    completed: 2,
+                    total: Some(3),
+                    detail: "node: copy 2/3; copying path '/store/next'...".into()
+                },
+            ]
+        );
         assert!(progress.feed(&vec![b'x'; LINE_LIMIT + 1], task).is_empty());
         assert!(progress.feed(b"copying path 'false'\n", task).is_empty());
-        assert!(progress.feed(b"unknown raw\n", task).is_empty());
+        assert!(progress.feed(b"unknown raw\n\xff\n", task).is_empty());
         assert!(
             Progress::new(Kind::Copy {
                 host: "node".into()
@@ -283,26 +344,49 @@ mod copy_tests {
             .feed(b"copying +2 paths...\n", task)
             .is_empty()
         );
-        progress.feed(b"copying path '/store/final'", task);
-        assert!(matches!(
+        assert!(
+            progress
+                .feed(b"copying path '/store/final'", task)
+                .is_empty()
+        );
+        assert_eq!(
             progress.flush(task),
-            Some(UiEvent::TaskProgress {
-                completed: 3,
-                total: Some(3),
-                ..
-            })
-        ));
-        assert!(matches!(
-            Progress::new(Kind::Copy {
-                host: "node".into()
-            })
-            .feed(b"copying path '/store/new'\n", task)
-            .as_slice(),
-            [UiEvent::TaskProgress {
-                completed: 1,
-                total: None,
-                ..
-            }]
-        ));
+            vec![
+                UiEvent::PlainOutput {
+                    stream: OutputStream::Stdout,
+                    bytes: b"[node] [3/3] copy 3/3; copying path '/store/final'\n".to_vec()
+                },
+                UiEvent::TaskProgress {
+                    task,
+                    completed: 3,
+                    total: Some(3),
+                    detail: "node: copy 3/3; copying path '/store/final'".into()
+                },
+            ]
+        );
+        assert!(
+            progress.flush(task).is_empty(),
+            "EOF emits each parsed line once"
+        );
+        let mut unknown = Progress::new(Kind::Copy {
+            host: "node".into(),
+        });
+        assert!(unknown.feed(b"copying path '/store/only'", task).is_empty());
+        assert_eq!(
+            unknown.flush(task),
+            vec![
+                UiEvent::PlainOutput {
+                    stream: OutputStream::Stdout,
+                    bytes: b"[node] [1/?] copy 1/?; copying path '/store/only'\n".to_vec()
+                },
+                UiEvent::TaskProgress {
+                    task,
+                    completed: 1,
+                    total: None,
+                    detail: "node: copy 1/?; copying path '/store/only'".into()
+                },
+            ]
+        );
+        assert!(unknown.flush(task).is_empty());
     }
 }

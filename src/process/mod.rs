@@ -182,6 +182,8 @@ pub struct ProcessSpec {
     pub stdout: StreamPolicy,
     pub stderr: StreamPolicy,
     pub redacted_description: String,
+    /// Audited, redacted display only; never enables announcement delivery.
+    pub display_command: Option<String>,
     // Native fixtures may wait for an actual queued kernel stop before attach.
     // This observes with NOWAIT in the sole worker; it skips no route policy.
     #[cfg(test)]
@@ -202,6 +204,7 @@ impl ProcessSpec {
             stdout: StreamPolicy::Capture,
             stderr: StreamPolicy::Capture,
             redacted_description: redacted_description.into(),
+            display_command: None,
             #[cfg(test)]
             before_attach_stop: None,
             #[cfg(test)]
@@ -367,6 +370,7 @@ impl ProcessLog {
 
 struct Owner {
     events: EventSink,
+    announce_commands: bool,
     log: Option<ProcessLog>,
     spool_dir: PathBuf,
     memory_limit: usize,
@@ -440,9 +444,34 @@ impl Supervisor {
         log: Option<ProcessLog>,
         timing: Option<Timing>,
     ) -> Self {
+        Self::with_announcements(events, spool_dir, memory_limit, grace, log, timing, false)
+    }
+
+    /// The caller owns a running, acknowledging presentation consumer.
+    pub(crate) fn new_presented(
+        events: EventSink,
+        spool_dir: PathBuf,
+        memory_limit: usize,
+        grace: Duration,
+        log: Option<ProcessLog>,
+        timing: Option<Timing>,
+    ) -> Self {
+        Self::with_announcements(events, spool_dir, memory_limit, grace, log, timing, true)
+    }
+
+    fn with_announcements(
+        events: EventSink,
+        spool_dir: PathBuf,
+        memory_limit: usize,
+        grace: Duration,
+        log: Option<ProcessLog>,
+        timing: Option<Timing>,
+        announce_commands: bool,
+    ) -> Self {
         Self {
             owner: Arc::new(Owner {
                 events,
+                announce_commands,
                 log,
                 spool_dir,
                 memory_limit,
@@ -918,6 +947,35 @@ async fn execute(
     // Keep Child unpolled even when Tokio uses its pidfd implementation.
     let _child_signal = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::child())
         .map_err(|error| io_error("own child notifications", None, error))?;
+    if owner.announce_commands {
+        let display = spec.display_command.clone().unwrap_or_else(|| {
+            if spec.args.is_empty() {
+                spec.redacted_description.clone()
+            } else {
+                format!("{} [arguments omitted]", spec.redacted_description)
+            }
+        });
+        tokio::select! { biased;
+            _ = cancel.cancelled() => return Err(ConfctlError::Cancelled),
+            result = owner.events.emit(UiEvent::CommandStarting { task: scope.task, display }) => result?,
+        }
+    }
+    if let Some(event) = scope
+        .nix_progress
+        .as_ref()
+        .and_then(|kind| crate::nix::progress::Progress::new(kind.clone()).snapshot(scope.task))
+    {
+        tokio::select! { biased;
+            _ = cancel.cancelled() => return Err(ConfctlError::Cancelled),
+            result = owner.events.emit(event) => result?,
+        }
+    }
+    if cancel.is_cancelled()
+        || scope.cancellation.is_cancelled()
+        || owner.cancellation.is_cancelled()
+    {
+        return Err(ConfctlError::Cancelled);
+    }
     let spawned = command.spawn();
     // Command retains supplied Stdio handles for reuse. Close the parent's
     // merged-pipe writers now so the existing drain can observe real EOF.
@@ -1424,16 +1482,9 @@ async fn relay_stream(
                 .map(|decoder| decoder.feed(&bytes, task))
                 .unwrap_or_default();
             tokio::select! {
-                result = events.emit(UiEvent::Output { task, stream, bytes }) => if let Err(error) = result { let _ = errors.send(error); return; },
+                result = events.emit(UiEvent::ActivityOutput { task, stream, bytes }) => if let Err(error) = result { let _ = errors.send(error); return; },
                 _ = cancel.cancelled() => return,
             }
-            let updates = updates.into_iter().flat_map(|event| {
-                progress
-                    .as_ref()
-                    .and_then(|decoder| decoder.copy_line(&event))
-                    .into_iter()
-                    .chain(std::iter::once(event))
-            });
             for event in updates {
                 tokio::select! {
                     result = events.emit(event) => if let Err(error) = result { let _ = errors.send(error); return; },
@@ -1450,11 +1501,8 @@ async fn relay_stream(
                 let _ = errors.send(error);
                 return;
             }
-            if let Some(event) = progress.as_mut().and_then(|decoder| decoder.flush(task)) {
-                let line = progress
-                    .as_ref()
-                    .and_then(|decoder| decoder.copy_line(&event));
-                for event in line.into_iter().chain(std::iter::once(event)) {
+            if let Some(decoder) = progress.as_mut() {
+                for event in decoder.flush(task) {
                     tokio::select! {
                         result = events.emit(event) => if let Err(error) = result { let _ = errors.send(error); return; },
                         _ = cancel.cancelled() => return,

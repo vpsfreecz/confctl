@@ -458,7 +458,7 @@ async fn supervisor_protocol_observes_markers_fallback_retry_and_only_helper_suc
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
         for event in &events {
-            if let UiEvent::Output { stream, bytes, .. } = event {
+            if let UiEvent::ActivityOutput { stream, bytes, .. } = event {
                 match stream {
                     crate::events::OutputStream::Stdout => stdout.extend_from_slice(bytes),
                     crate::events::OutputStream::Stderr => stderr.extend_from_slice(bytes),
@@ -570,7 +570,7 @@ async fn exhaustion_and_early_zero_or_signal_cannot_report_protocol_success() {
             "{mode}: failed helper must not report protocol success"
         );
         if mode == "exhaust" {
-            assert!(events.iter().any(|e| matches!(e, UiEvent::Output { bytes, .. } if bytes.windows(b"natural helper completion".len()).any(|b| b == b"natural helper completion"))));
+            assert!(events.iter().any(|e| matches!(e, UiEvent::ActivityOutput { bytes, .. } if bytes.windows(b"natural helper completion".len()).any(|b| b == b"natural helper completion"))));
         }
     }
 }
@@ -583,7 +583,7 @@ async fn cancellation_or_helper_delivery_failure_joins_both_entered_requests() {
         let consumer = tokio::spawn(async move {
             while let Some(delivery) = receiver.receive().await {
                 let (event, ack) = delivery.into_parts();
-                if matches!(event, UiEvent::Output { .. }) {
+                if matches!(event, UiEvent::ActivityOutput { .. }) {
                     if reject {
                         ack.acknowledge(Err("controlled helper output rejection".into()));
                         continue;
