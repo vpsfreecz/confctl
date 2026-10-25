@@ -2,18 +2,18 @@
 
 `confctl-rust gen-data vpsadmin containers`, `network` and `all` authenticate
 with vpsAdmin and replace generated Nix data. They ask for a user name and a
-protected password, followed by any described authentication challenges. Password
-spaces are preserved. There is no additional confirmation. Tokens stay in memory;
-an expired token repeats authentication with the retained credentials and any
-new challenge. No background refresh or token revocation runs.
+protected password, followed by TOTP or password-reset challenges when required.
+Password spaces are preserved. There is no additional confirmation. Tokens stay
+in memory; an expired token repeats authentication with the retained credentials
+and any new challenge. No background refresh or token revocation runs.
 
 Containers use the configured Nix inventory after authentication. Only absent or
 null container metadata is skipped; unmanaged, carried and nonrunnable machines
 are included. Each entry requests its literal VPS ID with node, location and
 environment includes. Resolved associations are read directly; unresolved ones
-use their described show action and path parameters. Required missing associations
-fail. Keys join non-null host name, location and domain fields with dots, retaining
-empty strings. Duplicate keys use the last inventory entry.
+use API 7.0 show actions with the returned path parameters. Missing required
+associations fail. Keys join non-null host name, location and domain fields with
+dots, retaining empty strings. Duplicate keys use the last inventory entry.
 
 Networks make one list request, preserving source order and duplicates in separate
 IPv4 and IPv6 lists. Only numeric versions 4 and 6 are selected. Count metadata
@@ -36,21 +36,27 @@ An error after rename or cancellation can leave the new file in place. Inspect
 both files before explicitly rerunning the desired route; there is no automatic
 retry, rollback or compensation.
 
-The private HTTP client uses `https://api.vpsfree.cz`, normal proxy configuration,
-TLS verification and the `haveapi-client` User-Agent. It follows the API's described
-methods, namespaces, action aliases and token header. Described URLs must stay
-within that origin and base. Redirects, URL user information, escaping paths and
-unresolved arguments are refused before a credential-bearing request. Failed
-requests are not replayed. Protocol major 2 is required; a minor mismatch warns.
-HTTP success with invalid API status or response shape fails rather than producing
-empty data. Diagnostics redact known credentials, challenge values and tokens;
-request bodies and authentication responses are never logged.
+The `vpsadmin-client` crate provides asynchronous API 7.0 requests and typed
+responses. The endpoint is `https://api.vpsfree.cz`, with normal environment proxy
+handling, TLS verification and the `haveapi-client` User-Agent. Redirects and automatic
+retries are disabled. The client confines action paths and literal IDs to the
+configured origin and base. Its request timeout is 30 seconds, connection timeout
+10 seconds and response limit 16 MiB. Canceling a request stops waiting for it;
+it cannot undo an action the server already accepted. Failed requests, including
+HTTP 401 and 403, are not replayed or used to trigger fresh login.
 
-Scalar challenge conversion, nullability, omission and presence checks follow
-the pinned client contract. Other validators run on the server, so a value Ruby
-would reject locally may instead receive an API validation error. Unsupported
-input/output layouts and blocking data actions fail explicitly. This client
-supports the data-generation subset, without action-state polling.
+Authentication supports the API 7.0 token request, TOTP and password-reset
+continuations. Challenge values use protected input. Unknown continuations fail
+without sending another action. The client uses a generated API contract. It
+does not query OPTIONS for dynamic methods, paths, token headers or arbitrary
+challenge fields. A server requiring another contract needs a compatible client
+release and an explicit confctl update.
+
+Invalid API status, response shapes or schema field types fail before publication.
+Diagnostics redact known credentials, challenge values and tokens; request bodies
+and authentication responses are never logged. The adapter does not poll action
+state or refresh tokens in the background. Building confctl requires Rust 1.95
+or newer; its configured development and CI toolchain remains Rust 1.95.0.
 
 The private renderer sorts attribute keys, keeps list order and uses two-space
 indentation with a final newline. Ordinary output matches the Ruby fixture bytes.

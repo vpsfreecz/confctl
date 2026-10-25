@@ -104,10 +104,13 @@ without system builds or profile enumeration. Only changelog clones or fetches
 Git mirrors; both use the [report pager](pager.md), with redirected output kept
 visible and later host/Git work stopped after an actual pager-pipe EPIPE.
 [`gen-data vpsadmin containers`, `network` and `all`](gen-data.md) authenticate
-and publish complete Nix data. The guide describes the same-origin, no-replay API
-subset, scalar conversion and server validation limits, and partial effects from
-sequential file replacements.
-All 30 parsed action leaves have concrete Rust dispatch. Route-specific option
+and publish complete Nix data using the registry `vpsadmin-client` crate and its
+fixed API 7.0 contract. Known TOTP and password-reset challenges are supported;
+unknown continuations fail. Live OPTIONS discovery and arbitrary described
+challenge fields are not supported. Rust 1.95 is the minimum compiler. The guide
+describes the same-origin API, finite transport limits, redacted diagnostics,
+no-replay behavior and partial effects from sequential file replacements.
+All parsed action leaves have concrete Rust dispatch. Route-specific option
 limits and separate native and site acceptance gates still apply. Help and version need no inventory, input broker or process supervisor.
 Static original help text is preserved in `src/cli/help.json`, with source
 provenance in that module; it does not load test snapshots or Ruby at runtime.
@@ -133,7 +136,7 @@ bootstrap Ruby gems. Configuration tools mode retains its separate Ruby tools.
 | Health/status | Health result summary and failure status; status offline/unknown/outdated rows do not themselves cause failure. Generation `none` skips target build/toplevel comparison. |
 | SSH/connection | Literal local argv versus remote shell quoting; input modes; sequential/parallel and aggregate output. Failed connection hosts and remote nonzero command results do not universally become confctl nonzero status. |
 | Generations/GC | Local default, remote or both, distinct selectors, current resolution, rejected formats untouched, retention minima/current, optional remote GC and partial failure. Preserve explicit baseline errors pending decision. |
-| Data generation | All/container/network routes execute the locked client against a confined mock API: descriptor discovery, protected challenge, fixed token lifetime, authenticated includes query, container/node metadata and IPv4/IPv6 files. Auth-error, redirect and negative HTTP/socket cases retain failure evidence. The client issues one list call; this is not proof of arbitrary server pagination or TLS behavior. |
+| Data generation | All/container/network routes execute the locked client against a confined API 7.0 mock: protected TOTP/password-reset challenges, fixed token lifetime, authenticated includes query, container/node metadata and IPv4/IPv6 files. Auth-error, redirect and negative HTTP/socket cases retain failure evidence. The client issues one list call; this is not proof of arbitrary server pagination or TLS behavior. |
 
 Ordinary result tables, progress and prompts use stdout. Error diagnostics and
 log locators use stderr. Capture streams separately. Help-related errors can

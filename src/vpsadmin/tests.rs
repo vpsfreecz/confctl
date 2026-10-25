@@ -1,59 +1,43 @@
 use super::*;
 #[test]
-fn described_urls_are_confined_before_credentials_or_tokens() {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-    runtime.block_on(async {
-        let (events, _receiver) = EventSink::channel(1);
-        let cancel = CancellationToken::new();
-        let ui = Ui::new(
-            std::fs::File::open("/dev/null").unwrap(),
-            events.clone(),
-            cancel.clone(),
-            None,
-        )
-        .unwrap();
-        let client = Client::loopback(
-            &ui,
-            &events,
-            &cancel,
-            "http://127.0.0.1:1/api/",
-            std::sync::Arc::new(std::sync::atomic::AtomicI64::new(0)),
-        )
-        .unwrap();
-        for path in [
-            "http://127.0.0.1:2/api/",
-            "http://user@127.0.0.1:1/api/",
-            "//127.0.0.1:1/api/",
-            "/outside",
-            "../outside",
-            "%2e%2e/outside",
-            "../api/inside",
-            "/api/{id}",
-            "/api/foo#fragment",
-        ] {
-            assert!(
-                client.action_url(&json!({"path":path}), &[]).is_err(),
-                "{path}"
-            );
-        }
-        assert_eq!(
-            client
-                .action_url(&json!({"path":"/api/vps/{id}"}), &[json!("a/b ?é")])
-                .unwrap()
-                .as_str(),
-            "http://127.0.0.1:1/api/vps/a%2Fb%20%3F%C3%A9"
-        );
-        for endpoint in [
-            "http://localhost:1/",
-            "http://192.0.2.1:1/",
-            "https://127.0.0.1:1/",
-            "http://127.0.0.1:1/?x",
-        ] {
-            assert!(test_base(endpoint).is_err());
-        }
-        ui.shutdown().unwrap();
-    });
+fn included_associations_preserve_data_and_unresolved_path_parameters() {
+    let association: Association = serde_json::from_value(json!({
+        "id":7,"name":"node","domain_name":"node.test",
+        "location":{"domain":"test","_meta":{"resolved":true}},
+        "_meta":{"resolved":true}}))
+    .unwrap();
+    assert!(resolved(&association));
+    let node: resources::node::show::Output = included(&association).unwrap();
+    assert_eq!(node.id, Some(7));
+    assert_eq!(node.name.as_deref(), Some("node"));
+    assert!(resolved(node.location.as_ref().unwrap()));
+    let unresolved: Association = serde_json::from_value(json!({
+        "_meta":{"resolved":false,"path_params":["node/7"]}}))
+    .unwrap();
+    assert!(!resolved(&unresolved));
+    assert_eq!(association_id(&unresolved).unwrap(), "node/7");
+    for value in [
+        json!({}),
+        json!({"_meta":{"path_params":[]}}),
+        json!({"_meta":{"path_params":[1,2]}}),
+        json!({"_meta":{"path_params":[{}]}}),
+    ] {
+        let association: Association = serde_json::from_value(value).unwrap();
+        assert!(association_id(&association).is_err());
+    }
+}
+#[test]
+fn fixture_endpoints_remain_numeric_loopback_only() {
+    for endpoint in [
+        "http://localhost:1/",
+        "http://192.0.2.1:1/",
+        "https://127.0.0.1:1/",
+        "http://127.0.0.1:1/?x",
+        "http://user@127.0.0.1:1/",
+        "http://127.0.0.1:1/#fragment",
+    ] {
+        assert!(test_base(endpoint).is_err());
+    }
+    assert!(test_base("http://127.0.0.1:1/").is_ok());
+    assert!(test_base("http://[::1]:1/").is_ok());
 }
