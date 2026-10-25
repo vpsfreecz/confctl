@@ -12,11 +12,29 @@ use serde_json::{Map, Value};
 pub(super) async fn list(
     root: &ConfigRoot,
     pattern: Option<&str>,
+    json: bool,
     events: &EventSink,
 ) -> Result<(), ConfctlError> {
     root.require_flake()?;
     let lock = FlakeLock::load(&root.path().join("flake.lock"))?;
-    events.emit(table(&lock, pattern)).await
+    crate::inputs::LockGraph::new(&lock)?;
+    if json {
+        let rows = lock.root_inputs().into_iter().filter(|name| pattern.is_none_or(|p| pattern_matches(p,name))).map(|input| {
+            let info=lock.input_info(&input)?;
+            Ok(serde_json::json!({"input":input,"type":if info.kind=="-" {None}else{Some(info.kind)},"ref":info.reference,"rev":info.rev,"url":info.url}))
+        }).collect::<Result<Vec<_>,ConfctlError>>()?;
+        let mut bytes = serde_json::to_vec_pretty(&rows).expect("input rows serialize");
+        bytes.push(b'\n');
+        events
+            .emit(UiEvent::Output {
+                task: crate::events::TaskId(0),
+                stream: OutputStream::Stdout,
+                bytes,
+            })
+            .await
+    } else {
+        events.emit(table(&lock, pattern)?).await
+    }
 }
 
 pub(super) async fn channels(
@@ -107,7 +125,7 @@ fn channels_table(
                 Value::Null | Value::Bool(false) => continue,
                 Value::Object(roles) => {
                     for (role, input) in roles {
-                        rows.push(channel_row(lock, channel, role.clone(), input));
+                        rows.push(channel_row(lock, channel, role.clone(), input)?);
                     }
                 }
                 Value::Array(roles) => {
@@ -122,7 +140,7 @@ fn channels_table(
                         } else {
                             (entry, &absent)
                         };
-                        rows.push(channel_row(lock, channel, table_cell(role), input));
+                        rows.push(channel_row(lock, channel, table_cell(role), input)?);
                     }
                 }
                 Value::Number(number) if !number.as_str().contains(['.', 'e', 'E']) => {
@@ -158,34 +176,42 @@ fn table_cell(value: &Value) -> String {
         ruby_string(value)
     }
 }
-fn channel_row(lock: &FlakeLock, channel: &str, role: String, input: &Value) -> Vec<String> {
-    let info = input.as_str().map(|input| lock.input_info(input));
+fn channel_row(
+    lock: &FlakeLock,
+    channel: &str,
+    role: String,
+    input: &Value,
+) -> Result<Vec<String>, ConfctlError> {
+    let info = input
+        .as_str()
+        .map(|input| lock.input_info(input))
+        .transpose()?;
     let field = |value: Option<String>| value.unwrap_or_else(|| "-".into());
-    vec![
+    Ok(vec![
         channel.into(),
         role,
         table_cell(input),
         field(info.as_ref().and_then(|info| info.short_rev.clone())),
         field(info.and_then(|info| info.url)),
-    ]
+    ])
 }
-fn table(lock: &FlakeLock, pattern: Option<&str>) -> UiEvent {
+fn table(lock: &FlakeLock, pattern: Option<&str>) -> Result<UiEvent, ConfctlError> {
     let rows = lock
         .root_inputs()
         .into_iter()
         .filter(|input| pattern.is_none_or(|pattern| pattern_matches(pattern, input)))
         .map(|input| {
-            let info = lock.input_info(&input);
-            vec![
+            let info = lock.input_info(&input)?;
+            Ok(vec![
                 input,
                 info.kind,
                 info.reference.unwrap_or_default(),
                 info.short_rev.unwrap_or_default(),
                 info.url.unwrap_or_default(),
-            ]
+            ])
         })
-        .collect();
-    UiEvent::Table {
+        .collect::<Result<Vec<_>, ConfctlError>>()?;
+    Ok(UiEvent::Table {
         stream: OutputStream::Stdout,
         columns: ["INPUT", "TYPE", "REF", "REV", "URL"]
             .map(str::to_owned)
@@ -196,7 +222,7 @@ fn table(lock: &FlakeLock, pattern: Option<&str>) -> UiEvent {
             layout: TableLayout::Columns,
             ..TableFormat::default()
         },
-    }
+    })
 }
 
 #[cfg(test)]
@@ -247,11 +273,11 @@ mod tests {
     }
 
     #[test]
-    fn channel_rows_keep_role_order_missing_fields_empty_strings_and_first_segment_follows() {
+    fn channel_rows_keep_role_order_missing_fields_empty_strings_and_complete_follows() {
         let lock = FlakeLock::decode(
             br#"{
-            "nodes": {
-                "root": {"inputs": {"alias": ["target", "ignored"], "empty": "empty"}},
+            "version":7,"root":"root","nodes": {
+                "root": {"inputs": {"target":"target","alias": ["target"], "empty": "empty"}},
                 "target": {"locked": {"rev": "abcdefgh-more", "url": "git+https://target.invalid"}},
                 "empty": {"locked": {"rev": "", "url": ""}}
             }
@@ -291,7 +317,7 @@ mod tests {
     fn channel_array_mapping_destructures_roles_and_does_not_coerce_input_lookup_keys() {
         let lock = FlakeLock::decode(
             br#"{
-            "nodes": {
+            "version":7,"root":"root","nodes": {
                 "root": {"inputs": {"22": "target"}},
                 "target": {"locked": {"rev": "abcdefgh-more", "url": "https://target.invalid"}}
             }
@@ -333,7 +359,9 @@ mod tests {
 
     #[test]
     fn channel_integer_mapping_fails_before_table_publication_for_every_integer_size() {
-        let lock = FlakeLock::decode(br#"{}"#).unwrap();
+        let lock =
+            FlakeLock::decode(br#"{"version":7,"root":"root","nodes":{"root":{"inputs":{}}}}"#)
+                .unwrap();
         for number in ["0", "-22", "184467440737095516160000000"] {
             let value =
                 serde_json::from_str(&format!(r#"{{"a":{{"valid":"missing"}},"z":{number}}}"#))
@@ -358,38 +386,31 @@ mod tests {
     }
 
     #[test]
-    fn input_list_output_matches_all_four_immutable_follows_variations() {
-        for variation in ["single", "nested", "different-suffix", "missing-first"] {
-            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-                "tests/compat/core/expected-follows/follows-{variation}-ls.json"
-            ));
-            let expected: serde_json::Value =
-                serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
-            let lock = FlakeLock::decode(
-                expected["files"]["flake.lock"]["text"]
-                    .as_str()
-                    .unwrap()
-                    .as_bytes(),
-            )
-            .unwrap();
-            let UiEvent::Table {
-                columns,
-                rows,
-                format,
-                ..
-            } = table(&lock, None)
-            else {
-                panic!()
-            };
-            assert_eq!(
-                crate::presentation::plain::table(&columns, &rows, &format),
-                expected["stdout"].as_str().unwrap().as_bytes(),
-                "{variation}"
-            );
-            let UiEvent::Table { rows, .. } = table(&lock, Some("does-not-match")) else {
-                panic!()
-            };
-            assert!(rows.is_empty());
-        }
+    fn input_list_uses_declared_root_and_full_follows_without_changing_table_columns() {
+        let lock = FlakeLock {
+            data: serde_json::json!({"version":7,"root":"entry","nodes":{
+                "entry":{"inputs":{"parent":"parent","alias":["parent","leaf"]}},
+                "parent":{"locked":{"rev":"abcdefgh-parent"},"inputs":{"leaf":"leaf"}},
+                "leaf":{"locked":{"type":"github","owner":"fixture","repo":"leaf","rev":"12345678-full-revision"}}
+            }}),
+        };
+        let UiEvent::Table { columns, rows, .. } = table(&lock, None).unwrap() else {
+            panic!()
+        };
+        assert_eq!(columns, ["INPUT", "TYPE", "REF", "REV", "URL"]);
+        assert_eq!(
+            rows[0],
+            [
+                "alias",
+                "github",
+                "",
+                "12345678",
+                "https://github.com/fixture/leaf"
+            ]
+        );
+        let UiEvent::Table { rows, .. } = table(&lock, Some("absent*")).unwrap() else {
+            panic!()
+        };
+        assert!(rows.is_empty());
     }
 }

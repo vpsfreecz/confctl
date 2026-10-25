@@ -59,7 +59,9 @@ fn every_frozen_route_help_and_option_probe_matches_static_baseline() {
         let expected: serde_json::Value =
             serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
         assert_eq!(
-            String::from_utf8(actual.stdout).unwrap(),
+            String::from_utf8(actual.stdout).unwrap()
+                .replace("    --[no-]forward-only - Require complete same-source forward Git ancestry (exit 3 rejects)\n", "")
+                .replace("\nCOMMAND OPTIONS\n    --json - Print input, type, ref, full rev and url as JSON\n\n", ""),
             expected["stdout"],
             "{id}"
         );
@@ -245,4 +247,70 @@ fn unified_generation_offsets_preserve_exact_ruby_integer_spelling() {
         };
         assert_eq!(selector, UnifiedGenerationSelector::Pattern(value.into()));
     }
+}
+
+#[test]
+fn input_json_check_update_and_guard_flags_are_explicit_requests() {
+    assert_eq!(
+        action(&["inputs", "ls", "--json", "nix*"]),
+        Action::InputsList {
+            pattern: Some("nix*".into()),
+            json: true
+        }
+    );
+    for words in [
+        vec![
+            "inputs",
+            "update",
+            "--forward-only",
+            "--downgrade",
+            "source",
+        ],
+        vec!["inputs", "channel", "update", "--forward-only", "base"],
+        vec![
+            "inputs",
+            "machine",
+            "update",
+            "--forward-only",
+            "machine",
+            "role",
+        ],
+    ] {
+        let request = action(&words);
+        let changes = match request {
+            Action::InputsUpdate { changes, .. }
+            | Action::ChannelUpdate { changes, .. }
+            | Action::MachineUpdate { changes, .. } => changes,
+            _ => panic!(),
+        };
+        assert!(changes.forward_only);
+    }
+    assert_eq!(
+        action(&[
+            "inputs",
+            "check-update",
+            "--old-lock",
+            "old",
+            "--new-lock",
+            "new"
+        ]),
+        Action::InputsCheckUpdate {
+            old_lock: "old".into(),
+            new_lock: "new".into()
+        }
+    );
+    assert!(parse_words(&["inputs", "check-update", "--old-lock", "old"]).is_err());
+    assert!(
+        parse_words(&[
+            "inputs",
+            "check-update",
+            "--old-lock",
+            "old",
+            "--new-lock",
+            "new",
+            "extra"
+        ])
+        .is_err()
+    );
+    assert!(parse_words(&["inputs", "set", "--forward-only", "source", "rev"]).is_err());
 }

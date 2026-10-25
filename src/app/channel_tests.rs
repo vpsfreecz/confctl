@@ -103,6 +103,7 @@ impl Fixture {
         fs::write(root.join("flake.nix"), "{ outputs = _: {}; }\n").unwrap();
         fs::write(root.join("flake.lock"), serde_json::to_vec(&serde_json::json!({
             "version": 7,
+            "root": "root",
             "nodes": {
                 "root": {"inputs": {"nixpkgs": "nixpkgs"}},
                 "nixpkgs": {"locked": {"type": "github", "owner": "fixture", "repo": "nixpkgs", "rev": "a".repeat(40)}}

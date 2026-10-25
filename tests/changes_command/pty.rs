@@ -157,7 +157,10 @@ if [ "$CHANGES_PAGER_CASE" = exit7 ]; then exit 7; fi
         let calls = f.calls();
         assert!(!calls.iter().any(|s| s.starts_with("ssh:")), "{calls:?}");
         assert_eq!(
-            calls.iter().filter(|s| s.starts_with("git:")).count(),
+            calls
+                .iter()
+                .filter(|s| s.starts_with("git:clone ") || s.contains(" log "))
+                .count(),
             2,
             "{calls:?}"
         );

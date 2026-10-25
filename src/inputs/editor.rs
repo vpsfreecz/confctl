@@ -1,3 +1,4 @@
+mod guarded;
 use super::{FlakeLock, InputChange, check_nix_output};
 use crate::{
     configuration::{ConfigRoot, MutationGuard},
@@ -7,6 +8,7 @@ use crate::{
     process::{Captured, ProcessRunner, ProcessScope, ProcessSpec, StreamPolicy, TerminationCause},
     timing::Phase,
 };
+pub use guarded::GuardedCandidate;
 use std::{ffi::OsString, fs, path::Path};
 use tokio_util::sync::CancellationToken;
 
@@ -47,7 +49,7 @@ impl<P: ProcessRunner> InputEditor<P> {
         args.extend(inputs.iter().map(OsString::from));
         self.run_nix(guard, args).await?;
         let new = FlakeLock::load(&path)?;
-        Ok(InputChange::between(old.as_ref(), &new, inputs))
+        InputChange::between(old.as_ref(), &new, inputs)
     }
     pub async fn set(
         &self,
@@ -76,7 +78,7 @@ impl<P: ProcessRunner> InputEditor<P> {
                 Ok((
                     input.clone(),
                     old.override_url(input, revision)?,
-                    old.original(input),
+                    old.original(input)?,
                 ))
             })
             .collect::<Result<Vec<_>, ConfctlError>>()?;
@@ -115,7 +117,7 @@ impl<P: ProcessRunner> InputEditor<P> {
             self.check(guard)?;
         }
         let new = FlakeLock::load(&path)?;
-        Ok(InputChange::between(Some(&old), &new, inputs))
+        InputChange::between(Some(&old), &new, inputs)
     }
     fn check(&self, guard: &MutationGuard) -> Result<(), ConfctlError> {
         if self.cancellation.is_cancelled() {
@@ -178,6 +180,21 @@ impl<P: ProcessRunner> InputEditor<P> {
             let out = String::from_utf8_lossy(&out);
             let err = String::from_utf8_lossy(&err);
             if result.status.success() {
+                let guarded = args.iter().any(|a| a == "--output-lock-file")
+                    && args.iter().any(|a| a == "--reference-lock-file");
+                if guarded
+                    && format!("{out}\n{err}")
+                        .to_ascii_lowercase()
+                        .contains("does not match any input")
+                {
+                    return Err(process_error(
+                        ConfctlError::Configuration(
+                            "Nix did not match the requested update input; no lock was installed"
+                                .into(),
+                        ),
+                        result,
+                    ));
+                }
                 return check_nix_output(&out, &err).map_err(|error| process_error(error, result));
             }
             let message = format!("{out}\n{err}").to_lowercase();

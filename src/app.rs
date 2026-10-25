@@ -165,7 +165,32 @@ async fn execute<O: Operations>(
             );
         }
     };
-    let (invocation_log, process_log) = match InvocationLog::open(&cwd, invocation.action.name()) {
+    // check-update is independent of a checkout, including its operational logs.
+    // Keep failure logs in temporary storage rather than creating .confctl here.
+    let standalone_log = if matches!(invocation.action, Action::InputsCheckUpdate { .. }) {
+        match tempfile::Builder::new()
+            .prefix("confctl-check-update-")
+            .tempdir()
+        {
+            Ok(dir) => Some(dir.keep()),
+            Err(source) => {
+                return diagnose(
+                    &ConfctlError::Io {
+                        operation: "prepare check-update log",
+                        path: None,
+                        source,
+                    },
+                    &stderr,
+                );
+            }
+        }
+    } else {
+        None
+    };
+    let (invocation_log, process_log) = match InvocationLog::open(
+        standalone_log.as_deref().unwrap_or(&cwd),
+        invocation.action.name(),
+    ) {
         Ok(log) => log,
         Err(error) => return diagnose(&error, &stderr),
     };
@@ -345,6 +370,8 @@ async fn execute<O: Operations>(
         Err(error) => {
             let exit = if error.is_cancelled() {
                 ExitDisposition::canceled(130)
+            } else if error.policy_rejected() {
+                ExitDisposition::failed(3)
             } else if operational_usage(&error) {
                 ExitDisposition::failed(64)
             } else {
@@ -783,6 +810,121 @@ mod diagnostic_boundary_tests {
         assert_eq!(paths.len(), 1);
         assert_eq!(std::fs::read(&paths[0]).unwrap(), b"nested lock evidence");
     }
+    struct ForwardComparisonFailure(Mutex<Option<ConfctlError>>);
+    impl Operations for ForwardComparisonFailure {
+        fn available(&self, _: &Action) -> bool {
+            true
+        }
+        async fn run(&self, _: &Invocation, _: &Context) -> Result<ExitDisposition, ConfctlError> {
+            Err(self
+                .0
+                .lock()
+                .unwrap()
+                .take()
+                .expect("one operational failure"))
+        }
+    }
+
+    #[tokio::test]
+    async fn forward_comparison_failure_exits_one_after_retaining_typed_native_evidence() {
+        use std::{
+            cell::{Cell, RefCell},
+            os::unix::process::ExitStatusExt,
+        };
+        let scratch = tempfile::tempdir().unwrap();
+        let mut spool = tempfile::NamedTempFile::new_in(scratch.path()).unwrap();
+        let stdout = b"owned comparison stdout\xff\n";
+        spool.write_all(stdout).unwrap();
+        let source_path = spool.path().to_owned();
+        let failure = RefCell::new(Some(
+            ConfctlError::ProcessFailure {
+                source: Box::new(ConfctlError::Child {
+                    description: "Git comparison".into(),
+                    code: Some(17),
+                    signal: None,
+                    log: None,
+                }),
+                evidence: Box::new(PartialProcessEvidence {
+                    status: Some(std::process::ExitStatus::from_raw(17 << 8)),
+                    stdout: Captured::Spool {
+                        file: spool,
+                        length: stdout.len() as u64,
+                    },
+                    stderr: Captured::Memory(b"owned comparison stderr".to_vec()),
+                    stdout_complete: true,
+                    stderr_complete: false,
+                    log: None,
+                }),
+            }
+            .with_secondary(vec![ConfctlError::State(
+                "comparison secondary failure".into(),
+            )]),
+        ));
+        let old = crate::inputs::FlakeLock {
+            data: serde_json::json!({"version":7,"root":"root","nodes":{
+                "root":{"inputs":{"source":"source","alias":["source"]}},
+                "source":{"locked":{"type":"github","owner":"fixture","repo":"source","rev":"a".repeat(40)}}
+            }}),
+        };
+        let mut new = old.clone();
+        new.data["nodes"]["source"]["locked"]["rev"] = serde_json::json!("b".repeat(40));
+        let calls = Cell::new(0);
+        let error = crate::inputs::validate_forward(&old, &new, |_| {
+            calls.set(calls.get() + 1);
+            std::future::ready(Err(failure
+                .borrow_mut()
+                .take()
+                .expect("deduplicated comparison")))
+        })
+        .await
+        .unwrap_err();
+        assert_eq!(calls.get(), 1);
+        assert!(source_path.is_file());
+        let (out, err, buffer) = outputs();
+        let code = execute(
+            [
+                "inputs",
+                "check-update",
+                "--old-lock",
+                "old",
+                "--new-lock",
+                "new",
+            ]
+            .map(Into::into)
+            .to_vec(),
+            Timing::start(),
+            &ForwardComparisonFailure(Mutex::new(Some(error))),
+            Ok(scratch.path().into()),
+            out,
+            err,
+        )
+        .await;
+        assert_eq!(code, 1);
+        let bytes = buffer.0.lock().unwrap().clone();
+        let text = String::from_utf8(bytes).unwrap();
+        assert!(text.contains("alias:") && text.contains("source:"));
+        let locator = text
+            .lines()
+            .find_map(|line| line.strip_prefix("Log file: "))
+            .unwrap();
+        let log = std::fs::read(locator).unwrap();
+        for marker in [
+            stdout.as_slice(),
+            b"owned comparison stderr",
+            b"[native status] exit=Some(17) signal=None",
+            b"comparison secondary failure",
+        ] {
+            assert!(
+                log.windows(marker.len()).any(|bytes| bytes == marker),
+                "missing retained evidence marker"
+            );
+        }
+        assert!(
+            !source_path.exists(),
+            "source released before durable finalization or leaked afterward"
+        );
+    }
+
     struct Failing;
     impl Operations for Failing {
         fn available(&self, _: &Action) -> bool {

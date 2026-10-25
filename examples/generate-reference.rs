@@ -415,7 +415,8 @@ mod tests {
     #[test]
     fn every_route_group_and_schema_spelling_uses_real_public_help() {
         let rendered = cli_reference().unwrap();
-        assert_eq!(schema::ROUTES.len(), 30);
+        assert_eq!(schema::ROUTES.len(), 31);
+        assert!(schema::ROUTES.contains(&"inputs check-update"));
         assert!(rendered.contains(&help_code(&help("").unwrap())));
         let mut groups = Vec::new();
         super::groups("", &mut groups);

@@ -7,7 +7,7 @@ use crate::{
     domain::{Action, InputChanges},
     error::ConfctlError,
     events::{OutputStream, TaskId, TaskState, UiEvent},
-    inputs::{FlakeLock, InputEditor},
+    inputs::{FlakeLock, InputEditor, validate_forward},
     nix::{InvocationSettings, NixClient, NixOptions, process_error},
     process::{
         ProcessRunner, ProcessScope, ProcessSpec, StdinPolicy, StreamPolicy, TerminationCause,
@@ -94,7 +94,19 @@ async fn mutate(
         ctx.processes.clone(),
         ctx.cancellation.clone(),
     );
-    let changes = if let Some(revision) = revision {
+    let mut prepared = None;
+    let changes = if options.forward_only && revision.is_none() {
+        let candidate = editor.prepare_forward(guard, &inputs).await?;
+        let changes = validate_forward(&candidate.old, &candidate.candidate, |proof| {
+            super::input_git::compare(ctx, proof)
+        })
+        .await?;
+        editor
+            .install_forward(guard, &candidate, !changes.is_empty())
+            .await?;
+        prepared = Some(candidate);
+        Ok(changes)
+    } else if let Some(revision) = revision {
         editor.set(guard, &inputs, revision).await
     } else {
         editor.update(guard, &inputs).await
@@ -134,13 +146,15 @@ async fn mutate(
         targets
             .into_iter()
             .map(|(input, label)| {
-                format!(
+                Ok(format!(
                     "{label} -> {}\n",
-                    lock.input_info(&input).short_rev.as_deref().unwrap_or("-")
-                )
+                    lock.input_info(&input)?.short_rev.as_deref().unwrap_or("-")
+                ))
             })
-            .collect()
+            .collect::<Result<String, ConfctlError>>()?
     };
+    // Keep the guarded Git-path lock until all optional hooks and summaries finish.
+    let _prepared = prepared;
     ctx.events
         .emit(UiEvent::Output {
             task: TaskId(0),
@@ -454,4 +468,41 @@ fn config(text: &str) -> ConfctlError {
 }
 fn retained(error: ConfctlError, phase: &str) -> ConfctlError {
     error.with_secondary(vec![ConfctlError::State(format!("input mutation stopped during {phase}; completed lock/cache/commit effects may remain; inspect flake.lock and Git state before explicitly retrying or restoring files"))])
+}
+
+/// Offline lock inspection needs neither Nix nor cluster outputs nor mutation admission.
+pub(super) async fn check_update(
+    root: &ConfigRoot,
+    old: &std::path::Path,
+    new: &std::path::Path,
+    ctx: &Context,
+) -> Result<(), ConfctlError> {
+    let old = FlakeLock::load(&root.path().join(old))?;
+    let new = FlakeLock::load(&root.path().join(new))?;
+    let changes =
+        validate_forward(&old, &new, |proof| super::input_git::compare(ctx, proof)).await?;
+    let mut text = if changes.is_empty() {
+        "No changes.\n".into()
+    } else {
+        format!("Updated inputs ({}):\n", changes.len())
+    };
+    for change in changes {
+        text.push_str(&format!(
+            "  {}: {} -> {}\n",
+            change.name,
+            change
+                .old_info
+                .as_ref()
+                .and_then(|i| i.short_rev.as_deref())
+                .unwrap_or("-"),
+            change.new_info.short_rev.as_deref().unwrap_or("-")
+        ));
+    }
+    ctx.events
+        .emit(UiEvent::Output {
+            task: TaskId(0),
+            stream: OutputStream::Stdout,
+            bytes: text.into_bytes(),
+        })
+        .await
 }

@@ -41,7 +41,13 @@ impl Fixture {
         let script=r#"#!PYTHON
 import json,os,pathlib,sys,time,subprocess
 c=pathlib.Path(os.environ['MUT_CONTROL']); args=sys.argv[1:]; kind=pathlib.Path(sys.argv[0]).name
-s=json.loads((c/'scenario').read_text()); records=sorted(c.glob('call-*')); n=len(records)+1
+s=json.loads((c/'scenario').read_text())
+raw_args=list(args)
+if kind=='git' and args[:1]==['--no-replace-objects']:
+ assert args[:7]==['--no-replace-objects','-c','core.commitGraph=false','-c','gc.auto=0','-c','maintenance.auto=false']
+ assert os.environ.get('GIT_NO_REPLACE_OBJECTS')=='1' and os.environ.get('GIT_NO_LAZY_FETCH')=='1'
+ args=args[7:]
+records=sorted(c.glob('call-*')); n=len(records)+1
 (c/f'call-{n:03}').write_bytes(b'\0'.join(os.fsencode(a) for a in [kind,*args])+b'\0')
 (c/f'cwd-{n:03}').write_text(os.getcwd())
 def block(stage):
@@ -61,11 +67,20 @@ if kind=='nix':
  if operation not in ['update','lock']: sys.exit(97)
  if s.get('experimental') and '--extra-experimental-features' not in args:
   print('experimental feature flakes disabled',file=sys.stderr); sys.exit(1)
- data=json.loads(pathlib.Path('flake.lock').read_text()) if pathlib.Path('flake.lock').exists() else s['initial']
- if operation=='update': names=args[args.index('update')+1:]; target=pathlib.Path('flake.lock')
+ data=json.loads(pathlib.Path(args[args.index('--reference-lock-file')+1]).read_text()) if '--reference-lock-file' in args else (json.loads(pathlib.Path('flake.lock').read_text()) if pathlib.Path('flake.lock').exists() else s['initial'])
+ if operation=='update':
+  names=args[args.index('update')+1:]
+  if '--output-lock-file' in args: names=args[args.index('--output-lock-file')+2:]
+  target=pathlib.Path(args[args.index('--output-lock-file')+1]) if '--output-lock-file' in args else pathlib.Path('flake.lock')
  else: names=[args[args.index('--update-input')+1]]; target=pathlib.Path(args[args.index('--output-lock-file')+1])
  for name in names:
-  node=data['nodes']['root']['inputs'][name]; node=node[0] if isinstance(node,list) else node
+  node=data['root']
+  for part in name.split('/'):
+   node=data['nodes'][node]['inputs'][part]
+   if isinstance(node,list):
+    resolved=data['root']
+    for segment in node: resolved=data['nodes'][resolved]['inputs'][segment]
+    node=resolved
   data['nodes'][node]['locked']['rev']=s.get('rev','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')
   if s.get('metadata_only'): data['nodes'][node]['locked']['rev']='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
   if s.get('remove_url'):
@@ -75,13 +90,19 @@ if kind=='nix':
   for node in data['nodes'].values():
    if 'original' in node: node['original']={'type':'git','url':'child-replaced'}
  data['unknown']={'preserved':[False,None,7]}
- target.write_text(json.dumps(data))
+ if s.get('candidate'): data=s['candidate']
+ if s.get('malformed'): target.write_text('{')
+ elif not s.get('missing_output'): target.write_text(json.dumps(data))
+ if s.get('external_write'): pathlib.Path(s['external_write']).write_text('external writer')
+ if s.get('unmatched'): print('input does not match any input',file=sys.stderr)
+ if s.get('nix_exit'): sys.exit(s['nix_exit'])
  block('nix')
  if s.get('fail_input') in names: print('setter native failed',file=sys.stderr); sys.exit(23)
  if s.get('cached'): print("unable to download 'https://api.github.com/repos/fixture/repo': using cached version",file=sys.stderr)
  print('NIX-STDOUT'); print('NIX-STDERR',file=sys.stderr)
  sys.exit(0)
 if kind=='git':
+ if s.get('proof_git'): os.execv(os.environ['MUT_REAL_GIT'],[os.environ['MUT_REAL_GIT'],*raw_args])
  if args[0]=='commit':
   p=pathlib.Path(args[args.index('-F')+1]); (c/'message-path').write_text(str(p)); (c/'message').write_bytes(p.read_bytes())
   block('commit')
@@ -91,9 +112,13 @@ if kind=='git':
   sys.exit(s.get('commit_exit',0))
  block('git')
  if s.get('git_exit') and (not s.get('git_fail_at') or s['git_fail_at'] in args): print('GIT-NATIVE-FAIL',file=sys.stderr); sys.exit(s['git_exit'])
- if args[0]=='clone': pathlib.Path(args[-1],'mirror-receipt').write_text('clone')
- elif args[0]=='-C' and args[2]=='fetch': pathlib.Path(args[1],'mirror-receipt').write_text('fetch')
- elif args[0]=='-C' and args[2]=='log':
+ if args[0]=='clone':
+  p=pathlib.Path(args[-1]); p.mkdir(); (p/'objects').mkdir(); (p/'config').write_text('fixture'); (p/'origin').write_text(args[-2]); (p/'mirror-receipt').write_text('clone')
+ elif args[0]=='--git-dir' and args[2:] == ['rev-parse','--is-bare-repository']: print('true')
+ elif args[0]=='--git-dir' and args[2:4] == ['config','--get-regexp']: sys.exit(1)
+ elif args[0]=='--git-dir' and args[2:5] == ['config','--local','--no-includes']: print(pathlib.Path(args[1],'origin').read_text())
+ elif args[0]=='--git-dir' and args[2]=='fetch': pathlib.Path(args[1],'mirror-receipt').write_text('fetch')
+ elif args[0]=='--git-dir' and args[2]=='log':
   sys.stdout.buffer.write(b'< entry\xff\n' if s.get('raw') else b''.join(f'> {i:08} line\n'.encode() for i in range(80)))
  else: sys.exit(97)
  sys.exit(0)
@@ -197,12 +222,14 @@ raise RuntimeError('forbidden native tool '+kind)
             let e = e.unwrap();
             let n = e.file_name();
             let n = n.to_string_lossy();
-            !n.starts_with("confctl-input-message-") && !n.starts_with("flake.lock.tmp-")
+            !n.starts_with("confctl-input-message-")
+                && !n.starts_with("flake.lock.tmp-")
+                && !n.starts_with(".confctl-update-")
         }));
     }
 }
 fn lock() -> Value {
-    json!({"version":7,"nodes":{"root":{"inputs":{"b":"b","a":"a","alias":["a","ignored"]}},"a":{"original":{"type":"git","url":"https://repo.invalid/a/","ref":"keep","unknown":4},"locked":{"type":"git","url":"https://repo.invalid/a/","rev":"a".repeat(40)}},"b":{"original":{"type":"github","owner":"fixture","repo":"b","dir":"nested"},"locked":{"type":"github","owner":"fixture","repo":"b","rev":"a".repeat(40)}}}})
+    json!({"version":7,"root":"root","nodes":{"root":{"inputs":{"b":"b","a":"a","alias":["a"]}},"a":{"original":{"type":"git","url":"https://repo.invalid/a/","ref":"keep","unknown":4},"locked":{"type":"git","url":"https://repo.invalid/a/","rev":"a".repeat(40)}},"b":{"original":{"type":"github","owner":"fixture","repo":"b","dir":"nested"},"locked":{"type":"github","owner":"fixture","repo":"b","rev":"a".repeat(40)}}}})
 }
 fn executable(p: &Path, s: &str) {
     fs::write(p, s).unwrap();
@@ -401,13 +428,16 @@ fn actual_message_file_unlimited_log_raw_url_cache_fetch_downgrade_and_flags() {
     let o = f.run(&["inputs", "update", "--commit", "--downgrade", "a"]);
     pass(&o);
     let calls = f.calls();
-    assert_eq!(calls.len(), 4);
-    assert_eq!(
-        &calls[1][..5],
-        ["git", "clone", "--quiet", "--mirror", "--"]
-    );
-    assert_eq!(calls[1][5], "https://repo.invalid/a/");
-    let log = &calls[2];
+    let clone = calls
+        .iter()
+        .find(|a| a.get(1).map(String::as_str) == Some("clone"))
+        .unwrap();
+    assert_eq!(&clone[..5], ["git", "clone", "--mirror", "--quiet", "--"]);
+    assert_eq!(clone[5], "https://repo.invalid/a/");
+    let log = calls
+        .iter()
+        .find(|a| a.get(3).map(String::as_str) == Some("log"))
+        .unwrap();
     assert!(!log.iter().any(|a| a.contains("max-count")));
     assert_eq!(
         log[log.len() - 2],
@@ -420,8 +450,12 @@ fn actual_message_file_unlimited_log_raw_url_cache_fetch_downgrade_and_flags() {
             .starts_with("inputs: update a to bbbbbbbb\n\na: aaaaaaaa -> bbbbbbbb\ngit log for ")
     );
     assert!(message.contains("> 00000079 line"));
-    assert_eq!(calls[3][..3], ["git", "commit", "-F"]);
-    assert_eq!(&calls[3][4..], ["--", "flake.lock"]);
+    let commit = calls
+        .iter()
+        .find(|a| a.get(1).map(String::as_str) == Some("commit"))
+        .unwrap();
+    assert_eq!(commit[..3], ["git", "commit", "-F"]);
+    assert_eq!(&commit[4..], ["--", "flake.lock"]);
     f.no_temps();
     f.scenario(json!({"rev":"c".repeat(40),"raw":true}));
     pass(&f.run(&["inputs", "update", "--commit", "a"]));
@@ -607,7 +641,10 @@ fn empty_literal_input_role_filters_globs_and_shared_scan_validation() {
     data["nodes"]["root"]["inputs"][""] = json!("a");
     f.lock(data);
     f.scenario(json!({"channels":{"base":{"main":""}}}));
-    pass(&f.run(&["inputs", "channel", "update", "b*", "main"]));
+    fail(
+        &f.run(&["inputs", "channel", "update", "b*", "main"]),
+        "Malformed lock input path",
+    );
     assert_eq!(mutcalls(&f), [vec!["nix", "flake", "update", ""]]);
     let f = Fixture::new();
     f.scenario(json!({"channels":{"base":{"main":"a"},"outside":[8]}}));
@@ -791,7 +828,11 @@ fn message_grouping_raw_url_fallback_missing_url_and_complete_log_failure() {
     pass(&f.run(&["inputs", "update", "--commit", "a"]));
     let calls = f.calls();
     assert_eq!(calls[1][5], "https://repo.invalid/a/");
-    assert!(calls[2].iter().any(|a| a == "log"));
+    assert!(
+        calls
+            .iter()
+            .any(|a| a.get(3).map(String::as_str) == Some("log"))
+    );
     assert!(
         String::from_utf8(f.message())
             .unwrap()
@@ -856,4 +897,557 @@ fn output_failure_stops_before_commit_and_retains_native_lock_effects() {
     assert_eq!(f.changed()["nodes"]["a"]["locked"]["rev"], "b".repeat(40));
     assert!(f.calls().iter().all(|c| c[0] == "nix"));
     f.no_temps();
+}
+
+// Local Git objects exercise the actual provider; Nix remains the confined child.
+fn git_at(path: &Path, args: &[&str]) -> Output {
+    let out = Command::new(find("git"))
+        .current_dir(path)
+        .args(args)
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .output()
+        .unwrap();
+    pass(&out);
+    out
+}
+fn history(f: &Fixture) -> (String, String, String) {
+    let origin = f.control.join("origin");
+    fs::create_dir(&origin).unwrap();
+    git_at(&origin, &["init", "-q", "--initial-branch=main"]);
+    git_at(&origin, &["config", "user.name", "Fixture"]);
+    git_at(
+        &origin,
+        &["config", "user.email", "fixture@example.invalid"],
+    );
+    git_at(&origin, &["config", "commit.gpgsign", "false"]);
+    fs::write(origin.join("file"), "base").unwrap();
+    git_at(&origin, &["add", "file"]);
+    git_at(&origin, &["commit", "-q", "-m", "base"]);
+    let base = String::from_utf8(git_at(&origin, &["rev-parse", "HEAD"]).stdout)
+        .unwrap()
+        .trim()
+        .to_owned();
+    fs::write(origin.join("file"), "forward").unwrap();
+    git_at(&origin, &["commit", "-q", "-am", "forward"]);
+    let ahead = String::from_utf8(git_at(&origin, &["rev-parse", "HEAD"]).stdout)
+        .unwrap()
+        .trim()
+        .to_owned();
+    git_at(&origin, &["checkout", "-q", "-b", "side", &base]);
+    fs::write(origin.join("other"), "side").unwrap();
+    git_at(&origin, &["add", "other"]);
+    git_at(&origin, &["commit", "-q", "-m", "side"]);
+    let side = String::from_utf8(git_at(&origin, &["rev-parse", "HEAD"]).stdout)
+        .unwrap()
+        .trim()
+        .to_owned();
+    git_at(&origin, &["checkout", "-q", "main"]);
+    let config = f.control.join("git-config");
+    git_at(
+        &f.root,
+        &[
+            "config",
+            "--file",
+            config.to_str().unwrap(),
+            &format!("url.{}.insteadOf", origin.display()),
+            "https://github.com/fixture/repository",
+        ],
+    );
+    (base, ahead, side)
+}
+fn github_lock(rev: &str) -> Value {
+    json!({"version":7,"root":"entry","nodes":{"entry":{"inputs":{"source":"source","alias":["source"]}},"source":{"locked":{"type":"github","owner":"fixture","repo":"repository","rev":rev}}}})
+}
+fn initialize_checkout(f: &Fixture, rev: &str) {
+    f.lock(github_lock(rev));
+    git_at(&f.root, &["init", "-q"]);
+    git_at(&f.root, &["config", "user.name", "Fixture"]);
+    git_at(
+        &f.root,
+        &["config", "user.email", "fixture@example.invalid"],
+    );
+    git_at(&f.root, &["config", "commit.gpgsign", "false"]);
+    git_at(&f.root, &["add", "flake.nix", "flake.lock"]);
+    git_at(&f.root, &["commit", "-q", "-m", "baseline"]);
+}
+fn proof_command(f: &Fixture, args: &[&str]) -> Command {
+    let mut c = f.command(args);
+    c.env("MUT_REAL_GIT", find("git"))
+        .env("GIT_CONFIG_GLOBAL", f.control.join("git-config"));
+    c
+}
+fn snapshot_checkout(f: &Fixture) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+    (
+        fs::read(f.root.join("flake.lock")).unwrap(),
+        git_at(&f.root, &["rev-parse", "HEAD"]).stdout,
+        fs::read(f.root.join(".git/index")).unwrap(),
+    )
+}
+#[test]
+fn json_uses_full_revisions_nulls_empty_selection_and_ignores_caller_ruby_startup() {
+    let f = Fixture::new();
+    let mut data = github_lock(&"a".repeat(40));
+    data["nodes"]["entry"]["inputs"]["empty"] = json!("empty");
+    data["nodes"]["empty"] = json!({"locked":{}});
+    f.lock(data);
+    let out = f
+        .command(&["inputs", "ls", "--json"])
+        .env("RUBYOPT", "-r/does-not-exist")
+        .env("BUNDLE_GEMFILE", "/absent/Gemfile")
+        .output()
+        .unwrap();
+    pass(&out);
+    let rows: Vec<Value> = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(rows.len(), 3);
+    assert_eq!(
+        rows[0],
+        json!({"input":"alias","type":"github","ref":null,"rev":"a".repeat(40),"url":"https://github.com/fixture/repository"})
+    );
+    assert_eq!(
+        rows[1],
+        json!({"input":"empty","type":null,"ref":null,"rev":null,"url":null})
+    );
+    let out = f.run(&["inputs", "ls", "--json", "absent*"]);
+    pass(&out);
+    assert_eq!(
+        serde_json::from_slice::<Value>(&out.stdout).unwrap(),
+        json!([])
+    );
+    assert!(f.calls().is_empty());
+}
+#[test]
+fn check_update_is_readonly_without_flake_or_nix_and_keeps_exit_zero_three_one() {
+    let f = Fixture::new();
+    let (base, ahead, side) = history(&f);
+    fs::remove_file(f.root.join("flake.nix")).unwrap();
+    fs::remove_file(f.root.join("flake.lock")).unwrap();
+    f.scenario(json!({"proof_git":true}));
+    let old = f.root.join("old.json");
+    let new = f.root.join("new.json");
+    fs::write(&old, serde_json::to_vec(&github_lock(&base)).unwrap()).unwrap();
+    for (from, to, status) in [
+        (&base, &ahead, 0),
+        (&ahead, &base, 3),
+        (&ahead, &side, 3),
+        (&base, &base, 0),
+        (&base, &"f".repeat(40), 1),
+    ] {
+        fs::write(&old, serde_json::to_vec(&github_lock(from)).unwrap()).unwrap();
+        fs::write(&new, serde_json::to_vec(&github_lock(to)).unwrap()).unwrap();
+        let before = (fs::read(&old).unwrap(), fs::read(&new).unwrap());
+        let result = proof_command(
+            &f,
+            &[
+                "inputs",
+                "check-update",
+                "--old-lock",
+                old.to_str().unwrap(),
+                "--new-lock",
+                new.to_str().unwrap(),
+            ],
+        )
+        .output()
+        .unwrap();
+        assert_eq!(result.status.code(), Some(status), "{result:?}");
+        assert_eq!((fs::read(&old).unwrap(), fs::read(&new).unwrap()), before);
+        assert!(!f.root.join(".confctl").exists());
+    }
+    assert!(f.calls().iter().all(|a| a[0] == "git"));
+}
+#[test]
+fn guarded_update_installs_atomically_preserves_mode_and_caller_environment_for_real_hook() {
+    let f = Fixture::new();
+    let (base, ahead, _) = history(&f);
+    initialize_checkout(&f, &base);
+    fs::set_permissions(f.root.join("flake.lock"), fs::Permissions::from_mode(0o640)).unwrap();
+    let probe = f.control.join("hook.json");
+    let hook = format!(
+        "#!{}\nimport os,json,pathlib,fcntl,hashlib\nassert os.environ['RUBYOPT']=='-r/caller-preload'\nassert os.environ['BUNDLE_GEMFILE']=='/caller/Gemfile'\nassert os.environ['BUNDLE_PATH']=='/caller/bundle'\nassert os.environ['BUNDLE_APP_CONFIG']=='/caller/config'\np=pathlib.Path(os.environ['XDG_CACHE_HOME'])/'confctl/git-mirrors'/ (hashlib.sha256(b'https://github.com/fixture/repository').hexdigest()+'.lock')\nwith p.open('r+') as f: fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB)\npathlib.Path({:?}).write_text('hook passed')\n",
+        find("python3").display(),
+        probe.to_str().unwrap()
+    );
+    executable(&f.root.join(".git/hooks/pre-commit"), &hook);
+    f.scenario(json!({"proof_git":true,"candidate":github_lock(&ahead)}));
+    let o = proof_command(
+        &f,
+        &[
+            "inputs",
+            "update",
+            "--forward-only",
+            "--commit",
+            "--no-editor",
+            "alias",
+        ],
+    )
+    .env("RUBYOPT", "-r/caller-preload")
+    .env("BUNDLE_GEMFILE", "/caller/Gemfile")
+    .env("BUNDLE_PATH", "/caller/bundle")
+    .env("BUNDLE_APP_CONFIG", "/caller/config")
+    .output()
+    .unwrap();
+    pass(&o);
+    assert_eq!(f.changed(), github_lock(&ahead));
+    assert_eq!(
+        fs::metadata(f.root.join("flake.lock"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o640
+    );
+    assert_eq!(fs::read_to_string(&probe).unwrap(), "hook passed");
+    assert_eq!(
+        serde_json::from_slice::<Value>(&git_at(&f.root, &["show", "HEAD:flake.lock"]).stdout)
+            .unwrap(),
+        github_lock(&ahead)
+    );
+    let call = mutcalls(&f).pop().unwrap();
+    assert!(
+        call.iter().any(|a| a == "--reference-lock-file")
+            && call.iter().any(|a| a == "--output-lock-file")
+    );
+    assert_eq!(call.last().unwrap(), "source");
+    f.no_temps();
+}
+#[test]
+fn guarded_refusal_and_candidate_failures_leave_exact_lock_head_and_index() {
+    for scenario in [
+        "behind",
+        "diverged",
+        "unavailable",
+        "malformed",
+        "missing",
+        "nix",
+        "cached",
+        "unmatched",
+        "unchanged",
+        "dirty",
+    ] {
+        let f = Fixture::new();
+        let (base, ahead, side) = history(&f);
+        initialize_checkout(&f, if scenario == "behind" { &ahead } else { &base });
+        let target = match scenario {
+            "behind" => &base,
+            "diverged" => &side,
+            "unavailable" => &"f".repeat(40),
+            "unchanged" => &base,
+            _ => &ahead,
+        };
+        let mut options = json!({"proof_git":true,"candidate":github_lock(target)});
+        match scenario {
+            "malformed" => options["malformed"] = json!(true),
+            "missing" => options["missing_output"] = json!(true),
+            "nix" => options["nix_exit"] = json!(23),
+            "cached" => options["cached"] = json!(true),
+            "unmatched" => options["unmatched"] = json!(true),
+            "dirty" => {
+                fs::write(f.root.join("flake.nix"), "dirty tracked data").unwrap();
+            }
+            _ => {}
+        }
+        // Divergence requires a forward baseline, so side cannot contain it.
+        if scenario == "diverged" {
+            f.lock(github_lock(&ahead));
+            git_at(&f.root, &["add", "flake.lock"]);
+            git_at(&f.root, &["commit", "-q", "-m", "forward baseline"]);
+        }
+        f.scenario(options);
+        let before = snapshot_checkout(&f);
+        let o = proof_command(
+            &f,
+            &[
+                "inputs",
+                "update",
+                "--forward-only",
+                "--downgrade",
+                "--commit",
+                "--no-changelog",
+                "source",
+            ],
+        )
+        .output()
+        .unwrap();
+        let status = if scenario == "unchanged" {
+            0
+        } else if matches!(scenario, "behind" | "diverged") {
+            3
+        } else {
+            1
+        };
+        assert_eq!(o.status.code(), Some(status), "{scenario}: {o:?}");
+        assert_eq!(snapshot_checkout(&f), before, "{scenario}");
+        f.no_temps();
+        if scenario == "dirty" {
+            assert!(mutcalls(&f).is_empty());
+        }
+    }
+}
+#[test]
+fn guarded_checkout_race_and_failing_hook_preserve_actual_partial_effects() {
+    let f = Fixture::new();
+    let (base, ahead, _) = history(&f);
+    initialize_checkout(&f, &base);
+    let before = snapshot_checkout(&f);
+    f.scenario(
+        json!({"proof_git":true,"candidate":github_lock(&ahead),"external_write":"flake.nix"}),
+    );
+    fail(
+        &proof_command(&f, &["inputs", "update", "--forward-only", "source"])
+            .output()
+            .unwrap(),
+        "checkout changed",
+    );
+    assert_eq!(snapshot_checkout(&f), before);
+    assert_eq!(
+        fs::read_to_string(f.root.join("flake.nix")).unwrap(),
+        "external writer"
+    );
+    f.no_temps();
+    let f = Fixture::new();
+    let (base, ahead, _) = history(&f);
+    initialize_checkout(&f, &base);
+    executable(
+        &f.root.join(".git/hooks/pre-commit"),
+        "#!/bin/sh\nprintf hook-ran > hook-effect\nexit 17\n",
+    );
+    let before = snapshot_checkout(&f);
+    f.scenario(json!({"proof_git":true,"candidate":github_lock(&ahead)}));
+    fail(
+        &proof_command(
+            &f,
+            &[
+                "inputs",
+                "update",
+                "--forward-only",
+                "--commit",
+                "--no-changelog",
+                "source",
+            ],
+        )
+        .output()
+        .unwrap(),
+        "Git commit",
+    );
+    assert_eq!(f.changed(), github_lock(&ahead));
+    assert_eq!(git_at(&f.root, &["rev-parse", "HEAD"]).stdout, before.1);
+    assert!(f.root.join("hook-effect").exists());
+    f.no_temps();
+}
+
+fn inspect_locks(f: &Fixture, old: &str, new: &str) -> Output {
+    let before = f.control.join("old.lock");
+    let after = f.control.join("new.lock");
+    fs::write(&before, serde_json::to_vec(&github_lock(old)).unwrap()).unwrap();
+    fs::write(&after, serde_json::to_vec(&github_lock(new)).unwrap()).unwrap();
+    proof_command(
+        f,
+        &[
+            "inputs",
+            "check-update",
+            "--old-lock",
+            before.to_str().unwrap(),
+            "--new-lock",
+            after.to_str().unwrap(),
+        ],
+    )
+    .output()
+    .unwrap()
+}
+fn mirror_path(f: &Fixture) -> PathBuf {
+    use sha2::{Digest, Sha256};
+    f.cache.join("confctl/git-mirrors").join(
+        Sha256::digest(b"https://github.com/fixture/repository")
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>(),
+    )
+}
+#[test]
+fn shared_mirror_warm_missing_sha_and_invalid_storage_fail_closed() {
+    let f = Fixture::new();
+    let (base, ahead, _) = history(&f);
+    f.scenario(json!({"proof_git":true}));
+    pass(&inspect_locks(&f, &base, &ahead));
+    let path = mirror_path(&f);
+    assert!(path.is_dir());
+    assert!(path.with_extension("lock").is_file());
+    let origin = f.control.join("origin");
+    let offline = f.control.join("offline");
+    fs::rename(&origin, &offline).unwrap();
+    let calls = f.calls().len();
+    pass(&inspect_locks(&f, &base, &ahead));
+    assert!(
+        f.calls()[calls..]
+            .iter()
+            .all(|a| !a.iter().any(|arg| arg == "fetch" || arg == "clone"))
+    );
+    fs::rename(&offline, &origin).unwrap();
+    fs::write(origin.join("new"), "new").unwrap();
+    git_at(&origin, &["add", "new"]);
+    git_at(&origin, &["commit", "-q", "-m", "new"]);
+    let newer = String::from_utf8(git_at(&origin, &["rev-parse", "HEAD"]).stdout)
+        .unwrap()
+        .trim()
+        .to_owned();
+    pass(&inspect_locks(&f, &ahead, &newer));
+    assert_eq!(
+        git_at(
+            &f.root,
+            &[
+                "--git-dir",
+                path.to_str().unwrap(),
+                "rev-parse",
+                "refs/heads/main"
+            ]
+        )
+        .stdout,
+        format!("{ahead}\n").as_bytes()
+    );
+    for relative in [
+        "shallow",
+        "info/grafts",
+        "objects/info/alternates",
+        "objects/info/http-alternates",
+        "commondir",
+    ] {
+        let p = path.join(relative);
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(&p, b"untrusted external history").unwrap();
+        let out = inspect_locks(&f, &base, &ahead);
+        fail(&out, "external object history");
+        assert_eq!(fs::read(&p).unwrap(), b"untrusted external history");
+        fs::remove_file(&p).unwrap();
+    }
+    for key in [
+        "extensions.partialClone",
+        "remote.origin.promisor",
+        "remote.origin.partialclonefilter",
+    ] {
+        git_at(
+            &f.root,
+            &["--git-dir", path.to_str().unwrap(), "config", key, "true"],
+        );
+        fail(&inspect_locks(&f, &base, &ahead), "unsupported partial");
+        git_at(
+            &f.root,
+            &[
+                "--git-dir",
+                path.to_str().unwrap(),
+                "config",
+                "--unset",
+                key,
+            ],
+        );
+    }
+    let pack = path.join("objects/pack");
+    let outside = f.control.join("outside-pack");
+    fs::rename(&pack, &outside).unwrap();
+    std::os::unix::fs::symlink(&outside, &pack).unwrap();
+    fail(
+        &inspect_locks(&f, &base, &ahead),
+        "self-contained object storage",
+    );
+    fs::remove_file(&pack).unwrap();
+    fs::rename(outside, pack).unwrap();
+    git_at(
+        &f.root,
+        &[
+            "--git-dir",
+            path.to_str().unwrap(),
+            "config",
+            "remote.origin.url",
+            "https://different.invalid/repo",
+        ],
+    );
+    fail(&inspect_locks(&f, &base, &ahead), "unexpected origin");
+}
+#[test]
+fn mirror_ignores_replacements_and_ambient_redirection_and_requires_commit_parent_evidence() {
+    let f = Fixture::new();
+    let (base, ahead, side) = history(&f);
+    f.scenario(json!({"proof_git":true}));
+    pass(&inspect_locks(&f, &base, &ahead));
+    let path = mirror_path(&f);
+    let origin = f.control.join("origin");
+    git_at(&origin, &["merge", "--no-ff", "side", "-m", "merge"]);
+    let merge = String::from_utf8(git_at(&origin, &["rev-parse", "HEAD"]).stdout)
+        .unwrap()
+        .trim()
+        .to_owned();
+    pass(&inspect_locks(&f, &side, &merge));
+    git_at(
+        &f.root,
+        &[
+            "--git-dir",
+            path.to_str().unwrap(),
+            "replace",
+            &ahead,
+            &merge,
+        ],
+    );
+    assert_eq!(inspect_locks(&f, &side, &ahead).status.code(), Some(3));
+    let old = f.control.join("old.lock");
+    let new = f.control.join("new.lock");
+    fs::write(&old, serde_json::to_vec(&github_lock(&base)).unwrap()).unwrap();
+    fs::write(&new, serde_json::to_vec(&github_lock(&ahead)).unwrap()).unwrap();
+    let result = proof_command(
+        &f,
+        &[
+            "inputs",
+            "check-update",
+            "--old-lock",
+            old.to_str().unwrap(),
+            "--new-lock",
+            new.to_str().unwrap(),
+        ],
+    )
+    .env("GIT_DIR", "/absent/enclosing-repo")
+    .env("GIT_OBJECT_DIRECTORY", "/absent/objects")
+    .env("GIT_CONFIG", "/absent/config")
+    .output()
+    .unwrap();
+    pass(&result);
+    let tree =
+        String::from_utf8(git_at(&origin, &["rev-parse", &format!("{base}^{{tree}}")]).stdout)
+            .unwrap()
+            .trim()
+            .to_owned();
+    fail(&inspect_locks(&f, &tree, &ahead), "exact commit objects");
+    let parent = path.join("objects").join(&base[..2]).join(&base[2..]);
+    assert!(parent.is_file());
+    fs::remove_file(parent).unwrap();
+    assert_eq!(inspect_locks(&f, &ahead, &side).status.code(), Some(1));
+}
+#[test]
+fn guarded_cancellation_removes_only_owned_preinstall_temps_and_releases_locks() {
+    let f = Fixture::new();
+    let (base, ahead, _) = history(&f);
+    initialize_checkout(&f, &base);
+    f.scenario(json!({"proof_git":true,"candidate":github_lock(&ahead),"block":"nix"}));
+    let before = snapshot_checkout(&f);
+    let mut child = proof_command(&f, &["inputs", "update", "--forward-only", "source"])
+        .spawn()
+        .unwrap();
+    drop(child.stdin.take());
+    let native = pid(&f.control.join("native-pid"));
+    let descendant = pid(&f.control.join("descendant-pid"));
+    nix::sys::signal::kill(
+        nix::unistd::Pid::from_raw(child.id() as i32),
+        nix::sys::signal::Signal::SIGINT,
+    )
+    .unwrap();
+    assert_eq!(wait(child).status.code(), Some(130));
+    assert_eq!(snapshot_checkout(&f), before);
+    f.no_temps();
+    for id in [native, descendant] {
+        assert!(!Path::new(&format!("/proc/{id}")).exists());
+    }
+    let lock = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(f.root.join(".git/confctl-input-update.lock"))
+        .unwrap();
+    rustix::fs::flock(&lock, rustix::fs::FlockOperation::NonBlockingLockExclusive).unwrap();
 }

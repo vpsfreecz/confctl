@@ -1,3 +1,4 @@
+use super::LockGraph;
 use crate::{domain::ruby_string, error::ConfctlError};
 use serde_json::{Map, Value};
 use std::{fs, path::Path};
@@ -44,25 +45,33 @@ impl FlakeLock {
         names
     }
     fn root_map(&self) -> Option<&Map<String, Value>> {
-        // Ruby reads the literal root node, independently of data["root"].
+        // The declared root owns input names; graph traversal resolves every edge.
         self.data
             .get("nodes")?
-            .get("root")?
+            .get(
+                self.data
+                    .get("root")
+                    .and_then(Value::as_str)
+                    .unwrap_or("root"),
+            )?
             .get("inputs")?
             .as_object()
     }
-    pub fn node_id(&self, input: &str) -> Option<&str> {
-        match self.root_map()?.get(input)? {
-            Value::String(id) => Some(id),
-            Value::Array(segments) => segments.first()?.as_str(),
-            _ => None,
+    pub fn node_for_input(&self, input: &str) -> Result<Option<&Value>, ConfctlError> {
+        let graph = LockGraph::new(self)?;
+        if !self
+            .root_inputs()
+            .iter()
+            .any(|n| Some(n.as_str()) == input.split('/').next())
+        {
+            return Ok(None);
         }
+        Ok(Some(graph.resolve_path(input)?.node))
     }
-    pub fn node_for_input(&self, input: &str) -> Option<&Value> {
-        self.data.get("nodes")?.get(self.node_id(input)?)
+    pub fn input_info(&self, input: &str) -> Result<InputInfo, ConfctlError> {
+        Ok(Self::node_info(self.node_for_input(input)?))
     }
-    pub fn input_info(&self, input: &str) -> InputInfo {
-        let node = self.node_for_input(input);
+    pub fn node_info(node: Option<&Value>) -> InputInfo {
         let object = |field| {
             node.and_then(|node| node.get(field))
                 .and_then(Value::as_object)
@@ -104,9 +113,9 @@ impl FlakeLock {
         }
     }
     pub fn override_url(&self, input: &str, revision: &str) -> Result<String, ConfctlError> {
-        self.node_id(input)
+        self.node_for_input(input)?
             .ok_or_else(|| ConfctlError::Configuration(format!("unknown input '{input}'")))?;
-        let info = self.input_info(input);
+        let info = self.input_info(input)?;
         match info.kind.as_str() {
             "github" => {
                 let owner = first(&info.locked, &info.original, "owner");
@@ -141,22 +150,23 @@ impl FlakeLock {
             ))),
         }
     }
-    pub fn original(&self, input: &str) -> Option<Value> {
-        self.node_for_input(input)?
-            .get("original")
+    pub fn original(&self, input: &str) -> Result<Option<Value>, ConfctlError> {
+        Ok(self
+            .node_for_input(input)?
+            .and_then(|n| n.get("original"))
             .filter(|v| !v.is_null())
-            .cloned()
+            .cloned())
     }
-    /// Restore metadata on the temporary result, using that result's first
-    /// segment mapping exactly as Ruby does before the atomic lock replacement.
+    /// Restore metadata on the temporary result, using that result's complete
+    /// logical path before the atomic lock replacement.
     pub fn restore_original(
         &mut self,
         input: &str,
         original: Option<&Value>,
     ) -> Result<(), ConfctlError> {
-        let id = self
-            .node_id(input)
-            .ok_or_else(|| ConfctlError::Configuration(format!("unknown input '{input}'")))?
+        let id = LockGraph::new(self)?
+            .resolve_path(input)?
+            .node_id
             .to_owned();
         let nodes = self
             .data
@@ -197,22 +207,23 @@ pub struct InputChange {
     pub new_info: InputInfo,
 }
 impl InputChange {
-    pub fn between(old: Option<&FlakeLock>, new: &FlakeLock, names: &[String]) -> Vec<Self> {
-        names
-            .iter()
-            .filter_map(|name| {
-                let old_info = old.map(|old| old.input_info(name));
-                let new_info = new.input_info(name);
-                if old_info.as_ref().and_then(|info| info.rev.as_ref()) == new_info.rev.as_ref() {
-                    None
-                } else {
-                    Some(Self {
-                        name: name.clone(),
-                        old_info,
-                        new_info,
-                    })
-                }
-            })
-            .collect()
+    pub fn between(
+        old: Option<&FlakeLock>,
+        new: &FlakeLock,
+        names: &[String],
+    ) -> Result<Vec<Self>, ConfctlError> {
+        let mut changes = Vec::new();
+        for name in names {
+            let old_info = old.map(|old| old.input_info(name)).transpose()?;
+            let new_info = new.input_info(name)?;
+            if old_info.as_ref().and_then(|info| info.rev.as_ref()) != new_info.rev.as_ref() {
+                changes.push(Self {
+                    name: name.clone(),
+                    old_info,
+                    new_info,
+                });
+            }
+        }
+        Ok(changes)
     }
 }

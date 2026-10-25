@@ -31,7 +31,7 @@ impl Fixture {
         fs::create_dir_all(root.join("native")).unwrap();
         fs::create_dir(&bin).unwrap();
         fs::create_dir(&home).unwrap();
-        for tool in ["cat", "sleep"] {
+        for tool in ["cat", "sleep", "mkdir"] {
             symlink(native_tool::resolve(tool), root.join("native").join(tool)).unwrap();
         }
         fs::write(root.join("flake.nix"), "{outputs=_:{};}\n").unwrap();
@@ -109,11 +109,30 @@ esac
         executable(
             &fixture.bin.join("git"),
             r#"#!/bin/sh
+if [ "$1" = --no-replace-objects ]; then
+ [ "$GIT_NO_REPLACE_OBJECTS" = 1 ] && [ "$GIT_NO_LAZY_FETCH" = 1 ] || exit 96
+ shift 7
+fi
 printf 'git:%s\n' "$*" >> "$CHANGES_ROOT/calls"
 printf '%s\0' "$@" > "$CHANGES_ROOT/git-args-$$"
 case "$1" in
- clone) last=; for arg do last="$arg"; done; printf 'partial clone\n' > "$last/fixture-cache" ;;
- -C) printf 'updated\n' >> "$2/fixture-cache" ;;
+ clone)
+  last=; for arg do last="$arg"; done
+  "$CHANGES_ROOT/native/mkdir" -p "$last/objects"
+  printf 'fixture config\n' > "$last/config"
+  printf '%s\n' "$5" > "$last/origin"
+  printf 'partial clone\n' > "$last/fixture-cache"
+  ;;
+ --git-dir)
+  case "$3" in
+   rev-parse) printf 'true\n'; exit 0 ;;
+   config)
+    if [ "$4" = --get-regexp ]; then exit 1; fi
+    exec "$CHANGES_ROOT/native/cat" "$2/origin" ;;
+   fetch) printf 'updated\n' >> "$2/fixture-cache" ;;
+   log) : ;;
+   *) exit 97 ;;
+  esac ;;
  *) exit 97 ;;
 esac
 if [ -e "$CHANGES_ROOT/git-slow" ]; then printf '%s\n' "$$" > "$CHANGES_ROOT/git-pid"; exec "$CHANGES_ROOT/native/sleep" 60; fi
@@ -436,11 +455,16 @@ fn changelog_clones_fetches_each_repeated_role_and_keeps_full_direction_and_flag
         .into_iter()
         .filter(|s| s.starts_with("git:"))
         .collect::<Vec<_>>();
-    assert_eq!(calls.len(), 4, "{calls:?}");
-    assert!(calls[0].contains("clone --quiet --mirror -- ssh://"));
-    assert!(calls[1].contains("--oneline -p --end-of-options new-full..old-full --"));
-    assert!(calls[2].contains("fetch --no-show-forced-updates --quiet"));
-    assert!(calls[3].contains("--end-of-options --new..old-z --"));
+    // Validation reads accompany each setup/read under the same URL lock.
+    let effects = calls
+        .iter()
+        .filter(|s| s.starts_with("git:clone ") || s.contains(" fetch ") || s.contains(" log "))
+        .collect::<Vec<_>>();
+    assert_eq!(effects.len(), 4, "{calls:?}");
+    assert!(effects[0].contains("clone --mirror --quiet -- ssh://"));
+    assert!(effects[1].contains("--oneline -p --end-of-options new-full..old-full --"));
+    assert!(effects[2].contains("fetch --no-auto-maintenance --no-show-forced-updates --quiet"));
+    assert!(effects[3].contains("--end-of-options --new..old-z --"));
     assert!(!calls.iter().any(|s| s.contains("--max-count")));
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(text.find("alpha @ a:").unwrap() < text.find("alpha @ z:").unwrap());
@@ -458,7 +482,7 @@ fn changelog_clones_fetches_each_repeated_role_and_keeps_full_direction_and_flag
 }
 
 #[test]
-fn git_native_failures_continue_roles_and_leave_partial_cache_while_spawn_errors_abort() {
+fn git_native_failures_continue_roles_without_installing_partial_cache_while_spawn_errors_abort() {
     let f = Fixture::new();
     f.json(
         "target-a",
@@ -473,7 +497,14 @@ fn git_native_failures_continue_roles_and_leave_partial_cache_while_spawn_errors
         2
     );
     assert!(String::from_utf8_lossy(&out.stdout).contains("Git failed with exit status: 17"));
-    assert!(f.mirror("repo").join("fixture-cache").exists());
+    // Atomic cold setup never publishes a failed clone, but keeps the URL lock.
+    assert!(!f.mirror("repo").exists());
+    assert!(f.mirror("repo").with_extension("lock").is_file());
+    assert!(
+        fs::read_dir(f.mirror("repo").parent().unwrap())
+            .unwrap()
+            .all(|e| !e.unwrap().file_name().to_string_lossy().starts_with('.'))
+    );
     f.assert_unchanged();
     let f = Fixture::new();
     fs::remove_file(f.bin.join("git")).unwrap();
@@ -485,7 +516,9 @@ fn git_native_failures_continue_roles_and_leave_partial_cache_while_spawn_errors
     fs::write(&leaf, b"do not repair").unwrap();
     let out = f.run(&["changelog", "--yes", "alpha"], b"");
     assert_eq!(out.status.code(), Some(0), "{out:?}");
-    assert!(String::from_utf8_lossy(&out.stdout).contains("not a real directory"));
+    assert!(
+        String::from_utf8_lossy(&out.stdout).contains("self-contained bare repository is required")
+    );
     assert_eq!(fs::read(leaf).unwrap(), b"do not repair");
     assert!(!f.calls().iter().any(|s| s.starts_with("git:")));
 }
@@ -517,7 +550,9 @@ fn malformed_role_metadata_and_symlink_cache_leaves_never_start_git() {
     symlink(&f.home, &leaf).unwrap();
     let out = f.run(&["changelog", "--yes", "alpha"], b"");
     assert_eq!(out.status.code(), Some(0), "{out:?}");
-    assert!(String::from_utf8_lossy(&out.stdout).contains("not a real directory"));
+    assert!(
+        String::from_utf8_lossy(&out.stdout).contains("self-contained bare repository is required")
+    );
     assert!(fs::symlink_metadata(leaf).unwrap().file_type().is_symlink());
     assert!(!f.calls().iter().any(|s| s.starts_with("git:")));
 }

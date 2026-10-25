@@ -46,6 +46,7 @@ pub struct NixBuildOptions {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InputChanges {
+    pub forward_only: bool,
     pub commit: bool,
     pub changelog: bool,
     pub editor: bool,
@@ -55,6 +56,7 @@ pub struct InputChanges {
 impl Default for InputChanges {
     fn default() -> Self {
         Self {
+            forward_only: false,
             commit: false,
             changelog: true,
             editor: true,
@@ -208,6 +210,11 @@ pub enum Action {
     Rediscover,
     InputsList {
         pattern: Option<String>,
+        json: bool,
+    },
+    InputsCheckUpdate {
+        old_lock: PathBuf,
+        new_lock: PathBuf,
     },
     InputsUpdate {
         inputs: Vec<String>,
@@ -332,6 +339,7 @@ impl Action {
             Self::Rename { .. } => "rename",
             Self::Rediscover => "rediscover",
             Self::InputsList { .. } => "inputs ls",
+            Self::InputsCheckUpdate { .. } => "inputs check-update",
             Self::InputsUpdate { .. } => "inputs update",
             Self::InputsSet { .. } => "inputs set",
             Self::ChannelList { .. } => "inputs channel ls",

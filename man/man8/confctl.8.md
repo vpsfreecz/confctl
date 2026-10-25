@@ -10,6 +10,10 @@
 `confctl` is a Nix deployment configuration management tool. It can be used to
 build and deploy *NixOS* and *vpsAdminOS* machines.
 
+The packaged Rust executable does not activate a caller's Ruby preload or bundle.
+It preserves `RUBYOPT` and `BUNDLE_*` for child commands such as Git hooks. A hook
+that invokes Ruby retains its own interpreter and bundle configuration.
+
 ## FLAKE INPUTS
 Configurations require `flake.nix` with outputs from
 `confctl.lib.mkConfctlOutputs` and inputs locked in `flake.lock`. Channels map dependency roles to root inputs;
@@ -535,6 +539,11 @@ Use retained confctl v3 for old software-pin generations.
   List root-level flake inputs and their locked revisions. Available only in
   flake configs.
 
+    `--json`
+      Print rows with `input`, `type`, `ref`, full `rev` and `url`. Missing fields
+      are null. Resolves complete follows paths. An unmatched pattern prints
+      an empty array. The default table keeps eight-character revisions.
+
 `confctl inputs update` [*input-name ...*]
   Update flake inputs in `flake.lock`. Available only in flake configs.
 
@@ -554,6 +563,28 @@ Use retained confctl v3 for old software-pin generations.
 
     `--all`
       Update all root inputs.
+
+    `--forward-only`
+      Validate the complete reachable version-7 lock graph before installation.
+      Requires Nix 2.19 or newer, an existing tracked lock and a clean tracked
+      checkout and index. Resolve follows aliases to terminal update paths.
+      Existing GitHub full revisions must remain ancestors in the same source;
+      removed paths or changed source/extraction attributes reject the candidate.
+      Exit 3 means policy rejection; exit 1 means unavailable evidence or tool
+      failure. `--downgrade` cannot bypass this guard. Hooks run only after the
+      atomic installation; a hook failure leaves the accepted candidate installed.
+
+`confctl inputs check-update` `--old-lock` *file* `--new-lock` *file*
+  Apply the same complete-graph ancestry policy to two supplied locks. Does not
+  invoke Nix, install or commit a lock, write to the checkout or require cluster
+  outputs. It may clone or fetch full mirrors shared with changelogs under
+  `${XDG_CACHE_HOME:-$HOME/.cache}/confctl/git-mirrors`. Cold mirrors can be large.
+  Per-URL locks coordinate current confctl callers; older or manual writers must
+  use the cache sequentially. Invalid or incomplete mirrors fail with the cache
+  key and are never repaired automatically. Ordinary Git transport/authentication
+  configuration remains available. Returns 0 on acceptance, 3 on policy rejection
+  and 1 on evidence/tool errors. Both nonzero statuses must stop publication.
+  See `docs/flake-inputs.md` for supported sources and transaction limits.
 
 `confctl inputs set` *input-name* *rev*
   Set a flake input to a specific revision in `flake.lock` while keeping the
@@ -595,6 +626,16 @@ Use retained confctl v3 for old software-pin generations.
       Use when the new version is older than the previously set version. Used for
       generating the commit changelog direction.
 
+    `--forward-only`
+      Validate the complete reachable version-7 lock graph before installation.
+      Requires Nix 2.19 or newer, an existing tracked lock and a clean tracked
+      checkout and index. Resolve follows aliases to terminal update paths.
+      Existing GitHub full revisions must remain ancestors in the same source;
+      removed paths or changed source/extraction attributes reject the candidate.
+      Exit 3 means policy rejection; exit 1 means unavailable evidence or tool
+      failure. `--downgrade` cannot bypass this guard. Hooks run only after the
+      atomic installation; a hook failure leaves the accepted candidate installed.
+
 `confctl inputs channel set` *channels* *role* *rev*
   Set inputs referenced by selected channels for a specific role to *rev*.
   Available only in flake configs.
@@ -634,6 +675,16 @@ Use retained confctl v3 for old software-pin generations.
     `-d`, `--downgrade`
       Use when the new version is older than the previously set version. Used for
       generating the commit changelog direction.
+
+    `--forward-only`
+      Validate the complete reachable version-7 lock graph before installation.
+      Requires Nix 2.19 or newer, an existing tracked lock and a clean tracked
+      checkout and index. Resolve follows aliases to terminal update paths.
+      Existing GitHub full revisions must remain ancestors in the same source;
+      removed paths or changed source/extraction attributes reject the candidate.
+      Exit 3 means policy rejection; exit 1 means unavailable evidence or tool
+      failure. `--downgrade` cannot bypass this guard. Hooks run only after the
+      atomic installation; a hook failure leaves the accepted candidate installed.
 
 `confctl inputs machine set` *machine* *role* *rev*
   Set the input used by a specific machine for a specific role to *rev*.
