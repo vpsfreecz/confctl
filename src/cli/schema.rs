@@ -55,6 +55,7 @@ pub const ROUTES: &[&str] = &[
     "rediscover",
     "inputs ls",
     "inputs update",
+    "inputs check-update",
     "inputs set",
     "inputs channel ls",
     "inputs channel update",
@@ -197,6 +198,18 @@ pub fn options(path: &str) -> Vec<OptionSpec> {
     ) {
         result.push(integer("max-concurrent-gc", &[]));
     }
+    if matches!(
+        path,
+        "inputs update" | "inputs channel update" | "inputs machine update"
+    ) {
+        result.push(switch("forward-only", &[], false));
+    }
+    if path == "inputs check-update" {
+        result.extend([value("old-lock", &[]), value("new-lock", &[])]);
+    }
+    if path == "inputs ls" {
+        result.push(plain("json", &[]));
+    }
     match path {
         "inputs update" => result.push(switch("all", &[], false)),
         "inputs channel set" => result.push(switch("allow_shared", &["allow-shared"], false)),
@@ -240,6 +253,7 @@ pub fn arity(path: &str) -> Option<(&'static [&'static str], usize)> {
     match path {
         "add" => Some((&["name"], 0)),
         "rename" => Some((&["old-name", "new-name"], 0)),
+        "inputs check-update" => Some((&[], 0)),
         "inputs set" => Some((&["input-name", "rev"], 0)),
         "inputs channel update" => Some((&["channels"], 1)),
         "inputs channel set" => Some((&["channels", "role", "rev"], 0)),

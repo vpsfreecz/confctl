@@ -14,7 +14,30 @@ pub(super) async fn build(
     changes: &[InputChange],
     options: &InputChanges,
     setting: bool,
+    selected_inputs: Option<&[String]>,
 ) -> Result<Vec<u8>, ConfctlError> {
+    super::canceled(ctx)?;
+    if changes.is_empty() {
+        return Err(ConfctlError::Configuration("no changes".into()));
+    }
+    // Validation/results keep the complete graph. Only message generation uses
+    // the original logical selectors, before follows targets are resolved.
+    let filtered;
+    let changes = if let Some(inputs) = selected_inputs {
+        filtered = changes
+            .iter()
+            .filter(|change| inputs.contains(&change.name))
+            .cloned()
+            .collect::<Vec<_>>();
+        if filtered.is_empty() {
+            let mut names = inputs.iter().map(String::as_str).collect::<Vec<_>>();
+            names.sort();
+            return Ok(format!("inputs: update {}", names.join(", ")).into_bytes());
+        }
+        filtered.as_slice()
+    } else {
+        changes
+    };
     let mut message = title(changes, setting).into_bytes();
     message.extend_from_slice(b"\n\n");
     if !options.changelog {
@@ -127,6 +150,16 @@ fn cache_failure(e: &ConfctlError) -> bool {
             ..
         }
     ) || matches!(e, ConfctlError::Configuration(text) if text == "current user has no passwd home")
+        || mirror_unavailable(e)
+}
+fn mirror_unavailable(e: &ConfctlError) -> bool {
+    match e {
+        ConfctlError::Configuration(message) => {
+            message.starts_with("Git mirror operation failed (cache ")
+        }
+        ConfctlError::ProcessFailure { source, .. } => mirror_unavailable(source),
+        _ => false,
+    }
 }
 fn title(changes: &[InputChange], setting: bool) -> String {
     let mut names = changes.iter().map(|c| c.name.as_str()).collect::<Vec<_>>();
@@ -219,7 +252,7 @@ mod tests {
     use serde_json::json;
     fn change(name: &str, old: Option<&str>, new: &str, url: Option<&str>) -> InputChange {
         let info = |rev: Option<&str>| {
-            FlakeLock { data: json!({"nodes":{"root":{"inputs":{"i":"i"}},"i":{"locked":{"rev":rev,"url":url}}}}) }.input_info("i")
+            FlakeLock { data: json!({"version":7,"root":"root","nodes":{"root":{"inputs":{"i":"i"}},"i":{"locked":{"rev":rev,"url":url}}}}) }.input_info("i").unwrap()
         };
         InputChange {
             name: name.into(),

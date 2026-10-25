@@ -1,8 +1,7 @@
 # Flake inputs
 
-Root input commands work in any Git checkout with a `flake.nix`; they do not
-require cluster outputs. Channel and machine commands require a configuration
-flake whose outputs use `confctl.lib.mkConfctlOutputs`:
+Root input commands work with a `flake.nix` and do not require cluster outputs.
+Channel and machine commands require outputs from `confctl.lib.mkConfctlOutputs`:
 
 - inputs are normal flake inputs locked in `flake.lock`
 - machines select “channels” via `inputs.channels`
@@ -169,8 +168,7 @@ Use a checkout with one writer. Cooperating guarded confctl updates use a
 process lock; other tools must not write to the checkout concurrently.
 
 Guarded updates require Nix 2.19 or newer, including
-`--reference-lock-file` and `--output-lock-file` support. The transaction and
-nested selection have been exercised with Nix 2.34.9. The packaged confctl uses
+`--reference-lock-file` and `--output-lock-file` support. The packaged confctl uses
 its bundled Nix; installing another Nix in CI does not necessarily change that
 runtime. Unsupported flags or unmatched selectors fail without updating the
 real lock. There is no fallback to an update in place.
@@ -180,13 +178,9 @@ Titles, revision summaries and Git logs omit unselected dependencies and aliases
 Selected paths with the same source and revision range share one Git log. If
 only dependencies change, the message contains just a title naming the requested
 inputs, such as `inputs: update vpsadminos`. `--no-changelog` omits all Git logs
-while retaining selected revision summaries. Ancestry validation still checks
-the complete input graph.
-
-The Nix package starts confctl with its packaged Ruby gems and ignores inherited
-`RUBYOPT` options for that Ruby process. It retains `RUBYOPT` and `BUNDLE_*`
-environment variables for child commands, including Git hooks. User scripts
-that explicitly load Bundler remain subject to their bundle configuration.
+while retaining selected revision summaries. Ancestry validation and update
+results still cover the complete input graph. Manual updates and input sets
+keep their existing message behavior.
 
 confctl resolves requested `follows` aliases to their terminal input paths and
 deduplicates shared targets. For example, a root `nixpkgs` following
@@ -237,8 +231,8 @@ sequentially, without concurrent old/new writers. Mirror locks are released
 before commit hooks run. Changelog failures retain their existing soft error
 behavior; they cannot turn a failed ancestry check into an accepted update.
 
-Source, fetcher or extraction changes require manual review. A change to locked
-attributes at the same revision also rejects, including a changed `narHash`.
+Source, fetcher or extraction changes require manual review. The guard also rejects changes to
+locked attributes at the same revision, including a changed `narHash`.
 Previously reachable paths cannot disappear. New paths must contain supported
 immutable Git sources. Unchanged unsupported sources may remain; changed path,
 tarball, indirect or other unsupported sources fail with an evidence error.
@@ -350,9 +344,9 @@ Root update preserves explicit names, order and duplicates. `--all` instead uses
 the sorted root names in the existing lock and ignores positional names. An
 explicit update may create a missing lock; set requires a lock and GitHub or Git
 input metadata. Set prepares every override before its first child and restores
-all selected original metadata in each published temporary result. The existing
-first-node interpretation of `follows`, unknown JSON and URL/query fields remain
-unchanged. These operations do not edit `flake.nix` or refresh generated lists.
+all selected original metadata in each published temporary result. Input paths
+resolve complete `follows` chains; unknown JSON and URL/query fields are preserved.
+These operations do not edit `flake.nix` or refresh generated lists.
 
 Channel selectors preserve brace/comma order and duplicates; glob matches sort
 by name. Underlying input names are deduplicated at their first occurrence.
@@ -363,7 +357,8 @@ and role through configured Nix evaluation, without inventory builds or host
 contact. Channel and machine summaries read the actual resulting lock.
 
 Null/false channel mappings are empty; an absent, null or false explicitly
-requested role input selects nothing. Empty strings remain literal input names.
+requested role input selects nothing. Lock-graph validation rejects empty input
+path components.
 Malformed selected mappings and other non-string names fail before mutation,
 including malformed mappings examined by channel set's shared-use scan. Channel
 listing retains its existing tolerant rendering.
@@ -399,3 +394,11 @@ and Git state, then explicitly commit, retry or restore the chosen files.
 Lock formats remain readable by the preceding Ruby implementation and Rust.
 The public entrypoint now selects Rust. Confined fake-tool and local Git
 fixtures do not qualify real Nix input acquisition or site configuration behavior.
+
+## Caller environment
+
+The packaged Rust executable does not start a Ruby interpreter or activate a
+caller bundle. It preserves `RUBYOPT` and `BUNDLE_*` for child commands, including
+Git hooks. A hook that invokes Ruby still uses its own interpreter and bundle
+configuration. Git proof children separately disable replacement objects and
+repository/object redirection without changing that caller environment.

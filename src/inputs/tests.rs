@@ -1,57 +1,46 @@
 use super::*;
+use crate::error::ConfctlError;
 use serde_json::{Value, json};
-
-fn snapshot(variation: &str, action: &str) -> Value {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-        "tests/compat/core/expected-follows/follows-{variation}-{action}.json"
-    ));
-    serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
-}
-fn lock(snapshot: &Value) -> FlakeLock {
-    FlakeLock::decode(
-        snapshot["files"]["flake.lock"]["text"]
-            .as_str()
-            .unwrap()
-            .as_bytes(),
-    )
-    .unwrap()
-}
-#[test]
-fn immutable_ruby_follows_info_and_override_argv_use_first_segment() {
-    for variation in ["single", "nested", "different-suffix"] {
-        let listing = snapshot(variation, "ls");
-        let before = lock(&listing);
-        let info = before.input_info("alias");
-        assert_eq!(info.kind, "github");
-        assert_eq!(info.short_rev.as_deref(), Some("aaaaaaaa"));
-        assert_eq!(
-            info.url.as_deref(),
-            Some("https://github.com/fixture/nixpkgs")
-        );
-        let setting = snapshot(variation, "set");
-        let events: Value = serde_json::from_str(setting["events"].as_str().unwrap()).unwrap();
-        assert_eq!(
-            before.override_url("alias", "next").unwrap(),
-            events[0]["argv"][6]
-        );
-        assert_eq!(before.root_inputs(), ["alias"]);
+fn before_lock() -> FlakeLock {
+    FlakeLock {
+        data: json!({"version":7,"root":"entry","nodes":{
+            "entry":{"inputs":{"parent":"parent","alias":["parent","leaf"]}},
+            "parent":{"locked":{"type":"github","owner":"fixture","repo":"parent","rev":"c".repeat(40)},"inputs":{"leaf":"source"}},
+            "source":{"original":{"type":"github","owner":"fixture","repo":"nixpkgs","ref":"main"},"locked":{"type":"github","owner":"fixture","repo":"nixpkgs","rev":"a".repeat(40)}}
+        }}),
     }
 }
+fn expected_set() -> FlakeLock {
+    let mut lock = before_lock();
+    lock.data["nodes"]["source"]["locked"]["rev"] = json!("b".repeat(40));
+    lock
+}
 #[test]
-fn immutable_ruby_missing_first_segment_never_resolves_nested_leaf() {
-    let listing = snapshot("missing-first", "ls");
-    let before = lock(&listing);
-    assert_eq!(before.input_info("alias").kind, "-");
-    assert!(before.input_info("alias").rev.is_none());
-    let error = before.override_url("alias", "next").unwrap_err();
-    let setting = snapshot("missing-first", "set");
-    assert!(
-        setting["stderr"]
-            .as_str()
-            .unwrap()
-            .ends_with(&format!("error: {error}\n"))
+fn aliases_resolve_complete_paths_and_set_restores_terminal_original() {
+    let before = before_lock();
+    let info = before.input_info("alias").unwrap();
+    assert_eq!(info.rev, Some("a".repeat(40)));
+    assert_eq!(
+        before.override_url("alias", "next").unwrap(),
+        "github:fixture/nixpkgs/next"
     );
-    assert_eq!(before.data, lock(&setting).data);
+    let mut candidate = expected_set();
+    candidate.data["nodes"]["source"]["original"] = json!({"ref":"replaced"});
+    candidate
+        .restore_original("alias", before.original("alias").unwrap().as_ref())
+        .unwrap();
+    assert_eq!(candidate.data, expected_set().data);
+    assert_eq!(
+        InputChange::between(Some(&before), &candidate, &["alias".into()])
+            .unwrap()
+            .len(),
+        1
+    );
+    assert!(
+        InputChange::between(Some(&candidate), &candidate, &["alias".into()])
+            .unwrap()
+            .is_empty()
+    );
     assert!(
         before
             .override_url("unknown", "next")
@@ -61,27 +50,9 @@ fn immutable_ruby_missing_first_segment_never_resolves_nested_leaf() {
     );
 }
 #[test]
-fn setter_restores_original_on_temporary_first_node_and_preserves_leaf() {
-    let before = lock(&snapshot("nested", "ls"));
-    let expected = lock(&snapshot("nested", "set"));
-    let mut temporary = before.clone();
-    temporary.data["nodes"]["nixpkgs"]["locked"]["rev"] = json!("b".repeat(40));
-    temporary.data["nodes"]["nixpkgs"]["original"] =
-        json!({"type":"github","ref":"child-replaced"});
-    temporary
-        .restore_original("alias", before.original("alias").as_ref())
-        .unwrap();
-    assert_eq!(temporary.data, expected.data);
-    let changes = InputChange::between(Some(&before), &temporary, &["alias".into()]);
-    assert_eq!(changes.len(), 1);
-    assert_eq!(changes[0].new_info.short_rev.as_deref(), Some("bbbbbbbb"));
-    assert_eq!(temporary.pretty(), expected.pretty());
-    assert!(InputChange::between(Some(&temporary), &temporary, &["alias".into()]).is_empty());
-}
-#[test]
 fn override_urls_keep_git_query_and_github_dir_without_encoding_revisions() {
     let input = FlakeLock {
-        data: json!({"nodes":{"root":{"inputs":{"git":"git","github":"github"}},"git":{"original":{"type":"git","url":"git+https://example.invalid/repo?shallow=1"}},"github":{"original":{"type":"github","owner":"fixture","repo":"repo","dir":"nested/path"}}}}),
+        data: json!({"version":7,"root":"root","nodes":{"root":{"inputs":{"git":"git","github":"github"}},"git":{"locked":{},"original":{"type":"git","url":"git+https://example.invalid/repo?shallow=1"}},"github":{"locked":{},"original":{"type":"github","owner":"fixture","repo":"repo","dir":"nested/path"}}}}),
     };
     assert_eq!(
         input.override_url("git", "branch/name").unwrap(),
@@ -172,11 +143,7 @@ type Calls = std::sync::Arc<std::sync::Mutex<Vec<crate::process::ProcessSpec>>>;
 fn editor(replies: Vec<Reply>) -> (tempfile::TempDir, InputEditor<FakeEditor>, Calls) {
     let scratch = tempfile::tempdir().unwrap();
     std::fs::write(scratch.path().join("flake.nix"), "{}\n").unwrap();
-    std::fs::write(
-        scratch.path().join("flake.lock"),
-        lock(&snapshot("nested", "ls")).pretty(),
-    )
-    .unwrap();
+    std::fs::write(scratch.path().join("flake.lock"), before_lock().pretty()).unwrap();
     let calls = Calls::default();
     let runner = FakeEditor {
         calls: calls.clone(),
@@ -190,8 +157,8 @@ fn editor(replies: Vec<Reply>) -> (tempfile::TempDir, InputEditor<FakeEditor>, C
     (scratch, editor, calls)
 }
 fn child_lock() -> Value {
-    let mut lock = lock(&snapshot("nested", "set")).data;
-    lock["nodes"]["nixpkgs"]["original"] = json!({"type":"github","ref":"child-replaced"});
+    let mut lock = expected_set().data;
+    lock["nodes"]["source"]["original"] = json!({"type":"github","ref":"child-replaced"});
     lock
 }
 #[tokio::test]
@@ -225,7 +192,7 @@ async fn setter_child_argv_fallback_and_original_restoration_match_oracle_effect
         FlakeLock::load(&scratch.path().join("flake.lock"))
             .unwrap()
             .data,
-        lock(&snapshot("nested", "set")).data
+        expected_set().data
     );
     let calls = calls.lock().unwrap();
     assert_eq!(calls.len(), 2);
@@ -388,4 +355,306 @@ async fn editor_refuses_foreign_guard_before_native_effects() {
             .contains("different configuration root")
     );
     assert!(calls.lock().unwrap().is_empty());
+}
+
+#[test]
+fn graph_uses_declared_root_chains_shared_paths_and_rejects_cycles() {
+    let mut lock = before_lock();
+    lock.data["nodes"]["entry"]["inputs"]["chain"] = json!(["alias"]);
+    lock.data["nodes"]["entry"]["inputs"]["other"] = json!("parent");
+    let graph = LockGraph::new(&lock).unwrap();
+    assert_eq!(
+        graph.resolve_path("chain").unwrap().terminal_path,
+        "parent/leaf"
+    );
+    assert_eq!(
+        graph
+            .update_inputs(&["chain".into(), "alias".into(), "other/leaf".into()])
+            .unwrap(),
+        ["parent/leaf", "other/leaf"]
+    );
+    assert!(graph.entries.contains_key("other/leaf"));
+    assert_eq!(graph.entries.len(), 6);
+    assert!(graph.resolve_path("parent//leaf").is_err());
+    for kind in 0..8 {
+        let mut bad = lock.clone();
+        match kind {
+            0 => bad.data["version"] = json!(7.0),
+            1 => bad.data["root"] = Value::Null,
+            2 => {
+                bad.data["nodes"]
+                    .as_object_mut()
+                    .unwrap()
+                    .shift_remove("source");
+            }
+            3 => bad.data["nodes"]["entry"]["inputs"]["alias"] = json!(["chain"]),
+            4 => bad.data["nodes"]["source"]["inputs"] = json!({"cycle":"parent"}),
+            5 => bad.data["nodes"]["parent"]["inputs"] = json!([]),
+            6 => bad.data["nodes"]["source"]["flake"] = json!("false"),
+            _ => bad.data["nodes"]["entry"]["inputs"]["alias"] = json!([]),
+        }
+        assert!(LockGraph::new(&bad).is_err(), "case {kind}");
+    }
+    let mut unused = lock;
+    unused.data["nodes"]["unused"] = json!({"inputs":{"bad":"absent"}});
+    assert!(LockGraph::new(&unused).is_ok());
+}
+
+#[tokio::test]
+async fn forward_policy_covers_all_paths_and_deduplicates_success_and_failed_evidence() {
+    use std::cell::Cell;
+    let before = before_lock();
+    let mut candidate = before.clone();
+    candidate.data["nodes"]["source"]["locked"]["rev"] = json!("b".repeat(40));
+    for direction in [Ancestry::Ahead, Ancestry::Behind, Ancestry::Diverged] {
+        let calls = Cell::new(0);
+        let outcome = validate_forward(&before, &candidate, |proof| {
+            calls.set(calls.get() + 1);
+            assert_eq!(proof.repo, "nixpkgs");
+            std::future::ready(Ok(direction))
+        })
+        .await;
+        assert_eq!(calls.get(), 1);
+        if direction == Ancestry::Ahead {
+            assert_eq!(
+                outcome
+                    .unwrap()
+                    .iter()
+                    .map(|c| c.name.as_str())
+                    .collect::<Vec<_>>(),
+                ["alias", "parent/leaf"]
+            );
+        } else {
+            assert!(outcome.unwrap_err().policy_rejected());
+        }
+    }
+    let calls = Cell::new(0);
+    let error = validate_forward(&before, &candidate, |_| {
+        calls.set(calls.get() + 1);
+        std::future::ready(Err(crate::error::ConfctlError::Configuration(
+            "unavailable evidence".into(),
+        )))
+    })
+    .await
+    .unwrap_err();
+    assert_eq!(calls.get(), 1);
+    assert!(!error.policy_rejected());
+    assert!(error.to_string().contains("alias:") && error.to_string().contains("parent/leaf:"));
+}
+
+#[tokio::test]
+async fn forward_policy_rejects_removed_changed_source_and_equal_sha_attributes() {
+    let before = before_lock();
+    for kind in 0..6 {
+        let mut candidate = before.clone();
+        match kind {
+            0 => {
+                candidate.data["nodes"]["entry"]["inputs"]
+                    .as_object_mut()
+                    .unwrap()
+                    .shift_remove("alias");
+            }
+            1 => candidate.data["nodes"]["source"]["locked"]["repo"] = json!("other"),
+            2 => candidate.data["nodes"]["source"]["locked"]["dir"] = json!("subdir"),
+            3 => candidate.data["nodes"]["source"]["locked"]["narHash"] = json!("changed"),
+            4 => candidate.data["nodes"]["source"]["locked"]["lastModified"] = json!(123),
+            _ => candidate.data["nodes"]["source"]["flake"] = json!(false),
+        }
+        let error = validate_forward(&before, &candidate, |_| async {
+            panic!("unexpected ancestry request")
+        })
+        .await
+        .unwrap_err();
+        assert!(error.policy_rejected(), "{kind}: {error}");
+    }
+    let mut renumbered = before.clone();
+    let node = renumbered.data["nodes"]
+        .as_object_mut()
+        .unwrap()
+        .shift_remove("source")
+        .unwrap();
+    renumbered.data["nodes"]["arbitrary"] = node;
+    renumbered.data["nodes"]["parent"]["inputs"]["leaf"] = json!("arbitrary");
+    assert!(
+        validate_forward(&before, &renumbered, |_| async {
+            panic!("unchanged source")
+        })
+        .await
+        .unwrap()
+        .is_empty()
+    );
+}
+#[tokio::test]
+async fn forward_policy_allows_unchanged_unsupported_but_errors_on_new_or_changed_unsupported() {
+    let mut before = before_lock();
+    before.data["nodes"]["source"]["locked"] = json!({"type":"path","path":"/fixture"});
+    assert!(
+        validate_forward(&before, &before, |_| async {
+            panic!("unchanged unsupported")
+        })
+        .await
+        .unwrap()
+        .is_empty()
+    );
+    let mut changed = before.clone();
+    changed.data["nodes"]["source"]["locked"]["path"] = json!("/changed");
+    assert!(
+        !validate_forward(&before, &changed, |_| async { panic!("unsupported") })
+            .await
+            .unwrap_err()
+            .policy_rejected()
+    );
+    let mut candidate = before_lock();
+    candidate.data["nodes"]["entry"]["inputs"]["new"] = json!("new");
+    candidate.data["nodes"]["new"] =
+        json!({"locked":{"type":"tarball","url":"https://fixture.invalid"}});
+    assert!(
+        !validate_forward(&before_lock(), &candidate, |_| async {
+            panic!("unsupported new")
+        })
+        .await
+        .unwrap_err()
+        .policy_rejected()
+    );
+    candidate.data["nodes"]["new"]["locked"] =
+        json!({"type":"github","owner":"fixture","repo":"new","rev":"f".repeat(40)});
+    assert_eq!(
+        validate_forward(&before_lock(), &candidate, |_| async {
+            panic!("new immutable")
+        })
+        .await
+        .unwrap()
+        .len(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn forward_failure_aggregation_owns_native_spools_and_secondaries_through_aliases() {
+    use crate::process::{Captured, PartialProcessEvidence};
+    use std::{
+        cell::{Cell, RefCell},
+        io::Write,
+        os::unix::process::ExitStatusExt,
+    };
+    let root = tempfile::tempdir().unwrap();
+    let mut spool = tempfile::NamedTempFile::new_in(root.path()).unwrap();
+    spool.write_all(b"native stdout evidence").unwrap();
+    let path = spool.path().to_owned();
+    let failure = RefCell::new(Some(
+        ConfctlError::ProcessFailure {
+            source: Box::new(ConfctlError::Child {
+                description: "Git comparison".into(),
+                code: Some(17),
+                signal: None,
+                log: None,
+            }),
+            evidence: Box::new(PartialProcessEvidence {
+                status: Some(std::process::ExitStatus::from_raw(17 << 8)),
+                stdout: Captured::Spool {
+                    file: spool,
+                    length: 22,
+                },
+                stderr: Captured::Memory(b"native stderr evidence".to_vec()),
+                stdout_complete: true,
+                stderr_complete: false,
+                log: None,
+            }),
+        }
+        .with_secondary(vec![ConfctlError::State(
+            "secondary evidence failure".into(),
+        )]),
+    ));
+    let before = before_lock();
+    let candidate = expected_set();
+    let calls = Cell::new(0);
+    let error = validate_forward(&before, &candidate, |_| {
+        calls.set(calls.get() + 1);
+        std::future::ready(Err(failure
+            .borrow_mut()
+            .take()
+            .expect("one failure per source/revisions")))
+    })
+    .await
+    .unwrap_err();
+    assert_eq!(calls.get(), 1);
+    assert!(!error.policy_rejected());
+    assert!(!error.is_cancelled());
+    assert!(error.to_string().contains("alias:") && error.to_string().contains("parent/leaf:"));
+    assert!(path.exists(), "aggregation dropped the only owned spool");
+    let ConfctlError::Cleanup { primary, secondary } = &error else {
+        panic!("typed evidence owner missing")
+    };
+    assert!(matches!(primary.as_ref(), ConfctlError::Configuration(_)));
+    assert_eq!(secondary.len(), 1);
+    let ConfctlError::Cleanup { primary, secondary } = &secondary[0] else {
+        panic!("original secondary lost")
+    };
+    assert!(matches!(&secondary[..],[ConfctlError::State(s)] if s=="secondary evidence failure"));
+    let ConfctlError::ProcessFailure { evidence, .. } = primary.as_ref() else {
+        panic!("original native failure lost")
+    };
+    assert_eq!(evidence.status.unwrap().code(), Some(17));
+    assert!(evidence.stdout_complete && !evidence.stderr_complete);
+    assert_eq!(
+        evidence.stderr.memory(),
+        Some(b"native stderr evidence".as_slice())
+    );
+    let Captured::Spool { file, .. } = &evidence.stdout else {
+        panic!("spool changed")
+    };
+    assert_eq!(
+        std::fs::read(file.path()).unwrap(),
+        b"native stdout evidence"
+    );
+    drop(error);
+    assert!(!path.exists(), "original owner did not release its spool");
+}
+
+#[tokio::test]
+async fn forward_cancellation_retains_preceding_failures_and_its_own_evidence() {
+    use crate::process::{Captured, PartialProcessEvidence};
+    use std::cell::RefCell;
+    let before = before_lock();
+    let mut candidate = expected_set();
+    candidate.data["nodes"]["parent"]["locked"]["rev"] = json!("d".repeat(40));
+    let failure = |source, bytes: &[u8]| ConfctlError::ProcessFailure {
+        source: Box::new(source),
+        evidence: Box::new(PartialProcessEvidence {
+            status: None,
+            stdout: Captured::Memory(bytes.into()),
+            stderr: Captured::Unavailable,
+            stdout_complete: false,
+            stderr_complete: false,
+            log: None,
+        }),
+    };
+    let errors = RefCell::new(std::collections::VecDeque::from([
+        failure(
+            ConfctlError::State("first comparison failed".into()),
+            b"first evidence",
+        ),
+        failure(ConfctlError::Cancelled, b"cancellation evidence"),
+    ]));
+    let error = validate_forward(&before, &candidate, |_| {
+        std::future::ready(Err(errors.borrow_mut().pop_front().expect("no retry")))
+    })
+    .await
+    .unwrap_err();
+    assert!(errors.borrow().is_empty());
+    assert!(error.is_cancelled());
+    let ConfctlError::Cleanup { primary, secondary } = error else {
+        panic!("earlier error lost on cancellation")
+    };
+    let ConfctlError::ProcessFailure { evidence, .. } = *primary else {
+        panic!("cancellation evidence lost")
+    };
+    assert_eq!(
+        evidence.stdout.memory(),
+        Some(b"cancellation evidence".as_slice())
+    );
+    let [ConfctlError::ProcessFailure { evidence, .. }] = &secondary[..] else {
+        panic!("earlier evidence lost")
+    };
+    assert_eq!(evidence.stdout.memory(), Some(b"first evidence".as_slice()));
 }

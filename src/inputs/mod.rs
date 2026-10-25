@@ -1,10 +1,12 @@
-//! Preserve the Ruby input-info and setter interpretation of flake.lock.
-//! In particular an array reference selects its first node ID; later follows
-//! segments are ignored. This is deliberately not a recursive graph resolver.
+//! Flake input information, logical lock graphs and guarded lock editing.
 
 mod editor;
+mod forward;
+mod graph;
 mod lock;
 pub use editor::*;
+pub use forward::*;
+pub use graph::*;
 pub use lock::*;
 
 /// A successful Nix command can still have used stale GitHub metadata. Such a

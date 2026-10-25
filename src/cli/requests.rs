@@ -32,6 +32,7 @@ impl Values<'_> {
     }
     fn changes(&self) -> InputChanges {
         InputChanges {
+            forward_only: self.flag("forward-only"),
             commit: self.flag("commit"),
             changelog: self.flag("changelog"),
             editor: self.flag("editor"),
@@ -116,7 +117,20 @@ pub(super) fn build(v: &Values<'_>) -> Result<Action, CliFailure> {
             new: PathBuf::from(&v.positional[1]),
         },
         "rediscover" => Action::Rediscover,
-        "inputs ls" => Action::InputsList { pattern: v.arg(0)? },
+        "inputs ls" => Action::InputsList {
+            pattern: v.arg(0)?,
+            json: v.flag("json"),
+        },
+        "inputs check-update" => Action::InputsCheckUpdate {
+            old_lock: v
+                .string("old-lock")?
+                .ok_or_else(|| failure(v.path, "--old-lock is required", true))?
+                .into(),
+            new_lock: v
+                .string("new-lock")?
+                .ok_or_else(|| failure(v.path, "--new-lock is required", true))?
+                .into(),
+        },
         "inputs update" => Action::InputsUpdate {
             inputs: (0..v.positional.len())
                 .map(|i| v.required(i))

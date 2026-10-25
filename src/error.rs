@@ -70,6 +70,8 @@ pub enum ConfctlError {
     #[error("{0}")]
     Configuration(String),
     #[error("{0}")]
+    InputPolicyRejected(String),
+    #[error("{0}")]
     Selection(String),
     #[error("{0}")]
     State(String),
@@ -145,6 +147,20 @@ pub enum ConfctlError {
 }
 
 impl ConfctlError {
+    /// Evidence wrappers retain the primary policy disposition through shutdown.
+    pub fn policy_rejected(&self) -> bool {
+        match self {
+            Self::InputPolicyRejected(_) => true,
+            Self::FlakeLockFailure(f) => f.source.policy_rejected(),
+            Self::NixCommandFailure(f) => f.source.policy_rejected(),
+            Self::Cleanup { primary, .. } => primary.policy_rejected(),
+            Self::ProcessFailure { source, .. } | Self::OutputFailure { source, .. } => {
+                source.policy_rejected()
+            }
+            _ => false,
+        }
+    }
+
     /// Evidence and cleanup wrappers do not change the primary cancellation
     /// disposition. A later canceled cleanup cannot replace an earlier failure.
     pub fn is_cancelled(&self) -> bool {
@@ -184,6 +200,19 @@ impl ConfctlError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn policy_rejection_survives_primary_wrappers_but_secondary_does_not_replace_errors() {
+        let rejection = ConfctlError::InputPolicyRejected("rejected".into())
+            .with_secondary(vec![ConfctlError::Cancelled]);
+        assert!(rejection.policy_rejected());
+        assert!(!rejection.is_cancelled());
+        assert!(
+            !ConfctlError::State("evidence missing".into())
+                .with_secondary(vec![rejection])
+                .policy_rejected()
+        );
+    }
 
     #[test]
     fn flake_lock_wrapper_redacts_context_and_retains_typed_source_and_cleanup_order() {

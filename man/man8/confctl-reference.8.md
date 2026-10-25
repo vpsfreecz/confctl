@@ -92,6 +92,7 @@ NAME
 
 COMMANDS
     channel
+    check-update
     ls
     machine
     set
@@ -190,7 +191,17 @@ NAME
 SYNOPSIS
 
     confctl [global options] inputs ls [input-pattern]
+
+COMMAND OPTIONS
+    --json - Print input, type, ref, full rev and url as JSON
+
 ```
+
+Options from the parser schema:
+
+| Spellings | Kind | Negative spellings | Schema default |
+| --- | --- | --- | --- |
+| `--json` | switch | none | `false` |
 
 ### confctl inputs update
 
@@ -210,6 +221,7 @@ COMMAND OPTIONS
     --[no-]commit        - Commit changes to git
     -d, --[no-]downgrade - Treat change as downgrade for changelog direction
     --[no-]editor        - Open $EDITOR with commit message (default: enabled)
+    --[no-]forward-only - Require complete same-source forward Git ancestry (exit 3 rejects)
 
 ```
 
@@ -221,7 +233,35 @@ Options from the parser schema:
 | `--changelog` | switch | `--no-changelog` | `true` |
 | `--editor` | switch | `--no-editor` | `true` |
 | `--downgrade`, `-d` | switch | `--no-downgrade`, `--no-d` | `false` |
+| `--forward-only` | switch | `--no-forward-only` | `false` |
 | `--all` | switch | `--no-all` | `false` |
+
+### confctl inputs check-update
+
+```text
+NAME
+    check-update - Verify that a candidate lock preserves complete Git ancestry
+
+SYNOPSIS
+
+    confctl [global options] inputs check-update --old-lock FILE --new-lock FILE
+
+COMMAND OPTIONS
+    --old-lock=FILE - Original version-7 lock
+    --new-lock=FILE - Candidate version-7 lock
+
+Reads locks without Nix, cluster outputs or checkout writes. May fetch Git mirrors.
+Exit 0 accepts, 3 rejects policy, and 1 means evidence or tool failure.
+```
+
+Required arguments: none. Additional optional arguments: 0.
+
+Options from the parser schema:
+
+| Spellings | Kind | Negative spellings | Schema default |
+| --- | --- | --- | --- |
+| `--old-lock` | value | none | not specified |
+| `--new-lock` | value | none | not specified |
 
 ### confctl inputs set
 
@@ -280,6 +320,7 @@ COMMAND OPTIONS
     --[no-]commit        -
     -d, --[no-]downgrade -
     --[no-]editor        - (default: enabled)
+    --[no-]forward-only - Require complete same-source forward Git ancestry (exit 3 rejects)
 
 ```
 
@@ -293,6 +334,7 @@ Options from the parser schema:
 | `--changelog` | switch | `--no-changelog` | `true` |
 | `--editor` | switch | `--no-editor` | `true` |
 | `--downgrade`, `-d` | switch | `--no-downgrade`, `--no-d` | `false` |
+| `--forward-only` | switch | `--no-forward-only` | `false` |
 
 ### confctl inputs channel set
 
@@ -340,6 +382,7 @@ COMMAND OPTIONS
     --[no-]commit        -
     -d, --[no-]downgrade -
     --[no-]editor        - (default: enabled)
+    --[no-]forward-only - Require complete same-source forward Git ancestry (exit 3 rejects)
 
 ```
 
@@ -353,6 +396,7 @@ Options from the parser schema:
 | `--changelog` | switch | `--no-changelog` | `true` |
 | `--editor` | switch | `--no-editor` | `true` |
 | `--downgrade`, `-d` | switch | `--no-downgrade`, `--no-d` | `false` |
+| `--forward-only` | switch | `--no-forward-only` | `false` |
 
 ### confctl inputs machine set
 

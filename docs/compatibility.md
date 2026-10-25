@@ -250,12 +250,13 @@ and malformed-output failures remain infrastructure errors. Keep the lexical
 dispatch. This read-only child is an accepted login-lookup intervention; other
 children do not gain permission to inherit stdin through this path.
 
-Flake-lock input arrays preserve the baseline first-segment interpretation:
-`["node", "nested"]` reads `nodes["node"]` and ignores the suffix. Setter
-restoration uses the temporary lock's first-segment mapping too. Recursive
-follows resolution would change this behavior. Eight additional immutable
-observations cover varied suffixes, missing first nodes, original metadata
-restoration, distinct nested leaves and exact result/error streams.
+Flake-lock input arrays resolve complete version-7 logical `follows` paths.
+Setter restoration uses the temporary lock's full path to restore `original`
+metadata on the terminal node. This intentionally changes the Ruby baseline's
+first-segment interpretation. Eight immutable Ruby observations retain the
+historical results for varied suffixes, missing first nodes, original metadata
+restoration, distinct nested leaves and exact result/error streams. They do not
+define current path resolution; see the [flake-input guide](flake-inputs.md).
 
 Nix output names, channels/overrides, machine keys, evaluation impurity,
 no-lock-write/update flags and recognized retry policy are interfaces. The fake

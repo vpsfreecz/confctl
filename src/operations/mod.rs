@@ -51,6 +51,7 @@ impl Operations for CoreOperations {
                     | Action::GenDataContainers
                     | Action::GenDataNetwork
                     | Action::InputsList { .. }
+                    | Action::InputsCheckUpdate { .. }
                     | Action::InputsUpdate { .. }
                     | Action::InputsSet { .. }
                     | Action::ChannelUpdate { .. }
@@ -95,8 +96,11 @@ impl Operations for CoreOperations {
             Action::Add { .. } | Action::Rename { .. } | Action::Rediscover => {
                 configuration::run(&invocation.action, root, context).await?
             }
-            Action::InputsList { pattern } => {
-                inputs::list(&root, pattern.as_deref(), &context.events).await?
+            Action::InputsList { pattern, json } => {
+                inputs::list(&root, pattern.as_deref(), *json, &context.events).await?
+            }
+            Action::InputsCheckUpdate { old_lock, new_lock } => {
+                input_mutation::check_update(&root, old_lock, new_lock, context).await?
             }
             Action::ChannelList {
                 pattern,
