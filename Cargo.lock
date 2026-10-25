@@ -273,6 +273,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-util",
+ "vpsadmin-client",
 ]
 
 [[package]]
@@ -1444,6 +1445,8 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
+ "serde",
+ "serde_json",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",
@@ -2132,6 +2135,18 @@ name = "utf8_iter"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6c140620e7ffbb22c2dee59cafe6084a59b5ffc27a8859a5f0d494b5d52b6be"
+
+[[package]]
+name = "vpsadmin-client"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2099d96e698e23912879cc15a32097c920f0db96976c2bee671a5ce2239777d0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
+ "url",
+]
 
 [[package]]
 name = "walkdir"

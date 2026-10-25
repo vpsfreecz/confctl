@@ -2,7 +2,7 @@
 name = "confctl"
 version = "3.0.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.95"
 license = "GPL-3.0-only"
 description = "Nix deployment management tool"
 publish = false
@@ -48,6 +48,7 @@ required-features = ["qualification-fixtures"]
 qualification-fixtures = []
 
 [dependencies]
+vpsadmin-client = "0.1.0"
 clap = { version = "4.6.7", default-features = false, features = ["std", "string"] }
 chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 crossterm = "0.29.0"

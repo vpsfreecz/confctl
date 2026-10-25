@@ -1,31 +1,20 @@
-//! The described token and read-only resource subset used by gen-data.
-//! No request, response or credential-bearing type implements Debug.
+//! Prompting, cancellation and gen-data projection around the API 7.0 client.
+//! Credentials and authentication responses are never logged.
 mod auth;
-use crate::{
-    error::ConfctlError,
-    events::{EventSink, OutputStream, Style, UiEvent},
-    terminal::Ui,
-};
-use reqwest::{
-    Client as Http, Method, Url,
-    header::{HeaderName, HeaderValue},
-};
-use serde_json::{Map, Value, json};
+use crate::{error::ConfctlError, events::EventSink, terminal::Ui};
+use serde::de::DeserializeOwned;
+use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
+use vpsadmin_client::{Association, Client as Api, Error as ApiError, resources};
 
 pub(crate) struct Client<'a> {
-    http: Http,
-    base: Url,
+    api: Api,
+    base: String,
     ui: &'a Ui,
-    events: &'a EventSink,
     cancel: &'a CancellationToken,
-    description: Option<Value>,
-    auth_description: Value,
     user: String,
     password: String,
-    token: Option<String>,
     valid_to: Option<chrono::DateTime<chrono::FixedOffset>>,
-    header: Option<HeaderName>,
     secrets: Vec<String>,
     #[cfg(test)]
     clock: Option<std::sync::Arc<std::sync::atomic::AtomicI64>>,
@@ -40,57 +29,41 @@ pub(crate) fn check(cancel: &CancellationToken) -> Result<(), ConfctlError> {
         Ok(())
     }
 }
-fn truthy(v: Option<&Value>) -> bool {
-    !matches!(v, None | Some(Value::Null | Value::Bool(false)))
+fn api(base: &str, token: Option<&str>) -> Result<Api, ApiError> {
+    let builder = Api::builder(base).user_agent("haveapi-client");
+    match token {
+        Some(token) => builder.token(token),
+        None => builder,
+    }
+    .build()
 }
 impl<'a> Client<'a> {
     pub(crate) fn new(
         ui: &'a Ui,
-        events: &'a EventSink,
+        _events: &'a EventSink,
         cancel: &'a CancellationToken,
     ) -> Result<Self, ConfctlError> {
         #[cfg(test)]
         if let Some(settings) = TEST_SETTINGS.lock().unwrap().clone() {
-            return Self::loopback(ui, events, cancel, &settings.endpoint, settings.clock);
+            let mut client = Self::construct(ui, cancel, test_base(&settings.endpoint)?.as_str())?;
+            client.clock = Some(settings.clock);
+            return Ok(client);
         }
-        Self::construct(
-            ui,
-            events,
-            cancel,
-            Url::parse("https://api.vpsfree.cz/").unwrap(),
-            false,
-        )
+        Self::construct(ui, cancel, "https://api.vpsfree.cz/")
     }
     fn construct(
         ui: &'a Ui,
-        events: &'a EventSink,
         cancel: &'a CancellationToken,
-        base: Url,
-        no_proxy: bool,
+        base: &str,
     ) -> Result<Self, ConfctlError> {
-        let mut builder = Http::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .retry(reqwest::retry::never())
-            .user_agent("haveapi-client");
-        if no_proxy {
-            builder = builder.no_proxy();
-        }
-        let http = builder
-            .build()
-            .map_err(|_| error("unable to initialize HTTP transport"))?;
         Ok(Self {
-            http,
-            base,
+            api: api(base, None).map_err(|_| error("unable to initialize API client"))?,
+            base: base.into(),
             ui,
-            events,
             cancel,
-            description: None,
-            auth_description: Value::Null,
             user: String::new(),
             password: String::new(),
-            token: None,
             valid_to: None,
-            header: None,
             secrets: Vec::new(),
             #[cfg(test)]
             clock: None,
@@ -110,397 +83,169 @@ impl<'a> Client<'a> {
         }
         text
     }
-    fn diagnostic(&self, value: &Value) -> Value {
-        match value {
-            Value::String(s) => Value::String(self.redact(s)),
-            Value::Array(a) => Value::Array(a.iter().map(|v| self.diagnostic(v)).collect()),
-            Value::Object(m) => Value::Object(
-                m.iter()
-                    .map(|(k, v)| (self.redact(k), self.diagnostic(v)))
-                    .collect(),
-            ),
-            _ => {
-                let s = value.to_string();
-                if self.secrets.iter().any(|secret| s.contains(secret)) {
-                    Value::String("[redacted]".into())
-                } else {
-                    value.clone()
-                }
-            }
+    fn api_error(&self, failure: ApiError) -> ConfctlError {
+        // SDK Display/Debug omit response values. Explicit server details must
+        // additionally pass through the session's known-secret redactor.
+        let mut message = failure.to_string();
+        if let Some(detail) = failure.server_message() {
+            message.push_str(": ");
+            message.push_str(detail);
         }
-    }
-    async fn request(
-        &self,
-        method: Method,
-        url: Url,
-        body: Option<Value>,
-        authenticated: bool,
-    ) -> Result<Value, ConfctlError> {
-        check(self.cancel)?;
-        self.validate(&url)?;
-        let mut request = self
-            .http
-            .request(method, url)
-            .header("Accept", "application/json");
-        if authenticated {
-            let header = self
-                .header
-                .as_ref()
-                .ok_or_else(|| error("missing token header"))?;
-            let mut token = HeaderValue::from_str(
-                self.token
-                    .as_deref()
-                    .ok_or_else(|| error("missing token"))?,
-            )
-            .map_err(|_| error("invalid token header value"))?;
-            token.set_sensitive(true);
-            request = request.header(header, token);
-        }
-        if let Some(body) = body {
-            request = request
-                .header("Content-Type", "application/json")
-                .body(body.to_string());
-        }
-        let response = tokio::select! { r=request.send() => r.map_err(|_| error("HTTP transport failed"))?, _=self.cancel.cancelled()=>return Err(ConfctlError::Cancelled) };
-        let status = response.status();
-        if status.is_redirection() {
-            return Err(error("HTTP redirects are refused"));
-        }
-        if status == reqwest::StatusCode::FORBIDDEN {
-            return Err(error("access denied (HTTP 403)"));
-        }
-        let bytes = tokio::select! { r=response.bytes()=>r.map_err(|_| error("HTTP body read failed"))?, _=self.cancel.cancelled()=>return Err(ConfctlError::Cancelled) };
-        check(self.cancel)?;
-        // JSON parser excerpts can contain secrets; never retain its raw error.
-        let value: Value =
-            serde_json::from_slice(&bytes).map_err(|_| error("invalid JSON response"))?;
-        if !status.is_success() || value.get("status").is_some_and(|v| !truthy(Some(v))) {
-            let detail = json!({"message": self.diagnostic(&value["message"]), "errors": self.diagnostic(&value["errors"])});
-            return Err(error(&format!(
-                "request failed (HTTP {}): {detail}",
-                status.as_u16()
-            )));
-        }
-        Ok(value)
-    }
-    fn validate(&self, url: &Url) -> Result<(), ConfctlError> {
-        if url.origin() != self.base.origin()
-            || !url.username().is_empty()
-            || url.password().is_some()
-            || url.fragment().is_some()
-            || !url.path().starts_with(self.base.path())
+        if let Some(details) = failure
+            .validation_errors()
+            .filter(|details| !details.is_empty())
         {
-            return Err(error("described URL escapes API origin or base"));
-        }
-        Ok(())
-    }
-    fn action_url(&self, spec: &Value, args: &[Value]) -> Result<Url, ConfctlError> {
-        let path = spec["path"]
-            .as_str()
-            .ok_or_else(|| error("missing action path"))?;
-        if path.starts_with("//") || path.chars().any(|c| c.is_control() || c == '\\') {
-            return Err(error("invalid described action URL"));
-        }
-        // Reject traversal before URL normalization can erase its evidence.
-        let decoded = percent_decode(path)?;
-        if decoded
-            .split(['/', '\\', '?', '#'])
-            .any(|s| s == "." || s == "..")
-        {
-            return Err(error("escaping described action URL"));
-        }
-        let mut path = path.to_owned();
-        for arg in args {
-            let start = path
-                .find('{')
-                .ok_or_else(|| error("too many action path arguments"))?;
-            let end = path[start..]
-                .find('}')
-                .ok_or_else(|| error("invalid action placeholder"))?
-                + start;
-            let id = crate::domain::ruby_string(arg);
-            if id == "." || id == ".." {
-                return Err(error("escaping action path argument"));
-            }
-            path.replace_range(start..=end, &encode_segment(&id));
-        }
-        if path.contains(['{', '}']) {
-            return Err(error("unresolved action path arguments"));
-        }
-        let url = self
-            .base
-            .join(&path)
-            .map_err(|_| error("invalid described action URL"))?;
-        self.validate(&url)?;
-        Ok(url)
-    }
-    async fn describe(&mut self, authenticated: bool) -> Result<Value, ConfctlError> {
-        if authenticated {
-            self.ensure_token().await?;
-        }
-        let mut url = self.base.clone();
-        url.query_pairs_mut().append_pair("describe", "default");
-        let response = self
-            .request(Method::OPTIONS, url, None, authenticated)
-            .await?;
-        let version = response["version"]
-            .as_str()
-            .ok_or_else(|| error("missing protocol version"))?;
-        let mut parts = version.split('.');
-        if parts.next() != Some("2") {
-            return Err(error("incompatible API protocol major version"));
-        }
-        if version != "2.0" {
-            self.events
-                .emit(UiEvent::Diagnostic {
-                    stream: OutputStream::Stderr,
-                    style: Style::Plain,
-                    text: "vpsAdmin: server uses a different protocol minor version\n".into(),
+            message.push_str(": ");
+            let redacted: serde_json::Map<String, Value> = details
+                .iter()
+                .map(|(name, messages)| {
+                    (
+                        self.redact(name),
+                        Value::Array(
+                            messages
+                                .iter()
+                                .map(|message| Value::String(self.redact(message)))
+                                .collect(),
+                        ),
+                    )
                 })
-                .await?;
-            check(self.cancel)?;
+                .collect();
+            message.push_str(&Value::Object(redacted).to_string());
         }
-        response["response"]
-            .as_object()
-            .ok_or_else(|| error("invalid API description"))?;
-        Ok(response["response"].clone())
+        error(&self.redact(&message))
     }
-    async fn resources(&mut self) -> Result<(), ConfctlError> {
-        if self.description.is_none() {
-            self.description = Some(self.describe(true).await?);
-        }
-        Ok(())
-    }
-    async fn data_action(
-        &mut self,
-        spec: &Value,
-        args: &[Value],
-        includes: bool,
-        layout: &str,
-    ) -> Result<Value, ConfctlError> {
-        if truthy(spec.get("blocking")) {
-            return Err(error("blocking data actions are unsupported"));
-        }
-        self.ensure_token().await?;
-        self.call(
-            spec,
-            args,
-            auth::inputs(spec, &Map::new())?,
-            includes,
-            true,
-            layout,
-        )
-        .await
-    }
-    async fn call(
+    async fn send<T>(
         &self,
-        spec: &Value,
-        args: &[Value],
-        input: Map<String, Value>,
-        includes: bool,
-        authenticated: bool,
-        layout: &str,
-    ) -> Result<Value, ConfctlError> {
-        if spec["output"]["layout"].as_str() != Some(layout) {
-            return Err(error("unsupported action output layout"));
-        }
-        let ns = spec["output"]["namespace"]
-            .as_str()
-            .ok_or_else(|| error("missing output namespace"))?;
-        let mut url = self.action_url(spec, args)?;
-        let method = match spec["method"].as_str() {
-            Some("GET") => Method::GET,
-            Some("POST") => Method::POST,
-            Some("PUT") => Method::PUT,
-            Some("DELETE") => Method::DELETE,
-            _ => return Err(error("unsupported described HTTP method")),
+        request: impl std::future::Future<Output = Result<T, ApiError>>,
+    ) -> Result<T, ConfctlError> {
+        check(self.cancel)?;
+        let result = tokio::select! {
+            biased;
+            _ = self.cancel.cancelled() => return Err(ConfctlError::Cancelled),
+            result = request => result.map_err(|failure| self.api_error(failure))?,
         };
-        let body = if method == Method::POST || method == Method::PUT {
-            let mut body = Map::new();
-            if !spec["input"].is_null() {
-                let n = spec["input"]["namespace"]
-                    .as_str()
-                    .ok_or_else(|| error("missing input namespace"))?;
-                body.insert(n.into(), Value::Object(input));
-            }
-            if includes {
-                body.insert(
-                    "_meta".into(),
-                    json!({"includes":"node__location__environment"}),
-                );
-            }
-            Some(Value::Object(body))
-        } else {
-            if !input.is_empty() {
-                let n = spec["input"]["namespace"]
-                    .as_str()
-                    .ok_or_else(|| error("missing input namespace"))?;
-                for (k, v) in input {
-                    url.query_pairs_mut()
-                        .append_pair(&format!("{n}[{k}]"), &crate::domain::ruby_string(&v));
-                }
-            }
-            if includes {
-                url.query_pairs_mut()
-                    .append_pair("_meta[includes]", "node__location__environment");
-            }
-            None
-        };
-        let response = self.request(method, url, body, authenticated).await?;
-        if response.get("status").and_then(Value::as_bool) != Some(true) {
-            return Err(error("response is missing successful API status"));
-        }
-        let output = response
-            .get("response")
-            .and_then(|v| v.get(ns))
-            .ok_or_else(|| error("missing namespaced action response"))?;
-        if layout == "object" && !output.is_object()
-            || layout == "object_list" && !output.is_array()
-        {
-            return Err(error("invalid namespaced action response shape"));
-        }
-        Ok(output.clone())
+        check(self.cancel)?;
+        Ok(result)
     }
     pub(crate) async fn vps_node(&mut self, id: Value) -> Result<Value, ConfctlError> {
-        self.resources().await?;
-        let description = self.description.as_ref().unwrap().clone();
-        let vps = action(&description, &["vps".into()], "show")?;
-        let ct = self.data_action(&vps, &[id], true, "object").await?;
-        let (node, node_spec) = self.association(&description, &vps, &ct, "node").await?;
-        let (location, location_spec) = self
-            .association(&description, &node_spec, &node, "location")
-            .await?;
-        let (environment, _) = self
-            .association(&description, &location_spec, &location, "environment")
-            .await?;
-        for value in [
-            &node["id"],
-            &node["name"],
-            &node["domain_name"],
-            &location["domain"],
-            &environment["domain"],
-        ] {
-            if value.is_object() || value.is_array() {
-                return Err(error("expected scalar node data"));
-            }
-        }
+        self.ensure_token().await?;
+        let vps = self
+            .send(
+                self.api
+                    .vps()
+                    .show(crate::domain::ruby_string(&id))
+                    .global_meta(
+                        json!({"includes":"node__location__environment"})
+                            .as_object()
+                            .unwrap()
+                            .clone(),
+                    )
+                    .send(),
+            )
+            .await?
+            .output;
+        let node = self.node(vps.node).await?;
+        let location = self.location(node.location.clone()).await?;
+        let environment = self.environment(location.environment.clone()).await?;
         Ok(
-            json!({"node":{"id":node["id"],"name":node["name"],"location":location["domain"],"domain":environment["domain"],"fqdn":format!("{}.{}",crate::domain::ruby_string(&node["domain_name"]),crate::domain::ruby_string(&environment["domain"]))}}),
+            json!({"node":{"id":node.id,"name":node.name,"location":location.domain,
+            "domain":environment.domain,"fqdn":format!("{}.{}",
+                node.domain_name.as_deref().unwrap_or(""), environment.domain.as_deref().unwrap_or(""))}}),
         )
     }
-    async fn association(
+    async fn node(
         &mut self,
-        description: &Value,
-        parent_spec: &Value,
-        parent: &Value,
-        field: &str,
-    ) -> Result<(Value, Value), ConfctlError> {
-        let parameter = &parent_spec["output"]["parameters"][field];
-        if parameter["type"] != "Resource" {
-            return Err(error("required association is not described"));
+        association: Option<Association>,
+    ) -> Result<resources::node::show::Output, ConfctlError> {
+        let association = association.ok_or_else(|| error("missing required node association"))?;
+        if resolved(&association) {
+            return included(&association);
         }
-        let path = parameter["resource"]
-            .as_array()
-            .ok_or_else(|| error("missing association resource path"))?
-            .iter()
-            .map(|v| {
-                v.as_str()
-                    .map(String::from)
-                    .ok_or_else(|| error("invalid association resource path"))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let spec = action(description, &path, "show")?;
-        let value = parent
-            .get(field)
-            .filter(|v| v.is_object())
-            .ok_or_else(|| error("missing required association"))?;
-        if truthy(value.pointer("/_meta/resolved")) {
-            return Ok((value.clone(), spec));
+        self.ensure_token().await?;
+        Ok(self
+            .send(self.api.node().show(association_id(&association)?).send())
+            .await?
+            .output)
+    }
+    async fn location(
+        &mut self,
+        association: Option<Association>,
+    ) -> Result<resources::location::show::Output, ConfctlError> {
+        let association =
+            association.ok_or_else(|| error("missing required location association"))?;
+        if resolved(&association) {
+            return included(&association);
         }
-        let args = value
-            .pointer("/_meta/path_params")
-            .and_then(Value::as_array)
-            .ok_or_else(|| error("missing association path parameters"))?;
-        let resolved = self.data_action(&spec, args, false, "object").await?;
-        Ok((resolved, spec))
+        self.ensure_token().await?;
+        Ok(self
+            .send(
+                self.api
+                    .location()
+                    .show(association_id(&association)?)
+                    .send(),
+            )
+            .await?
+            .output)
+    }
+    async fn environment(
+        &mut self,
+        association: Option<Association>,
+    ) -> Result<resources::environment::show::Output, ConfctlError> {
+        let association =
+            association.ok_or_else(|| error("missing required environment association"))?;
+        if resolved(&association) {
+            return included(&association);
+        }
+        self.ensure_token().await?;
+        Ok(self
+            .send(
+                self.api
+                    .environment()
+                    .show(association_id(&association)?)
+                    .send(),
+            )
+            .await?
+            .output)
     }
     pub(crate) async fn networks(&mut self) -> Result<Vec<Value>, ConfctlError> {
-        self.resources().await?;
-        let spec = action(
-            self.description.as_ref().unwrap(),
-            &["network".into()],
-            "list",
-        )?;
-        let values = self.data_action(&spec, &[], false, "object_list").await?;
-        let values = values.as_array().unwrap();
-        if values.iter().any(|v| !v.is_object()) {
-            return Err(error("invalid network list entry"));
-        }
-        for v in values {
-            for k in ["ip_version", "address", "prefix"] {
-                if v[k].is_object() || v[k].is_array() {
-                    return Err(error("expected scalar network data"));
-                }
-            }
-        }
-        Ok(values.clone())
-    }
-}
-fn action(description: &Value, path: &[String], name: &str) -> Result<Value, ConfctlError> {
-    let mut resource = description;
-    for part in path {
-        resource = resource
-            .get("resources")
-            .and_then(|v| v.get(part))
-            .ok_or_else(|| error("described resource unavailable"))?;
-    }
-    let actions = resource["actions"]
-        .as_object()
-        .ok_or_else(|| error("missing described actions"))?;
-    actions
-        .get(name)
-        .or_else(|| {
-            actions.values().find(|v| {
-                v["aliases"]
-                    .as_array()
-                    .is_some_and(|a| a.iter().any(|v| v == name))
+        self.ensure_token().await?;
+        let response = self.send(self.api.network().list().send()).await?;
+        Ok(response
+            .output
+            .into_iter()
+            .map(|network| {
+                json!({"ip_version":network.ip_version,
+            "address":network.address,"prefix":network.prefix})
             })
-        })
-        .cloned()
-        .ok_or_else(|| error("described action unavailable"))
-}
-fn encode_segment(s: &str) -> String {
-    let mut out = String::new();
-    for byte in s.bytes() {
-        if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) {
-            out.push(byte as char);
-        } else {
-            out.push_str(&format!("%{byte:02X}"));
-        }
+            .collect())
     }
-    out
 }
-fn percent_decode(s: &str) -> Result<String, ConfctlError> {
-    let b = s.as_bytes();
-    let mut out = Vec::new();
-    let mut i = 0;
-    while i < b.len() {
-        if b[i] == b'%' {
-            if i + 2 >= b.len() {
-                return Err(error("invalid described URL escape"));
-            }
-            let h = std::str::from_utf8(&b[i + 1..i + 3])
-                .ok()
-                .and_then(|s| u8::from_str_radix(s, 16).ok())
-                .ok_or_else(|| error("invalid described URL escape"))?;
-            out.push(h);
-            i += 3;
-        } else {
-            out.push(b[i]);
-            i += 1;
-        }
+fn resolved(association: &Association) -> bool {
+    !matches!(
+        association
+            .as_map()
+            .get("_meta")
+            .and_then(|meta| meta.get("resolved")),
+        None | Some(Value::Null | Value::Bool(false))
+    )
+}
+fn included<T: DeserializeOwned>(association: &Association) -> Result<T, ConfctlError> {
+    serde_json::from_value(Value::Object(association.as_map().clone()))
+        .map_err(|_| error("invalid included association data"))
+}
+fn association_id(association: &Association) -> Result<String, ConfctlError> {
+    let parameters = association
+        .as_map()
+        .get("_meta")
+        .and_then(|meta| meta.get("path_params"))
+        .and_then(Value::as_array)
+        .filter(|parameters| parameters.len() == 1)
+        .ok_or_else(|| error("missing association path parameters"))?;
+    let id = &parameters[0];
+    if id.is_array() || id.is_object() {
+        return Err(error("invalid association path parameter"));
     }
-    String::from_utf8(out).map_err(|_| error("invalid described URL encoding"))
+    Ok(crate::domain::ruby_string(id))
 }
 #[cfg(test)]
 #[derive(Clone)]
@@ -523,8 +268,8 @@ pub(crate) fn configure_loopback(
     Ok(())
 }
 #[cfg(test)]
-fn test_base(endpoint: &str) -> Result<Url, ConfctlError> {
-    let url = Url::parse(endpoint).map_err(|_| error("invalid fixture endpoint"))?;
+fn test_base(endpoint: &str) -> Result<reqwest::Url, ConfctlError> {
+    let url = reqwest::Url::parse(endpoint).map_err(|_| error("invalid fixture endpoint"))?;
     let ip = url
         .host_str()
         .unwrap_or("")
@@ -542,20 +287,6 @@ fn test_base(endpoint: &str) -> Result<Url, ConfctlError> {
         return Err(error("invalid fixture loopback endpoint"));
     }
     Ok(url)
-}
-#[cfg(test)]
-impl<'a> Client<'a> {
-    fn loopback(
-        ui: &'a Ui,
-        events: &'a EventSink,
-        cancel: &'a CancellationToken,
-        endpoint: &str,
-        clock: std::sync::Arc<std::sync::atomic::AtomicI64>,
-    ) -> Result<Self, ConfctlError> {
-        let mut client = Self::construct(ui, events, cancel, test_base(endpoint)?, true)?;
-        client.clock = Some(clock);
-        Ok(client)
-    }
 }
 #[cfg(test)]
 mod tests;

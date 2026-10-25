@@ -16,8 +16,9 @@ const FIXTURE: &str = "app::gen_data_tests::actual_gen_data_application_fixture"
 const ROOT: &str = "CONFCTL_GEN_DATA_TEST_ROOT";
 const MODE: &str = "CONFCTL_GEN_DATA_TEST_MODE";
 const USER: &str = "fixture-user-39281";
-const PASSWORD: &str = " fixture-password-83641 ";
+const PASSWORD: &str = " fixture-password-\"83641\\ ";
 const CODE: &str = "fixture-code-81624";
+const NEW_PASSWORD: &str = " fixture-new-password-91726 ";
 const STEP: &str = "fixture-step-59321";
 const TOKEN: &str = "fixture-session-78162";
 #[test]
@@ -74,67 +75,6 @@ impl Write for FailingOutput {
         Ok(())
     }
 }
-fn parameter(kind: &str) -> Value {
-    json!({"type":kind,"validators":{}})
-}
-fn action(path: &str, method: &str, ns: &str, params: Value, output: Value, layout: &str) -> Value {
-    json!({"path":path,"method":method,"aliases":[],"blocking":false,"input":{"layout":"object","namespace":ns,"parameters":params},"output":{"layout":layout,"namespace":ns,"parameters":output}})
-}
-fn reference(resource: &str) -> Value {
-    json!({"type":"Resource","resource":[resource],"value_id":"id","value_label":"id"})
-}
-fn resource(a: Value) -> Value {
-    json!({"resources":{},"actions":{"show":a}})
-}
-fn description(mode: &str) -> Value {
-    let scalar = parameter("String");
-    let request = action(
-        "/auth/start",
-        "POST",
-        "login",
-        json!({"user":scalar,"password":parameter("String"),"lifetime":scalar,"interval":parameter("Integer")}),
-        json!({}),
-        "object",
-    );
-    let challenge = action(
-        "/auth/next",
-        "POST",
-        "challenge",
-        json!({"token":scalar,"code":{"type":"String","label":"Verification code","protected":true,"validators":{"presence":true}}}),
-        json!({}),
-        "object",
-    );
-    let mut d = json!({"authentication":{"token":{"http_header":"X-Gen-Token","resources":{"token":{"actions":{"request":request,"challenge":challenge,"empty":action("/auth/empty","POST","empty",json!({}),json!({}),"object")}}}}},"resources":{
-        "vps":resource(action("/vps/{id}","GET","instance",json!({}),json!({"node":reference("node")}),"object")),
-        "node":resource(action("/nodes/{id}","GET","node",json!({}),json!({"location":reference("location")}),"object")),
-        "location":resource(action("/locations/{id}","GET","location",json!({}),json!({"environment":reference("environment")}),"object")),
-        "environment":resource(action("/environments/{id}","GET","environment",json!({}),json!({}),"object")),
-        "network":{"resources":{},"actions":{"fetch":action("/nets","GET","items",json!({}),json!({}),"object_list")}}
-    }});
-    d["resources"]["network"]["actions"]["fetch"]["aliases"] = json!(["list"]);
-    if mode == "foreign-auth" {
-        d["authentication"]["token"]["resources"]["token"]["actions"]["request"]["path"] =
-            json!("https://example.invalid/stolen");
-    }
-    if mode == "userinfo" {
-        d["authentication"]["token"]["resources"]["token"]["actions"]["request"]["path"] =
-            json!("http://user@127.0.0.1/stolen");
-    }
-    if mode == "required" {
-        d["authentication"]["token"]["resources"]["token"]["actions"]["request"]["input"]["parameters"]
-            ["unsupported"] = json!({"type":"String","validators":{"required":true}});
-    }
-    if mode == "layout" {
-        d["resources"]["network"]["actions"]["fetch"]["output"]["layout"] = json!("hash_list");
-    }
-    if mode == "blocking" {
-        d["resources"]["network"]["actions"]["fetch"]["blocking"] = json!(true);
-    }
-    if mode.starts_with("types") {
-        d["authentication"]["token"]["resources"]["token"]["actions"]["challenge"]["input"]["parameters"] = json!({"token":scalar,"text":{"type":"Text","label":"Public text"},"integer":parameter("Integer"),"float":parameter("Float"),"boolean":parameter("Boolean"),"datetime":parameter("Datetime"),"resource":parameter("Resource"),"nullable":{"type":"String","nullable":true},"delegated":{"type":"String","validators":{"format":"server-only"}}});
-    }
-    d
-}
 fn completed(expiry: Value) -> Value {
     json!({"complete":true,"token":TOKEN,"valid_to":expiry})
 }
@@ -143,7 +83,7 @@ fn node(id: Value) -> Value {
 }
 fn token_expiry(mode: &str) -> Value {
     match mode {
-        "expire" => json!("1970-01-01T00:00:50Z"),
+        "expire" | "reset-expire" => json!("1970-01-01T00:00:50Z"),
         "expire-compact" => json!("1970-01-01T00:00:50+0000"),
         "expire-offset" => json!("1970-01-01T01:00:50.5+0100"),
         "expire-future-offset" => json!("1970-01-01T00:00:50-0100"),
@@ -197,43 +137,18 @@ impl Server {
                 let mut status = 200;
                 let mut raw = None;
                 let mut redirect = false;
-                let response = if method == "OPTIONS" {
-                    if e.lock()
-                        .unwrap()
-                        .iter()
-                        .filter(|v| v.starts_with("OPTIONS"))
-                        .count()
-                        > 1
-                        && !headers.contains(&format!("x-gen-token: {TOKEN}"))
-                    {
-                        f.store(true, Ordering::SeqCst);
-                    }
-                    if e.lock()
-                        .unwrap()
-                        .iter()
-                        .filter(|v| v.starts_with("OPTIONS"))
-                        .count()
-                        > 1
-                    {
-                        let argv: Vec<String> =
-                            serde_json::from_slice(&fs::read(root.join("argv.json")).unwrap())
-                                .unwrap();
-                        if argv[2] != "network"
-                            && fs::read_to_string(root.join("nix-calls"))
-                                .map(|s| s.lines().count())
-                                .unwrap_or(0)
-                                != 3
-                        {
-                            f.store(true, Ordering::SeqCst);
-                        }
-                    }
-                    json!({"version":if mode=="major"{"3.0"}else if mode=="minor"{"2.1"}else{"2.0"},"response":description(&mode)})
-                } else if path == "/auth/start" {
+                let response = if path == "/_auth/token/tokens" && method == "POST" {
                     auth_count += 1;
-                    let valid = body["login"]["user"] == USER
-                        && body["login"]["password"] == PASSWORD
-                        && body["login"]["lifetime"] == "fixed"
-                        && body["login"]["interval"] == 60;
+                    let valid = body["token"]["user"] == USER
+                        && body["token"]["password"]
+                            == if mode == "reset-expire" && auth_count > 1 {
+                                NEW_PASSWORD
+                            } else {
+                                PASSWORD
+                            }
+                        && body["token"]["lifetime"] == "fixed"
+                        && body["token"]["interval"] == 60
+                        && !headers.contains("x-haveapi-auth-token:");
                     if !valid {
                         f.store(true, Ordering::SeqCst);
                     }
@@ -241,44 +156,63 @@ impl Server {
                         status = 400;
                         json!({"status":false,"message":format!("bad {PASSWORD}"),"errors":{"password":[PASSWORD]}})
                     } else {
-                        json!({"status":true,"response":{"login":if mode.starts_with("expire")&&auth_count>1{completed(Value::Null)}else if mode=="empty-step" || mode=="multi"{json!({"complete":false,"next_action":"empty","token":STEP})}else{json!({"complete":false,"next_action":"challenge","token":STEP})}}})
+                        let result = if mode == "direct"
+                            || (mode.starts_with("expire") || mode == "reset-expire")
+                                && auth_count > 1
+                        {
+                            completed(Value::Null)
+                        } else if mode == "invalid-token" {
+                            json!({"complete":true})
+                        } else {
+                            json!({"complete":false,"next_action":match mode.as_str() {
+                                "unknown-step" => "unsupported-fixture-step", "reset" | "multi" | "reset-expire" => "reset_password", _ => "totp"
+                            },"token":STEP})
+                        };
+                        json!({"status":true,"response":{"token":result}})
                     }
-                } else if path == "/auth/next" {
-                    let valid = if mode.starts_with("types") {
-                        body["challenge"]["text"] == " public "
-                            && body["challenge"]["integer"] == 7
-                            && body["challenge"]["float"] == 1.25
-                            && body["challenge"]["boolean"] == true
-                            && body["challenge"]["datetime"]
-                                == if mode == "types-compact" {
-                                    "2026-10-20T00:00:00-04:30"
-                                } else {
-                                    "2026-10-20T00:00:00+00:00"
-                                }
-                            && body["challenge"]["resource"] == 9
-                            && body["challenge"]["nullable"].is_null()
-                            && body["challenge"]["delegated"] == "arbitrary"
+                } else if path == "/_auth/token/tokens/totp" && method == "POST" {
+                    if body["token"]["code"] != CODE
+                        || body["token"]["token"] != STEP
+                        || headers.contains("x-haveapi-auth-token:")
+                    {
+                        f.store(true, Ordering::SeqCst);
+                    }
+                    json!({"status":true,"response":{"token":completed(token_expiry(&mode))}})
+                } else if path == "/_auth/token/tokens/reset_password" && method == "POST" {
+                    if body["token"]["new_password1"] != NEW_PASSWORD
+                        || body["token"]["new_password2"] != NEW_PASSWORD
+                        || body["token"]["token"] != STEP
+                        || headers.contains("x-haveapi-auth-token:")
+                    {
+                        f.store(true, Ordering::SeqCst);
+                    }
+                    let result = if mode == "multi" {
+                        json!({"complete":false,"next_action":"totp","token":STEP})
                     } else {
-                        body["challenge"]["code"] == CODE
+                        completed(token_expiry(&mode))
                     };
-                    if !valid || body["challenge"]["token"] != STEP {
-                        f.store(true, Ordering::SeqCst);
-                    }
-                    json!({"status":true,"response":{"challenge":completed(token_expiry(&mode))}})
-                } else if path == "/auth/empty" {
-                    if body != json!({"empty":{}}) {
-                        f.store(true, Ordering::SeqCst);
-                    }
-                    json!({"status":true,"response":{"empty":if mode=="multi"{json!({"complete":false,"next_action":"challenge","token":STEP})}else{completed(Value::Null)}}})
+                    json!({"status":true,"response":{"token":result}})
                 } else {
-                    if !headers.contains(&format!("x-gen-token: {TOKEN}")) {
+                    if method != "GET"
+                        || !headers.contains(&format!("x-haveapi-auth-token: {TOKEN}"))
+                    {
                         f.store(true, Ordering::SeqCst);
                     }
-                    if path.starts_with("/vps/") {
+                    let argv: Vec<String> =
+                        serde_json::from_slice(&fs::read(root.join("argv.json")).unwrap()).unwrap();
+                    if argv[2] != "network"
+                        && fs::read_to_string(root.join("nix-calls"))
+                            .map(|calls| calls.lines().count())
+                            .unwrap_or(0)
+                            != 3
+                    {
+                        f.store(true, Ordering::SeqCst);
+                    }
+                    if path.starts_with("/v7.0/vpses/") {
                         if !path.contains("_meta%5Bincludes%5D=node__location__environment") {
                             f.store(true, Ordering::SeqCst);
                         }
-                        let id = if path.starts_with("/vps/2") {
+                        let id = if path.starts_with("/v7.0/vpses/2") {
                             json!(8)
                         } else {
                             json!(7)
@@ -289,22 +223,19 @@ impl Server {
                             node(id)
                         };
                         if mode == "missing-association" {
-                            json!({"status":true,"response":{"instance":{"node":null}}})
+                            json!({"status":true,"response":{"vps":{"node":null}}})
                         } else {
-                            json!({"status":true,"response":{"instance":{"node":n}}})
+                            json!({"status":true,"response":{"vps":{"node":n}}})
                         }
-                    } else if path == "/nodes/node%2F7" {
+                    } else if path == "/v7.0/nodes/node%2F7" {
                         let mut n = node(json!(7));
                         n["location"] = json!({"_meta":{"path_params":[4]}});
                         json!({"status":true,"response":{"node":n}})
-                    } else if path == "/locations/4" {
+                    } else if path == "/v7.0/locations/4" {
                         json!({"status":true,"response":{"location":{"domain":"test","environment":{"_meta":{"path_params":[5]}}}}})
-                    } else if path == "/environments/5" {
+                    } else if path == "/v7.0/environments/5" {
                         json!({"status":true,"response":{"environment":{"domain":"example.invalid"}}})
-                    } else if path == "/nets" {
-                        let argv: Vec<String> =
-                            serde_json::from_slice(&fs::read(root.join("argv.json")).unwrap())
-                                .unwrap();
+                    } else if path == "/v7.0/networks" {
                         if argv[2] == "all"
                             && !fs::read_to_string(root.join("data/vpsadmin/containers.nix"))
                                 .unwrap_or_default()
@@ -319,17 +250,23 @@ impl Server {
                             }
                             "bad-json" => raw = Some(b"{broken".to_vec()),
                             "http-error" | "partial-all" => status = 404,
+                            "unauthorized" => status = 401,
                             "denied" => status = 403,
                             _ => {}
                         }
                         if mode == "empty" {
-                            json!({"status":true,"response":{"items":[],"_meta":{"total_count":999}}})
+                            json!({"status":true,"response":{"networks":[],"_meta":{"total_count":999}}})
                         } else if mode == "wrong-shape" {
-                            json!({"status":true,"response":{"items":null}})
-                        } else if matches!(mode.as_str(), "http-error" | "partial-all") {
+                            json!({"status":true,"response":{"networks":null}})
+                        } else if mode == "wrong-scalar" {
+                            json!({"status":true,"response":{"networks":[{"ip_version":"4","address":"omit","prefix":0}]}})
+                        } else if matches!(
+                            mode.as_str(),
+                            "http-error" | "partial-all" | "unauthorized" | "denied"
+                        ) {
                             json!({"status":false,"message":format!("not found {TOKEN}"),"errors":{"item":[PASSWORD,CODE]}})
                         } else {
-                            json!({"status":true,"response":{"items":[{"ip_version":4,"address":"192.0.2.0","prefix":24},{"ip_version":"4","address":"omit","prefix":0},{"ip_version":6,"address":"2001:db8::","prefix":32},{"ip_version":4,"address":"192.0.2.0","prefix":24}],"_meta":{"total_count":999}}})
+                            json!({"status":true,"response":{"networks":[{"ip_version":4,"address":"192.0.2.0","prefix":24},{"ip_version":5,"address":"omit","prefix":0},{"ip_version":6,"address":"2001:db8::","prefix":32},{"ip_version":4,"address":"192.0.2.0","prefix":24}],"_meta":{"total_count":999}}})
                         }
                     } else {
                         f.store(true, Ordering::SeqCst);
@@ -348,8 +285,8 @@ impl Server {
                     }
                 );
                 let _ = stream.write_all(header.as_bytes());
-                if mode == "body-cancel" && path == "/nets"
-                    || mode == "auth-body-cancel" && path == "/auth/start"
+                if mode == "body-cancel" && path == "/v7.0/networks"
+                    || mode == "auth-body-cancel" && path == "/_auth/token/tokens"
                 {
                     let _ = stream.write_all(&bytes[..1]);
                     fs::write(root.join("body-blocked"), b"").unwrap();
@@ -436,7 +373,8 @@ printf '%s\n' "$*" >> "$CONFCTL_GEN_DATA_TEST_ROOT/nix-calls"
 last=
 for arg do last="$arg"; done
 if [ "$CONFCTL_GEN_DATA_TEST_MODE" = nix-cancel ] && [ "$last" = '.#confctl.machinesJson' ]; then
-  printf '%s\n' "$$" > "$CONFCTL_GEN_DATA_TEST_ROOT/nix-blocked"
+  printf '%s\n' "$$" > "$CONFCTL_GEN_DATA_TEST_ROOT/nix-blocked.pending"
+  mv -- "$CONFCTL_GEN_DATA_TEST_ROOT/nix-blocked.pending" "$CONFCTL_GEN_DATA_TEST_ROOT/nix-blocked"
   exec sleep 120
 fi
 if [ "$CONFCTL_GEN_DATA_TEST_MODE" = nix-error ]; then printf 'native fixture failure' >&2; exit 7; fi
@@ -472,10 +410,14 @@ esac
             .env(MODE, mode)
             .env("CONFCTL_GEN_DATA_TEST_ENDPOINT", &server.endpoint)
             .env("PATH", path)
-            .env("HTTP_PROXY", "http://192.0.2.1:1")
-            .env("HTTPS_PROXY", "http://192.0.2.1:1")
-            .env("ALL_PROXY", "http://192.0.2.1:1")
-            .env("NO_PROXY", "")
+            .env_remove("HTTP_PROXY")
+            .env_remove("http_proxy")
+            .env_remove("HTTPS_PROXY")
+            .env_remove("https_proxy")
+            .env_remove("ALL_PROXY")
+            .env_remove("all_proxy")
+            .env("NO_PROXY", "127.0.0.1,::1")
+            .env("no_proxy", "127.0.0.1,::1")
             .env("CONFCTL_TTY", "0")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -500,11 +442,16 @@ esac
                 bytes.extend(fs::read(e.unwrap().path()).unwrap());
             }
         }
-        for secret in [USER, PASSWORD, CODE, STEP, TOKEN] {
-            assert!(
-                !bytes.windows(secret.len()).any(|b| b == secret.as_bytes()),
-                "synthetic secret leaked (value withheld)"
-            );
+        for secret in [USER, PASSWORD, NEW_PASSWORD, CODE, STEP, TOKEN] {
+            let encoded = serde_json::to_string(secret).unwrap();
+            for representation in [secret, &encoded[1..encoded.len() - 1]] {
+                assert!(
+                    !bytes
+                        .windows(representation.len())
+                        .any(|b| b == representation.as_bytes()),
+                    "synthetic secret leaked (value withheld)"
+                );
+            }
         }
     }
     fn containers(&self) -> PathBuf {
@@ -546,9 +493,15 @@ fn gen_data_all_publishes_fixture_bytes_once_preserving_modes_and_native_order()
         0o640
     );
     let calls = server.events();
-    assert_eq!(calls.iter().filter(|s| s.starts_with("OPTIONS")).count(), 2);
-    assert_eq!(calls.iter().filter(|s| s.ends_with("/nets")).count(), 1);
-    assert!(calls.last().unwrap().ends_with("/nets"));
+    assert!(!calls.iter().any(|s| s.starts_with("OPTIONS")));
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|s| s.ends_with("/v7.0/networks"))
+            .count(),
+        1
+    );
+    assert!(calls.last().unwrap().ends_with("/v7.0/networks"));
     assert!(!String::from_utf8_lossy(&out.stderr).contains("Timing:"));
     let nix = fs::read_to_string(f.root.join("nix-calls")).unwrap();
     assert_eq!(nix.lines().count(), 3);
@@ -571,19 +524,17 @@ fn gen_data_network_has_no_flake_nix_pagination_or_credential_replay() {
     for mode in [
         "normal",
         "empty",
-        "empty-step",
+        "direct",
+        "reset",
         "multi",
-        "types",
         "expire",
-        "minor",
+        "reset-expire",
     ] {
         let f = Fixture::new();
         fs::remove_file(f.root.join("flake.nix")).unwrap();
         let server = Server::new(mode, &f.root);
-        let input = if mode.starts_with("types") {
-            format!(
-                "{USER}\n{PASSWORD}\n public \n+007\n1.25\nYES\n2026-10-20\n009\n \narbitrary\n"
-            )
+        let input = if matches!(mode, "reset" | "multi" | "reset-expire") {
+            format!("{USER}\n{PASSWORD}\n{NEW_PASSWORD}\n{NEW_PASSWORD}\n{CODE}\n")
         } else {
             credentials()
         };
@@ -596,7 +547,7 @@ fn gen_data_network_has_no_flake_nix_pagination_or_credential_replay() {
             server
                 .events()
                 .iter()
-                .filter(|s| s.ends_with("/nets"))
+                .filter(|s| s.ends_with("/v7.0/networks"))
                 .count(),
             1
         );
@@ -604,9 +555,13 @@ fn gen_data_network_has_no_flake_nix_pagination_or_credential_replay() {
             server
                 .events()
                 .iter()
-                .filter(|s| s.ends_with("/auth/start"))
+                .filter(|s| s.ends_with("/_auth/token/tokens"))
                 .count(),
-            if mode == "expire" { 2 } else { 1 }
+            if matches!(mode, "expire" | "reset-expire") {
+                2
+            } else {
+                1
+            }
         );
     }
 }
@@ -633,14 +588,17 @@ fn gen_data_containers_keep_inventory_filtering_duplicates_empty_and_lazy_associ
                     .iter()
                     .filter(|s| s.starts_with("OPTIONS"))
                     .count(),
-                1
+                0
             );
         } else {
             assert!(text.contains("\".d\""));
             assert_eq!(text.matches("node =").count(), 1);
             let calls = server.events();
             assert_eq!(
-                calls.iter().filter(|s| s.starts_with("GET /vps/")).count(),
+                calls
+                    .iter()
+                    .filter(|s| s.starts_with("GET /v7.0/vpses/"))
+                    .count(),
                 3
             );
             assert!(calls.iter().any(|s| s.contains("a%2Fb%20%3F%C3%A9")));
@@ -648,13 +606,13 @@ fn gen_data_containers_keep_inventory_filtering_duplicates_empty_and_lazy_associ
                 assert_eq!(
                     calls
                         .iter()
-                        .filter(|s| s.starts_with("GET /nodes/"))
+                        .filter(|s| s.starts_with("GET /v7.0/nodes/"))
                         .count(),
                     3
                 );
             } else {
                 assert!(text.contains("id = 8"));
-                assert!(!calls.iter().any(|s| s.starts_with("GET /nodes/")));
+                assert!(!calls.iter().any(|s| s.starts_with("GET /v7.0/nodes/")));
             }
         }
     }
@@ -663,12 +621,10 @@ fn gen_data_containers_keep_inventory_filtering_duplicates_empty_and_lazy_associ
 fn gen_data_errors_keep_old_files_and_partial_all_without_secret_diagnostics() {
     for mode in [
         "auth-error",
-        "foreign-auth",
-        "userinfo",
-        "required",
-        "major",
-        "layout",
-        "blocking",
+        "unknown-step",
+        "invalid-token",
+        "wrong-scalar",
+        "unauthorized",
         "bad-json",
         "wrong-shape",
         "http-error",
@@ -724,15 +680,34 @@ fn gen_data_errors_keep_old_files_and_partial_all_without_secret_diagnostics() {
             assert_eq!(fs::read(f.networks()).unwrap(), b"old-network");
             assert_eq!(fs::read(f.containers()).unwrap(), b"old-container");
         }
-        if matches!(
-            mode,
-            "foreign-auth" | "userinfo" | "required" | "major" | "output-fail"
-        ) {
+        if mode == "output-fail" {
             assert!(!calls.iter().any(|s| s.starts_with("POST")));
         }
-        assert!(calls.iter().filter(|s| s.ends_with("/nets")).count() <= 1);
-        if mode == "auth-error" {
+        assert!(
+            calls
+                .iter()
+                .filter(|s| s.ends_with("/v7.0/networks"))
+                .count()
+                <= 1
+        );
+        if matches!(mode, "auth-error" | "unknown-step" | "invalid-token") {
             assert!(!f.root.join("nix-calls").exists());
+            assert_eq!(calls.len(), 1);
+        }
+        if matches!(mode, "unauthorized" | "denied") {
+            assert_eq!(
+                calls
+                    .iter()
+                    .filter(|s| s.ends_with("/_auth/token/tokens"))
+                    .count(),
+                1
+            );
+        }
+        if mode == "unknown-step" {
+            assert!(
+                String::from_utf8_lossy(&out.stderr)
+                    .contains("unsupported authentication continuation")
+            );
         }
         if mode == "nix-error" {
             let text = String::from_utf8_lossy(&out.stderr);
@@ -902,16 +877,15 @@ fn gen_data_protected_password_challenge_cancel_eof_restore_existing_pty_owner()
         }
         let calls = server.events();
         if mode != "pty-success" {
-            assert!(!calls.iter().any(|s| s.starts_with("OPTIONS")));
+            assert!(calls.is_empty());
             assert!(!f.networks().exists());
         }
     }
 }
 
 #[test]
-fn gen_data_iso8601_compact_challenges_and_token_expiry_use_the_same_offset_rule() {
+fn gen_data_iso8601_token_expiry_preserves_compact_offsets_and_fractional_instants() {
     for (mode, requests) in [
-        ("types-compact", 1),
         ("expire-compact", 2),
         ("expire-offset", 2),
         ("expire-future-offset", 1),
@@ -920,27 +894,20 @@ fn gen_data_iso8601_compact_challenges_and_token_expiry_use_the_same_offset_rule
     ] {
         let fixture = Fixture::new();
         let server = Server::new(mode, &fixture.root);
-        let input = if mode == "types-compact" {
-            format!(
-                "{USER}\n{PASSWORD}\n public \n+007\n1.25\nYES\n2026-10-20T00:00:00.123456789-0430\n009\n \narbitrary\n"
-            )
-        } else {
-            credentials()
-        };
-        let output = fixture.run(&server, mode, "network", &input);
+        let output = fixture.run(&server, mode, "network", &credentials());
         fixture.secret_free(&output);
         let events = server.events();
         assert_eq!(
             events
                 .iter()
-                .filter(|event| event.ends_with("/auth/start"))
+                .filter(|event| event.ends_with("/_auth/token/tokens"))
                 .count(),
             requests
         );
         if mode == "expire-malformed" {
             assert!(!output.status.success());
             assert!(!fixture.networks().exists());
-            assert!(!events.iter().any(|event| event.ends_with("/nets")));
+            assert!(!events.iter().any(|event| event.ends_with("/v7.0/networks")));
             assert!(String::from_utf8_lossy(&output.stderr).contains("invalid token expiry"));
         } else {
             succeeded(&output);
