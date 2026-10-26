@@ -15,6 +15,14 @@ pub fn diagnostic(text: &str, style: Style, color: bool) -> Vec<u8> {
     }
 }
 
+pub fn styled_diagnostic(parts: &[(Style, String)], color: bool) -> Vec<u8> {
+    let mut output = String::new();
+    for (style, text) in parts {
+        value(&mut output, text, *style, color);
+    }
+    output.into_bytes()
+}
+
 fn style_code(style: Style) -> Option<&'static str> {
     Some(match style {
         Style::Plain => return None,
@@ -321,6 +329,21 @@ mod tests {
             styled_table(&columns, &rows, &[vec![Style::Success]], &format, false).expect("Never"),
             " A:  é\n     界\n B:  last\n\n".as_bytes()
         );
+    }
+
+    #[test]
+    fn mixed_diagnostic_preserves_order_spacing_and_bytes_when_uncolored() {
+        let parts = vec![
+            (Style::Heading, "Built generations\n".into()),
+            (Style::Machine, "node: ".into()),
+            (Style::Generation, "gen-界".into()),
+            (Style::Plain, " (reused)\n".into()),
+        ];
+        assert_eq!(
+            styled_diagnostic(&parts, false),
+            "Built generations\nnode: gen-界 (reused)\n".as_bytes()
+        );
+        assert_eq!(styled_diagnostic(&parts, true), "\x1b[1mBuilt generations\n\x1b[0m\x1b[33mnode: \x1b[0m\x1b[36mgen-界\x1b[0m (reused)\n".as_bytes());
     }
 
     #[test]

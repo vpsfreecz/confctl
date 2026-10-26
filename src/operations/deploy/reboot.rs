@@ -1,5 +1,5 @@
 //! One reboot request and serial uptime observations, without a remote retry.
-use super::{check_cancel, checked, diagnostic, process_error};
+use super::{check_cancel, checked, diagnostic, diagnostic_style, process_error};
 use crate::{
     app::Context,
     domain::{Machine, WaitOnline},
@@ -63,6 +63,13 @@ impl<'a> Budget<'a> {
     }
 }
 
+/// Only an acknowledged terminal row may be included in a machine checkpoint.
+/// An error before admission (including a prompt failure) creates no such row.
+pub(super) struct Completion {
+    pub outcome: Result<Outcome, ConfctlError>,
+    pub terminal_task: Option<TaskId>,
+}
+
 pub(super) async fn run(
     ctx: &Context,
     machine: &Machine,
@@ -70,93 +77,107 @@ pub(super) async fn run(
     task: TaskId,
     wait: &WaitOnline,
     interactive: bool,
-) -> Result<Outcome, ConfctlError> {
-    check_cancel(&ctx.cancellation)?;
-    // Carried targets can have a null direct address; never resolve it here.
-    let reason = if machine.carrier.is_some() {
-        Some("carried machines are not rebooted")
-    } else if connection::target_host(machine)? == "localhost" {
-        Some("localhost is not rebooted")
-    } else {
-        None
-    };
-    if let Some(reason) = reason {
-        checked(
-            &ctx.events,
-            &ctx.cancellation,
-            diagnostic(&format!("{}: {reason}.\n", machine.name)),
-        )
-        .await?;
-        return Ok(Outcome::Skipped);
-    }
-    if interactive {
-        let accepted = loop {
-            let line = ctx
-                .ui
-                .line(format!("Reboot {}? [y/N]: ", machine.name))
-                .await?;
-            check_cancel(&ctx.cancellation)?;
-            let answer = line.trim_ascii().to_ascii_lowercase();
-            match answer.as_slice() {
-                b"y" => break true,
-                b"" | b"n" => break false,
-                _ => {}
-            }
+) -> Completion {
+    let mut terminal_task = None;
+    let outcome = async {
+        check_cancel(&ctx.cancellation)?;
+        // Carried targets can have a null direct address; never resolve it here.
+        let reason = if machine.carrier.is_some() {
+            Some("carried machines are not rebooted")
+        } else if connection::target_host(machine)? == "localhost" {
+            Some("localhost is not rebooted")
+        } else {
+            None
         };
-        checked(&ctx.events, &ctx.cancellation, diagnostic("\n")).await?;
-        if !accepted {
+        if let Some(reason) = reason {
             checked(
                 &ctx.events,
                 &ctx.cancellation,
-                diagnostic(&format!("{}: reboot declined.\n", machine.name)),
+                diagnostic_style(Style::Incomplete, &format!("{}: {reason}.\n", machine.name)),
             )
             .await?;
             return Ok(Outcome::Skipped);
         }
-    }
-    let description = format!("reboot/wait on {}", machine.name);
-    ctx.events
-        .emit(UiEvent::TaskPending {
-            task,
-            description: description.clone(),
-        })
-        .await?;
-    let result = async {
-        checked(
-            &ctx.events,
-            &ctx.cancellation,
-            UiEvent::LogAvailable {
+        if interactive {
+            let accepted = loop {
+                let line = ctx
+                    .ui
+                    .line(format!("Reboot {}? [y/N]: ", machine.name))
+                    .await?;
+                check_cancel(&ctx.cancellation)?;
+                let answer = line.trim_ascii().to_ascii_lowercase();
+                match answer.as_slice() {
+                    b"y" => break true,
+                    b"" | b"n" => break false,
+                    _ => {}
+                }
+            };
+            checked(&ctx.events, &ctx.cancellation, diagnostic("\n")).await?;
+            if !accepted {
+                checked(
+                    &ctx.events,
+                    &ctx.cancellation,
+                    diagnostic_style(
+                        Style::Incomplete,
+                        &format!("{}: reboot declined.\n", machine.name),
+                    ),
+                )
+                .await?;
+                return Ok(Outcome::Skipped);
+            }
+        }
+        let description = format!("reboot/wait on {}", machine.name);
+        ctx.events
+            .emit(UiEvent::TaskPending {
                 task,
-                path: ctx.log_path().into(),
-            },
-        )
-        .await?;
-        checked(
-            &ctx.events,
-            &ctx.cancellation,
-            UiEvent::TaskStarted { task, description },
-        )
-        .await?;
-        let _phase = ctx.timing.phase(Phase::RebootWait);
-        execute(ctx, machine, ssh_config, task, wait).await
+                description: description.clone(),
+            })
+            .await?;
+        let result = async {
+            checked(
+                &ctx.events,
+                &ctx.cancellation,
+                UiEvent::LogAvailable {
+                    task,
+                    path: ctx.log_path().into(),
+                },
+            )
+            .await?;
+            checked(
+                &ctx.events,
+                &ctx.cancellation,
+                UiEvent::TaskStarted { task, description },
+            )
+            .await?;
+            let _phase = ctx.timing.phase(Phase::RebootWait);
+            execute(ctx, machine, ssh_config, task, wait).await
+        }
+        .await;
+        let state = match &result {
+            Ok(Outcome::NoWait {
+                native_success: false,
+            }) => TaskState::Failed,
+            Ok(_) => TaskState::Succeeded,
+            Err(error) if error.is_cancelled() => TaskState::Canceled,
+            Err(_) => TaskState::Failed,
+        };
+        let delivery = ctx.events.emit(UiEvent::TaskFinished { task, state }).await;
+        if delivery.is_ok() {
+            terminal_task = Some(task);
+        }
+        match (result, delivery) {
+            (Err(error), Err(later)) => Err(error.with_secondary(vec![later])),
+            (Err(error), _) | (_, Err(error)) => Err(error),
+            (Ok(outcome), Ok(())) => {
+                check_cancel(&ctx.cancellation)?;
+                Ok(outcome)
+            }
+        }
     }
     .await;
-    let state = match &result {
-        Ok(Outcome::NoWait {
-            native_success: false,
-        }) => TaskState::Failed,
-        Ok(_) => TaskState::Succeeded,
-        Err(error) if error.is_cancelled() => TaskState::Canceled,
-        Err(_) => TaskState::Failed,
-    };
-    let delivery = ctx.events.emit(UiEvent::TaskFinished { task, state }).await;
-    match (result, delivery) {
-        (Err(error), Err(later)) => Err(error.with_secondary(vec![later])),
-        (Err(error), _) | (_, Err(error)) => Err(error),
-        (Ok(outcome), Ok(())) => {
-            check_cancel(&ctx.cancellation)?;
-            Ok(outcome)
-        }
+    Completion {
+        outcome,
+        terminal_task,
     }
 }
 
@@ -238,10 +259,13 @@ async fn execute(
         checked(
             &ctx.events,
             &ctx.cancellation,
-            diagnostic(&format!(
-                "{}: reboot command completed with {}; online state unverified (nowait).\n",
-                machine.name, outcome.status
-            )),
+            diagnostic_style(
+                Style::Incomplete,
+                &format!(
+                    "{}: reboot command completed with {}; online state unverified (nowait).\n",
+                    machine.name, outcome.status
+                ),
+            ),
         )
         .await
         .map_err(|error| process_error(error, outcome))?;
@@ -367,7 +391,7 @@ impl Waiting<'_> {
                 let uptime = valid_uptime(&status, &self.machine.name)?;
                 if uptime < baseline {
                     self.progress("lower uptime observed").await?;
-                    checked(&self.ctx.events, &self.ctx.cancellation, diagnostic(&format!("{}: lower uptime observed ({uptime} < {baseline}); command causality and target generation unverified.\n", self.machine.name))).await?;
+                    checked(&self.ctx.events, &self.ctx.cancellation, diagnostic_style(Style::Machine, &format!("{}: lower uptime observed ({uptime} < {baseline}); command causality and target generation unverified.\n", self.machine.name))).await?;
                     return Ok(Outcome::Online);
                 }
                 "uptime unchanged or increasing"
@@ -376,12 +400,15 @@ impl Waiting<'_> {
             checked(
                 &self.ctx.events,
                 &self.ctx.cancellation,
-                diagnostic(&format!(
-                    "{}: {state}; {:.1}s elapsed; {}.\n",
-                    self.machine.name,
-                    self.start.elapsed().as_secs_f64(),
-                    self.budget.remaining(self.start.elapsed())
-                )),
+                diagnostic_style(
+                    Style::Machine,
+                    &format!(
+                        "{}: {state}; {:.1}s elapsed; {}.\n",
+                        self.machine.name,
+                        self.start.elapsed().as_secs_f64(),
+                        self.budget.remaining(self.start.elapsed())
+                    ),
+                ),
             )
             .await?;
             if self.budget.expired(self.start.elapsed()) {
@@ -402,6 +429,61 @@ impl Waiting<'_> {
 mod tests {
     use super::*;
     use crate::native_tool;
+    #[tokio::test]
+    async fn skipped_reboot_is_yellow_and_never_admits_native_work_or_success() {
+        use crate::{events::EventSink, process::Supervisor, terminal::Ui, timing::Timing};
+        for carried in [false, true] {
+            let directory = tempfile::tempdir().unwrap();
+            let (events, mut receiver) = EventSink::channel(1);
+            let consumer = tokio::spawn(async move {
+                let mut seen = Vec::new();
+                while let Some(delivery) = receiver.receive().await {
+                    let (event, ack) = delivery.into_parts();
+                    seen.push(event);
+                    ack.acknowledge(Ok(()));
+                }
+                seen
+            });
+            let cancellation = CancellationToken::new();
+            let ui = Ui::new(
+                std::fs::File::open("/dev/null").unwrap(),
+                events.clone(),
+                cancellation.clone(),
+                None,
+            )
+            .unwrap();
+            let runner = Supervisor::new(
+                events.clone(),
+                directory.path().into(),
+                64,
+                Duration::from_millis(20),
+                None,
+                None,
+            );
+            let ctx = Context::for_test(
+                directory.path().into(),
+                cancellation,
+                events,
+                runner,
+                ui,
+                Timing::start(),
+                directory.path().join("log"),
+            );
+            let machine = Machine::from_value(serde_json::json!({"name":"host", "metaConfig":{"host":{"target":"localhost"}}, "carrier":if carried { serde_json::json!("carrier") } else { serde_json::Value::Null }})).unwrap();
+            let completion = run(&ctx, &machine, None, TaskId(1), &WaitOnline::NoWait, false).await;
+            assert_eq!(completion.outcome.unwrap(), Outcome::Skipped);
+            assert_eq!(completion.terminal_task, None);
+            ctx.ui.shutdown().unwrap();
+            drop(ctx);
+            let seen = consumer.await.unwrap();
+            assert_eq!(seen.len(), 1);
+            assert!(
+                matches!(&seen[0], UiEvent::Diagnostic { stream: OutputStream::Stdout, style: Style::Incomplete, text }
+                if text == if carried { "host: carried machines are not rebooted.\n" } else { "host: localhost is not rebooted.\n" })
+            );
+        }
+    }
+
     #[tokio::test]
     async fn waiting_output_ack_failure_or_cancel_joins_the_entered_native_child() {
         use crate::{events::EventSink, process::Supervisor, terminal::Ui, timing::Timing};

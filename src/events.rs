@@ -11,6 +11,15 @@ use tokio::sync::{mpsc, oneshot};
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct TaskId(pub u64);
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct CommandId(pub u64);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BuildPhase {
+    Begin,
+    End,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OutputStream {
     Stdout,
@@ -78,10 +87,12 @@ impl Default for TableFormat {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ActivityCount {
-    pub observed: u64,
-    pub total: Option<u64>,
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct NixActivityProgress {
+    pub done: u64,
+    pub expected: u64,
+    pub running: u64,
+    pub failed: u64,
 }
 
 #[derive(Debug, PartialEq)]
@@ -93,7 +104,7 @@ pub enum UiEvent {
         preview: Vec<UiEvent>,
         text: String,
     },
-    /// Prelude contains only Table/Diagnostic values, validated before dedup.
+    /// Prelude contains only presentation values, validated before dedup.
     OperationGroup {
         group: u64,
         description: String,
@@ -115,13 +126,25 @@ pub enum UiEvent {
         bytes: Vec<u8>,
     },
     CommandStarting {
+        command: CommandId,
         task: TaskId,
         display: String,
     },
+    CommandFinished {
+        command: CommandId,
+    },
+    BuildPhase(BuildPhase),
     BuildProgress {
         task: TaskId,
-        building: ActivityCount,
-        fetching: ActivityCount,
+        building: Option<NixActivityProgress>,
+        fetching: Option<NixActivityProgress>,
+    },
+    /// One operation-owned terminal unit, independent of other admitted work.
+    Checkpoint {
+        key: TaskId,
+        label: String,
+        state: TaskState,
+        tasks: Vec<TaskId>,
     },
     Table {
         stream: OutputStream,
@@ -159,6 +182,10 @@ pub enum UiEvent {
         stream: OutputStream,
         style: Style,
         text: String,
+    },
+    StyledDiagnostic {
+        stream: OutputStream,
+        parts: Vec<(Style, String)>,
     },
 }
 

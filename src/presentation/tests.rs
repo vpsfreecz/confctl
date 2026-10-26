@@ -56,6 +56,11 @@ fn config(directory: &Path, live: bool) -> PresentationConfig {
         spool_dir: directory.into(),
         configuration_dir: None,
         invocation_log: None,
+        mode: if live {
+            PresentationMode::Full
+        } else {
+            PresentationMode::Plain
+        },
         policy: OutputPolicy {
             live,
             stdout_color: false,
@@ -110,6 +115,22 @@ fn mode_and_color_policy_are_independent_for_each_original_stream() {
                             no_color,
                         );
                         assert_eq!(policy.live, stdout && stderr && usable && tty_enabled);
+                        for requested_full in [false, true] {
+                            assert_eq!(
+                                PresentationMode::resolve(
+                                    policy.live,
+                                    stderr && usable && tty_enabled,
+                                    requested_full
+                                ),
+                                if requested_full && policy.live {
+                                    PresentationMode::Full
+                                } else if stderr && usable && tty_enabled {
+                                    PresentationMode::CommandSpinner
+                                } else {
+                                    PresentationMode::Plain
+                                },
+                            );
+                        }
                         for (tty, selected) in
                             [(stdout, policy.stdout_color), (stderr, policy.stderr_color)]
                         {
@@ -651,6 +672,223 @@ async fn group_prelude_is_once_and_duplicate_frames_are_validated_before_ignored
 }
 
 #[tokio::test]
+async fn checkpoints_publish_each_unit_once_without_finalizing_other_work() {
+    for live in [false, true] {
+        let directory = tempfile::tempdir().unwrap();
+        let (stdout, out) = writer(None, false);
+        let (stderr, _) = writer(None, false);
+        let (_sink, receiver) = EventSink::channel(1);
+        let (_state, observe) = watch::channel(TerminalState::Live);
+        let (_control, mut presentation) = Presentation::new(
+            receiver,
+            observe,
+            OutputTargets { stdout, stderr },
+            config(directory.path(), live),
+            None,
+        )
+        .unwrap();
+        for id in [1, 2] {
+            presentation
+                .event(UiEvent::TaskStarted {
+                    task: TaskId(id),
+                    description: format!("unit {id}"),
+                })
+                .unwrap();
+        }
+        presentation
+            .event(UiEvent::ActivityOutput {
+                task: TaskId(1),
+                stream: OutputStream::Stderr,
+                bytes: b"first unit native output\n".to_vec(),
+            })
+            .unwrap();
+        presentation
+            .event(UiEvent::ActivityOutput {
+                task: TaskId(2),
+                stream: OutputStream::Stderr,
+                bytes: b"other unfinished fragment".to_vec(),
+            })
+            .unwrap();
+        presentation
+            .event(UiEvent::TaskFinished {
+                task: TaskId(1),
+                state: crate::events::TaskState::Succeeded,
+            })
+            .unwrap();
+        let before = out.lock().unwrap().len();
+        presentation
+            .event(UiEvent::Checkpoint {
+                key: TaskId(1),
+                label: "Published group 1/2".into(),
+                state: crate::events::TaskState::Succeeded,
+                tasks: vec![TaskId(1)],
+            })
+            .unwrap();
+        if live {
+            let output = out.lock().unwrap();
+            assert_eq!(
+                String::from_utf8_lossy(&output[before..])
+                    .matches("Published group 1/2: succeeded\n")
+                    .count(),
+                1
+            );
+            assert!(
+                !String::from_utf8_lossy(&output[before..]).contains("first unit native output")
+            );
+            assert!(!presentation.model.finalized());
+            assert_eq!(
+                presentation.model.rows()[1].phase,
+                model::TaskPhase::Executing
+            );
+            assert_eq!(
+                presentation.model.current_tail_line(),
+                "other unfinished fragment"
+            );
+        } else {
+            assert_eq!(out.lock().unwrap().len(), before);
+        }
+        let after_first = out.lock().unwrap().len();
+        presentation
+            .event(UiEvent::Checkpoint {
+                key: TaskId(1),
+                label: "Published group 1/2".into(),
+                state: crate::events::TaskState::Succeeded,
+                tasks: vec![TaskId(1)],
+            })
+            .unwrap();
+        assert_eq!(out.lock().unwrap().len(), after_first);
+        presentation
+            .event(UiEvent::TaskFinished {
+                task: TaskId(2),
+                state: crate::events::TaskState::Failed,
+            })
+            .unwrap();
+        presentation
+            .event(UiEvent::Checkpoint {
+                key: TaskId(2),
+                label: "Machine 2 (health failed)".into(),
+                state: crate::events::TaskState::Failed,
+                tasks: vec![TaskId(2)],
+            })
+            .unwrap();
+        presentation.finalize_group().unwrap();
+        let bytes = out.lock().unwrap();
+        if live {
+            let text = String::from_utf8_lossy(&bytes);
+            assert_eq!(text.matches("Published group 1/2: succeeded\n").count(), 1);
+            assert_eq!(
+                text.matches("Machine 2 (health failed): failed\n").count(),
+                1
+            );
+            assert!(presentation.model.visible_rows(10).is_empty());
+            assert_eq!(text.matches("first unit native output").count(), 0);
+        } else {
+            assert!(bytes.is_empty());
+        }
+    }
+}
+
+#[tokio::test]
+async fn parked_checkpoint_acknowledges_owned_bytes_and_replays_before_the_next_panel() {
+    let directory = tempfile::tempdir().unwrap();
+    let (stdout, out) = writer(None, false);
+    let (stderr, _) = writer(None, false);
+    let (sink, receiver) = EventSink::channel(1);
+    let (state, observe) = watch::channel(TerminalState::Prompt);
+    let (control, presentation) = Presentation::new(
+        receiver,
+        observe,
+        OutputTargets { stdout, stderr },
+        config(directory.path(), true),
+        None,
+    )
+    .unwrap();
+    let running = tokio::spawn(presentation.run());
+    sink.emit(UiEvent::TaskStarted {
+        task: TaskId(1),
+        description: "published build".into(),
+    })
+    .await
+    .unwrap();
+    sink.emit(UiEvent::TaskFinished {
+        task: TaskId(1),
+        state: crate::events::TaskState::Succeeded,
+    })
+    .await
+    .unwrap();
+    sink.emit(UiEvent::Checkpoint {
+        key: TaskId(1),
+        label: "Published unit".into(),
+        state: crate::events::TaskState::Succeeded,
+        tasks: vec![TaskId(1)],
+    })
+    .await
+    .unwrap();
+    assert!(out.lock().unwrap().is_empty());
+    state.send_replace(TerminalState::Live);
+    sink.emit(UiEvent::TerminalState(TerminalState::Live))
+        .await
+        .unwrap();
+    control.finish().await.unwrap();
+    running.await.unwrap().unwrap();
+    let output = out.lock().unwrap();
+    let text = String::from_utf8_lossy(&output);
+    assert!(text.starts_with("Published unit: succeeded\npublished build: succeeded 0\n"));
+    assert_eq!(text.matches("Published unit: succeeded").count(), 1);
+    assert!(
+        !text.contains("Command: confctl"),
+        "a fully snapshotted unit must not reopen an empty panel"
+    );
+}
+
+#[tokio::test]
+async fn checkpoint_write_failure_retains_exact_snapshot_without_marking_it_delivered() {
+    let directory = tempfile::tempdir().unwrap();
+    let (stdout, _) = writer(Some(0), false);
+    let (stderr, _) = writer(None, false);
+    let (_sink, receiver) = EventSink::channel(1);
+    let (_state, observe) = watch::channel(TerminalState::Idle);
+    let (_control, mut presentation) = Presentation::new(
+        receiver,
+        observe,
+        OutputTargets { stdout, stderr },
+        config(directory.path(), true),
+        None,
+    )
+    .unwrap();
+    presentation
+        .event(UiEvent::TaskStarted {
+            task: TaskId(1),
+            description: "published build".into(),
+        })
+        .unwrap();
+    presentation
+        .event(UiEvent::TaskFinished {
+            task: TaskId(1),
+            state: crate::events::TaskState::Succeeded,
+        })
+        .unwrap();
+    assert!(
+        presentation
+            .event(UiEvent::Checkpoint {
+                key: TaskId(1),
+                label: "Published unit".into(),
+                state: crate::events::TaskState::Succeeded,
+                tasks: vec![TaskId(1)]
+            })
+            .is_err()
+    );
+    assert!(!presentation.model.was_snapshotted(TaskId(1)));
+    assert!(!presentation.seen_checkpoints.contains(&TaskId(1)));
+    let pending = presentation.pending();
+    assert_eq!(pending.stdout_replayed, 0);
+    assert_eq!(
+        bytes(&pending.stdout),
+        b"Published unit: succeeded\npublished build: succeeded 0\n"
+    );
+}
+
+#[tokio::test]
 async fn live_stream_sanitization_is_incremental_and_final_panel_does_not_replay_log() {
     let directory = tempfile::tempdir().expect("directory");
     let (stdout, out) = writer(None, false);
@@ -773,6 +1011,7 @@ async fn command_context_has_no_phantom_task_and_activity_never_replays_in_live_
         .unwrap();
         let running = tokio::spawn(presentation.run());
         sink.emit(UiEvent::CommandStarting {
+            command: crate::events::CommandId(10001),
             task: TaskId(0),
             display: "nix eval [arguments redacted]".into(),
         })
@@ -812,7 +1051,10 @@ async fn command_context_has_no_phantom_task_and_activity_never_replays_in_live_
             assert!(!text.contains("Output source"));
             assert!(!text.contains("task 0"));
             assert!(!text.contains("succeeded"));
-            assert!(text.contains("activity-fragment"));
+            assert!(
+                !text.contains("activity-fragment"),
+                "finish must not replay an unpainted tail"
+            );
         } else {
             assert_eq!(&*err, b"\x1b[31mactivity-fragment\x1b[0m\n");
         }
@@ -844,6 +1086,7 @@ async fn each_live_command_is_flushed_before_acknowledgement_and_fast_activity()
     ] {
         let start = out.lock().unwrap().len();
         sink.emit(UiEvent::CommandStarting {
+            command: crate::events::CommandId(10002),
             task: TaskId(id),
             display: display.into(),
         })
@@ -944,6 +1187,7 @@ async fn tiny_or_bounded_tail_commands_transfer_once_to_required_output() {
         .unwrap();
         let running = tokio::spawn(presentation.run());
         sink.emit(UiEvent::CommandStarting {
+            command: crate::events::CommandId(10003),
             task: TaskId(0),
             display: "nix build .#node".into(),
         })
@@ -979,6 +1223,7 @@ async fn command_paint_failure_rejects_admission_and_retains_checked_failure() {
     let running = tokio::spawn(presentation.run());
     assert!(
         sink.emit(UiEvent::CommandStarting {
+            command: crate::events::CommandId(10004),
             task: TaskId(0),
             display: "must not spawn".into(),
         })
@@ -1014,6 +1259,7 @@ async fn required_chunks_without_lf_survive_the_next_live_anchor_on_either_strea
             .unwrap();
         assert_eq!(&*bytes.lock().unwrap(), b"unfinished report chunk");
         sink.emit(UiEvent::CommandStarting {
+            command: crate::events::CommandId(10005),
             task: TaskId(0),
             display: "next command".into(),
         })
@@ -1069,7 +1315,7 @@ async fn omitted_and_shortened_task_rows_keep_full_final_source_associations() {
     control.finish().await.expect("finish");
     running.await.expect("join").expect("run");
     let rendered = String::from_utf8(out.lock().expect("stdout").clone()).expect("UTF-8");
-    assert!(rendered.contains("2 tasks not shown in full\n"));
+    assert!(!rendered.contains("tasks not shown in full"));
     assert!(rendered.contains("node-a activation with detailed error: failed 0\n"));
     assert!(rendered.contains("node-b activation with detailed error: failed 0\n"));
 }
@@ -1108,8 +1354,8 @@ async fn checked_finish_keeps_missing_pending_and_executing_results_incomplete()
     // Every paint begins with Hide. Earlier timer paints may truthfully show
     // execution; only the checked final panel must show incomplete results.
     let final_panel = rendered.rsplit("\x1b[?25l").next().unwrap();
-    assert!(final_panel.contains("incomplete (last pending) 0 node-a"));
-    assert!(final_panel.contains("incomplete (last running) 0 node-b"));
+    assert!(final_panel.contains("node-a: incomplete (last pending) 0"));
+    assert!(final_panel.contains("node-b: incomplete (last running) 0"));
     assert!(!final_panel.contains("succeeded"));
     assert!(!final_panel.contains("canceled"));
     assert!(!final_panel.contains("running @2"));
@@ -1234,6 +1480,556 @@ async fn typed_table_cells_follow_color_policy_without_coloring_headers_or_paddi
                 b"N\nx\n".to_vec()
             }
         );
+    }
+}
+
+#[tokio::test]
+async fn styled_diagnostics_are_atomic_frame_values_with_original_stream_color_policy() {
+    for (mode, no_color) in [
+        (ColorMode::Always, true),
+        (ColorMode::Never, false),
+        (ColorMode::Auto, true),
+    ] {
+        for live in [false, true] {
+            let directory = tempfile::tempdir().unwrap();
+            let (stdout, out) = writer(None, false);
+            let (stderr, err) = writer(None, false);
+            let (_sink, receiver) = EventSink::channel(1);
+            let (state, observe) = watch::channel(TerminalState::Prompt);
+            let mut settings = config(directory.path(), live);
+            let policy = OutputPolicy::resolve(mode, true, false, true, true, no_color);
+            settings.policy.stdout_color = policy.stdout_color;
+            settings.policy.stderr_color = policy.stderr_color;
+            let (_control, mut presentation) = Presentation::new(
+                receiver,
+                observe,
+                OutputTargets { stdout, stderr },
+                settings,
+                None,
+            )
+            .unwrap();
+            let parts = vec![
+                (Style::Heading, "Built generations\n".into()),
+                (Style::Generation, "node: gen\n".into()),
+            ];
+            let event = || UiEvent::StyledDiagnostic {
+                stream: OutputStream::Stdout,
+                parts: parts.clone(),
+            };
+            validate_frame(&[event()]).unwrap();
+            presentation
+                .event(UiEvent::OperationGroup {
+                    group: 1,
+                    description: "styled group".into(),
+                    prelude: vec![event()],
+                })
+                .unwrap();
+            assert!(out.lock().unwrap().is_empty(), "parked frame stays owned");
+            let expected = plain::styled_diagnostic(&parts, policy.stdout_color);
+            assert_eq!(
+                std::fs::read(presentation.stdout.file.as_ref().unwrap().path()).unwrap(),
+                expected
+            );
+            presentation
+                .event(UiEvent::StyledDiagnostic {
+                    stream: OutputStream::Stderr,
+                    parts: parts.clone(),
+                })
+                .unwrap();
+            assert_eq!(
+                std::fs::read(presentation.stderr.file.as_ref().unwrap().path()).unwrap(),
+                plain::styled_diagnostic(&parts, policy.stderr_color)
+            );
+            state.send_replace(TerminalState::Idle);
+            presentation.transition(TerminalState::Idle).unwrap();
+            assert_eq!(*out.lock().unwrap(), expected);
+            assert_eq!(
+                *err.lock().unwrap(),
+                plain::styled_diagnostic(&parts, policy.stderr_color)
+            );
+            presentation.finalize_group().unwrap();
+            presentation.cleaned = true;
+        }
+    }
+}
+
+#[tokio::test]
+async fn styled_prompt_preview_is_one_atomic_sanitized_presentation_value() {
+    let directory = tempfile::tempdir().unwrap();
+    let (stdout, out) = writer(None, false);
+    let (stderr, _) = writer(None, false);
+    let (_sink, receiver) = EventSink::channel(1);
+    let (_state, observe) = watch::channel(TerminalState::Prompt);
+    let (_control, mut presentation) = Presentation::new(
+        receiver,
+        observe,
+        OutputTargets { stdout, stderr },
+        config(directory.path(), true),
+        None,
+    )
+    .unwrap();
+    presentation
+        .event(UiEvent::PromptFrame {
+            preview: vec![UiEvent::StyledDiagnostic {
+                stream: OutputStream::Stdout,
+                parts: vec![
+                    (Style::Heading, "Plan: ".into()),
+                    (Style::Generation, "\x1b[31mgen\x1b[0m\n".into()),
+                ],
+            }],
+            text: "Continue? ".into(),
+        })
+        .unwrap();
+    assert_eq!(&*out.lock().unwrap(), b"Plan: gen\nContinue? ");
+    presentation.cleaned = true;
+}
+
+#[tokio::test]
+async fn compact_commands_use_unique_ids_suppress_visible_output_and_never_resurrect_peers() {
+    let directory = tempfile::tempdir().unwrap();
+    let (stdout, out) = writer(None, false);
+    let (stderr, err) = writer(None, false);
+    let (_sink, receiver) = EventSink::channel(1);
+    let (_state, observe) = watch::channel(TerminalState::Live);
+    let mut settings = config(directory.path(), false);
+    settings.mode = PresentationMode::CommandSpinner;
+    let (_control, mut presentation) = Presentation::new(
+        receiver,
+        observe,
+        OutputTargets { stdout, stderr },
+        settings,
+        None,
+    )
+    .unwrap();
+    for (id, display) in [
+        (1, "nix eval --json safe"),
+        (2, "second capture-only command"),
+    ] {
+        presentation
+            .event(UiEvent::CommandStarting {
+                command: crate::events::CommandId(id),
+                task: TaskId(0),
+                display: display.into(),
+            })
+            .unwrap();
+    }
+    assert!(out.lock().unwrap().is_empty(), "transients are stderr-only");
+    let shown = String::from_utf8(err.lock().unwrap().clone()).unwrap();
+    assert!(shown.contains("nix eval --json safe") && shown.contains("+1 running"));
+    assert!(!shown.contains("Command:") && !shown.contains("Live view"));
+    // A capture-only child emits no output event. Completion of its own ID
+    // clears it while the other ID remains admitted despite shared TaskId0.
+    presentation
+        .event(UiEvent::CommandFinished {
+            command: crate::events::CommandId(2),
+        })
+        .unwrap();
+    assert_eq!(presentation.commands.len(), 1);
+    presentation
+        .event(UiEvent::Output {
+            task: TaskId(0),
+            stream: OutputStream::Stdout,
+            bytes: b"exact-no-LF".to_vec(),
+        })
+        .unwrap();
+    assert_eq!(&*out.lock().unwrap(), b"exact-no-LF");
+    assert!(
+        presentation
+            .commands
+            .iter()
+            .all(|command| command.suppressed)
+    );
+    let bytes = err.lock().unwrap().len();
+    presentation.paint_now().unwrap();
+    presentation
+        .event(UiEvent::CommandFinished {
+            command: crate::events::CommandId(1),
+        })
+        .unwrap();
+    presentation
+        .event(UiEvent::CommandFinished {
+            command: crate::events::CommandId(99),
+        })
+        .unwrap();
+    presentation
+        .event(UiEvent::CommandStarting {
+            command: crate::events::CommandId(3),
+            task: TaskId(0),
+            display: "must stay suppressed at uncertain cursor".into(),
+        })
+        .unwrap();
+    assert_eq!(err.lock().unwrap().len(), bytes);
+    presentation
+        .event(UiEvent::Output {
+            task: TaskId(0),
+            stream: OutputStream::Stdout,
+            bytes: b"\n".to_vec(),
+        })
+        .unwrap();
+    presentation.paint_now().unwrap();
+    assert_eq!(
+        err.lock().unwrap().len(),
+        bytes,
+        "same command cannot revive after visible output"
+    );
+    presentation
+        .event(UiEvent::CommandFinished {
+            command: crate::events::CommandId(3),
+        })
+        .unwrap();
+    presentation
+        .event(output(OutputStream::Stderr, b"stderr anchor\n"))
+        .unwrap();
+    presentation
+        .event(UiEvent::CommandStarting {
+            command: crate::events::CommandId(4),
+            task: TaskId(0),
+            display: "later independent quiet child".into(),
+        })
+        .unwrap();
+    assert!(
+        String::from_utf8(err.lock().unwrap().clone())
+            .unwrap()
+            .contains("later independent quiet child")
+    );
+    presentation.finalize_group().unwrap();
+    assert!(
+        !presentation
+            .spinner_painter
+            .as_ref()
+            .unwrap()
+            .has_viewport()
+    );
+    presentation.cleaned = true;
+}
+
+#[tokio::test]
+async fn redirected_stdout_lf_cannot_reopen_spinner_over_unfinished_required_stderr() {
+    for full_available in [false, true] {
+        let directory = tempfile::tempdir().unwrap();
+        let (stdout, out) = writer(None, false);
+        let (stderr, err) = writer(None, false);
+        let (_sink, receiver) = EventSink::channel(1);
+        let (_state, observe) = watch::channel(TerminalState::Live);
+        let mut settings = config(directory.path(), full_available);
+        settings.mode = PresentationMode::CommandSpinner;
+        let (_control, mut presentation) = Presentation::new(
+            receiver,
+            observe,
+            OutputTargets { stdout, stderr },
+            settings,
+            None,
+        )
+        .unwrap();
+        presentation
+            .event(UiEvent::CommandStarting {
+                command: crate::events::CommandId(1),
+                task: TaskId(1),
+                display: "child A".into(),
+            })
+            .unwrap();
+        presentation
+            .event(output(OutputStream::Stderr, b"required stderr without LF"))
+            .unwrap();
+        presentation
+            .event(UiEvent::CommandFinished {
+                command: crate::events::CommandId(1),
+            })
+            .unwrap();
+        assert!(err.lock().unwrap().ends_with(b"required stderr without LF"));
+        let before = err.lock().unwrap().clone();
+        presentation
+            .event(output(OutputStream::Stdout, b"report to redirected file\n"))
+            .unwrap();
+        presentation
+            .event(UiEvent::CommandStarting {
+                command: crate::events::CommandId(2),
+                task: TaskId(2),
+                display: "child B".into(),
+            })
+            .unwrap();
+        presentation.paint_now().unwrap();
+        presentation
+            .event(UiEvent::CommandFinished {
+                command: crate::events::CommandId(2),
+            })
+            .unwrap();
+        presentation.finalize_group().unwrap();
+        assert_eq!(&*out.lock().unwrap(), b"report to redirected file\n");
+        assert_eq!(
+            *err.lock().unwrap(),
+            before,
+            "no transient write may erase the required stderr prefix"
+        );
+        presentation.cleaned = true;
+    }
+}
+
+#[tokio::test]
+async fn compact_prompt_foreground_resize_and_finish_keep_the_existing_terminal_owner() {
+    let directory = tempfile::tempdir().unwrap();
+    let (stdout, _) = writer(None, false);
+    let (stderr, err) = writer(None, false);
+    let (_sink, receiver) = EventSink::channel(1);
+    let (_state, observe) = watch::channel(TerminalState::Live);
+    let mut settings = config(directory.path(), true);
+    settings.mode = PresentationMode::CommandSpinner;
+    let (_control, mut presentation) = Presentation::new(
+        receiver,
+        observe,
+        OutputTargets { stdout, stderr },
+        settings,
+        None,
+    )
+    .unwrap();
+    for (id, state) in [
+        (1, TerminalState::Prompt),
+        (2, TerminalState::ExternalChild),
+    ] {
+        presentation
+            .event(UiEvent::CommandStarting {
+                command: crate::events::CommandId(id),
+                task: TaskId(id),
+                display: "quiet child".into(),
+            })
+            .unwrap();
+        presentation.transition(state).unwrap();
+        assert!(
+            !presentation
+                .spinner_painter
+                .as_ref()
+                .unwrap()
+                .has_viewport()
+        );
+        let parked = err.lock().unwrap().len();
+        presentation.paint_now().unwrap();
+        assert_eq!(err.lock().unwrap().len(), parked);
+        presentation.transition(TerminalState::Live).unwrap();
+        presentation.paint_now().unwrap();
+        assert_eq!(
+            err.lock().unwrap().len(),
+            parked,
+            "foreign cursor cannot be guessed"
+        );
+        presentation
+            .event(output(OutputStream::Stderr, b"visible line\n"))
+            .unwrap();
+        presentation
+            .event(UiEvent::CommandFinished {
+                command: crate::events::CommandId(id),
+            })
+            .unwrap();
+    }
+    presentation
+        .event(UiEvent::CommandStarting {
+            command: crate::events::CommandId(3),
+            task: TaskId(3),
+            display: "resize child".into(),
+        })
+        .unwrap();
+    presentation.config.initial_size = (40, 12);
+    presentation.paint_now().unwrap();
+    assert!(
+        !presentation
+            .spinner_painter
+            .as_ref()
+            .unwrap()
+            .has_viewport()
+    );
+    presentation.finalize_group().unwrap();
+    presentation.cleaned = true;
+}
+
+#[tokio::test]
+async fn build_scope_restores_compact_before_reports_without_finalizing_unrelated_work() {
+    let directory = tempfile::tempdir().unwrap();
+    let (stdout, out) = writer(None, false);
+    let (stderr, _) = writer(None, false);
+    let (_sink, receiver) = EventSink::channel(1);
+    let (_state, observe) = watch::channel(TerminalState::Live);
+    let mut settings = config(directory.path(), true);
+    settings.mode = PresentationMode::CommandSpinner;
+    settings.operation = "status".into();
+    let (_control, mut presentation) = Presentation::new(
+        receiver,
+        observe,
+        OutputTargets { stdout, stderr },
+        settings,
+        None,
+    )
+    .unwrap();
+    presentation
+        .event(UiEvent::TaskStarted {
+            task: TaskId(99),
+            description: "unrelated peer".into(),
+        })
+        .unwrap();
+    presentation
+        .event(UiEvent::BuildPhase(crate::events::BuildPhase::Begin))
+        .unwrap();
+    assert_eq!(presentation.mode, PresentationMode::Full);
+    assert!(
+        presentation
+            .event(UiEvent::BuildPhase(crate::events::BuildPhase::Begin))
+            .is_err()
+    );
+    presentation
+        .event(UiEvent::OperationGroup {
+            group: 1,
+            description: "build".into(),
+            prelude: vec![],
+        })
+        .unwrap();
+    presentation
+        .event(UiEvent::TaskStarted {
+            task: TaskId(1),
+            description: "build group".into(),
+        })
+        .unwrap();
+    presentation
+        .event(UiEvent::BuildProgress {
+            task: TaskId(1),
+            building: None,
+            fetching: None,
+        })
+        .unwrap();
+    presentation
+        .event(UiEvent::TaskFinished {
+            task: TaskId(1),
+            state: crate::events::TaskState::Failed,
+        })
+        .unwrap();
+    presentation
+        .event(UiEvent::BuildPhase(crate::events::BuildPhase::End))
+        .unwrap();
+    assert_eq!(presentation.mode, PresentationMode::CommandSpinner);
+    assert_eq!(presentation.config.operation, "status");
+    assert!(!presentation.model.finalized());
+    assert_eq!(
+        presentation.model.rows()[0].phase,
+        model::TaskPhase::Executing
+    );
+    assert!(presentation.model.was_snapshotted(TaskId(1)));
+    assert!(!presentation.model.was_snapshotted(TaskId(99)));
+    assert!(!presentation.painter.as_ref().unwrap().has_viewport());
+    let before = out.lock().unwrap().len();
+    presentation
+        .event(UiEvent::Diagnostic {
+            stream: OutputStream::Stdout,
+            style: Style::Heading,
+            text: "Built generations\nactual result\n".into(),
+        })
+        .unwrap();
+    presentation.paint_now().unwrap();
+    assert_eq!(
+        &out.lock().unwrap()[before..],
+        b"Built generations\nactual result\n"
+    );
+    assert!(
+        presentation
+            .event(UiEvent::BuildPhase(crate::events::BuildPhase::End))
+            .is_err()
+    );
+    presentation.cleaned = true;
+}
+
+#[tokio::test]
+async fn compact_completion_clears_owned_view_and_never_reopens_after_generations() {
+    for state in [
+        crate::events::TaskState::Succeeded,
+        crate::events::TaskState::Failed,
+        crate::events::TaskState::Canceled,
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let (stdout, out) = writer(None, false);
+        let (stderr, _) = writer(None, false);
+        let (_sink, receiver) = EventSink::channel(1);
+        let (_state, observe) = watch::channel(TerminalState::Live);
+        let (_control, mut presentation) = Presentation::new(
+            receiver,
+            observe,
+            OutputTargets { stdout, stderr },
+            config(directory.path(), true),
+            None,
+        )
+        .unwrap();
+        presentation
+            .event(UiEvent::TaskStarted {
+                task: TaskId(1),
+                description: "build group 1/1".into(),
+            })
+            .unwrap();
+        presentation
+            .event(UiEvent::BuildProgress {
+                task: TaskId(1),
+                building: Some(crate::events::NixActivityProgress {
+                    done: 2,
+                    expected: 2,
+                    running: 0,
+                    failed: 0,
+                }),
+                fetching: Some(crate::events::NixActivityProgress::default()),
+            })
+            .unwrap();
+        presentation
+            .event(UiEvent::ActivityOutput {
+                task: TaskId(1),
+                stream: OutputStream::Stderr,
+                bytes: b"must-not-be-retained-native-tail\n".to_vec(),
+            })
+            .unwrap();
+        presentation.paint_now().unwrap();
+        assert!(presentation.painter.as_ref().unwrap().has_viewport());
+        presentation
+            .event(UiEvent::TaskFinished {
+                task: TaskId(1),
+                state,
+            })
+            .unwrap();
+        let before = out.lock().unwrap().len();
+        presentation
+            .event(UiEvent::Checkpoint {
+                key: TaskId(1),
+                label: "Published group".into(),
+                state,
+                tasks: vec![TaskId(1)],
+            })
+            .unwrap();
+        assert!(
+            !presentation.painter.as_ref().unwrap().has_viewport(),
+            "full-height panel must be cleared, not retained"
+        );
+        assert!(!presentation.active_view);
+        let after_checkpoint = out.lock().unwrap().len();
+        let retained = String::from_utf8(out.lock().unwrap()[before..].to_vec()).unwrap();
+        let compact = retained.split_once("Published group:").unwrap().1;
+        assert!(
+            compact.contains("Building")
+                && compact.contains("Fetching")
+                && compact.contains("Total")
+        );
+        assert_eq!(
+            compact.lines().count(),
+            5,
+            "outcome, task and three bars only"
+        );
+        assert!(compact.lines().all(|line| !line.trim().is_empty()));
+        assert!(!compact.contains("must-not-be-retained") && !compact.contains("Live view"));
+        presentation
+            .event(UiEvent::Diagnostic {
+                stream: OutputStream::Stdout,
+                style: Style::Heading,
+                text: "Built generations\nnode: gen\n".into(),
+            })
+            .unwrap();
+        presentation.paint_now().unwrap();
+        presentation.finalize_group().unwrap();
+        assert!(!presentation.painter.as_ref().unwrap().has_viewport());
+        assert_eq!(
+            &out.lock().unwrap()[after_checkpoint..],
+            b"Built generations\nnode: gen\n"
+        );
+        presentation.cleaned = true;
     }
 }
 

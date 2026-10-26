@@ -6,10 +6,10 @@ use crate::{
     configuration::{ConfigEpoch, ConfigRoot, MutationGuard, MutationLock, NixSettings},
     domain::{BuildRequest, Inventory, MachineId, ManagedFilter, SelectionPolicy, select},
     error::ConfctlError,
-    events::{EventSink, OutputStream, Style, TaskId, TaskState, UiEvent},
+    events::{BuildPhase, EventSink, OutputStream, Style, TaskId, TaskState, UiEvent},
     generation::{BuildGeneration, GcRoots, GenerationStore},
     nix::{InvocationSettings, NixClient, NixOptions, selected_apply},
-    process::{ProcessRunner, Supervisor},
+    process::ProcessRunner,
     terminal::ConfirmPrompt,
 };
 use chrono::{DateTime, FixedOffset};
@@ -63,7 +63,7 @@ pub(super) async fn run(
             preview: vec![
                 UiEvent::Diagnostic {
                     stream: OutputStream::Stdout,
-                    style: Style::Plain,
+                    style: Style::Heading,
                     text: "The following machines will be built:\n".into(),
                 },
                 super::machines::table(inventory, &selected, &settings.list_columns, true),
@@ -102,9 +102,9 @@ pub(super) async fn run(
     Ok(())
 }
 
-pub(super) async fn build_selected(
+pub(super) async fn build_selected<P: ProcessRunner>(
     ctx: &Context,
-    nix: &NixClient<Supervisor>,
+    nix: &NixClient<P>,
     inventory: &Inventory,
     ids: &[MachineId],
     guard: &MutationGuard,
@@ -115,75 +115,108 @@ pub(super) async fn build_selected(
         return Err(ConfctlError::State("Build task IDs must be nonzero".into()));
     }
     check_cancel(&ctx.cancellation)?;
-    let settings = nix.settings().await?.value;
-    let plan = nix.cached_json(".#confctl.buildPlan").await?.value;
-    let hosts = plan_hosts(nix, inventory, ids, &plan).await?;
-    let groups = groups(hosts, settings.nix.legacy_nix_path);
-    let first = TaskId(*next_task);
-    *next_task = next_task
-        .checked_add(
-            u64::try_from(groups.len())
-                .map_err(|_| ConfctlError::State("Build task IDs overflow".into()))?,
+    let full_ui_available = ctx.full_ui_available();
+    if full_ui_available {
+        ctx.events
+            .emit(UiEvent::BuildPhase(BuildPhase::Begin))
+            .await?;
+    }
+    let result = async {
+        check_cancel(&ctx.cancellation)?;
+        let settings = nix.settings().await?.value;
+        let plan = nix.cached_json(".#confctl.buildPlan").await?.value;
+        let hosts = plan_hosts(nix, inventory, ids, &plan).await?;
+        let groups = groups(hosts, settings.nix.legacy_nix_path);
+        let first = TaskId(*next_task);
+        *next_task = next_task
+            .checked_add(
+                u64::try_from(groups.len())
+                    .map_err(|_| ConfctlError::State("Build task IDs overflow".into()))?,
+            )
+            .ok_or_else(|| ConfctlError::State("Build task IDs overflow".into()))?;
+        let roots = roots(nix.root(), ctx).await?;
+        let store = GenerationStore::new(nix.root().clone(), roots);
+        let publication = Publication {
+            store: &store,
+            guard,
+            events: &ctx.events,
+            cancellation: &ctx.cancellation,
+            time: chrono::Local::now().fixed_offset(),
+        };
+        let saved = build_groups(
+            nix,
+            &groups,
+            &settings.nix,
+            &publication,
+            ctx.log_path(),
+            first,
+            full_ui_available,
         )
-        .ok_or_else(|| ConfctlError::State("Build task IDs overflow".into()))?;
-    let roots = roots(nix.root(), ctx).await?;
-    let store = GenerationStore::new(nix.root().clone(), roots);
-    let publication = Publication {
-        store: &store,
-        guard,
-        events: &ctx.events,
-        cancellation: &ctx.cancellation,
-        time: chrono::Local::now().fixed_offset(),
-    };
-    let saved = build_groups(
-        nix,
-        &groups,
-        &settings.nix,
-        &publication,
-        ctx.log_path(),
-        first,
-    )
-    .await?;
-    let mut returned = Vec::new();
-    for (host, generation) in &saved {
-        let id = ids
-            .iter()
-            .find(|id| inventory.get(**id).name == *host)
-            .ok_or_else(|| ConfctlError::State("Build returned an unselected host".into()))?;
-        if returned.iter().any(|(previous, _)| previous == id) {
-            return Err(ConfctlError::State("Build returned a host twice".into()));
+        .await?;
+        let mut returned = Vec::new();
+        for (host, generation) in &saved {
+            let id = ids
+                .iter()
+                .find(|id| inventory.get(**id).name == *host)
+                .ok_or_else(|| ConfctlError::State("Build returned an unselected host".into()))?;
+            if returned.iter().any(|(previous, _)| previous == id) {
+                return Err(ConfctlError::State("Build returned a host twice".into()));
+            }
+            returned.push((*id, generation.clone()));
         }
-        returned.push((*id, generation.clone()));
+        if returned.len() != ids.len() {
+            return Err(ConfctlError::State(
+                "Build did not return every selected host".into(),
+            ));
+        }
+        Ok((saved, returned))
     }
-    if returned.len() != ids.len() {
-        return Err(ConfctlError::State(
-            "Build did not return every selected host".into(),
-        ));
-    }
-    report_saved(&publication, &saved).await?;
+    .await;
+    // End is checked cleanup after all native/group joins and checkpoints. It
+    // cannot be selected away by cancellation or replace an earlier failure.
+    let result = if full_ui_available {
+        match (
+            result,
+            ctx.events.emit(UiEvent::BuildPhase(BuildPhase::End)).await,
+        ) {
+            (result, Ok(())) => result,
+            (Err(error), Err(later)) => Err(error.with_secondary(vec![later])),
+            (Ok(_), Err(error)) => Err(error),
+        }
+    } else {
+        result
+    };
+    let (saved, returned) = result?;
+    report_saved(&ctx.events, &ctx.cancellation, &saved).await?;
     Ok(returned)
 }
 
 async fn report_saved(
-    publication: &Publication<'_>,
+    events: &EventSink,
+    cancellation: &CancellationToken,
     saved: &[(String, BuildGeneration)],
 ) -> Result<(), ConfctlError> {
-    check_cancel(publication.cancellation)?;
-    diagnostic(
-        publication.events,
-        OutputStream::Stdout,
-        "Built generations:\n".into(),
-    )
-    .await?;
-    check_cancel(publication.cancellation)?;
-    for (host, generation) in saved {
-        diagnostic(
-            publication.events,
-            OutputStream::Stdout,
-            format!("  {host}: {}\n", generation.name),
-        )
+    check_cancel(cancellation)?;
+    events
+        .emit(UiEvent::Diagnostic {
+            stream: OutputStream::Stdout,
+            style: Style::Heading,
+            text: "Built generations:\n".into(),
+        })
         .await?;
-        check_cancel(publication.cancellation)?;
+    check_cancel(cancellation)?;
+    for (host, generation) in saved {
+        events
+            .emit(UiEvent::StyledDiagnostic {
+                stream: OutputStream::Stdout,
+                parts: vec![
+                    (Style::Plain, format!("  {host}: ")),
+                    (Style::Generation, generation.name.clone()),
+                    (Style::Plain, "\n".into()),
+                ],
+            })
+            .await?;
+        check_cancel(cancellation)?;
     }
     Ok(())
 }
@@ -195,6 +228,7 @@ async fn build_groups<P: ProcessRunner>(
     publication: &Publication<'_>,
     log_path: &std::path::Path,
     first: TaskId,
+    live_progress: bool,
 ) -> Result<Vec<(String, BuildGeneration)>, ConfctlError> {
     let mut saved = Vec::new();
     for (index, group) in groups.iter().enumerate() {
@@ -216,6 +250,7 @@ async fn build_groups<P: ProcessRunner>(
     }
     for (index, group) in groups.iter().enumerate() {
         let task = TaskId(first.0 + index as u64);
+        let mut entered = false;
         let result = async {
             check_cancel(publication.cancellation)?;
             publication
@@ -225,7 +260,30 @@ async fn build_groups<P: ProcessRunner>(
                     description: description(index, groups.len(), group),
                 })
                 .await?;
-            build_group(nix, group, settings, task, publication, &mut saved).await
+            entered = true;
+            if live_progress {
+                publication
+                    .events
+                    .emit(UiEvent::BuildProgress {
+                        task,
+                        building: None,
+                        fetching: None,
+                    })
+                    .await?;
+                check_cancel(publication.cancellation)?;
+            }
+            build_group(
+                nix,
+                group,
+                settings,
+                BuildTask {
+                    id: task,
+                    live_progress,
+                },
+                publication,
+                &mut saved,
+            )
+            .await
         }
         .await;
         let state = match &result {
@@ -237,14 +295,39 @@ async fn build_groups<P: ProcessRunner>(
             .events
             .emit(UiEvent::TaskFinished { task, state })
             .await;
-        let result = match (result, final_result) {
-            (r, Ok(())) => r,
-            (Ok(()), Err(e)) => Err(e),
-            (Err(e), Err(later)) => Err(e.with_secondary(vec![later])),
-        }
-        // Cancellation during the acknowledgement cancels the invocation,
-        // without rewriting the group result already delivered above.
-        .and_then(|()| check_cancel(publication.cancellation));
+        // The boundary is publication, not native exit or TaskFinished delivery.
+        // Deliver the checkpoint even if acknowledgement canceled the invocation.
+        let checkpoint = if entered {
+            publication
+                .events
+                .emit(UiEvent::Checkpoint {
+                    key: task,
+                    label: format!(
+                        "{}: {}",
+                        description(index, groups.len(), group),
+                        if state == TaskState::Succeeded {
+                            "generations published"
+                        } else {
+                            "stopped; earlier publications retained"
+                        }
+                    ),
+                    state,
+                    tasks: vec![task],
+                })
+                .await
+        } else {
+            Ok(())
+        };
+        let result = [final_result, checkpoint]
+            .into_iter()
+            .fold(result, |result, delivery| match (result, delivery) {
+                (r, Ok(())) => r,
+                (Ok(()), Err(e)) => Err(e),
+                (Err(e), Err(later)) => Err(e.with_secondary(vec![later])),
+            })
+            // Cancellation during the acknowledgement cancels the invocation,
+            // without rewriting the group result already delivered above.
+            .and_then(|()| check_cancel(publication.cancellation));
         if let Err(error) = result {
             let mut later = Vec::new();
             for next in index + 1..groups.len() {
@@ -273,16 +356,11 @@ async fn build_groups<P: ProcessRunner>(
 
 fn description(index: usize, total: usize, group: &[Host]) -> String {
     format!(
-        "build group {}/{} ({} machine{}): {}",
+        "build group {}/{} ({} machine{})",
         index + 1,
         total,
         group.len(),
-        if group.len() == 1 { "" } else { "s" },
-        group
-            .iter()
-            .map(|host| host.name.as_str())
-            .collect::<Vec<_>>()
-            .join(", ")
+        if group.len() == 1 { "" } else { "s" }
     )
 }
 fn check_cancel(cancellation: &CancellationToken) -> Result<(), ConfctlError> {
@@ -457,14 +535,23 @@ struct Publication<'a> {
     cancellation: &'a CancellationToken,
     time: DateTime<FixedOffset>,
 }
+#[derive(Clone, Copy)]
+struct BuildTask {
+    id: TaskId,
+    live_progress: bool,
+}
 async fn build_group<P: ProcessRunner>(
     nix: &NixClient<P>,
     hosts: &[Host],
     settings: &NixSettings,
-    task: TaskId,
+    task: BuildTask,
     publication: &Publication<'_>,
     saved: &mut Vec<(String, BuildGeneration)>,
 ) -> Result<(), ConfctlError> {
+    let BuildTask {
+        id: task,
+        live_progress,
+    } = task;
     let legacy = legacy_args(nix, hosts, settings).await?;
     let installables = hosts
         .iter()
@@ -475,7 +562,7 @@ async fn build_group<P: ProcessRunner>(
             ]
         })
         .collect::<Vec<_>>();
-    nix.build_json_for_task(&installables, &legacy, task)
+    nix.build_json_for_task(&installables, &legacy, task, live_progress)
         .await?;
     let outputs = keyed(nix, ".#confctl.build", hosts).await?;
     let mut pending = Vec::new();
@@ -515,12 +602,7 @@ async fn build_group<P: ProcessRunner>(
                 .store
                 .set_current(publication.guard, &host.name, &generation.name)?;
             saved.push((host.name.clone(), generation.clone()));
-            diagnostic(
-                publication.events,
-                OutputStream::Stdout,
-                format!("Saved {}: {} (reused)\n", host.name, generation.name),
-            )
-            .await?;
+            saved_notice(publication.events, &host.name, &generation.name, true).await?;
             check_cancel(publication.cancellation)?;
         } else {
             pending.push((host, toplevel, rollback));
@@ -557,16 +639,32 @@ async fn build_group<P: ProcessRunner>(
                 .store
                 .publish(publication.guard, &host.name, &generation)?;
             saved.push((host.name.clone(), generation.clone()));
-            diagnostic(
-                publication.events,
-                OutputStream::Stdout,
-                format!("Saved {}: {}\n", host.name, generation.name),
-            )
-            .await?;
+            saved_notice(publication.events, &host.name, &generation.name, false).await?;
             check_cancel(publication.cancellation)?;
         }
     }
     check_cancel(publication.cancellation)
+}
+
+async fn saved_notice(
+    events: &EventSink,
+    host: &str,
+    generation: &str,
+    reused: bool,
+) -> Result<(), ConfctlError> {
+    events
+        .emit(UiEvent::StyledDiagnostic {
+            stream: OutputStream::Stdout,
+            parts: vec![
+                (Style::Plain, format!("Saved {host}: ")),
+                (Style::Generation, generation.into()),
+                (
+                    Style::Plain,
+                    if reused { " (reused)\n" } else { "\n" }.into(),
+                ),
+            ],
+        })
+        .await
 }
 
 #[cfg(test)]

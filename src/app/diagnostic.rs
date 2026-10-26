@@ -124,7 +124,8 @@ fn write_inner(
                 // Read before publishing the complete-child layout. A failed
                 // read must not turn missing bytes into "Nothing written".
                 let stdout = capture_bytes(&evidence.stdout)?;
-                let stderr = capture_bytes(&evidence.stderr)?;
+                let stderr =
+                    crate::nix::progress::readable_stderr(&capture_bytes(&evidence.stderr)?);
                 writer.write_all(prefix)?;
                 writer.write_all(b"Running `")?;
                 command(writer, context)?;
@@ -410,6 +411,34 @@ pub(super) mod tests {
             }
         }
     }
+    #[test]
+    fn structured_nix_stderr_uses_readable_messages_without_changing_retained_bytes() {
+        let mut error = failure();
+        let native = b"ordinary stderr\n@nix {\"action\":\"msg\",\"level\":0,\"msg\":\"build failed with detail\"}\n@nix {\"action\":\"stop\",\"id\":1}\n";
+        let ConfctlError::NixCommandFailure(failure) = &mut error else {
+            unreachable!()
+        };
+        let ConfctlError::ProcessFailure { evidence, .. } = failure.source.as_mut() else {
+            unreachable!()
+        };
+        evidence.stderr = Captured::Memory(native.to_vec());
+        let mut output = Vec::new();
+        write_error(&mut output, &error).unwrap();
+        assert!(
+            output
+                .windows(b"ordinary stderr\nbuild failed with detail".len())
+                .any(|part| part == b"ordinary stderr\nbuild failed with detail")
+        );
+        assert!(!output.windows(5).any(|part| part == b"@nix "));
+        let ConfctlError::NixCommandFailure(failure) = &error else {
+            unreachable!()
+        };
+        let ConfctlError::ProcessFailure { evidence, .. } = failure.source.as_ref() else {
+            unreachable!()
+        };
+        assert_eq!(capture_bytes(&evidence.stderr).unwrap(), native);
+    }
+
     #[test]
     fn exact_command_failure_uses_native_bytes_and_ruby_strip() {
         let mut bytes = vec![];

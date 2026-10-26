@@ -157,7 +157,13 @@ case "$last" in
  '.#confctl.inputsInfo') "$CONFCTL_BUILD_APP_ROOT/native/cat" "$CONFCTL_BUILD_APP_ROOT/replies/infos.json" ;;
  *)
   if [ "$1" != build ]; then printf 'unexpected Nix eval: %s\n' "$last" >&2; exit 97; fi
-  printf "these 2 derivations will be built:\nthis path will be fetched (1 MiB)\nbuilding '/nix/store/fixture.drv'...\nunknown build log\n" >&2
+  structured=no
+  for arg do if [ "$arg" = internal-json ]; then structured=yes; fi; done
+  if [ "$structured" = yes ]; then
+   printf '%s\n' '@nix {"action":"start","id":1,"type":104,"text":"building fixture"}' '@nix {"action":"result","id":1,"type":105,"fields":[1,2,1,0]}' '@nix {"action":"msg","level":3,"msg":"unknown build log"}' >&2
+  else
+   printf "these 2 derivations will be built:\nthis path will be fetched (1 MiB)\nbuilding '/nix/store/fixture.drv'...\nunknown build log\n" >&2
+  fi
   if [ "$CONFCTL_BUILD_APP_ROLE" = failure ]; then printf 'fixture build failed\n' >&2; exit 7; fi
   printf '[{"outputs":{"out":"not-the-selected-output"}}]\n'
  ;;
@@ -629,6 +635,28 @@ fn quiet_startup_evaluation_is_announced_by_the_production_app_before_native_out
         &modes,
         &rustix::termios::tcgetattr(&observer).unwrap(),
     );
+    let calls = f.calls();
+    let tasked = calls
+        .iter()
+        .find(|args| {
+            args.iter()
+                .any(|arg| arg == ".#confctl.build.alpha-key.toplevel")
+        })
+        .expect("tasked build");
+    assert!(
+        tasked
+            .windows(2)
+            .any(|pair| pair == ["--log-format", "internal-json"])
+    );
+    let inventory = calls
+        .iter()
+        .find(|args| {
+            args.last()
+                .is_some_and(|arg| arg == ".#confctl.machinesJson")
+        })
+        .unwrap();
+    assert!(!inventory.iter().any(|arg| arg == "--log-format"));
+    assert!(!transcript.windows(5).any(|b| b == b"@nix "));
     assert!(!transcript.windows(4).any(|b| b == b"\x1b[6n"));
     assert!(!transcript.windows(8).any(|b| b == b"\x1b[?1049h"));
     f.unchanged();
@@ -1227,6 +1255,21 @@ fn new_build_refresh_precedes_fresh_plan_and_default_status_uses_current_inputs_
         "{text}"
     );
     assert!(text.contains("CURRENT") && !text.contains("OLD"), "{text}");
+    assert_eq!(text.matches("Built generations:\n").count(), 1, "{text}");
+    assert!(text.find("Built generations:\n").unwrap() < text.rfind("alpha ").unwrap());
+    assert!(
+        !out.stdout.contains(&0x1b) && !out.stderr.contains(&0x1b),
+        "redirected status keeps plain streams"
+    );
+    let status_nix = f.native_records("nix-call-");
+    let status_build = status_nix
+        .iter()
+        .find(|args| args.iter().any(|arg| arg == b"build"))
+        .unwrap();
+    assert!(
+        !status_build.iter().any(|arg| arg == b"internal-json"),
+        "without full capability the shared status build keeps human Nix output"
+    );
     let sequence = f.sequence();
     assert!(seq_position(&sequence, "build 1") < seq_position(&sequence, "observe-or-command "));
     assert!(

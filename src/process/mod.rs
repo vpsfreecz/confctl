@@ -7,7 +7,7 @@
 
 use crate::{
     error::ConfctlError,
-    events::{EventSink, OutputStream, TaskId, UiEvent},
+    events::{CommandId, EventSink, OutputStream, TaskId, UiEvent},
     terminal::{ForegroundLease, foreground::ForegroundAttachment},
     timing::{Phase, Timing},
 };
@@ -21,7 +21,7 @@ use std::{
     process::{ExitStatus, Stdio},
     sync::{
         Arc, Mutex as StdMutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -371,6 +371,7 @@ impl ProcessLog {
 struct Owner {
     events: EventSink,
     announce_commands: bool,
+    next_command: AtomicU64,
     log: Option<ProcessLog>,
     spool_dir: PathBuf,
     memory_limit: usize,
@@ -472,6 +473,7 @@ impl Supervisor {
             owner: Arc::new(Owner {
                 events,
                 announce_commands,
+                next_command: AtomicU64::new(1),
                 log,
                 spool_dir,
                 memory_limit,
@@ -557,11 +559,32 @@ async fn owned_run(
     scope: ProcessScope,
     mut response: oneshot::Sender<Result<ProcessOutcome, ConfctlError>>,
 ) {
+    let command = if owner.announce_commands {
+        match owner
+            .next_command
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+        {
+            Ok(id) => Some(CommandId(id)),
+            Err(_) => {
+                deliver_result(
+                    &owner,
+                    response,
+                    Err(ConfctlError::State("Command IDs overflow".into())),
+                );
+                return;
+            }
+        }
+    } else {
+        None
+    };
+    let description = spec.redacted_description.clone();
+    let capture_stdout = spec.stdout.captures();
+    let capture_stderr = spec.stderr.captures();
     let local = CancellationToken::new();
     let root = owner.cancellation.clone();
     let parent = scope.cancellation.clone();
     // Receiver closure also cancels: dropping a run future cannot detach work.
-    let execution = execute(&owner, spec, scope, local.clone());
+    let execution = execute(&owner, spec, scope, local.clone(), command);
     tokio::pin!(execution);
     let result = tokio::select! {
         result = &mut execution => result,
@@ -569,6 +592,60 @@ async fn owned_run(
         _ = parent.cancelled() => { local.cancel(); execution.await },
         _ = response.closed() => { local.cancel(); execution.await },
     };
+    // execute owns every child/pipe/foreground join. Finish is an acknowledged
+    // lifecycle boundary, including failed admission/spawn, never a success claim.
+    let result = if let Some(command) = command {
+        match (
+            result,
+            owner
+                .events
+                .emit(UiEvent::CommandFinished { command })
+                .await,
+        ) {
+            (result, Ok(())) => result,
+            (Err(error), Err(later)) => Err(error.with_secondary(vec![later])),
+            (Ok(outcome), Err(later)) => {
+                let log = owner.log.as_ref().and_then(|log| log.locator.clone());
+                let error = if outcome.termination == TerminationCause::Canceled {
+                    ConfctlError::Cancelled.with_secondary(vec![later])
+                } else if !outcome.status.success() {
+                    ConfctlError::Child {
+                        description,
+                        code: outcome.code(),
+                        signal: outcome.signal(),
+                        log: log.clone(),
+                    }
+                    .with_secondary(vec![later])
+                } else {
+                    later
+                };
+                Err(ConfctlError::ProcessFailure {
+                    source: Box::new(error),
+                    evidence: Box::new(PartialProcessEvidence {
+                        status: Some(outcome.status),
+                        stdout: outcome.stdout,
+                        stderr: outcome.stderr,
+                        stdout_complete: outcome.stdout_complete,
+                        stderr_complete: outcome.stderr_complete,
+                        log,
+                    }),
+                })
+            }
+        }
+    } else {
+        result
+    };
+    let result = result.map(|mut outcome| {
+        // Forward-only spools stay owned through the final lifecycle ACK, so
+        // its failure retains evidence just like any earlier relay failure.
+        if !capture_stdout {
+            outcome.stdout = Captured::Unavailable;
+        }
+        if !capture_stderr {
+            outcome.stderr = Captured::Unavailable;
+        }
+        outcome
+    });
     deliver_result(&owner, response, result);
 }
 
@@ -840,6 +917,7 @@ async fn execute(
     mut spec: ProcessSpec,
     mut scope: ProcessScope,
     cancel: CancellationToken,
+    presented_command: Option<CommandId>,
 ) -> Result<ProcessOutcome, ConfctlError> {
     if cancel.is_cancelled()
         || scope.cancellation.is_cancelled()
@@ -947,7 +1025,7 @@ async fn execute(
     // Keep Child unpolled even when Tokio uses its pidfd implementation.
     let _child_signal = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::child())
         .map_err(|error| io_error("own child notifications", None, error))?;
-    if owner.announce_commands {
+    if let Some(command) = presented_command {
         let display = spec.display_command.clone().unwrap_or_else(|| {
             if spec.args.is_empty() {
                 spec.redacted_description.clone()
@@ -957,7 +1035,7 @@ async fn execute(
         });
         tokio::select! { biased;
             _ = cancel.cancelled() => return Err(ConfctlError::Cancelled),
-            result = owner.events.emit(UiEvent::CommandStarting { task: scope.task, display }) => result?,
+            result = owner.events.emit(UiEvent::CommandStarting { command, task: scope.task, display }) => result?,
         }
     }
     if let Some(event) = scope
@@ -1239,14 +1317,6 @@ async fn execute(
         });
     }
     let status = observed.expect("successful final wait provides a status");
-    // Forward-only spools survive until all infrastructure outcomes are known.
-    // Only successful forwarding may discard them.
-    if !spec.stdout.captures() {
-        stdout = Captured::Unavailable;
-    }
-    if !spec.stderr.captures() {
-        stderr = Captured::Unavailable;
-    }
     Ok(ProcessOutcome {
         status,
         stdout,
@@ -1481,9 +1551,14 @@ async fn relay_stream(
                 .as_mut()
                 .map(|decoder| decoder.feed(&bytes, task))
                 .unwrap_or_default();
-            tokio::select! {
-                result = events.emit(UiEvent::ActivityOutput { task, stream, bytes }) => if let Err(error) = result { let _ = errors.send(error); return; },
-                _ = cancel.cancelled() => return,
+            if !progress
+                .as_ref()
+                .is_some_and(|decoder| decoder.structured())
+            {
+                tokio::select! {
+                    result = events.emit(UiEvent::ActivityOutput { task, stream, bytes }) => if let Err(error) = result { let _ = errors.send(error); return; },
+                    _ = cancel.cancelled() => return,
+                }
             }
             for event in updates {
                 tokio::select! {

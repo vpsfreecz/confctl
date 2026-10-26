@@ -230,12 +230,20 @@ async fn last_copy_final_ack_cancellation_preserves_success_and_cancels_unentere
             generation: generation("saved"),
             task: TaskId(if i == 0 { 1 } else { 2 }),
         });
-        let error = bulk_copy(&copies, &jobs, 1).await.unwrap_err();
+        let mut finished = Vec::new();
+        let error = bulk_copy(&copies, &jobs, 1, &mut finished)
+            .await
+            .unwrap_err();
         if reject {
             assert!(error.to_string().contains("controlled final failure"));
         } else {
             assert!(error.is_cancelled());
         }
+        assert_eq!(
+            finished,
+            [(MachineId(0), TaskState::Succeeded)],
+            "acknowledgement cancellation retains completed copy truth"
+        );
         assert_eq!(*runner.calls.lock().unwrap(), [TaskId(1)]);
         drop(events);
         assert_eq!(
@@ -322,7 +330,7 @@ async fn bounded_bulk_joins_reverse_completions_and_reports_each_actual_final() 
             task: TaskId(i as u64 + 1),
         })
         .collect::<Vec<_>>();
-    bulk_copy(&copies, &jobs, 2).await.unwrap();
+    bulk_copy(&copies, &jobs, 2, &mut Vec::new()).await.unwrap();
     assert_eq!(runner.peak.load(std::sync::atomic::Ordering::SeqCst), 2);
     assert_eq!(runner.active.load(std::sync::atomic::Ordering::SeqCst), 0);
     assert_eq!(
@@ -930,11 +938,17 @@ async fn test_activation_uses_shared_rollback_policy_without_inventing_helper_su
         drop(events);
         let seen = consumer.await.unwrap();
         assert!(seen.iter().any(|e| matches!(e, UiEvent::TaskFinished { task: TaskId(10), state } if *state == if uses_helper { TaskState::Failed } else { TaskState::Succeeded })));
+        assert!(
+            seen.iter().any(|event| matches!(event,
+            UiEvent::Diagnostic { stream: OutputStream::Stdout, style: Style::Machine, text }
+                if text == "local: test\n")),
+            "activation notice keeps its exact bytes with the action palette"
+        );
         if uses_helper {
             assert!(seen.iter().any(|e| matches!(e, UiEvent::TaskStarted { description, .. } if description.contains("rollback-helper protocol"))));
         }
         if !helper {
-            assert!(seen.iter().any(|e| matches!(e, UiEvent::Diagnostic { text, .. } if text.contains("without rollback protection"))));
+            assert!(seen.iter().any(|e| matches!(e, UiEvent::Diagnostic { style: Style::Incomplete, text, .. } if text.contains("without rollback protection"))));
         }
     }
 }
@@ -1121,4 +1135,342 @@ fn dry_and_test_skip_need_only_exact_known_running_path_including_after_profile_
             ));
         }
     }
+}
+
+#[test]
+fn machine_checkpoint_qualification_preserves_failed_reboot_and_unverified_health() {
+    let mut finish = MachineFinish::copied(TaskId(1), TaskState::Succeeded);
+    finish.state = TaskState::Succeeded;
+    let health = health::HostResult {
+        machine: MachineId(0),
+        tasks: vec![TaskId(4), TaskId(5)],
+        passed: 1,
+        failed: 0,
+        pending: 0,
+    };
+    assert!(apply_reboot(
+        &mut finish,
+        &reboot::Outcome::NoWait {
+            native_success: false
+        }
+    ));
+    apply_health(&mut finish, &health);
+    assert_eq!(
+        finish.state,
+        TaskState::Failed,
+        "passing health cannot erase a failed reboot request"
+    );
+    assert_eq!(finish.tasks, [TaskId(1), TaskId(4), TaskId(5)]);
+    let mut skipped = MachineFinish::copied(TaskId(2), TaskState::Succeeded);
+    assert!(!apply_reboot(&mut skipped, &reboot::Outcome::Skipped));
+    apply_health(&mut skipped, &health);
+    assert_eq!(skipped.state, TaskState::Incomplete);
+    let mut declined = MachineFinish::copied(TaskId(3), TaskState::Succeeded);
+    apply_health(
+        &mut declined,
+        &health::HostResult {
+            machine: MachineId(0),
+            tasks: Vec::new(),
+            passed: 0,
+            failed: 0,
+            pending: 1,
+        },
+    );
+    assert_eq!(declined.state, TaskState::Incomplete);
+    apply_health(
+        &mut declined,
+        &health::HostResult {
+            machine: MachineId(0),
+            tasks: vec![TaskId(6)],
+            passed: 1,
+            failed: 1,
+            pending: 0,
+        },
+    );
+    assert_eq!(
+        declined.state,
+        TaskState::Failed,
+        "explicit continuation retains failed qualification"
+    );
+}
+
+#[tokio::test]
+async fn machine_checkpoint_names_only_its_terminal_rows_with_other_work_running() {
+    let tmp = tempfile::tempdir().unwrap();
+    let inventory = inventory();
+    let cancel = CancellationToken::new();
+    let (events, mut receiver) = EventSink::channel(1);
+    let consumer = tokio::spawn(async move {
+        let mut seen = Vec::new();
+        while let Some(delivery) = receiver.receive().await {
+            let (event, ack) = delivery.into_parts();
+            seen.push(event);
+            ack.acknowledge(Ok(()));
+        }
+        seen
+    });
+    let processes = crate::process::Supervisor::new(
+        events.clone(),
+        tmp.path().into(),
+        64,
+        std::time::Duration::from_millis(30),
+        None,
+        None,
+    );
+    let input = std::fs::File::open("/dev/null").unwrap();
+    let ui = crate::terminal::Ui::new(input, events.clone(), cancel.clone(), None).unwrap();
+    let mut ctx = Context::for_test(
+        tmp.path().into(),
+        cancel,
+        events.clone(),
+        processes.clone(),
+        ui,
+        crate::timing::Timing::start(),
+        tmp.path().join("log"),
+    );
+    assert!(!ctx.full_ui_available());
+    ctx.set_full_ui_available(true);
+    assert!(ctx.full_ui_available());
+    events
+        .emit(UiEvent::TaskStarted {
+            task: TaskId(99),
+            description: "other machine".into(),
+        })
+        .await
+        .unwrap();
+    events
+        .emit(UiEvent::TaskFinished {
+            task: TaskId(1),
+            state: TaskState::Succeeded,
+        })
+        .await
+        .unwrap();
+    let job = Job {
+        machine: MachineId(0),
+        generation: generation("saved"),
+        task: TaskId(1),
+    };
+    let mut finish = MachineFinish::copied(TaskId(1), TaskState::Succeeded);
+    finish.state = TaskState::Succeeded;
+    finish.qualification = "copied only".into();
+    machine_checkpoint(&ctx, &job, &inventory, &finish)
+        .await
+        .unwrap();
+    processes.shutdown().await.unwrap();
+    drop(ctx);
+    drop(processes);
+    drop(events);
+    let seen = consumer.await.unwrap();
+    assert!(
+        matches!(seen.last(), Some(UiEvent::Checkpoint { key:TaskId(1),state:TaskState::Succeeded,tasks,.. }) if tasks == &[TaskId(1)])
+    );
+    assert!(!seen.iter().any(|event| matches!(
+        event,
+        UiEvent::TaskFinished {
+            task: TaskId(99),
+            ..
+        }
+    )));
+}
+
+#[tokio::test]
+async fn reboot_before_admission_preserves_partial_checkpoint_in_actual_presentation() {
+    use crate::presentation::{OutputPolicy, OutputTargets, Presentation, PresentationConfig};
+    use std::{io::Write, sync::Arc, time::Duration};
+
+    struct Recorded(Arc<Mutex<Vec<u8>>>);
+    impl Write for Recorded {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    for before_admission in ["cancel", "target", "eof"] {
+        let tmp = tempfile::tempdir().unwrap();
+        let partial = tmp.path().join("published-generation");
+        std::fs::write(&partial, b"retained publication").unwrap();
+        let mut inventory = inventory();
+        if before_admission == "target" {
+            inventory.machines[0].metadata["host"]["target"] = serde_json::Value::Null;
+        }
+        let cancellation = CancellationToken::new();
+        let (events, receiver) = EventSink::channel(1);
+        let input = std::fs::File::open("/dev/null").unwrap();
+        let ui =
+            crate::terminal::Ui::new(input, events.clone(), cancellation.clone(), None).unwrap();
+        let output = Arc::new(Mutex::new(Vec::new()));
+        let (control, presentation) = Presentation::new(
+            receiver,
+            ui.observe_state(),
+            OutputTargets {
+                stdout: Arc::new(Mutex::new(Box::new(Recorded(output.clone())))),
+                stderr: Arc::new(Mutex::new(Box::new(std::io::sink()))),
+            },
+            PresentationConfig {
+                mode: crate::presentation::PresentationMode::Full,
+                command: "confctl deploy --reboot".into(),
+                operation: "deploy".into(),
+                spool_dir: tmp.path().into(),
+                configuration_dir: None,
+                invocation_log: None,
+                policy: OutputPolicy {
+                    live: true,
+                    stdout_color: false,
+                    stderr_color: false,
+                },
+                initial_size: (80, 24),
+                terminal: None,
+                max_tasks: 5,
+                tail_rows: 5,
+                tail_line_bytes: 100,
+            },
+            None,
+        )
+        .unwrap();
+        let presenting = tokio::spawn(presentation.run());
+        let processes = crate::process::Supervisor::new(
+            events.clone(),
+            tmp.path().into(),
+            64,
+            Duration::from_millis(30),
+            None,
+            None,
+        );
+        let ctx = Context::for_test(
+            tmp.path().into(),
+            cancellation.clone(),
+            events.clone(),
+            processes.clone(),
+            ui,
+            crate::timing::Timing::start(),
+            tmp.path().join("log"),
+        );
+        // These are known completed effects before either caller reaches reboot.
+        for (task, description) in [
+            (TaskId(1), "copy completed"),
+            (TaskId(2), "activation completed"),
+        ] {
+            events
+                .emit(UiEvent::TaskPending {
+                    task,
+                    description: description.into(),
+                })
+                .await
+                .unwrap();
+            events
+                .emit(UiEvent::TaskStarted {
+                    task,
+                    description: description.into(),
+                })
+                .await
+                .unwrap();
+            events
+                .emit(UiEvent::TaskFinished {
+                    task,
+                    state: TaskState::Succeeded,
+                })
+                .await
+                .unwrap();
+        }
+        if before_admission == "cancel" {
+            cancellation.cancel();
+        }
+        let completion = tokio::time::timeout(
+            Duration::from_secs(5),
+            reboot::run(
+                &ctx,
+                &inventory.machines[0],
+                None,
+                TaskId(3),
+                &crate::domain::WaitOnline::NoWait,
+                before_admission == "eof",
+            ),
+        )
+        .await
+        .unwrap();
+        assert_eq!(completion.terminal_task, None, "{before_admission}");
+        let mut finish = MachineFinish::copied(TaskId(1), TaskState::Succeeded);
+        finish.tasks.push(TaskId(2));
+        // Both one-by-one and bulk use this same owner-data consumption boundary.
+        let result = reboot_result(&mut finish, completion);
+        let error = result.unwrap_err();
+        match before_admission {
+            "cancel" => assert!(matches!(&error, ConfctlError::Cancelled)),
+            "target" => assert!(
+                matches!(&error, ConfctlError::Configuration(message) if message == "a has no target host")
+            ),
+            "eof" => assert!(matches!(&error, ConfctlError::InputEof)),
+            _ => unreachable!(),
+        }
+        finish.state = if error.is_cancelled() {
+            TaskState::Canceled
+        } else {
+            TaskState::Failed
+        };
+        finish.qualification =
+            "stopped before reboot admission; copy and activation retained".into();
+        assert_eq!(finish.tasks, [TaskId(1), TaskId(2)]);
+        let job = Job {
+            machine: MachineId(0),
+            generation: generation("saved"),
+            task: TaskId(1),
+        };
+        let delivery = machine_checkpoint(&ctx, &job, &inventory, &finish).await;
+        assert!(
+            delivery.is_ok(),
+            "checkpoint must not name unknown reboot task: {delivery:?}"
+        );
+        let combined =
+            combine_deliveries::<()>(Err(error), delivery.err().into_iter().collect()).unwrap_err();
+        assert!(
+            !matches!(
+                combined,
+                ConfctlError::Cleanup { .. } | ConfctlError::EventDelivery(_)
+            ),
+            "{combined:?}"
+        );
+        control.finish().await.unwrap();
+        presenting.await.unwrap().unwrap();
+        {
+            let rendered = output.lock().unwrap();
+            let rendered = String::from_utf8_lossy(&rendered);
+            assert!(
+                rendered.contains("stopped before reboot admission; copy and activation retained"),
+                "{rendered}"
+            );
+            assert!(
+                rendered.contains("copy completed") && rendered.contains("activation completed"),
+                "{rendered}"
+            );
+            assert!(
+                !rendered.contains("reboot/wait on"),
+                "no reboot task was admitted"
+            );
+        }
+        assert_eq!(std::fs::read(&partial).unwrap(), b"retained publication");
+        processes.shutdown().await.unwrap();
+        ctx.ui.shutdown().unwrap();
+    }
+}
+
+#[test]
+fn reboot_completion_carries_only_owner_reported_terminal_task_even_on_error() {
+    let mut finish = MachineFinish::copied(TaskId(1), TaskState::Succeeded);
+    let result = reboot_result(
+        &mut finish,
+        reboot::Completion {
+            outcome: Err(ConfctlError::Cancelled),
+            terminal_task: Some(TaskId(3)),
+        },
+    );
+    assert!(matches!(result, Err(ConfctlError::Cancelled)));
+    assert_eq!(
+        finish.tasks,
+        [TaskId(1), TaskId(3)],
+        "cancellation after final acknowledgement retains the actual row"
+    );
 }

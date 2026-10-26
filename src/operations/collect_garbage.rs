@@ -89,10 +89,11 @@ pub(super) async fn run(
         .ui
         .confirm(ConfirmPrompt {
             preview: vec![
-                message(
-                    OutputStream::Stdout,
-                    "Collect garbage on the following machines:\n".into(),
-                ),
+                UiEvent::Diagnostic {
+                    stream: OutputStream::Stdout,
+                    style: Style::Heading,
+                    text: "Collect garbage on the following machines:\n".into(),
+                },
                 super::machines::table(inventory, &selected, &settings.list_columns, true),
             ],
             assume_yes: targets.yes,

@@ -2,7 +2,7 @@
 
 use super::model::{Model, TaskPhase, TaskRow, clip, sanitize_text};
 use crate::{
-    events::{ActivityCount, TaskState},
+    events::{NixActivityProgress, Style as SemanticStyle, TaskState},
     timing::format_elapsed,
 };
 use ratatui::{
@@ -14,6 +14,7 @@ use ratatui::{
 };
 use std::time::Duration;
 
+#[derive(Clone, Copy)]
 pub struct FrameInfo<'a> {
     pub command: &'a str,
     pub started: &'a str,
@@ -54,40 +55,168 @@ pub(super) fn wrap(text: &str, columns: usize) -> Vec<String> {
 }
 
 pub(super) fn headers(info: &FrameInfo<'_>, width: u16) -> Vec<String> {
-    let mut lines = Vec::new();
-    for text in [
-        format!("Command: {}", single_line(info.command)),
-        format!(
-            "Started: {}  Elapsed: {}",
-            info.started,
-            format_elapsed(info.elapsed)
-        ),
-        format!("Operation: {}", single_line(info.operation)),
-    ] {
-        lines.extend(wrap(&text, usize::from(width)));
+    styled_headers(info, width)
+        .into_iter()
+        .map(|line| line.to_string())
+        .collect()
+}
+
+fn semantic_style(style: SemanticStyle, color: bool) -> Style {
+    if !color {
+        return Style::default();
     }
+    match style {
+        SemanticStyle::Heading => Style::default().add_modifier(Modifier::BOLD),
+        SemanticStyle::Machine | SemanticStyle::Incomplete => Style::default().fg(Color::Yellow),
+        SemanticStyle::Generation => Style::default().fg(Color::Cyan),
+        SemanticStyle::Success => Style::default().fg(Color::Green),
+        SemanticStyle::Failure => Style::default().fg(Color::Red),
+        SemanticStyle::Plain => Style::default(),
+    }
+}
+
+fn styled_headers(info: &FrameInfo<'_>, width: u16) -> Vec<Line<'static>> {
+    let mut records = vec![
+        vec![
+            (SemanticStyle::Heading, "Command: ".into()),
+            (SemanticStyle::Plain, single_line(info.command)),
+        ],
+        vec![
+            (SemanticStyle::Heading, "Started: ".into()),
+            (SemanticStyle::Plain, info.started.into()),
+            (SemanticStyle::Heading, "  Elapsed: ".into()),
+            (SemanticStyle::Plain, format_elapsed(info.elapsed)),
+        ],
+        vec![
+            (SemanticStyle::Heading, "Operation: ".into()),
+            (SemanticStyle::Plain, single_line(info.operation)),
+        ],
+    ];
     if let Some(log) = info.log {
-        lines.extend(wrap(&format!("Full log: {log}"), usize::from(width)));
+        records.push(vec![
+            (SemanticStyle::Heading, "Full log: ".into()),
+            (SemanticStyle::Generation, log.into()),
+        ]);
+    }
+    let mut lines = Vec::new();
+    if width == 0 {
+        return lines;
+    }
+    for parts in records {
+        let mut line = Line::default();
+        let mut used = 0;
+        for (role, text) in parts {
+            let style = semantic_style(role, info.color);
+            for grapheme in Span::raw(&text).styled_graphemes(style) {
+                let next = Span::raw(grapheme.symbol).width();
+                if used + next > usize::from(width) && used != 0 {
+                    lines.push(std::mem::take(&mut line));
+                    used = 0;
+                }
+                if next <= usize::from(width) {
+                    line.spans
+                        .push(Span::styled(grapheme.symbol.to_owned(), style));
+                    used += next;
+                }
+            }
+        }
+        lines.push(line);
     }
     lines
+}
+
+/// One geometry calculation owns panel, tail and whole-task row budgets.
+struct Layout<'a> {
+    header: Vec<String>,
+    tasks: Vec<(&'a TaskRow, usize)>,
+    tail_space: usize,
+    available: usize,
+}
+
+fn task_selection(model: &Model, limit: usize, height: u16) -> Vec<(&TaskRow, usize)> {
+    let mut remaining = status_budget(limit, height);
+    let mut selected = Vec::new();
+    for row in model.visible_rows(limit.min(remaining)) {
+        if remaining == 0 {
+            break;
+        }
+        let cost = if row.build.is_some() { 4 } else { 1 };
+        let shown = cost.min(remaining);
+        selected.push((row, shown));
+        remaining -= shown;
+    }
+    selected
+}
+
+fn status_budget(limit: usize, height: u16) -> usize {
+    // Reserve rows, not task-count multiples, before any work is registered.
+    limit.min(usize::from(height).saturating_sub(1))
+}
+
+fn layout<'a>(model: &'a Model, info: &FrameInfo<'_>, width: u16, height: u16) -> Layout<'a> {
+    let tasks = task_selection(model, info.max_tasks, height);
+    let task_space = status_budget(info.max_tasks, height);
+    let mut header = headers(info, width);
+    header.truncate(usize::from(height).saturating_sub(task_space));
+    let available = usize::from(height).saturating_sub(header.len() + task_space);
+    Layout {
+        header,
+        tasks,
+        tail_space: available.saturating_sub(2),
+        available,
+    }
+}
+
+fn preparing(model: &Model, info: &FrameInfo<'_>, height: u16) -> bool {
+    model.visible_rows(1).is_empty()
+        && !model.finalized()
+        && status_budget(info.max_tasks, height) > 0
 }
 
 pub fn render(model: &Model, info: &FrameInfo<'_>, width: u16, height: u16) -> Buffer {
     if width == 0 || height == 0 {
         return Buffer::empty(Rect::new(0, 0, width, 0));
     }
+    let layout = layout(model, info, width, height);
+    let header_count = layout.header.len();
     let heading = if info.color {
         Style::default().add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
-    let mut lines: Vec<(String, Style)> = headers(info, width)
+    let mut lines: Vec<(String, Style)> = layout
+        .header
         .into_iter()
-        .map(|text| (text, heading))
+        .map(|line| (line, Style::default()))
         .collect();
-    let selected = model.visible_rows(info.max_tasks.min(usize::from(height).saturating_sub(1)));
-    let mut tasks = Vec::new();
-    for row in selected {
+    if layout.available > 0 {
+        let title = clipped("─ Live view ", usize::from(width));
+        let title_width = Span::raw(&title).width();
+        lines.push((
+            format!(
+                "{title}{}",
+                "─".repeat(usize::from(width).saturating_sub(title_width))
+            ),
+            heading,
+        ));
+        if layout.available > 1 {
+            let tail: Vec<_> = model
+                .display_tail()
+                .into_iter()
+                .flat_map(|text| wrap(&text, usize::from(width)))
+                .collect();
+            let count = tail.len().min(layout.tail_space);
+            for text in &tail[tail.len() - count..] {
+                lines.push((text.clone(), Style::default()));
+            }
+            // Padding is inside the owned view from its very first quiet frame.
+            for _ in count..layout.tail_space {
+                lines.push((String::new(), Style::default()));
+            }
+            lines.push(("─".repeat(usize::from(width)), heading));
+        }
+    }
+    for (row, shown) in layout.tasks {
         let color = match row.phase {
             TaskPhase::Final {
                 state: Some(TaskState::Succeeded),
@@ -105,101 +234,179 @@ pub fn render(model: &Model, info: &FrameInfo<'_>, width: u16, height: u16) -> B
         } else {
             Style::default()
         };
-        tasks.push((task_label(row, usize::from(width)).0, style));
+        lines.push((task_label(row, usize::from(width)).0, style));
         if let Some((building, fetching)) = row.build {
-            let total = ActivityCount {
-                observed: building.observed.saturating_add(fetching.observed),
-                total: building
-                    .total
-                    .zip(fetching.total)
-                    .and_then(|(a, b)| a.checked_add(b)),
-            };
-            for (label, count) in [
-                ("Building", building),
-                ("Fetching", fetching),
-                ("Total", total),
-            ] {
-                tasks.push((activity_bar(label, count, usize::from(width)), style));
-            }
+            lines.extend(
+                activity_lines(
+                    building,
+                    fetching,
+                    usize::from(width),
+                    (row.phase == TaskPhase::Executing && !model.finalized())
+                        .then_some(info.elapsed),
+                )
+                .into_iter()
+                .take(shown - 1)
+                .map(|line| (line, style)),
+            );
         }
     }
-    // On a tiny terminal keep outcomes first. The caller publishes the full log
-    // in scrollback before the panel if its header cannot fit.
-    let task_space = tasks.len().min(usize::from(height).saturating_sub(1));
-    lines.truncate(usize::from(height).saturating_sub(task_space));
-    let available = usize::from(height).saturating_sub(lines.len() + task_space);
-    let tail: Vec<_> = model
-        .display_tail()
-        .into_iter()
-        .flat_map(|text| wrap(&text, usize::from(width)))
-        .collect();
-    if available > 0 {
-        let title = clipped("─ Live view ", usize::from(width));
-        let title_width = Span::raw(&title).width();
+    if preparing(model, info, height) {
+        let bar_width = usize::from(width).saturating_sub(26);
         lines.push((
-            format!(
-                "{title}{}",
-                "─".repeat(usize::from(width).saturating_sub(title_width))
+            clipped(
+                &format!(
+                    "Preparing {} waiting --%",
+                    indeterminate_bar(bar_width, Some(info.elapsed))
+                ),
+                usize::from(width),
             ),
-            heading,
+            if info.color {
+                Style::default().fg(Color::Cyan)
+            } else {
+                Style::default()
+            },
         ));
-        if available > 1 {
-            let count = tail.len().min(tail_capacity(model, info, width, height));
-            for text in &tail[tail.len() - count..] {
-                lines.push((text.clone(), Style::default()));
-            }
-            lines.push(("─".repeat(usize::from(width)), heading));
-        }
     }
-    lines.extend(tasks.into_iter().take(task_space));
-    let mut buffer = Buffer::empty(Rect::new(
-        0,
-        0,
-        width,
-        lines.len().min(usize::from(height)) as u16,
-    ));
-    for (y, (text, style)) in lines.into_iter().take(usize::from(height)).enumerate() {
+    let mut buffer = Buffer::empty(Rect::new(0, 0, width, height));
+    for (y, (text, style)) in lines.into_iter().enumerate() {
         Line::styled(text, style).render(Rect::new(0, y as u16, width, 1), &mut buffer);
+    }
+    for (y, line) in styled_headers(info, width)
+        .into_iter()
+        .take(header_count)
+        .enumerate()
+    {
+        line.render(Rect::new(0, y as u16, width, 1), &mut buffer);
     }
     buffer
 }
 
-fn activity_bar(label: &str, count: ActivityCount, columns: usize) -> String {
-    let counts = count.total.map_or_else(
-        || format!("{} / ?", count.observed),
-        |total| format!("{} / {total}", count.observed),
-    );
-    let prefix = format!("{label:<8} {counts}");
-    let Some(total) = count.total.filter(|n| *n > 0) else {
-        return clipped(&prefix, columns);
-    };
-    let space = columns.saturating_sub(Span::raw(&prefix).width() + 3);
-    if space < 3 {
-        return clipped(&prefix, columns);
-    }
-    let filled =
-        ((u128::from(count.observed.min(total)) * space as u128) / u128::from(total)) as usize;
-    format!(
-        "{prefix} [{}{}]",
-        "=".repeat(filled),
-        " ".repeat(space - filled)
+fn combined(
+    building: Option<NixActivityProgress>,
+    fetching: Option<NixActivityProgress>,
+) -> Option<NixActivityProgress> {
+    let (building, fetching) = building.zip(fetching)?;
+    Some(NixActivityProgress {
+        done: building.done.checked_add(fetching.done)?,
+        expected: building.expected.checked_add(fetching.expected)?,
+        running: building.running.checked_add(fetching.running)?,
+        failed: building.failed.checked_add(fetching.failed)?,
+    })
+}
+
+fn percentage(count: NixActivityProgress) -> Option<u64> {
+    (count.expected > 0 && count.done <= count.expected && count.failed == 0)
+        .then(|| ((u128::from(count.done) * 100) / u128::from(count.expected)) as u64)
+}
+
+fn indeterminate(count: Option<NixActivityProgress>) -> bool {
+    count.and_then(percentage).is_none() && count.is_none_or(|count| count.expected != 0)
+}
+
+fn counts(count: Option<NixActivityProgress>) -> String {
+    count.map_or_else(
+        || "waiting".into(),
+        |count| format!("{} / {}", count.done, count.expected),
     )
+}
+
+fn activity_suffix(count: Option<NixActivityProgress>) -> String {
+    count.map_or_else(String::new, |count| {
+        format!("running {} failed {}", count.running, count.failed)
+    })
+}
+
+fn activity_columns(values: &[Option<NixActivityProgress>; 3], columns: usize) -> (usize, usize) {
+    // Both missing-count labels (waiting/unknown) have the same display width.
+    let count_width = values
+        .iter()
+        .map(|count| counts(*count).len())
+        .max()
+        .unwrap_or(0);
+    let suffix_width = values
+        .iter()
+        .map(|count| activity_suffix(*count).len())
+        .max()
+        .unwrap_or(0);
+    // Labels, brackets, counts and percentage retain shared columns in all rows.
+    let bar_width = columns.saturating_sub(9 + 3 + count_width + 1 + 4 + 1 + suffix_width);
+    (count_width, bar_width)
+}
+
+fn activity_lines(
+    building: Option<NixActivityProgress>,
+    fetching: Option<NixActivityProgress>,
+    columns: usize,
+    animation: Option<Duration>,
+) -> Vec<String> {
+    let values = [building, fetching, combined(building, fetching)];
+    let counts: Vec<_> = values
+        .iter()
+        .map(|count| {
+            if count.is_none() && animation.is_none() {
+                "unknown".into()
+            } else {
+                counts(*count)
+            }
+        })
+        .collect();
+    let suffixes: Vec<_> = values.iter().map(|count| activity_suffix(*count)).collect();
+    let (count_width, bar_width) = activity_columns(&values, columns);
+    ["Building", "Fetching", "Total"]
+        .into_iter()
+        .enumerate()
+        .map(|(index, label)| {
+            let count = values[index];
+            let percent = count.and_then(percentage);
+            let fraction = percent.map_or_else(|| " --%".into(), |value| format!("{value:>3}%"));
+            let filled = count.filter(|_| percent.is_some()).map_or(0, |count| {
+                ((u128::from(count.done) * bar_width as u128) / u128::from(count.expected)) as usize
+            });
+            let bar = if indeterminate(count) {
+                indeterminate_bar(bar_width, animation)
+            } else {
+                format!(
+                    "[{}{}]",
+                    "=".repeat(filled),
+                    " ".repeat(bar_width.saturating_sub(filled))
+                )
+            };
+            clipped(
+                &format!(
+                    "{label:<8} {bar} {:>count_width$} {fraction} {}",
+                    counts[index], suffixes[index]
+                ),
+                columns,
+            )
+        })
+        .collect()
+}
+
+pub(super) fn spinner(elapsed: Duration) -> char {
+    ['|', '/', '-', '\\'][(elapsed.as_millis() / 100 % 4) as usize]
+}
+
+fn indeterminate_bar(width: usize, animation: Option<Duration>) -> String {
+    let mut cells = vec![' '; width];
+    if let Some(elapsed) = animation
+        && width > 0
+    {
+        cells[(width - 1) / 2] = spinner(elapsed);
+    }
+    format!("[{}]", cells.into_iter().collect::<String>())
 }
 
 /// Screen rows available to the newest tail entry, including wrapped lines.
 pub(super) fn tail_capacity(model: &Model, info: &FrameInfo<'_>, width: u16, height: u16) -> usize {
     if width == 0 || height == 0 {
-        return 0;
+        0
+    } else {
+        layout(model, info, width, height).tail_space
     }
-    let height = usize::from(height);
-    let task_space = model
-        .visible_rows(info.max_tasks.min(height.saturating_sub(1)))
-        .iter()
-        .map(|row| if row.build.is_some() { 4 } else { 1 })
-        .sum::<usize>()
-        .min(height.saturating_sub(1));
-    let heading = headers(info, width).len().min(height - task_space);
-    height.saturating_sub(heading + task_space + 2)
+}
+
+pub(super) fn headers_fit(model: &Model, info: &FrameInfo<'_>, width: u16, height: u16) -> bool {
+    width > 0 && layout(model, info, width, height).header.len() == headers(info, width).len()
 }
 
 fn clipped(text: &str, columns: usize) -> String {
@@ -245,50 +452,54 @@ pub(super) fn task_label(row: &TaskRow, columns: usize) -> (String, bool) {
     let shortened = Span::raw(&label).width() > columns;
     (clipped(&label, columns), shortened)
 }
-pub(super) fn task_summary(row: &TaskRow) -> String {
-    let mut summary = format!("{}: {}", task_description(row), phase_label(&row.phase));
+pub(super) fn result_style(state: TaskState) -> SemanticStyle {
+    match state {
+        TaskState::Succeeded => SemanticStyle::Success,
+        TaskState::Failed => SemanticStyle::Failure,
+        TaskState::Skipped | TaskState::Incomplete | TaskState::Canceled => {
+            SemanticStyle::Incomplete
+        }
+    }
+}
+
+pub(super) fn summary_parts(row: &TaskRow, columns: usize) -> Vec<(SemanticStyle, String)> {
+    let style = match row.phase {
+        TaskPhase::Final {
+            state: Some(state), ..
+        } => result_style(state),
+        _ => SemanticStyle::Incomplete,
+    };
+    let mut parts = vec![
+        (SemanticStyle::Heading, task_description(row)),
+        (SemanticStyle::Plain, ": ".into()),
+        (style, phase_label(&row.phase).into()),
+    ];
     if let Some((building, fetching)) = row.build {
-        let total = ActivityCount {
-            observed: building.observed.saturating_add(fetching.observed),
-            total: building
-                .total
-                .zip(fetching.total)
-                .and_then(|(a, b)| a.checked_add(b)),
-        };
-        for (label, count) in [
-            ("Building", building),
-            ("Fetching", fetching),
-            ("Total", total),
-        ] {
-            let total = count.total.map_or_else(|| "?".into(), |n| n.to_string());
-            summary.push_str(&format!("; {label} {}/{total}", count.observed));
+        parts.push((SemanticStyle::Plain, "\n".into()));
+        for line in activity_lines(building, fetching, columns.max(80), None) {
+            parts.push((style, format!("{line}\n")));
         }
     } else {
-        summary.push_str(&format!(" {}", task_counts(row)));
+        parts.push((SemanticStyle::Plain, format!(" {}\n", task_counts(row))));
     }
-    summary.push('\n');
-    summary
+    parts
+}
+
+#[cfg(test)]
+fn task_summary(row: &TaskRow) -> String {
+    summary_parts(row, 100)
+        .into_iter()
+        .map(|(_, text)| text)
+        .collect()
 }
 /// Match status-row visibility when a task also occupies three activity rows.
-pub(super) fn displayed_tasks(
-    model: &Model,
-    limit: usize,
-    height: u16,
-) -> Vec<crate::events::TaskId> {
-    let budget = usize::from(height).saturating_sub(1);
-    let mut used = 0;
-    let mut ids = Vec::new();
-    for row in model.visible_rows(limit.min(budget)) {
-        if used >= budget {
-            break;
-        }
-        let cost = if row.build.is_some() { 4 } else { 1 };
-        if used + cost <= budget {
-            ids.push(row.id);
-        }
-        used += cost;
-    }
-    ids
+#[cfg(test)]
+fn displayed_tasks(model: &Model, limit: usize, height: u16) -> Vec<crate::events::TaskId> {
+    task_selection(model, limit, height)
+        .into_iter()
+        .filter(|(row, shown)| *shown == if row.build.is_some() { 4 } else { 1 })
+        .map(|(row, _)| row.id)
+        .collect()
 }
 
 fn phase_label(phase: &TaskPhase) -> &'static str {
@@ -365,6 +576,10 @@ impl<W: std::io::Write> RelativePainter<W> {
             hidden: false,
             unfinished_line: false,
         }
+    }
+    #[cfg(test)]
+    pub(super) fn has_viewport(&self) -> bool {
+        self.previous.is_some() || self.hidden
     }
     pub fn writer_mut(&mut self) -> &mut W {
         &mut self.writer
@@ -471,24 +686,7 @@ impl<W: std::io::Write> RelativePainter<W> {
         Ok(())
     }
     pub fn finish(&mut self) -> std::io::Result<()> {
-        use crossterm::{
-            QueueableCommand,
-            cursor::{MoveToColumn, Show},
-        };
-        if self.previous.is_none() && !self.hidden {
-            return Ok(());
-        }
-        let mut batch = Vec::new();
-        if self.previous.is_some() {
-            batch.queue(MoveToColumn(0))?;
-            batch.extend_from_slice(b"\n");
-        }
-        batch.queue(Show)?;
-        self.writer.write_all(&batch)?;
-        self.writer.flush()?;
-        self.previous = None;
-        self.hidden = false;
-        Ok(())
+        self.park()
     }
 }
 fn move_row(batch: &mut Vec<u8>, at: &mut u16, to: u16) -> std::io::Result<()> {
@@ -600,7 +798,7 @@ mod tests {
         buffer.content().iter().map(|cell| cell.symbol()).collect()
     }
     #[test]
-    fn frame_uses_only_content_height_horizontal_separators_and_bounded_tasks() {
+    fn frame_has_fixed_height_internal_padding_horizontal_separators_and_bounded_tasks() {
         let mut model = Model::new(20, 100);
         for id in 0..8 {
             model
@@ -617,7 +815,7 @@ mod tests {
         assert!(!output.contains(['│', '┌', '┐']));
         assert!(output.contains("task4"));
         assert!(!output.contains("task5"));
-        assert!(buffer.area.height < 22);
+        assert_eq!(buffer.area.height, 22);
     }
     #[test]
     fn pending_and_executing_tasks_have_distinct_labels_without_native_claims() {
@@ -747,7 +945,7 @@ mod tests {
                 .expect("result");
         }
         for width in [32, 39, 40] {
-            let output = text(&render(&model, &info(), width, 14));
+            let output = text(&render(&model, &info(), width, 18));
             assert!(!output.contains("@3w5e11264sg"));
             assert!(output.contains("node-a"));
             assert!(output.contains("node-b"));
@@ -808,14 +1006,13 @@ mod tests {
         model
             .apply(&UiEvent::BuildProgress {
                 task: TaskId(7),
-                building: ActivityCount {
-                    observed: 2,
-                    total: Some(5),
-                },
-                fetching: ActivityCount {
-                    observed: 3,
-                    total: None,
-                },
+                building: Some(NixActivityProgress {
+                    done: 2,
+                    expected: 5,
+                    running: 1,
+                    failed: 0,
+                }),
+                fetching: None,
             })
             .unwrap();
         let long = format!(".confctl/logs/{}", "long-name-".repeat(8));
@@ -824,27 +1021,23 @@ mod tests {
         assert!(headers(&info, 32).concat().contains(&long));
         let buffer = render(&model, &info, 80, 24);
         let rendered = text(&buffer);
-        for value in ["Building 2 / 5", "Fetching 3 / ?", "Total    5 / ?"] {
+        for value in [
+            "Building", "2 / 5", "40%", "Fetching", "Total", "waiting", "--%",
+        ] {
             assert!(rendered.contains(value), "{rendered}");
         }
         assert_eq!(model.rows()[0].phase, TaskPhase::Executing);
-        assert!(!rendered.contains('%'));
+        assert!(!rendered.contains("100%"));
         assert!(rendered.contains("2026-10-18 12:00:00 +02:00"));
         model
             .apply(&UiEvent::BuildProgress {
                 task: TaskId(7),
-                building: ActivityCount {
-                    observed: 0,
-                    total: None,
-                },
-                fetching: ActivityCount {
-                    observed: 0,
-                    total: Some(0),
-                },
+                building: None,
+                fetching: Some(NixActivityProgress::default()),
             })
             .unwrap();
         let reset = text(&render(&model, &info, 80, 24));
-        assert!(reset.contains("Total    0 / ?"));
+        assert!(reset.contains("waiting") && reset.contains("--%"));
 
         // A separate representative frame keeps the unknown/reset cases above
         // intact and exposes the actual widgets through this existing fixture.
@@ -858,6 +1051,7 @@ mod tests {
         let command = "nix build --json --no-link .#machines";
         representative
             .apply(&UiEvent::CommandStarting {
+                command: crate::events::CommandId(10001),
                 task: TaskId(7),
                 display: command.into(),
             })
@@ -876,14 +1070,18 @@ mod tests {
         representative
             .apply(&UiEvent::BuildProgress {
                 task: TaskId(7),
-                building: ActivityCount {
-                    observed: 2,
-                    total: Some(5),
-                },
-                fetching: ActivityCount {
-                    observed: 3,
-                    total: Some(8),
-                },
+                building: Some(NixActivityProgress {
+                    done: 2,
+                    expected: 5,
+                    running: 1,
+                    failed: 0,
+                }),
+                fetching: Some(NixActivityProgress {
+                    done: 3,
+                    expected: 8,
+                    running: 2,
+                    failed: 0,
+                }),
             })
             .unwrap();
         let locator = r#"".confctl/logs/2026-10-25_12-00-00_build_api-and-storage_6b8b038f-qualified-invocation.log""#;
@@ -907,14 +1105,16 @@ mod tests {
                     < visible.find("these 5 derivations").unwrap()
             );
             assert_eq!(visible.matches(&format!("$ {command}")).count(), 1);
-            for label in ["Building 2 / 5", "Fetching 3 / 8", "Total    5 / 13"] {
+            for label in [
+                "Building", "2 / 5", "40%", "Fetching", "3 / 8", "37%", "Total", "5 / 13", "38%",
+            ] {
                 assert!(visible.contains(label), "{visible}");
             }
             assert!(visible.contains(locator));
             assert!(headers(&sample, width).concat().contains(locator));
             assert!(!visible.contains("@7"));
             assert!(visible.contains("Command: confctl build -t api"));
-            assert!(frame.area.height <= 24);
+            assert_eq!(frame.area.height, 24);
             if std::env::var_os("CONFCTL_TUI_SNAPSHOT").is_some() {
                 for y in 0..frame.area.height {
                     let line: String = (0..frame.area.width)
@@ -924,6 +1124,365 @@ mod tests {
                 }
                 println!();
             }
+        }
+    }
+
+    #[test]
+    fn authoritative_progress_aligns_and_keeps_unknown_invalid_and_failed_counts_honest() {
+        let building = NixActivityProgress {
+            done: 12,
+            expected: 20,
+            running: 2,
+            failed: 1,
+        };
+        let fetching = NixActivityProgress {
+            done: 3,
+            expected: 8,
+            running: 1,
+            failed: 0,
+        };
+        let lines = activity_lines(Some(building), Some(fetching), 100, Some(Duration::ZERO));
+        for marker in ["[", "]", "%", "running"] {
+            let positions: Vec<_> = lines
+                .iter()
+                .map(|line| Span::raw(&line[..line.find(marker).unwrap()]).width())
+                .collect();
+            assert!(positions.iter().all(|position| *position == positions[0]));
+        }
+        assert!(lines[0].contains("--%") && lines[0].contains("running 2 failed 1"));
+        assert!(lines[1].contains("37%"));
+        assert!(lines[2].contains("15 / 28") && lines[2].contains("--%"));
+        let grown = NixActivityProgress {
+            expected: 40,
+            ..building
+        };
+        assert_eq!(percentage(grown), None);
+        assert_eq!(
+            percentage(NixActivityProgress { failed: 0, ..grown }),
+            Some(30)
+        );
+        for invalid in [
+            NixActivityProgress::default(),
+            NixActivityProgress {
+                done: 9,
+                expected: 8,
+                running: 0,
+                failed: 0,
+            },
+            NixActivityProgress {
+                done: 7,
+                expected: 8,
+                running: 1,
+                failed: 1,
+            },
+        ] {
+            let lines = activity_lines(Some(invalid), None, 100, Some(Duration::ZERO));
+            assert!(lines[0].contains("--%"));
+            assert!(lines[1].contains("waiting") && lines[2].contains("waiting"));
+            assert!(
+                lines
+                    .iter()
+                    .all(|line| !line.contains("NaN") && !line.contains("100%"))
+            );
+        }
+        let huge = NixActivityProgress {
+            done: 0,
+            expected: u64::MAX,
+            running: 0,
+            failed: 0,
+        };
+        assert!(combined(Some(huge), Some(huge)).is_none());
+        let failed = NixActivityProgress {
+            done: 2,
+            expected: 2,
+            running: 0,
+            failed: 1,
+        };
+        let lines = activity_lines(
+            Some(failed),
+            Some(NixActivityProgress::default()),
+            100,
+            None,
+        );
+        assert!(lines[0].contains("2 / 2") && lines[0].contains("failed 1"));
+        assert!(lines[2].contains("2 / 2") && lines[2].contains("failed 1"));
+        assert!(
+            lines
+                .iter()
+                .all(|line| line.contains("--%") && !line.contains("100%"))
+        );
+        // Running/failed are independent observations, not extra completed work.
+        let independent = NixActivityProgress {
+            done: u64::MAX,
+            expected: u64::MAX,
+            running: u64::MAX,
+            failed: 0,
+        };
+        assert_eq!(percentage(independent), Some(100));
+        assert_eq!(
+            combined(Some(independent), Some(NixActivityProgress::default())),
+            Some(independent)
+        );
+        assert!(
+            combined(
+                Some(independent),
+                Some(NixActivityProgress {
+                    failed: u64::MAX,
+                    ..failed
+                })
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn indeterminate_spinner_is_ascii_stationary_and_fixed_at_ten_hz() {
+        for width in [0, 1, 2, 3, 8, 80, 120] {
+            for (millis, glyph) in [
+                (0, '|'),
+                (33, '|'),
+                (66, '|'),
+                (100, '/'),
+                (200, '-'),
+                (300, '\\'),
+                (400, '|'),
+            ] {
+                let bar = indeterminate_bar(width, Some(Duration::from_millis(millis)));
+                assert!(bar.is_ascii());
+                assert_eq!(bar.len(), width + 2);
+                if width > 0 {
+                    assert_eq!(bar.chars().nth(1 + (width - 1) / 2), Some(glyph));
+                }
+            }
+            assert_eq!(
+                indeterminate_bar(width, None),
+                format!("[{}]", " ".repeat(width))
+            );
+        }
+    }
+
+    #[test]
+    fn elapsed_animates_preparation_and_unknown_builds_but_not_actual_or_terminal_counts() {
+        let mut model = Model::new(12, 256);
+        let mut first = info();
+        first.elapsed = Duration::ZERO;
+        let mut later = info();
+        later.elapsed = Duration::from_millis(300);
+        let preparing = render(&model, &first, 80, 24);
+        assert!(text(&preparing).contains("Preparing") && model.rows().is_empty());
+        assert_ne!(preparing, render(&model, &later, 80, 24));
+        let monochrome_info = FrameInfo {
+            elapsed: Duration::from_millis(33),
+            color: false,
+            ..first
+        };
+        let monochrome = render(&model, &monochrome_info, 80, 24);
+        assert!(text(&monochrome).contains('|'));
+        assert!(
+            monochrome
+                .content
+                .iter()
+                .all(|cell| cell.fg == Color::Reset)
+        );
+        for width in [80, 120] {
+            model
+                .apply(&UiEvent::TaskStarted {
+                    task: TaskId(width as u64),
+                    description: "build group before native spawn".into(),
+                })
+                .unwrap();
+            model
+                .apply(&UiEvent::BuildProgress {
+                    task: TaskId(width as u64),
+                    building: None,
+                    fetching: None,
+                })
+                .unwrap();
+            let row = model.rows().last().unwrap();
+            let initial = activity_lines(None, None, width, Some(first.elapsed));
+            let moved = activity_lines(None, None, width, Some(later.elapsed));
+            assert_ne!(initial, moved);
+            for line in &moved {
+                assert!(line.contains("waiting") && line.contains("--%"));
+                assert!(!line.contains('?') && !line.contains("100%"));
+            }
+            assert!(
+                summary_parts(row, width)
+                    .iter()
+                    .all(|(_, line)| !line.contains('?'))
+            );
+            model
+                .apply(&UiEvent::TaskFinished {
+                    task: TaskId(width as u64),
+                    state: TaskState::Failed,
+                })
+                .unwrap();
+        }
+        let frozen = text(&render(&model, &first, 80, 24));
+        assert_eq!(frozen, text(&render(&model, &later, 80, 24)));
+        assert!(!frozen.contains("Preparing"));
+        let real = Some(NixActivityProgress {
+            done: 2,
+            expected: 5,
+            running: 1,
+            failed: 0,
+        });
+        assert_eq!(
+            activity_lines(real, real, 80, Some(first.elapsed)),
+            activity_lines(real, real, 80, Some(later.elapsed))
+        );
+        let zero = Some(NixActivityProgress::default());
+        assert_eq!(
+            activity_lines(zero, zero, 80, Some(first.elapsed)),
+            activity_lines(zero, zero, 80, Some(later.elapsed))
+        );
+        assert!(activity_lines(zero, zero, 80, Some(first.elapsed))[0].contains("0 / 0"));
+    }
+
+    #[test]
+    fn live_header_semantic_spans_keep_exact_wrapping_and_uncolored_text() {
+        let mut frame_info = info();
+        frame_info.color = true;
+        frame_info.log = Some("\".confctl/logs/a-very-long-and-fully-retained-invocation.log\"");
+        let model = Model::new(12, 256);
+        for width in [40, 80, 120] {
+            let colored = render(&model, &frame_info, width, 24);
+            let mut plain_info = frame_info;
+            plain_info.color = false;
+            let plain = render(&model, &plain_info, width, 24);
+            assert_eq!(text(&colored), text(&plain));
+            assert_eq!(colored[(0, 0)].modifier, Modifier::BOLD);
+            assert!(!colored[(9, 0)].modifier.contains(Modifier::BOLD));
+            let log_rows = styled_headers(&frame_info, width);
+            assert!(
+                log_rows
+                    .iter()
+                    .flat_map(|line| &line.spans)
+                    .any(|span| span.style.fg == Some(Color::Cyan))
+            );
+            assert_eq!(
+                log_rows.iter().map(ToString::to_string).collect::<Vec<_>>(),
+                headers(&plain_info, width)
+            );
+        }
+    }
+
+    #[test]
+    fn quiet_and_busy_frames_share_geometry_and_padding_never_grows_the_panel() {
+        let mut model = Model::new(100, 256);
+        let quiet = render(&model, &info(), 79, 24);
+        model
+            .apply(&UiEvent::TaskPending {
+                task: TaskId(1),
+                description: "build group 1/2 (3 machines)".into(),
+            })
+            .unwrap();
+        let pending = render(&model, &info(), 79, 24);
+        model
+            .apply(&UiEvent::TaskStarted {
+                task: TaskId(1),
+                description: "build group 1/2 (3 machines)".into(),
+            })
+            .unwrap();
+        model
+            .apply(&UiEvent::BuildProgress {
+                task: TaskId(1),
+                building: None,
+                fetching: None,
+            })
+            .unwrap();
+        for _ in 0..40 {
+            model.output(
+                TaskId(1),
+                crate::events::OutputStream::Stderr,
+                b"native activity\n",
+            );
+        }
+        let busy = render(&model, &info(), 79, 24);
+        model
+            .apply(&UiEvent::TaskFinished {
+                task: TaskId(1),
+                state: TaskState::Succeeded,
+            })
+            .unwrap();
+        model.mark_checkpoint(&[TaskId(1)]);
+        let snapshotted = render(&model, &info(), 79, 24);
+        model
+            .apply(&UiEvent::TaskStarted {
+                task: TaskId(2),
+                description: "next machine".into(),
+            })
+            .unwrap();
+        let next_machine = render(&model, &info(), 79, 24);
+        let rows = |frame: &Buffer| -> Vec<String> {
+            (0..frame.area.height)
+                .map(|y| {
+                    (0..frame.area.width)
+                        .map(|x| frame[(x, y)].symbol())
+                        .collect()
+                })
+                .collect()
+        };
+        let quiet_rows = rows(&quiet);
+        let separator_y = quiet_rows
+            .iter()
+            .position(|line| line == &"─".repeat(79))
+            .unwrap();
+        let status_y = separator_y + 1;
+        assert_eq!(
+            status_y, 19,
+            "five status rows are reserved before work starts"
+        );
+        for frame in [&quiet, &pending, &busy, &snapshotted, &next_machine] {
+            let frame_rows = rows(frame);
+            assert!(frame_rows[0].starts_with("Command: confctl build -t api"));
+            assert_eq!(
+                frame_rows
+                    .iter()
+                    .position(|line| line.starts_with("─ Live view")),
+                quiet_rows
+                    .iter()
+                    .position(|line| line.starts_with("─ Live view"))
+            );
+            assert_eq!(frame_rows[separator_y], "─".repeat(79));
+        }
+        assert!(quiet_rows[status_y].starts_with("Preparing"));
+        assert!(
+            quiet_rows[status_y + 1..]
+                .iter()
+                .all(|line| line.trim().is_empty())
+        );
+        assert!(rows(&pending)[status_y].starts_with("pending"));
+        let busy_rows = rows(&busy);
+        assert!(busy_rows[status_y].starts_with("running build group"));
+        for (offset, label) in [(1, "Building"), (2, "Fetching"), (3, "Total")] {
+            assert!(busy_rows[status_y + offset].starts_with(label));
+            assert!(rows(&pending)[status_y + offset].trim().is_empty());
+            assert!(rows(&snapshotted)[status_y + offset].trim().is_empty());
+            assert!(rows(&next_machine)[status_y + offset].trim().is_empty());
+        }
+        assert!(rows(&next_machine)[status_y].starts_with("running 0 next machine"));
+        assert_eq!(quiet.area, busy.area);
+        assert_eq!(quiet.area.height, 24);
+        let mut painter = RelativePainter::new(Vec::new(), false);
+        painter.paint(&quiet).unwrap();
+        let before = painter.writer_mut().len();
+        painter.paint(&busy).unwrap();
+        assert!(
+            !painter.writer_mut()[before..].contains(&b'\n'),
+            "tail growth must not scroll the viewport"
+        );
+        assert!(text(&busy).starts_with("Command: confctl build -t api"));
+        assert!(
+            text(&busy).contains("Building")
+                && text(&busy).contains("Fetching")
+                && text(&busy).contains("Total")
+        );
+        assert!(displayed_tasks(&model, 5, 24).contains(&TaskId(2)));
+        for height in [1, 2, 4, 7, 24] {
+            let frame = render(&model, &info(), 40, height);
+            assert_eq!(frame.area.height, height);
+            assert!(tail_capacity(&model, &info(), 40, height) <= usize::from(height));
         }
     }
 
