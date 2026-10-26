@@ -1,0 +1,111 @@
+name: Runtime binary cache
+
+on:
+  push:
+    branches: ['**']
+  workflow_call:
+    inputs:
+      revision:
+        required: true
+        type: string
+      branch:
+        required: true
+        type: string
+    secrets:
+      VPSADMINOS_CACHE_SSH_KEY:
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: confctl-cache-${{ inputs.branch || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  credentials:
+    if: >-
+      github.repository == 'vpsfreecz/confctl' &&
+      (github.event_name == 'push' || github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require cache credential before allocating a private runner
+        env:
+          CACHE_KEY: ${{ secrets.VPSADMINOS_CACHE_SSH_KEY }}
+        run: |
+          if [ -z "$CACHE_KEY" ]; then
+            echo '::error::VPSADMINOS_CACHE_SSH_KEY must be made available to this repository.'
+            exit 1
+          fi
+
+  cache:
+    needs: credentials
+    runs-on:
+      group: vpsadminos runners
+      labels: self-hosted
+    timeout-minutes: 120
+    env:
+      CACHE_REVISION: ${{ inputs.revision || github.sha }}
+      CACHE_BRANCH: ${{ inputs.branch || github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.revision || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify revision, architecture and pinned job-private SSH trust
+        env:
+          CACHE_KEY: ${{ secrets.VPSADMINOS_CACHE_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          [[ "$CACHE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$CACHE_REVISION"
+          test "$(uname -m)" = x86_64
+          test "$(nix config show system)" = x86_64-linux
+          test -n "$CACHE_KEY"
+          key_dir=$(mktemp -d /tmp/confctl-cache-key.XXXXXX)
+          key_file="$key_dir/id"
+          known_hosts_file="$key_dir/known_hosts"
+          printf 'CACHE_KEY_DIRECTORY=%s\nCACHE_KEY_FILE=%s\nCACHE_KNOWN_HOSTS_FILE=%s\n' \
+            "$key_dir" "$key_file" "$known_hosts_file" >> "$GITHUB_ENV"
+          (
+            umask 077
+            printf '%s\n' "$CACHE_KEY" > "$key_file"
+            # Approved host fingerprint: SHA256:x9wce1onC/odDnyf2+Cwiu6oWAfKCNcvzx08otOOtKw
+            printf '%s\n' 'cache.int.vpsadminos.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDnfwNO22eRYvQtGlzOYDObihr0JikX2qLhG1Y+63TPJ' > "$known_hosts_file"
+          )
+          cache_ssh_options="-i $key_file -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts_file -o GlobalKnownHostsFile=/dev/null -o HostKeyAlgorithms=ssh-ed25519 -o UpdateHostKeys=no"
+          printf 'CACHE_SSH_OPTIONS=%s\n' "$cache_ssh_options" >> "$GITHUB_ENV"
+          read -r -a ssh_options <<< "$cache_ssh_options"
+          ssh "${ssh_options[@]}" push@cache.int.vpsadminos.org true
+
+      - name: Qualify and inspect the exact runtime package
+        id: package
+        run: bash .github/scripts/qualify-package.sh x86_64-linux "$GITHUB_OUTPUT"
+
+      - name: Publish runtime closure and retain its branch generation
+        env:
+          RUNTIME_OUT: ${{ steps.package.outputs.runtime }}
+        run: |
+          set -euo pipefail
+          [[ "$RUNTIME_OUT" =~ ^/nix/store/[a-z0-9]{32}-confctl-rust-[0-9][a-zA-Z0-9.+_-]*$ ]]
+          branch_hash=$(printf '%s' "$CACHE_BRANCH" | sha256sum | cut -d ' ' -f 1)
+          profile="confctl-$branch_hash-x86_64-linux"
+          export NIX_SSHOPTS="$CACHE_SSH_OPTIONS"
+          read -r -a ssh_options <<< "$CACHE_SSH_OPTIONS"
+          nix-copy-closure --to push@cache.int.vpsadminos.org "$RUNTIME_OUT"
+          ssh "${ssh_options[@]}" push@cache.int.vpsadminos.org \
+            sudo push-ci-generation "$profile" "$RUNTIME_OUT"
+          nix store verify --store https://cache.vpsadminos.org --no-contents \
+            --sigs-needed 1 --option trusted-public-keys \
+            'cache.vpsadminos.org:wpIJlNZQIhS+0gFf1U3MC9sLZdLW3sh5qakOWGDoDrE=' "$RUNTIME_OUT"
+          printf 'Cached %s at %s under %s\n' "$CACHE_REVISION" "$RUNTIME_OUT" "$profile"
+
+      - name: Remove this job's temporary SSH files
+        if: always()
+        run: |
+          if [ -n "${CACHE_KEY_DIRECTORY:-}" ]; then
+            rm -f -- "$CACHE_KEY_FILE" "$CACHE_KNOWN_HOSTS_FILE"
+            rmdir -- "$CACHE_KEY_DIRECTORY"
+          fi
