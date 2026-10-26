@@ -44,9 +44,14 @@ of the complete committed history, final diff and migration inventory before
 longer checks. Then run the default suite and the assigned package/native gates.
 All-feature compilation is not permission to execute qualification mains.
 
-Build the actual public Nix package, its smoke and shell-selection checks for
-both supported native platforms in the approved builder environment. Verify the
-installed CLI/helper names, manuals, license notices and runtime references.
+Build the explicit `packages.<system>.confctl.tests.qualification` derivation for
+both supported native platforms in the approved builder environment. It enables
+the full default test phase on the same recipe/source/lock/packages as the
+ordinary runtime. The public CLI and helper packages deliberately have
+`doCheck = false`; their successful build alone is not full-suite evidence.
+Also build the actual public runtime package and its smoke and shell-selection
+checks. Verify the installed CLI/helper names, manuals, license notices and
+runtime references.
 No Ruby application, Bundler, test source or compatibility archive belongs in
 the installed product closure. Preserve site tools-mode Ruby as a separate
 consumer. Prove the locked graph on the declared MSRV as well as the normal

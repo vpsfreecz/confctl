@@ -3,7 +3,7 @@
 
   inputs = {
     vpsadminos.url = "github:vpsfreecz/vpsadminos";
-    nixpkgs.follows = "vpsadminos/nixpkgs";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
   };
 
   outputs =
@@ -30,7 +30,7 @@
         system:
         vpsadminos.lib.testFramework.mkTests {
           inherit system;
-          pkgsPath = nixpkgs.outPath;
+          pkgsPath = vpsadminos.inputs.nixpkgs.outPath;
           testsRoot = ./tests;
           suiteArgs = {
             confctlSrc = self.outPath;
@@ -42,7 +42,7 @@
         system:
         vpsadminos.lib.testFramework.mkTestsMeta {
           inherit system;
-          pkgsPath = nixpkgs.outPath;
+          pkgsPath = vpsadminos.inputs.nixpkgs.outPath;
           testsRoot = ./tests;
           suiteArgs = {
             confctlSrc = self.outPath;

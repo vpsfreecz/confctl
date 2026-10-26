@@ -43,7 +43,15 @@ A target lacking a suitable Rust platform requires a separate input decision;
 these selectors do not update inputs.
 
 The package compiles the CLI and four helpers with the existing Cargo.lock and
-default features. `CONFCTL_LOGNAME` is the lexical coreutils `bin/logname` entry
+default features. Ordinary public packages and target helper packages have
+`doCheck = false`: installing them does not run the test suite. The lazy
+`passthru.tests.qualification` derivation uses the same recipe, source, Cargo.lock
+and target packages with `doCheck = true`. CI and release checks build that
+derivation explicitly; runtime, helper, shell and smoke outputs do not depend on it.
+A cache miss can still require compiling the release binaries and their
+dependencies.
+
+`CONFCTL_LOGNAME` is the lexical coreutils `bin/logname` entry
 at compile time. The five backends live in `libexec/confctl`. The CLI wrapper
 executes its absolute backend, retaining argv, stdin, working directory and
 native exit status. It adds Nix, Git, OpenSSH, coreutils, Bash and less to PATH.
@@ -152,12 +160,21 @@ occur in disposable hosted CI. Hosted checks do not establish pinned production-
 packages, installed manuals, real Nix builds, site migration or operator
 acceptance. The self-hosted native suite remains separate.
 
-A separate hosted job builds the public package on native x86_64 and ARM Linux
+A separate hosted job qualifies the package on native x86_64 and ARM Linux
 runners. It checks that the public package and Rust alias select the same
-derivation, runs the package's default tests and smoke/shell-selection checks,
-and executes both installed CLI aliases. It also checks installed manuals,
+runtime derivation, builds `tests.qualification` for the default tests, then builds
+the runtime package and its smoke/shell-selection checks and executes both
+installed CLI aliases. It also checks installed manuals,
 license files and basic runtime-closure contents. These checks do not establish
 VM, real-Nix source-inclusion, mixed-helper or operator acceptance.
+
+## Stable input and binary cache
+
+Confctl pins its own `nixos-26.05` input for public packages and development
+shells. The VM framework keeps its separate vpsAdminOS input and fixture package
+set. Helpers continue to use the evaluated target's packages. Independent locks
+can select different revisions; cache reuse depends on the exact source, package
+set, system and derivation, rather than the channel name alone.
 
 The self-hosted native VM/GC job runs automatically only for default-branch
 pushes matching its path filters. Feature branches and tags require deliberate
