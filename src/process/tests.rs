@@ -81,9 +81,15 @@ async fn presented_capture_only_command_waits_for_ack_and_never_displays_secrets
             .await
             .unwrap()
             .unwrap();
-        let UiEvent::CommandStarting { task, display } = &delivery.event else {
+        let UiEvent::CommandStarting {
+            command,
+            task,
+            display,
+        } = &delivery.event
+        else {
             panic!("command must precede spawn")
         };
+        let command = *command;
         assert_eq!(*task, TaskId(0));
         assert_eq!(display, "fake local child [arguments omitted]");
         for secret in ["argument-secret", "environment-secret", "stdin-secret"] {
@@ -118,6 +124,16 @@ async fn presented_capture_only_command_waits_for_ack_and_never_displays_secrets
             }
             _ => unreachable!(),
         };
+        let finished = tokio::time::timeout(Duration::from_secs(5), receiver.receive())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(finished.event, UiEvent::CommandFinished { command });
+        assert!(
+            !child.is_finished(),
+            "reply waits for the lifecycle end acknowledgement"
+        );
+        finished.acknowledge(Ok(()));
         let result = tokio::time::timeout(Duration::from_secs(5), child)
             .await
             .unwrap()
@@ -145,7 +161,7 @@ async fn presented_capture_only_command_waits_for_ack_and_never_displays_secrets
         drop(runner);
         assert!(
             receiver.receive().await.is_none(),
-            "one announcement only, no phantom task/output"
+            "one command pair only, no phantom task/output"
         );
     }
 }
@@ -199,9 +215,36 @@ async fn presented_display_precedes_activity_and_failed_spawn_is_only_an_attempt
     assert!(
         matches!(&seen[0], UiEvent::CommandStarting { display, .. } if display == "nix eval --json '.#confctl.settings'")
     );
-    assert!(
-        matches!(seen.last(), Some(UiEvent::CommandStarting { display, .. }) if display == "missing-tool <arguments omitted>")
+    let starts = seen
+        .iter()
+        .filter_map(|event| match event {
+            UiEvent::CommandStarting { command, task, .. } => Some((*command, *task)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(starts.len(), 2);
+    assert_ne!(starts[0].0, starts[1].0);
+    assert_eq!((starts[0].1, starts[1].1), (TaskId(0), TaskId(0)));
+    assert_eq!(
+        seen.last(),
+        Some(&UiEvent::CommandFinished {
+            command: starts[1].0
+        })
     );
+    let first_end = seen
+        .iter()
+        .position(|e| {
+            *e == UiEvent::CommandFinished {
+                command: starts[0].0,
+            }
+        })
+        .unwrap();
+    assert!(
+        seen[..first_end]
+            .iter()
+            .any(|e| matches!(e, UiEvent::ActivityOutput { .. }))
+    );
+    assert!(seen[first_end + 1..].iter().any(|e| matches!(e, UiEvent::CommandStarting { display, .. } if display == "missing-tool <arguments omitted>")));
     assert_eq!(
         seen.iter()
             .filter(|e| matches!(e, UiEvent::CommandStarting { .. }))
@@ -225,6 +268,179 @@ async fn presented_display_precedes_activity_and_failed_spawn_is_only_an_attempt
         .collect::<Vec<_>>();
     assert_eq!(activity, b"raw\xffactivity");
     assert_eq!(std::fs::read(log_path).unwrap(), b"raw\xffactivity");
+}
+
+#[tokio::test]
+async fn presented_same_task_commands_finish_out_of_order_after_all_streams() {
+    let directory = tempfile::tempdir().unwrap();
+    let (events, mut receiver) = EventSink::channel(2);
+    let runner = Supervisor::new_presented(
+        events,
+        directory.path().into(),
+        1024,
+        Duration::from_millis(30),
+        None,
+        None,
+    );
+    let mut children = Vec::new();
+    let mut writers = Vec::new();
+    let mut commands = Vec::new();
+    for label in ["first", "second"] {
+        let (writer, input) = PagerInput::channel();
+        writers.push(writer);
+        let mut spec = shell("read -r gate; printf '%s-out' \"$1\"; printf '%s-err' \"$1\" >&2");
+        spec.args.extend(["fixture".into(), label.into()]);
+        spec.stdin = StdinPolicy::Pager(input);
+        spec.stdout = StreamPolicy::CaptureAndForward;
+        spec.stderr = StreamPolicy::CaptureAndForward;
+        let executing = runner.clone();
+        children.push(tokio::spawn(async move {
+            executing
+                .run(spec, ProcessScope::new(CancellationToken::new(), TaskId(0)))
+                .await
+        }));
+        let start = receiver.receive().await.unwrap();
+        let UiEvent::CommandStarting { command, task, .. } = start.event else {
+            panic!("start before spawn")
+        };
+        assert_eq!(task, TaskId(0));
+        commands.push(command);
+        start.acknowledge(Ok(()));
+    }
+    assert_ne!(commands[0], commands[1]);
+    for label in ["second", "first"] {
+        let mut writer = writers.pop().unwrap();
+        writer
+            .write(b"go\n", &CancellationToken::new())
+            .await
+            .unwrap();
+        drop(writer);
+        let command = commands.pop().unwrap();
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        loop {
+            let delivery = receiver.receive().await.unwrap();
+            match &delivery.event {
+                UiEvent::ActivityOutput { stream, bytes, .. } => {
+                    match stream {
+                        OutputStream::Stdout => &mut stdout,
+                        OutputStream::Stderr => &mut stderr,
+                    }
+                    .extend_from_slice(bytes);
+                }
+                UiEvent::CommandFinished { command: ended } => {
+                    assert_eq!(*ended, command);
+                    assert_eq!(stdout, format!("{label}-out").as_bytes());
+                    assert_eq!(stderr, format!("{label}-err").as_bytes());
+                    assert!(!children.last().unwrap().is_finished());
+                    delivery.acknowledge(Ok(()));
+                    break;
+                }
+                _ => panic!("unexpected lifecycle event: {:?}", delivery.event),
+            }
+            delivery.acknowledge(Ok(()));
+        }
+        let outcome = children.pop().unwrap().await.unwrap().unwrap();
+        assert!(outcome.stdout_complete && outcome.stderr_complete);
+        assert_eq!(outcome.stdout.memory().unwrap(), stdout);
+        assert_eq!(outcome.stderr.memory().unwrap(), stderr);
+    }
+    runner.shutdown().await.unwrap();
+    drop(runner);
+    assert!(receiver.receive().await.is_none());
+}
+
+#[tokio::test]
+async fn presented_finish_failure_retains_native_failure_cancellation_and_evidence() {
+    for disposition in ["success", "nonzero", "spawn", "cancel", "forward"] {
+        let directory = tempfile::tempdir().unwrap();
+        let (events, mut receiver) = EventSink::channel(2);
+        let runner = Supervisor::new_presented(
+            events,
+            directory.path().into(),
+            1024,
+            Duration::from_millis(30),
+            None,
+            None,
+        );
+        let cancellation = CancellationToken::new();
+        let cancel = cancellation.clone();
+        let pid = directory.path().join("pid");
+        let check_pid = pid.clone();
+        let consumer = tokio::spawn(async move {
+            while let Some(delivery) = receiver.receive().await {
+                if matches!(delivery.event, UiEvent::ActivityOutput { .. })
+                    && disposition == "cancel"
+                {
+                    cancel.cancel();
+                }
+                let finished = matches!(delivery.event, UiEvent::CommandFinished { .. });
+                if finished && disposition == "cancel" {
+                    let pid = std::fs::read_to_string(&check_pid).unwrap();
+                    assert!(
+                        !Path::new("/proc").join(pid.trim()).exists(),
+                        "finish follows native reap"
+                    );
+                }
+                delivery.acknowledge(if finished {
+                    Err("finish rejected".into())
+                } else {
+                    Ok(())
+                });
+            }
+        });
+        let mut spec = match disposition {
+            "spawn" => ProcessSpec::new(directory.path().join("missing"), "missing fixture"),
+            "cancel" => {
+                let mut spec = shell("printf '%s' \"$$\" > \"$1\"; printf ready; exec sleep 60");
+                spec.args.extend(["fixture".into(), pid.into_os_string()]);
+                spec.stdout = StreamPolicy::CaptureAndForward;
+                spec
+            }
+            "nonzero" => shell("printf kept; exit 7"),
+            _ => shell("printf kept"),
+        };
+        spec.display_command = Some("safe fixture".into());
+        if disposition == "forward" {
+            spec.stdout = StreamPolicy::Forward;
+        }
+        let error = runner
+            .run(spec, ProcessScope::new(cancellation, TaskId(0)))
+            .await
+            .unwrap_err();
+        if disposition == "spawn" {
+            assert!(
+                matches!(error, ConfctlError::Cleanup { primary, secondary } if matches!(*primary, ConfctlError::Spawn { .. }) && secondary.len() == 1)
+            );
+        } else {
+            if disposition == "cancel" {
+                assert!(error.is_cancelled(), "{error:?}");
+            }
+            let evidence = failure_evidence(&error);
+            assert_eq!(
+                evidence.stdout.memory().unwrap(),
+                if disposition == "cancel" {
+                    b"ready".as_slice()
+                } else {
+                    b"kept".as_slice()
+                }
+            );
+            if disposition == "nonzero" {
+                assert_eq!(evidence.status.unwrap().code(), Some(7));
+            }
+            if disposition == "cancel" {
+                // Finished proves joined ownership, not EOF on an interrupted
+                // pipe. The canceled reader retains its exact observed prefix.
+                assert!(!evidence.stdout_complete);
+                assert!(evidence.status.is_some());
+            } else {
+                assert!(evidence.stdout_complete && evidence.stderr_complete);
+            }
+        }
+        runner.shutdown().await.unwrap();
+        drop(runner);
+        consumer.await.unwrap();
+    }
 }
 
 #[tokio::test]
@@ -1413,13 +1629,13 @@ async fn quiet_build_retry_resets_both_activity_counters_without_fabricating_suc
         seen
     });
     for script in [
-        "printf \"these 2 derivations will be built:\\nbuilding '/nix/store/a.drv'...\\n\" >&2; exit 7",
+        r#"printf '%s\n' '@nix {"action":"start","id":1,"type":104,"text":""}' '@nix {"action":"result","id":1,"type":105,"fields":[1,2,1,0]}' >&2; exit 7"#,
         "printf '[]'",
     ] {
         let mut spec = shell(script);
         spec.stderr = StreamPolicy::CaptureAndForward;
         let mut scope = ProcessScope::new(CancellationToken::new(), TaskId(9));
-        scope.nix_progress = Some(crate::nix::progress::Kind::Build);
+        scope.nix_progress = Some(crate::nix::progress::Kind::StructuredBuild);
         let result = runner.run(spec, scope).await.unwrap();
         assert_eq!(
             result.code(),
@@ -1431,41 +1647,27 @@ async fn quiet_build_retry_resets_both_activity_counters_without_fabricating_suc
     let seen = consumer.await.unwrap();
     let counts = seen
         .iter()
-        .filter_map(|event| {
-            if let UiEvent::BuildProgress {
+        .filter_map(|event| match event {
+            UiEvent::BuildProgress {
                 building, fetching, ..
-            } = event
-            {
-                Some((*building, *fetching))
-            } else {
-                None
-            }
+            } => Some((*building, *fetching)),
+            _ => None,
         })
         .collect::<Vec<_>>();
-    use crate::events::ActivityCount;
-    let unknown = ActivityCount {
-        observed: 0,
-        total: None,
-    };
     assert_eq!(
         counts,
         [
-            (unknown, unknown),
+            (None, None),
             (
-                ActivityCount {
-                    observed: 0,
-                    total: Some(2)
-                },
-                unknown
+                Some(crate::events::NixActivityProgress {
+                    done: 1,
+                    expected: 2,
+                    running: 1,
+                    failed: 0
+                }),
+                None
             ),
-            (
-                ActivityCount {
-                    observed: 1,
-                    total: Some(2)
-                },
-                unknown
-            ),
-            (unknown, unknown)
+            (None, None)
         ]
     );
     assert!(!seen.iter().any(|event| matches!(
@@ -1478,18 +1680,19 @@ async fn quiet_build_retry_resets_both_activity_counters_without_fabricating_suc
 async fn nix_build_progress_uses_existing_relay_before_child_exit_and_retains_raw_bytes() {
     let directory = tempfile::tempdir().unwrap();
     let release = directory.path().join("release");
-    let (runner, mut receiver) = owner(directory.path(), 1024, None);
+    let (runner, mut receiver) = owner(directory.path(), 4096, None);
+    let native = b"@nix {\"action\":\"start\",\"id\":1,\"type\":104,\"text\":\"building group\"}\n@nix {\"action\":\"result\",\"id\":1,\"type\":105,\"fields\":[1,2,1,0]}\nunknown raw\n";
     let mut spec = shell(
-        "printf 'build' >&2; printf \"ing '/nix/store/a.drv'...\\nunknown raw\\n\" >&2; while [ ! -f \"$1\" ]; do sleep 0.01; done; printf '[1]'",
+        r#"printf '%s\n' '@nix {"action":"start","id":1,"type":104,"text":"building group"}' '@nix {"action":"result","id":1,"type":105,"fields":[1,2,1,0]}' 'unknown raw' >&2; while [ ! -f "$1" ]; do sleep 0.01; done; printf '[1]'"#,
     );
     spec.args
         .extend(["fixture".into(), release.as_os_str().into()]);
     spec.stderr = StreamPolicy::CaptureAndForward;
     let mut scope = ProcessScope::new(CancellationToken::new(), TaskId(9));
-    scope.nix_progress = Some(crate::nix::progress::Kind::Build);
+    scope.nix_progress = Some(crate::nix::progress::Kind::StructuredBuild);
     let running = runner.clone();
     let child = tokio::spawn(async move { running.run(spec, scope).await });
-    let mut raw = Vec::new();
+    let mut readable = Vec::new();
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             let delivery = receiver.receive().await.unwrap();
@@ -1497,10 +1700,12 @@ async fn nix_build_progress_uses_existing_relay_before_child_exit_and_retains_ra
                 delivery.event,
                 UiEvent::BuildProgress {
                     task: TaskId(9),
-                    building: crate::events::ActivityCount {
-                        observed: 1,
-                        total: None
-                    },
+                    building: Some(crate::events::NixActivityProgress {
+                        done: 1,
+                        expected: 2,
+                        running: 1,
+                        failed: 0
+                    }),
                     ..
                 }
             );
@@ -1512,7 +1717,7 @@ async fn nix_build_progress_uses_existing_relay_before_child_exit_and_retains_ra
             {
                 assert_eq!(*task, TaskId(9));
                 assert_eq!(*stream, OutputStream::Stderr);
-                raw.extend_from_slice(bytes);
+                readable.extend_from_slice(bytes);
             }
             assert!(
                 !child.is_finished(),
@@ -1534,11 +1739,9 @@ async fn nix_build_progress_uses_existing_relay_before_child_exit_and_retains_ra
     });
     let outcome = child.await.unwrap().unwrap();
     assert_eq!(outcome.stdout.memory(), Some(&b"[1]"[..]));
-    assert_eq!(
-        outcome.stderr.memory(),
-        Some(&b"building '/nix/store/a.drv'...\nunknown raw\n"[..])
-    );
-    assert!(raw.starts_with(b"building '/nix/store/a.drv'...\n"));
+    assert_eq!(outcome.stderr.memory(), Some(native.as_slice()));
+    assert!(readable.starts_with(b"building group\n"));
+    assert!(!readable.windows(5).any(|v| v == b"@nix "));
     runner.shutdown().await.unwrap();
     drop(runner);
     consumer.await.unwrap();
@@ -1548,16 +1751,18 @@ async fn nix_build_progress_uses_existing_relay_before_child_exit_and_retains_ra
 async fn nix_build_progress_rejection_joins_child_and_retains_raw_stderr() {
     let directory = tempfile::tempdir().unwrap();
     let (runner, mut receiver) = owner(directory.path(), 1024, None);
-    let mut spec = shell("printf \"building '/nix/store/a.drv'...\\n\" >&2; exec sleep 120");
+    let mut spec = shell(
+        r#"printf '%s\n' '@nix {"action":"start","id":1,"type":104,"text":""}' '@nix {"action":"result","id":1,"type":105,"fields":[1,2,1,0]}' >&2; exec sleep 120"#,
+    );
     spec.stderr = StreamPolicy::CaptureAndForward;
     let mut scope = ProcessScope::new(CancellationToken::new(), TaskId(10));
-    scope.nix_progress = Some(crate::nix::progress::Kind::Build);
+    scope.nix_progress = Some(crate::nix::progress::Kind::StructuredBuild);
     let consumer = tokio::spawn(async move {
         while let Some(delivery) = receiver.receive().await {
             let reject = matches!(
                 delivery.event,
                 UiEvent::BuildProgress {
-                    building: crate::events::ActivityCount { observed: 1, .. },
+                    building: Some(crate::events::NixActivityProgress { done: 1, .. }),
                     ..
                 }
             );
@@ -1581,9 +1786,12 @@ async fn nix_build_progress_rejection_joins_child_and_retains_raw_stderr() {
         panic!("retained process evidence")
     };
     assert!(evidence.status.is_some());
-    assert_eq!(
-        evidence.stderr.memory(),
-        Some(&b"building '/nix/store/a.drv'...\n"[..])
+    let raw = evidence.stderr.memory().unwrap();
+    assert!(
+        raw.starts_with(b"@nix ")
+            && raw
+                .windows(b"[1,2,1,0]}\n".len())
+                .any(|v| v == b"[1,2,1,0]}\n")
     );
     runner.shutdown().await.unwrap();
     drop(runner);

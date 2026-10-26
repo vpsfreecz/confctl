@@ -219,6 +219,7 @@ async fn audited_command_display_keeps_options_and_local_targets_but_redacts_exp
             ],
             &["-I".into(), "private=legacy-secret".into()],
             TaskId(4),
+            false,
         )
         .await
         .unwrap();
@@ -517,4 +518,65 @@ async fn unsuccessful_settings_decoding_is_not_cached_in_either_snapshot() {
     fixture.defaults.read().await.unwrap();
     client.settings().await.unwrap();
     assert_eq!(fixture.calls().len(), 4);
+}
+
+#[tokio::test]
+async fn only_tasked_live_builds_select_structured_logging_and_decoded_compatibility_errors() {
+    for live in [false, true] {
+        let fixture = Fixture::new(vec![
+            (0, "{}", ""),
+            (0, "{}", ""),
+            (
+                1,
+                "",
+                r#"@nix {"action":"msg","level":0,"msg":"error: unknown flag --no-update-lock-file"}"#,
+            ),
+            (0, "[]", ""),
+            (0, "[]", ""),
+        ]);
+        let client = fixture
+            .configured(NixOptions::default(), ConfigEpoch(0))
+            .await;
+        client
+            .build_json_for_task(&[".#confctl.build.a.toplevel".into()], &[], TaskId(3), live)
+            .await
+            .unwrap();
+        client
+            .build_json(&[".#confctl.machinesJson".into()], &[])
+            .await
+            .unwrap();
+        let calls = fixture.calls();
+        assert_eq!(calls.len(), 5);
+        for call in &calls[2..4] {
+            assert_eq!(
+                call.windows(2)
+                    .any(|pair| pair == ["--log-format", "internal-json"]),
+                live
+            );
+        }
+        assert!(!calls[4].iter().any(|arg| arg == "--log-format"));
+        assert!(!calls[3].iter().any(|arg| arg == "--no-update-lock-file"));
+    }
+    let raw = r#"@nix {"action":"msg","msg":"error: builder failed"}
+@nix malformed"#;
+    let fixture = Fixture::new(vec![(0, "{}", ""), (0, "{}", ""), (7, "prefix", raw)]);
+    let client = fixture
+        .configured(NixOptions::default(), ConfigEpoch(0))
+        .await;
+    let error = client
+        .build_json_for_task(&[".#confctl.build.a.toplevel".into()], &[], TaskId(4), true)
+        .await
+        .unwrap_err();
+    assert_eq!(
+        fixture.calls().len(),
+        3,
+        "ordinary or malformed protocol failure is never retried"
+    );
+    let ConfctlError::NixCommandFailure(failure) = error else {
+        panic!()
+    };
+    let ConfctlError::ProcessFailure { evidence, .. } = *failure.source else {
+        panic!()
+    };
+    assert_eq!(evidence.stderr.memory(), Some(raw.as_bytes()));
 }

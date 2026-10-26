@@ -77,6 +77,7 @@ pub struct Context {
     pub timing: Timing,
     log_path: PathBuf,
     keep_log: AtomicBool,
+    full_ui_available: bool,
 }
 
 impl Context {
@@ -99,11 +100,21 @@ impl Context {
             timing,
             log_path,
             keep_log: AtomicBool::new(false),
+            full_ui_available: false,
         }
     }
 
     pub fn log_path(&self) -> &std::path::Path {
         &self.log_path
+    }
+
+    pub(crate) fn full_ui_available(&self) -> bool {
+        self.full_ui_available
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_full_ui_available(&mut self, live: bool) {
+        self.full_ui_available = live;
     }
 
     /// Request retention at checked finalization. This performs no log I/O.
@@ -243,10 +254,14 @@ async fn execute<O: Operations>(
         invocation.global.color,
         spool.path().into(),
     );
+    config.select_mode(matches!(
+        invocation.action,
+        Action::Build(_) | Action::Deploy(_)
+    ));
     config.configuration_dir = Some(cwd.clone());
     config.invocation_log = Some(invocation_log.path().to_owned());
     let live_output = config.policy.live;
-    if let Err(error) = ui.set_live(config.policy.live) {
+    if let Err(error) = ui.set_live(config.mode != crate::presentation::PresentationMode::Plain) {
         drop(process_log);
         return report_error(
             error.with_secondary(ui.shutdown().err().into_iter().collect()),
@@ -291,6 +306,7 @@ async fn execute<O: Operations>(
         timing: timing.clone(),
         log_path: invocation_log.path().into(),
         keep_log: AtomicBool::new(false),
+        full_ui_available: live_output,
     };
     let mut renderer = tokio::spawn(presentation.run());
     let signal_cancel = cancellation.clone();

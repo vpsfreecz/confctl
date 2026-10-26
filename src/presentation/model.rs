@@ -2,11 +2,11 @@
 
 use crate::{
     error::ConfctlError,
-    events::{ActivityCount, OutputStream, TaskId, TaskState, UiEvent},
+    events::{NixActivityProgress, OutputStream, TaskId, TaskState, UiEvent},
 };
 use ratatui::{style::Style, text::Span};
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     path::PathBuf,
 };
 
@@ -29,7 +29,7 @@ pub struct TaskRow {
     pub total: Option<u64>,
     pub detail: String,
     pub phase: TaskPhase,
-    pub build: Option<(ActivityCount, ActivityCount)>,
+    pub build: Option<(Option<NixActivityProgress>, Option<NixActivityProgress>)>,
     original_description: String,
 }
 
@@ -66,6 +66,7 @@ pub struct Model {
     parsers: HashMap<(u64, bool), Sanitizer>,
     commands: Vec<(TaskId, String)>,
     finalized: bool,
+    snapshotted: HashSet<TaskId>,
 }
 
 impl Model {
@@ -77,10 +78,70 @@ impl Model {
             parsers: HashMap::new(),
             commands: Vec::new(),
             finalized: false,
+            snapshotted: HashSet::new(),
         }
     }
     pub fn rows(&self) -> &[TaskRow] {
         &self.rows
+    }
+    pub(super) fn was_snapshotted(&self, task: TaskId) -> bool {
+        self.snapshotted.contains(&task)
+    }
+
+    pub(super) fn checkpoint_rows(&self, tasks: &[TaskId]) -> Result<Vec<&TaskRow>, ConfctlError> {
+        let mut selected = HashSet::new();
+        let mut rows = Vec::new();
+        for task in tasks {
+            let row = self
+                .rows
+                .iter()
+                .find(|row| row.id == *task)
+                .ok_or_else(|| invalid("checkpoint names an unregistered task"))?;
+            if !matches!(row.phase, TaskPhase::Final { .. }) {
+                return Err(invalid("checkpoint requires terminal task results"));
+            }
+            if selected.insert(*task) && !self.was_snapshotted(*task) {
+                rows.push(row);
+            }
+        }
+        Ok(rows)
+    }
+
+    pub(super) fn has_active_tasks(&self) -> bool {
+        self.rows.iter().any(|row| {
+            !self.was_snapshotted(row.id)
+                && matches!(row.phase, TaskPhase::Pending | TaskPhase::Executing)
+        })
+    }
+
+    pub(super) fn mark_checkpoint(&mut self, tasks: &[TaskId]) {
+        self.snapshotted.extend(tasks.iter().copied());
+        self.tail.remove_tasks(tasks);
+    }
+
+    /// Close only tasks admitted by the explicit build scope. Other operation
+    /// rows and the model's overall observation lifetime remain unchanged.
+    pub(super) fn finish_scope(&mut self, first_row: usize) -> Vec<TaskId> {
+        let tasks: Vec<_> = self
+            .rows
+            .iter_mut()
+            .skip(first_row)
+            .map(|row| {
+                row.phase = match row.phase {
+                    TaskPhase::Pending => TaskPhase::Final {
+                        state: None,
+                        entered: false,
+                    },
+                    TaskPhase::Executing => TaskPhase::Final {
+                        state: None,
+                        entered: true,
+                    },
+                    phase => phase,
+                };
+                row.id
+            })
+            .collect();
+        tasks
     }
     pub fn logs(&self) -> &[(TaskId, PathBuf)] {
         &self.logs
@@ -119,7 +180,7 @@ impl Model {
 
     pub fn apply(&mut self, event: &UiEvent) -> Result<(), ConfctlError> {
         match event {
-            UiEvent::CommandStarting { task, display } => {
+            UiEvent::CommandStarting { task, display, .. } => {
                 self.command_starting(*task, display, true)
             }
             UiEvent::BuildProgress {
@@ -325,7 +386,12 @@ impl Model {
 
     /// Choose failures/incomplete work first, then restore registration order.
     pub fn visible_rows(&self, limit: usize) -> Vec<&TaskRow> {
-        let mut selected: Vec<_> = self.rows.iter().enumerate().collect();
+        let mut selected: Vec<_> = self
+            .rows
+            .iter()
+            .enumerate()
+            .filter(|(_, row)| !self.was_snapshotted(row.id))
+            .collect();
         selected.sort_by_key(|(index, row)| (row.priority(), *index));
         selected.truncate(limit);
         selected.sort_by_key(|(index, _)| *index);
@@ -439,6 +505,32 @@ struct Tail {
     line_bytes: usize,
 }
 impl Tail {
+    fn remove_tasks(&mut self, tasks: &[TaskId]) {
+        let mut keep = Self::new(self.rows, self.line_bytes);
+        for (((line, source), label), announcement) in self
+            .lines
+            .drain(..)
+            .zip(self.sources.drain(..))
+            .zip(self.labels.drain(..))
+            .zip(self.announcements.drain(..))
+        {
+            if !tasks.contains(&source.0) {
+                keep.lines.push_back(line);
+                keep.sources.push_back(source);
+                keep.labels.push_back(label);
+                keep.announcements.push_back(announcement);
+            }
+        }
+        if !self.source.is_some_and(|(task, _)| tasks.contains(&task)) {
+            keep.source = self.source;
+            keep.current = std::mem::take(&mut self.current);
+            keep.content = std::mem::take(&mut self.content);
+            keep.needs_label = self.needs_label;
+            keep.announcement = self.announcement;
+        }
+        *self = keep;
+    }
+
     fn new(rows: usize, line_bytes: usize) -> Self {
         Self {
             lines: VecDeque::new(),
@@ -573,6 +665,70 @@ mod tests {
             description: format!("task{id}"),
         }
     }
+    #[test]
+    fn checkpoint_retires_only_named_terminal_rows_and_preserves_foreign_fragments() {
+        let mut model = Model::new(12, 100);
+        for id in [1, 2] {
+            model.apply(&start(id)).unwrap();
+        }
+        model.output(
+            TaskId(1),
+            OutputStream::Stderr,
+            b"completed native activity\n",
+        );
+        model.output(TaskId(2), OutputStream::Stderr, b"still running fragment");
+        assert!(model.checkpoint_rows(&[TaskId(1)]).is_err());
+        model
+            .apply(&UiEvent::TaskFinished {
+                task: TaskId(1),
+                state: TaskState::Succeeded,
+            })
+            .unwrap();
+        let before = model.current_tail_line().to_owned();
+        let selected = model.checkpoint_rows(&[TaskId(1), TaskId(1)]).unwrap();
+        assert_eq!(selected.len(), 1);
+        assert!(
+            model
+                .display_tail()
+                .iter()
+                .any(|line| line.contains("completed native activity"))
+        );
+        assert!(model.has_active_tasks());
+        model.mark_checkpoint(&[TaskId(1)]);
+        assert_eq!(model.current_tail_line(), before);
+        assert_eq!(model.rows()[1].phase, TaskPhase::Executing);
+        assert!(!model.finalized());
+        assert_eq!(
+            model
+                .visible_rows(10)
+                .iter()
+                .map(|row| row.id)
+                .collect::<Vec<_>>(),
+            vec![TaskId(2)]
+        );
+        assert!(model.checkpoint_rows(&[TaskId(1)]).unwrap().is_empty());
+        assert!(
+            !model
+                .display_tail()
+                .iter()
+                .any(|line| line.contains("completed native activity"))
+        );
+        model.output(TaskId(2), OutputStream::Stderr, b" completed\n");
+        assert!(
+            model
+                .display_tail()
+                .iter()
+                .any(|line| line.contains("still running fragment completed"))
+        );
+        assert!(matches!(
+            model.rows()[0].phase,
+            TaskPhase::Final {
+                state: Some(TaskState::Succeeded),
+                ..
+            }
+        ));
+    }
+
     #[test]
     fn pending_promotion_keeps_identity_and_order_beside_direct_execution() {
         let mut model = Model::new(2, 40);
@@ -853,6 +1009,7 @@ mod tests {
         let mut model = Model::new(12, 128);
         model
             .apply(&UiEvent::CommandStarting {
+                command: crate::events::CommandId(10001),
                 task: TaskId(0),
                 display: "nix eval --json settings".into(),
             })
@@ -861,6 +1018,7 @@ mod tests {
         model.apply(&pending(2)).unwrap();
         model
             .apply(&UiEvent::CommandStarting {
+                command: crate::events::CommandId(10002),
                 task: TaskId(1),
                 display: "nix build group-one".into(),
             })
@@ -875,6 +1033,7 @@ mod tests {
         model.apply(&start(2)).unwrap();
         model
             .apply(&UiEvent::CommandStarting {
+                command: crate::events::CommandId(10003),
                 task: TaskId(2),
                 display: "nix build group-two".into(),
             })
@@ -911,6 +1070,7 @@ mod tests {
         let mut model = Model::new(4, 80);
         model
             .apply(&UiEvent::CommandStarting {
+                command: crate::events::CommandId(10004),
                 task: TaskId(0),
                 display: "nix eval [arguments redacted]".into(),
             })

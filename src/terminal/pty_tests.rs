@@ -59,7 +59,7 @@ pub(crate) fn run_fixture_after_output(
     let (master, slave) = open_pty();
     // This live fixture advances only after its outer PTY owner has observed
     // both rendered sources. No input bytes or production paint timing change.
-    let paint_ack = matches!(case, "live" | "live-cancel")
+    let paint_ack = matches!(case, "live" | "live-cancel" | "gc")
         .then(|| tempfile::tempdir().expect("owned paint phase"));
     let mut command = std::process::Command::new(std::env::current_exe().expect("test executable"));
     command
@@ -91,10 +91,14 @@ pub(crate) fn run_fixture_after_output(
         drain(&master, &mut bytes);
         if !paint_observed && let Some(directory) = &paint_ack {
             let text = String::from_utf8_lossy(&bytes);
-            if let Some((_, phase)) = text.split_once("PHASE-BURST-BEGIN")
-                && phase.contains("node-task>")
-                && phase.contains("other-host>")
-            {
+            let live_observed = text
+                .split_once("PHASE-BURST-BEGIN")
+                .is_some_and(|(_, phase)| {
+                    phase.contains("node-task>") && phase.contains("other-host>")
+                });
+            let gc_observed =
+                case == "gc" && text.contains("alpha> deleting") && text.contains("beta> deleting");
+            if live_observed || gc_observed {
                 std::fs::write(directory.path().join("burst-painted"), b"")
                     .expect("acknowledge observed parallel paint");
                 paint_observed = true;
@@ -339,6 +343,9 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
             assert!(!transcript.bytes.windows(4).any(|b| b == b"\x1b[6n"));
             assert!(!transcript.bytes.windows(8).any(|b| b == b"\x1b[?1049h"));
             let text = String::from_utf8_lossy(&transcript.bytes);
+            let compact = text.split_once("COMPACT-COMPLETE").unwrap().0;
+            assert!(compact.contains("compact-capture-only"));
+            assert!(!compact.contains("Command:") && !compact.contains("Live view"));
             assert!(text.contains("CHILD_READ:queued-child"));
             for marker in ["REQUIRED-NO-LF", "FOREGROUND-NO-LF"] {
                 let after = text.split_once(marker).expect("midline output marker").1;
@@ -348,6 +355,12 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
             assert!(
                 text.contains("$ nix build .#node"),
                 "later fast command was never shown"
+            );
+            assert_eq!(text.matches("Published unit one: succeeded\r\n").count(), 1);
+            assert!(text.contains("$ nix build .#next"));
+            assert!(
+                text.find("Published unit one:").unwrap()
+                    < text.find("$ nix build .#next").unwrap()
             );
             assert_eq!(text.matches("PRELUDE node").count(), 1);
             let footer = if cancelled {
@@ -362,6 +375,25 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
                     .is_some(),
                 "final outcome must precede the single footer"
             );
+            let completed = text.split_once("Completed remaining units:").unwrap().1;
+            let (summary, after_generations) =
+                completed.split_once("Built generations\r\n").unwrap();
+            assert!(
+                summary.contains("Building")
+                    && summary.contains("Fetching")
+                    && summary.contains("Total")
+            );
+            assert!(!summary.contains("BURST") && !summary.contains("Command:"));
+            assert!(
+                summary.lines().all(|line| !line.trim().is_empty()),
+                "compact final result has no panel padding"
+            );
+            let before_timing = after_generations.split_once("Timing:").unwrap().0;
+            assert_eq!(
+                before_timing, "node: fixture-generation\r\n\r\n",
+                "required generations must be followed directly by the existing timing separator, with no viewport redraw"
+            );
+            assert_eq!(text.matches("Built generations\r\n").count(), 1);
             assert!(text.contains("Continue? [y/N]: "));
             let phase = text
                 .split("PHASE-BURST-BEGIN")
@@ -419,13 +451,14 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
         )
         .expect("UI");
         ui.set_live(true).expect("live state");
-        let config = PresentationConfig::for_process(
+        let mut config = PresentationConfig::for_process(
             "build node".into(),
             "build".into(),
             ColorMode::Never,
             directory.path().into(),
         );
         assert!(config.policy.live, "real stdout and stderr TTY");
+        config.select_mode(false);
         let (control, presentation) = Presentation::new(
             receiver,
             ui.observe_state(),
@@ -435,6 +468,32 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
         )
         .expect("presentation");
         let consumer = tokio::spawn(presentation.run());
+        events
+            .emit(UiEvent::CommandStarting {
+                command: crate::events::CommandId(1000),
+                task: TaskId(0),
+                display: "compact-capture-only".into(),
+            })
+            .await
+            .unwrap();
+        events
+            .emit(UiEvent::CommandFinished {
+                command: crate::events::CommandId(1000),
+            })
+            .await
+            .unwrap();
+        events
+            .emit(UiEvent::Diagnostic {
+                stream: OutputStream::Stdout,
+                style: Style::Plain,
+                text: "COMPACT-COMPLETE\n".into(),
+            })
+            .await
+            .unwrap();
+        events
+            .emit(UiEvent::BuildPhase(crate::events::BuildPhase::Begin))
+            .await
+            .unwrap();
         events
             .emit(UiEvent::OperationGroup {
                 group: 1,
@@ -457,6 +516,7 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
             .expect("arbitrary required report chunk");
         events
             .emit(UiEvent::CommandStarting {
+                command: crate::events::CommandId(10001),
                 task: TaskId(0),
                 display: "nix eval --json .#settings".into(),
             })
@@ -480,6 +540,7 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
             .expect("progress");
         events
             .emit(UiEvent::CommandStarting {
+                command: crate::events::CommandId(10002),
                 task: TaskId(1),
                 display: "nix build .#node".into(),
             })
@@ -547,6 +608,45 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
             })
             .await
             .unwrap();
+        events
+            .emit(UiEvent::TaskFinished {
+                task: TaskId(1),
+                state: TaskState::Succeeded,
+            })
+            .await
+            .expect("unit one publication complete");
+        events
+            .emit(UiEvent::Checkpoint {
+                key: TaskId(1),
+                label: "Published unit one".into(),
+                state: TaskState::Succeeded,
+                tasks: vec![TaskId(1)],
+            })
+            .await
+            .expect("unit one snapshot before next unit");
+        events
+            .emit(UiEvent::TaskStarted {
+                task: TaskId(3),
+                description: "next serial group".into(),
+            })
+            .await
+            .expect("next group without finalizing the other host");
+        events
+            .emit(UiEvent::BuildProgress {
+                task: TaskId(3),
+                building: None,
+                fetching: None,
+            })
+            .await
+            .unwrap();
+        events
+            .emit(UiEvent::CommandStarting {
+                command: crate::events::CommandId(10003),
+                task: TaskId(3),
+                display: "nix build .#next".into(),
+            })
+            .await
+            .expect("next unit command");
         assert_modes(
             &original,
             &rustix::termios::tcgetattr(io::stdin()).expect("live did not change raw mode"),
@@ -623,9 +723,18 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
             },
         )
         .expect("restore original geometry");
+        events
+            .emit(UiEvent::CommandStarting {
+                command: crate::events::CommandId(10004),
+                task: TaskId(3),
+                display: "nix build .#resumed".into(),
+            })
+            .await
+            .expect("acknowledged paint after foreground no-LF handoff");
         if cancelled {
             events
                 .emit(UiEvent::CommandStarting {
+                    command: crate::events::CommandId(10005),
                     task: TaskId(0),
                     display: "READY-CANCEL".into(),
                 })
@@ -636,7 +745,20 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
                 .unwrap()
                 .unwrap();
         }
-        for task in [TaskId(1), TaskId(2)] {
+        events
+            .emit(UiEvent::BuildProgress {
+                task: TaskId(3),
+                building: Some(crate::events::NixActivityProgress {
+                    done: 2,
+                    expected: 2,
+                    running: 0,
+                    failed: 0,
+                }),
+                fetching: Some(crate::events::NixActivityProgress::default()),
+            })
+            .await
+            .unwrap();
+        for task in [TaskId(2), TaskId(3)] {
             events
                 .emit(UiEvent::TaskFinished {
                     task,
@@ -649,6 +771,31 @@ fn live_pty_resize_prompt_foreground_and_final_footer_preserve_input_modes() {
                 .await
                 .expect("result");
         }
+        events
+            .emit(UiEvent::Checkpoint {
+                key: TaskId(3),
+                label: "Completed remaining units".into(),
+                state: if cancelled {
+                    TaskState::Canceled
+                } else {
+                    TaskState::Succeeded
+                },
+                tasks: vec![TaskId(2), TaskId(3)],
+            })
+            .await
+            .unwrap();
+        events
+            .emit(UiEvent::BuildPhase(crate::events::BuildPhase::End))
+            .await
+            .unwrap();
+        events
+            .emit(UiEvent::Diagnostic {
+                stream: OutputStream::Stdout,
+                style: Style::Heading,
+                text: "Built generations\nnode: fixture-generation\n".into(),
+            })
+            .await
+            .unwrap();
         ui.shutdown().expect("input join");
         control.finish().await.expect("checked presentation finish");
         consumer.await.expect("presentation join").expect("run");
@@ -704,13 +851,14 @@ fn gc_live_pty_labels_progress_prompt_cancel_and_restore_share_existing_owner() 
         let cancel = tokio_util::sync::CancellationToken::new();
         let ui = Ui::new(io::stdin(), events.clone(), cancel.clone(), None).unwrap();
         ui.set_live(true).unwrap();
-        let config = PresentationConfig::for_process(
+        let mut config = PresentationConfig::for_process(
             "collect-garbage".into(),
             "collect-garbage".into(),
             ColorMode::Never,
             directory.path().into(),
         );
         assert!(config.policy.live);
+        config.select_mode(false);
         let (control, presentation) = Presentation::new(
             receiver,
             ui.observe_state(),
@@ -759,6 +907,12 @@ fn gc_live_pty_labels_progress_prompt_cancel_and_restore_share_existing_owner() 
             }
         }
         assert!(jobs.iter().all(|job| !job.is_finished()));
+        let paint_ack = std::path::PathBuf::from(std::env::var_os(PAINT_ACK_ENV).expect("outer GC paint observer"));
+        let deadline = Instant::now();
+        while !paint_ack.is_file() {
+            assert!(deadline.elapsed() < Duration::from_secs(5), "outer PTY did not observe both GC sources");
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
         cancel.cancel();
         for (i, job) in jobs.into_iter().enumerate() {
             match job.await.unwrap() {

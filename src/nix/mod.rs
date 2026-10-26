@@ -24,6 +24,7 @@ struct BuildInputs<'a> {
     installables: &'a [String],
     legacy_args: &'a [String],
     task: Option<TaskId>,
+    live_progress: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -288,15 +289,17 @@ impl<P: ProcessRunner> NixClient<P> {
         installables: &[String],
         legacy_args: &[String],
     ) -> Result<Value, ConfctlError> {
-        self.build_json_task(installables, legacy_args, None).await
+        self.build_json_task(installables, legacy_args, None, false)
+            .await
     }
     pub async fn build_json_for_task(
         &self,
         installables: &[String],
         legacy_args: &[String],
         task: TaskId,
+        live_progress: bool,
     ) -> Result<Value, ConfctlError> {
-        self.build_json_task(installables, legacy_args, Some(task))
+        self.build_json_task(installables, legacy_args, Some(task), live_progress)
             .await
     }
     async fn build_json_task(
@@ -304,6 +307,7 @@ impl<P: ProcessRunner> NixClient<P> {
         installables: &[String],
         legacy_args: &[String],
         task: Option<TaskId>,
+        live_progress: bool,
     ) -> Result<Value, ConfctlError> {
         self.root.require_flake()?;
         let settings = self.settings().await?.value;
@@ -316,6 +320,7 @@ impl<P: ProcessRunner> NixClient<P> {
                 installables,
                 legacy_args,
                 task,
+                live_progress,
             }),
             &self.options,
         )
@@ -375,6 +380,13 @@ impl<P: ProcessRunner> NixClient<P> {
                 experimental,
                 no_update,
             ));
+            let structured = build_inputs
+                .as_ref()
+                .is_some_and(|inputs| inputs.task.is_some() && inputs.live_progress);
+            if structured {
+                args.extend(["--log-format".into(), "internal-json".into()]);
+                display.extend(["--log-format".into(), "internal-json".into()]);
+            }
             if build {
                 if let Some(inputs) = &build_inputs {
                     args.extend(inputs.legacy_args.iter().cloned());
@@ -428,7 +440,11 @@ impl<P: ProcessRunner> NixClient<P> {
                 ProcessScope::new(self.cancellation.clone(), build_task.unwrap_or(TaskId(0)));
             if build_task.is_some() {
                 spec.stderr = crate::process::StreamPolicy::CaptureAndForward;
-                scope.nix_progress = Some(crate::nix::progress::Kind::Build);
+                scope.nix_progress = Some(if structured {
+                    progress::Kind::StructuredBuild
+                } else {
+                    progress::Kind::Build
+                });
             }
             scope.phase = Some(if build {
                 Phase::Build
@@ -468,7 +484,7 @@ impl<P: ProcessRunner> NixClient<P> {
                 Err(error) => return Err(nix_failure(context, process_error(error, result))),
             };
             match bytes(&result.stderr).await {
-                Ok(bytes) => diagnostics.extend(bytes),
+                Ok(bytes) => diagnostics.extend(progress::readable_stderr(&bytes)),
                 Err(error) => return Err(nix_failure(context, process_error(error, result))),
             }
             let message = String::from_utf8_lossy(&diagnostics);

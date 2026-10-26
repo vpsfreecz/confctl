@@ -168,17 +168,48 @@ pub(super) async fn run(
         rollback: request.auto_rollback,
         ssh_opts: ssh_opts.as_deref(),
     };
+    let mut finished = Vec::new();
     let result = async {
         admit(&copies, &jobs, ctx.log_path()).await?;
         if serial {
-            serial_copy(&copies, &jobs, request.interactive.then_some(&ctx.ui))
-                .await
-                .map(|_| ())
+            serial_copy(
+                &copies,
+                &jobs,
+                request.interactive.then_some(&ctx.ui),
+                &mut finished,
+            )
+            .await
+            .map(|_| ())
         } else {
-            bulk_copy(&copies, &jobs, limit).await
+            bulk_copy(&copies, &jobs, limit, &mut finished).await
         }
     }
     .await;
+    let mut deliveries = Vec::new();
+    for job in &jobs {
+        if let Some((_, state)) = finished.iter().find(|(id, _)| *id == job.machine)
+            && let Err(error) = ctx
+                .events
+                .emit(UiEvent::Checkpoint {
+                    key: job.task,
+                    label: format!(
+                        "{}: {}",
+                        inventory.get(job.machine).name,
+                        match state {
+                            TaskState::Succeeded => "copied only; no activation",
+                            TaskState::Skipped => "copy skipped",
+                            _ => "copy stopped; partial effects retained",
+                        }
+                    ),
+                    state: *state,
+                    tasks: vec![job.task],
+                })
+                .await
+        {
+            deliveries.push(error);
+        }
+    }
+    let result = combine_deliveries(result, deliveries);
     if let Err(error) = result {
         let later = ctx.events.emit(UiEvent::Diagnostic { stream: OutputStream::Stderr, style: Style::Failure, text: "Copy stopped; any local build publications, copied store paths and earlier runtime-kernel state changes are retained. No activation was performed.\n".into() }).await;
         return Err(error.with_secondary(later.err().into_iter().collect()));
@@ -207,7 +238,7 @@ async fn confirm_targets(
         .ui
         .confirm(ConfirmPrompt {
             preview: vec![
-                diagnostic(match (selector.is_some(), request.copy_only) {
+                diagnostic_style(Style::Heading, match (selector.is_some(), request.copy_only) {
                     (true, true) => "The following machines will have saved generations copied:\n",
                     (true, false) => {
                         "The following machines will receive saved generations for activation:\n"
@@ -295,7 +326,7 @@ async fn confirm_resolved(
     checked(
         &ctx.events,
         &ctx.cancellation,
-        diagnostic("Resolved host generations:\n"),
+        diagnostic_style(Style::Heading, "Resolved host generations:\n"),
     )
     .await?;
     checked(
@@ -366,9 +397,12 @@ fn check_cancel(token: &CancellationToken) -> Result<(), ConfctlError> {
     }
 }
 fn diagnostic(text: &str) -> UiEvent {
+    diagnostic_style(Style::Plain, text)
+}
+fn diagnostic_style(style: Style, text: &str) -> UiEvent {
     UiEvent::Diagnostic {
         stream: OutputStream::Stdout,
-        style: Style::Plain,
+        style,
         text: text.into(),
     }
 }
@@ -379,6 +413,129 @@ async fn checked(
 ) -> Result<(), ConfctlError> {
     events.emit(event).await?;
     check_cancel(token)
+}
+fn result_state<T>(result: &Result<T, ConfctlError>) -> TaskState {
+    match result {
+        Ok(_) => TaskState::Succeeded,
+        Err(error) if error.is_cancelled() => TaskState::Canceled,
+        Err(_) => TaskState::Failed,
+    }
+}
+fn combine_deliveries<T>(
+    result: Result<T, ConfctlError>,
+    mut errors: Vec<ConfctlError>,
+) -> Result<T, ConfctlError> {
+    if errors.is_empty() {
+        return result;
+    }
+    match result {
+        Err(error) => Err(error.with_secondary(errors)),
+        Ok(_) => Err(errors.remove(0).with_secondary(errors)),
+    }
+}
+
+// One machine's owning route only. These facts do not infer completion from
+// presentation events, and never change execution order or retry policy.
+struct MachineFinish {
+    tasks: Vec<TaskId>,
+    state: TaskState,
+    qualification: String,
+    reboot_unverified: bool,
+}
+impl MachineFinish {
+    fn copied(task: TaskId, state: TaskState) -> Self {
+        Self {
+            tasks: vec![task],
+            reboot_unverified: false,
+            state: if state == TaskState::Succeeded {
+                TaskState::Incomplete
+            } else {
+                state
+            },
+            qualification: if state == TaskState::Skipped {
+                "copy skipped"
+            } else {
+                "copy completed or stopped; activation unverified"
+            }
+            .into(),
+        }
+    }
+}
+async fn machine_checkpoint(
+    ctx: &Context,
+    job: &Job,
+    inventory: &Inventory,
+    finish: &MachineFinish,
+) -> Result<(), ConfctlError> {
+    ctx.events
+        .emit(UiEvent::Checkpoint {
+            key: job.task,
+            label: format!(
+                "{}: {}",
+                inventory.get(job.machine).name,
+                finish.qualification
+            ),
+            state: finish.state,
+            tasks: finish.tasks.clone(),
+        })
+        .await
+}
+fn apply_health(finish: &mut MachineFinish, detail: &health::HostResult) {
+    finish.tasks.extend(&detail.tasks);
+    if finish.state != TaskState::Failed && finish.state != TaskState::Canceled {
+        finish.state = if finish.reboot_unverified && detail.state() == TaskState::Succeeded {
+            TaskState::Incomplete
+        } else {
+            detail.state()
+        };
+    }
+    finish
+        .qualification
+        .push_str(&format!("; {}", detail.label()));
+}
+fn reboot_result(
+    finish: &mut MachineFinish,
+    completion: reboot::Completion,
+) -> Result<reboot::Outcome, ConfctlError> {
+    finish.tasks.extend(completion.terminal_task);
+    completion.outcome
+}
+fn apply_reboot(finish: &mut MachineFinish, outcome: &reboot::Outcome) -> bool {
+    match outcome {
+        reboot::Outcome::Skipped => {
+            finish.reboot_unverified = true;
+            finish.state = TaskState::Incomplete;
+            finish
+                .qualification
+                .push_str("; reboot skipped, unverified");
+            false
+        }
+        reboot::Outcome::NoWait {
+            native_success: false,
+        } => {
+            finish.state = TaskState::Failed;
+            finish
+                .qualification
+                .push_str("; reboot request failed, remote effect unknown");
+            true
+        }
+        reboot::Outcome::NoWait {
+            native_success: true,
+        } => {
+            finish.reboot_unverified = true;
+            finish.state = TaskState::Incomplete;
+            finish
+                .qualification
+                .push_str("; reboot requested without online verification");
+            true
+        }
+        reboot::Outcome::Online => {
+            finish
+                .qualification
+                .push_str("; lower uptime observed, running generation unverified");
+            true
+        }
+    }
 }
 fn description(inventory: &Inventory, job: &Job) -> String {
     format!(
@@ -593,7 +750,7 @@ async fn copy_one<P: ProcessRunner>(
     copies: &Copies<'_, P>,
     job: &Job,
     token: &CancellationToken,
-) -> Result<(), ConfctlError> {
+) -> (TaskState, Result<(), ConfctlError>) {
     let result = async {
         check_cancel(token)?;
         let mut spec = copy_spec(
@@ -656,12 +813,13 @@ async fn copy_one<P: ProcessRunner>(
             state,
         })
         .await;
-    match (result, finish) {
+    let result = match (result, finish) {
         (result, Ok(())) => result,
         (Ok(()), Err(e)) => Err(e),
         (Err(e), Err(later)) => Err(e.with_secondary(vec![later])),
     }
-    .and_then(|()| check_cancel(token))
+    .and_then(|()| check_cancel(token));
+    (state, result)
 }
 fn process_error(source: ConfctlError, outcome: ProcessOutcome) -> ConfctlError {
     ConfctlError::ProcessFailure {
@@ -739,6 +897,7 @@ async fn serial_copy<P: ProcessRunner>(
     copies: &Copies<'_, P>,
     jobs: &[Job],
     ui: Option<&crate::terminal::Ui>,
+    finished: &mut Vec<(MachineId, TaskState)>,
 ) -> Result<Vec<MachineId>, ConfctlError> {
     let mut copied = Vec::new();
     for (index, job) in jobs.iter().enumerate() {
@@ -748,10 +907,13 @@ async fn serial_copy<P: ProcessRunner>(
             if let Some(ui) = ui {
                 let accepted = ui
                     .confirm(ConfirmPrompt {
-                        preview: vec![diagnostic(&format!(
-                            "Copying configuration to {}\n",
-                            copies.inventory.get(job.machine).name
-                        ))],
+                        preview: vec![diagnostic_style(
+                            Style::Machine,
+                            &format!(
+                                "Copying configuration to {}\n",
+                                copies.inventory.get(job.machine).name
+                            ),
+                        )],
                         always: true,
                         ..ConfirmPrompt::default()
                     })
@@ -759,6 +921,7 @@ async fn serial_copy<P: ProcessRunner>(
                 check_cancel(copies.cancellation)?;
                 if !accepted {
                     finalized = true;
+                    finished.push((job.machine, TaskState::Skipped));
                     return checked(
                         copies.events,
                         copies.cancellation,
@@ -771,7 +934,9 @@ async fn serial_copy<P: ProcessRunner>(
                 }
             }
             finalized = true;
-            copy_one(copies, job, copies.cancellation).await?;
+            let (state, result) = copy_one(copies, job, copies.cancellation).await;
+            finished.push((job.machine, state));
+            result?;
             copied.push(job.machine);
             Ok(())
         }
@@ -786,6 +951,7 @@ async fn bulk_copy<P: ProcessRunner>(
     copies: &Copies<'_, P>,
     jobs: &[Job],
     limit: usize,
+    finished: &mut Vec<(MachineId, TaskState)>,
 ) -> Result<(), ConfctlError> {
     let token = copies.cancellation.child_token();
     let mut next = 0;
@@ -800,8 +966,9 @@ async fn bulk_copy<P: ProcessRunner>(
         while i < active.len() {
             match active[i].1.as_mut().poll(cx) {
                 Poll::Pending => i += 1,
-                Poll::Ready(result) => {
+                Poll::Ready((state, result)) => {
                     let (index, _) = active.remove(i);
+                    finished.push((jobs[index].machine, state));
                     if let Err(error) = result {
                         if !ordinary(&error) {
                             token.cancel();
@@ -875,6 +1042,10 @@ async fn activate_generations(
         job.task = TaskId(first_task + index as u64);
     }
     let statuses = target_statuses(&copies, &jobs, ssh_config.as_deref(), request.action).await?;
+    let status_tasks = jobs
+        .iter()
+        .map(|job| (job.machine, job.task))
+        .collect::<Vec<_>>();
     let mut remaining = Vec::new();
     for (job, status) in jobs.into_iter().zip(&statuses) {
         if already_current(
@@ -886,13 +1057,27 @@ async fn activate_generations(
             checked(
                 &ctx.events,
                 &ctx.cancellation,
-                diagnostic(&format!(
-                    "Skipping {}: already using target generation {}\n",
-                    inventory.get(job.machine).name,
-                    job.generation.name
-                )),
+                diagnostic_style(
+                    Style::Incomplete,
+                    &format!(
+                        "Skipping {}: already using target generation {}\n",
+                        inventory.get(job.machine).name,
+                        job.generation.name
+                    ),
+                ),
             )
             .await?;
+            ctx.events
+                .emit(UiEvent::Checkpoint {
+                    key: job.task,
+                    label: format!(
+                        "{}: already current; skipped",
+                        inventory.get(job.machine).name
+                    ),
+                    state: TaskState::Skipped,
+                    tasks: vec![job.task],
+                })
+                .await?;
         } else {
             remaining.push(job);
         }
@@ -916,52 +1101,129 @@ async fn activate_generations(
         action: request.action,
         log: ctx.log_path(),
     };
+    let mut finishes: Vec<Option<MachineFinish>> = (0..remaining.len()).map(|_| None).collect();
+    let mut snapshotted = vec![false; remaining.len()];
     let result = async {
         admit(&copies, &remaining, ctx.log_path()).await?;
         let mut completed = Vec::new();
         let mut health_outcomes = Vec::new();
         if request.one_by_one {
             for (index, job) in remaining.iter().enumerate() {
-                let result = async {
-                    let copied = serial_copy(&copies, std::slice::from_ref(job),
-                        request.interactive.then_some(&ctx.ui)).await?;
-                    if !copied.is_empty() && activate_one(&activation, job, TaskId(first_activation + index as u64)).await? {
-                        completed.push(job);
-                        let health_ready = !request.reboot || reboot::run(ctx, inventory.get(job.machine), ssh_config.as_deref(), TaskId(first_reboot + index as u64), &request.wait_online, request.interactive).await? != reboot::Outcome::Skipped;
-                        if health_ready && needs_health(request) {
-                            health_outcomes.push(health::run(ctx, request, inventory, root, &[job.machine], &mut next_health_id).await?);
+                let mut copy_results = Vec::new();
+                let result: Result<(), ConfctlError> = async {
+                    let copy = serial_copy(&copies, std::slice::from_ref(job), request.interactive.then_some(&ctx.ui), &mut copy_results).await;
+                    if let Some((_, state)) = copy_results.first() {
+                        let mut finish = MachineFinish::copied(job.task, *state);
+                        if let Some((_, task)) = status_tasks.iter().find(|(id, _)| *id == job.machine) { finish.tasks.insert(0, *task); }
+                        finishes[index] = Some(finish);
+                    }
+                    let copied = copy?;
+                    if !copied.is_empty() {
+                        let finish = finishes[index].as_mut().expect("completed copy");
+                        if inventory.get(job.machine).carrier.is_none() || request.action == SwitchAction::Switch {
+                            finish.tasks.push(TaskId(first_activation + index as u64));
+                        }
+                        if activate_one(&activation, job, TaskId(first_activation + index as u64)).await? {
+                            completed.push(job);
+                            finish.state = TaskState::Succeeded;
+                            finish.qualification = format!("{} action completed; helper protocol does not witness hidden switch/rollback outcome", action_name(request.action));
+                            let health_ready = if request.reboot {
+                                let completion = reboot::run(ctx, inventory.get(job.machine), ssh_config.as_deref(), TaskId(first_reboot + index as u64), &request.wait_online, request.interactive).await;
+                                let outcome = reboot_result(finish, completion)?;
+                                apply_reboot(finish, &outcome)
+                            } else { true };
+                            if health_ready && needs_health(request) {
+                                let health = health::run(ctx, request, inventory, root, &[job.machine], &mut next_health_id).await;
+                                for detail in &health.hosts { apply_health(finish, detail); }
+                                health_outcomes.push(health.outcome?);
+                            }
+                        } else if inventory.get(job.machine).carrier.is_some() && request.action != SwitchAction::Switch {
+                            finish.state = TaskState::Succeeded;
+                            finish.qualification = "carried target copied only; no activation".into();
+                        } else {
+                            finish.state = TaskState::Skipped;
+                            finish.qualification = "activation skipped; copy retained".into();
                         }
                     }
                     Ok(())
                 }.await;
-                if let Err(error) = result {
+                if let Err(error) = &result
+                    && let Some(finish) = finishes[index].as_mut()
+                {
+                    finish.state = if error.is_cancelled() { TaskState::Canceled } else { TaskState::Failed };
+                    finish.qualification.push_str("; stopped, earlier effects retained");
+                }
+                let delivery = if let Some(finish) = &finishes[index] {
+                    snapshotted[index] = true;
+                    machine_checkpoint(ctx, job, inventory, finish).await.err().into_iter().collect()
+                } else { Vec::new() };
+                if let Err(error) = combine_deliveries(result, delivery) {
                     return Err(unentered(&copies, &remaining[index + 1..], error).await);
                 }
+                check_cancel(&ctx.cancellation)?;
             }
         } else {
-            // Interactive bulk remains a complete copy phase before activation.
-            let copied = if request.interactive {
-                serial_copy(&copies, &remaining, Some(&ctx.ui)).await?
+            // Preserve the complete bulk copy phase before any activation.
+            let mut copy_results = Vec::new();
+            let copy = if request.interactive {
+                serial_copy(&copies, &remaining, Some(&ctx.ui), &mut copy_results).await
             } else {
                 let ordered = copy_order(inventory, selected_order(&remaining, confirmed));
-                bulk_copy(&copies, &ordered, limit).await?;
-                remaining.iter().map(|job| job.machine).collect()
+                bulk_copy(&copies, &ordered, limit, &mut copy_results).await.map(|()| remaining.iter().map(|job| job.machine).collect())
             };
             for (index, job) in remaining.iter().enumerate() {
-                if copied.contains(&job.machine) && activate_one(&activation, job, TaskId(first_activation + index as u64)).await? {
-                    completed.push(job);
+                if let Some((_, state)) = copy_results.iter().find(|(id, _)| *id == job.machine) {
+                    let mut finish = MachineFinish::copied(job.task, *state);
+                        if let Some((_, task)) = status_tasks.iter().find(|(id, _)| *id == job.machine) { finish.tasks.insert(0, *task); }
+                        finishes[index] = Some(finish);
                 }
             }
-            if request.reboot {
-                for (index, job) in remaining.iter().enumerate() {
-                    if completed.iter().any(|done| done.machine == job.machine) {
-                        reboot::run(ctx, inventory.get(job.machine), ssh_config.as_deref(), TaskId(first_reboot + index as u64), &request.wait_online, request.interactive).await?;
+            let copied = copy?;
+            for (index, job) in remaining.iter().enumerate() {
+                if copied.contains(&job.machine) {
+                    let finish = finishes[index].as_mut().expect("completed copy");
+                    if inventory.get(job.machine).carrier.is_none() || request.action == SwitchAction::Switch { finish.tasks.push(TaskId(first_activation + index as u64)); }
+                    let activation_result = activate_one(&activation, job, TaskId(first_activation + index as u64)).await;
+                    if let Err(error) = &activation_result {
+                        finish.state = result_state(&activation_result);
+                        finish.qualification.push_str("; activation stopped, earlier effects retained");
+                        if error.is_cancelled() { finish.state = TaskState::Canceled; }
                     }
+                    if activation_result? {
+                        completed.push(job);
+                        finish.state = TaskState::Succeeded;
+                        finish.qualification = format!("{} action completed; helper protocol does not witness hidden switch/rollback outcome", action_name(request.action));
+                        // Other machines may still stop this bulk route before health.
+                        if needs_health(request) { finish.state = TaskState::Incomplete; }
+                    } else if inventory.get(job.machine).carrier.is_some() && request.action != SwitchAction::Switch {
+                        finish.state = TaskState::Succeeded;
+                        finish.qualification = "carried target copied only; no activation".into();
+                    } else { finish.state = TaskState::Skipped; finish.qualification = "activation skipped; copy retained".into(); }
+                }
+            }
+            let mut health_hosts = Vec::new();
+            for (index, job) in remaining.iter().enumerate() {
+                if completed.iter().any(|done| done.machine == job.machine) {
+                    let finish = finishes[index].as_mut().expect("activated copy");
+                    let ready = if request.reboot {
+                        let completion = reboot::run(ctx, inventory.get(job.machine), ssh_config.as_deref(), TaskId(first_reboot + index as u64), &request.wait_online, request.interactive).await;
+                        match reboot_result(finish, completion) {
+                            Ok(outcome) => apply_reboot(finish, &outcome),
+                            Err(error) => { finish.state = if error.is_cancelled() { TaskState::Canceled } else { TaskState::Failed }; finish.qualification.push_str("; reboot stopped, effect unknown"); return Err(error); }
+                        }
+                    } else { true };
+                    let _ = ready;
+                    health_hosts.push(job.machine);
                 }
             }
             if needs_health(request) {
-                let hosts = confirmed.iter().copied().filter(|id| completed.iter().any(|job| job.machine == *id)).collect::<Vec<_>>();
-                health_outcomes.push(health::run(ctx, request, inventory, root, &hosts, &mut next_health_id).await?);
+                // Retry-all can rerun a passed host; snapshot only after the final decision.
+                let hosts = confirmed.iter().copied().filter(|id| health_hosts.contains(id)).collect::<Vec<_>>();
+                let health = health::run(ctx, request, inventory, root, &hosts, &mut next_health_id).await;
+                for (index, job) in remaining.iter().enumerate() {
+                    if let (Some(finish), Some(detail)) = (finishes[index].as_mut(), health.hosts.iter().find(|detail| detail.machine == job.machine)) { apply_health(finish, detail); }
+                }
+                health_outcomes.push(health.outcome?);
             }
         }
         let summary = if request.reboot {
@@ -985,6 +1247,16 @@ async fn activate_generations(
         };
         checked(&ctx.events, &ctx.cancellation, diagnostic(&summary)).await
     }.await;
+    let mut deliveries = Vec::new();
+    for (index, job) in remaining.iter().enumerate() {
+        if !snapshotted[index]
+            && let Some(finish) = &finishes[index]
+            && let Err(error) = machine_checkpoint(ctx, job, inventory, finish).await
+        {
+            deliveries.push(error);
+        }
+    }
+    let result = combine_deliveries(result, deliveries);
     if let Err(error) = result {
         let later = ctx.events.emit(UiEvent::Diagnostic {
             stream: OutputStream::Stderr, style: Style::Failure,
@@ -1268,7 +1540,7 @@ async fn activate_one<P: ProcessRunner>(
         checked(
             copies.events,
             copies.cancellation,
-            diagnostic(&format!(
+            diagnostic_style(Style::Incomplete, &format!(
                 "{host}: carried {} copies store paths only; no activation or profile change.\n",
                 action_name(activation.action)
             )),
@@ -1338,11 +1610,14 @@ async fn activate_one<P: ProcessRunner>(
                 checked(
                     copies.events,
                     copies.cancellation,
-                    diagnostic(&format!(
-                        "Run {} for generation {} on {host}\n",
-                        action_name(activation.action),
-                        job.generation.name
-                    )),
+                    diagnostic_style(
+                        Style::Machine,
+                        &format!(
+                            "Run {} for generation {} on {host}\n",
+                            action_name(activation.action),
+                            job.generation.name
+                        ),
+                    ),
                 )
                 .await?;
                 match choose_boot(activation).await? {
@@ -1426,11 +1701,14 @@ async fn activation_command<P: ProcessRunner>(
     checked(
         copies.events,
         copies.cancellation,
-        diagnostic(&if phase == "set carrier profile" {
-            format!("{description}\n")
-        } else {
-            format!("{}: {phase}\n", machine.name)
-        }),
+        diagnostic_style(
+            Style::Machine,
+            &if phase == "set carrier profile" {
+                format!("{description}\n")
+            } else {
+                format!("{}: {phase}\n", machine.name)
+            },
+        ),
     )
     .await?;
     if matches!(activation.action, SwitchAction::Test | SwitchAction::Switch)
@@ -1440,7 +1718,7 @@ async fn activation_command<P: ProcessRunner>(
         if let Some(helper) = &job.generation.auto_rollback {
             return rollback::run(activation, job, task, helper).await;
         }
-        checked(copies.events, copies.cancellation, diagnostic(&format!(
+        checked(copies.events, copies.cancellation, diagnostic_style(Style::Incomplete, &format!(
             "{}: saved rollback helper unavailable; running direct {phase} without rollback protection.\n",
             machine.name
         ))).await?;

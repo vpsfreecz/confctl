@@ -19,13 +19,30 @@ Typed per-cell styles are separate from layout. Missing entries use `Plain`; exc
 rows or columns are rejected before output. Widths use the original cell text.
 Padding stays outside the styled value and reset, including right alignment and
 multiline values; headers, row labels and continuation indentation stay plain.
+Diagnostics can carry ordered styled parts for mixed lines, such as a heading
+and log path or a machine and generation. The consumer formats and delivers the
+whole line atomically. Without color, those parts retain the original text,
+spacing and stream. Headings are bold, generations and log paths cyan, operation
+and skip notices yellow, success green and failure red.
 
 The live model keeps task registration order, explicit final results, bounded
 sanitized tail lines and full log locators. Visible membership prioritizes failed,
-incomplete and canceled work before restoring registration order. Unknown or zero
-totals show counts; positive totals permit a clamped progress bar. Narrow rows
-keep the result before a clipped description. Rendering reads elapsed time
-without freezing the timing ledger.
+incomplete and canceled work before restoring registration order. Known counts
+remain visible; valid positive totals permit a progress bar. Narrow rows keep
+the result before a clipped description. Rendering reads elapsed time without
+freezing the timing ledger.
+
+The full live panel is used by `build` and `deploy`, and during the build phase
+of other commands such as `status`. Other phases keep ordinary output and use
+a single transient command spinner on stderr. A shared build phase enters the
+full panel before preparation and leaves it before the built-generation report;
+the enclosing command then continues with its ordinary presentation.
+
+In the full panel, Preparing and unknown build counts use a stationary ASCII
+spinner (`|`, `/`, `-`, `\`) until measurements arrive. Measured progress uses
+the `=` bars. The spinner indicates activity without claiming that a child has
+started or inventing completed work, percentages or remaining time. It pauses
+during prompts and foreground children and stops when the task finishes.
 
 `TaskPending` records admitted work whose execution body has not been entered.
 `TaskStarted` promotes the same ID and description to running logical work, or
@@ -144,19 +161,37 @@ qualification.
 
 `build` registers one task per actual build group after consent and planning.
 Groups run serially; a shared Nix build does not prove that each host executed
-separately. Stderr streams through the existing checked output relay while stdout
-stays captured for JSON decoding. Bounded incremental parsing recognizes Nix's
-build/fetch summaries and activity lines; unknown output remains visible and raw
-captures are unchanged. Separate Building, Fetching and Total rows show observed
-starts, with labels and counts outside the filled bar. Total combines build and
-fetch activity and stays indeterminate until both totals are known. Unknown or
-zero totals do not produce a percentage. Counts reset for each native attempt,
-including retries; a full bar never establishes successful completion. A successful
-group includes generation reuse/publication. On failure, later groups are skipped
-or canceled and earlier saved generations and partial roots remain in place.
-Task log locators refer to the app-owned invocation log. Successful finalization
-removes that log unless the operation explicitly requests retention; failures
-retain it under the existing policy.
+separately. Live builds request Nix's structured activity output while stdout
+stays captured for JSON decoding. The relay displays decoded messages and retains
+the original stderr in captures and logs. Plain builds keep the existing human
+output and command arguments.
+
+Building, Fetching and Total have aligned count, percentage and bar columns.
+Counts describe completed work reported by Nix, with running and failed work kept
+separate. Fetching counts copied or substituted paths, not downloaded bytes.
+Total combines both categories only when both are known. While running, unknown
+counts show `waiting for counts`; unknown, zero or inconsistent totals show `--%`.
+Expected work can increase as Nix discovers more work, so percentages can decrease.
+When Nix stops an activity, its completed and failed counts remain, but its unused
+estimate retires. Other active activities can still keep the expected total higher.
+Stopping an activity never adds completed work. Failed counts remain independent
+of the completed/expected ratio and suppress the percentage rather than displaying
+a misleading 100%. These percentages describe known work rather than elapsed or
+remaining time. Counters reset for each native attempt; starting or stopping an
+activity alone does not prove successful completion. If Nix sends no final update,
+the bars retain the last observed counts.
+
+A full bar does not finish a group: successful completion also includes generation
+reuse/publication. After a group's final result, a compact snapshot with its
+actual Building, Fetching and Total bars stays in terminal scrollback before
+the next group proceeds. Final bars stop animating and retain actual counts;
+a failed or canceled group never gains fabricated completion. The repeated live
+label shows the group number and machine count; selection confirmation and generation reports
+retain the complete machine list. On failure, later groups are skipped or canceled,
+and earlier saved generations and partial roots remain in place. Task log locators
+refer to the app-owned invocation log. Successful finalization removes that log
+unless the operation requests retention; failures retain it under the existing
+policy.
 
 Saved-generation copy-only deploys admit one task per resolved host, with bounded
 copying-count/path progress from native stderr and unknown totals when absent.
@@ -196,14 +231,34 @@ requests retention of the raw invocation log before diagnostics or cooldown.
 The final summary reports actual passed and failed checks. Cancellation and
 delivery failures join entered work and preserve already delivered results.
 
+The inline panel reserves a stable height from its first paint. Unused rows stay
+inside the panel, so incoming output does not move the header, separators or
+progress rows. Resize changes the available geometry. The header starts on the
+first owned row without reserving two empty terminal rows above it.
+
+Completed build groups and machine deployments leave compact snapshots in normal
+terminal scrollback, without retaining the live log tail or unused viewport rows.
+A machine snapshot follows its final requested copy,
+activation, reboot/wait and health decision; copy-only and unverified outcomes
+remain labelled accordingly. Bulk deployment keeps its existing execution order,
+and shared health retries finish before machine snapshots are emitted. Snapshots
+preserve other running work and never infer a result from a progress bar or an
+intermediate task. A failed or canceled unit retains its known partial outcome.
+Plain mode adds no checkpoint output. Prompts and foreground children defer
+snapshots through the existing required-output owner. The next active unit may
+open another live panel. Completion clears only the owned panel and retains
+remaining terminal summaries compactly; required result output does not reopen
+an empty panel. A finished build leaves its completed bars, built generations
+and timing together above the prompt, with no padded final viewport.
+
 The live header shows the invocation, current operation, local start time and
 whole-second elapsed time. The log locator has its own wrapped line, using a
 configuration-relative path when possible. Horizontal separators bound the live
 tail without adding vertical characters to copied output. A tiny terminal may
 show the full locator in normal scrollback when it cannot fit in the panel.
 
-Native activity updates the sanitized live tail without also printing a raw
-transcript outside the view. Plain mode forwards the same activity bytes on
+In the full panel, native activity updates the sanitized tail without also
+printing a raw transcript outside the view. Other modes forward activity bytes on
 their original streams and retains the existing host-attributed copy-progress
 lines on stdout. Those derived copy lines use a plain-only event, so they do not
 duplicate native activity in the live tail. Reports, tables, diagnostics and
@@ -219,7 +274,8 @@ Tail text and source metadata remain bounded.
 
 The presented process runner announces attempted commands before spawning them
 and before any child output. An accepted announcement does not assert that spawn
-succeeded. Quiet startup and settings commands therefore appear immediately.
+succeeded. Quiet startup and settings commands can therefore show activity before
+any output, when terminal ownership and line boundaries permit.
 Audited producers supply a shell-readable, redacted display; other commands show
 their safe description with arguments omitted. The display never derives from
 arbitrary environment values or stdin, and native argv remains unchanged. Plain
@@ -235,10 +291,24 @@ logs are removed unless an operation already requests retention. Failure and
 cancellation retain logs under the existing policy, and final locators refer to
 retained evidence rather than a deleted successful log.
 
-Both output streams must be usable terminals for live mode. `CONFCTL_TTY=0` or a
-redirected stream selects plain mode. Color policy is separate: `always` forces
-confctl styling, `never` disables it, and `auto` follows the destination and
-`NO_COLOR`. Child data and captured paths are not recolored or changed.
+Both output streams must be usable terminals for a full panel. Without that
+capability, commands can still show the compact spinner when stderr alone is a
+usable terminal. Thus `confctl ls >file` keeps stdout clean while showing activity
+on terminal stderr. Redirected stderr, `TERM=dumb` or `CONFCTL_TTY=0` disables all
+transient presentation. Color policy is separate: `always` forces confctl styling,
+`never` disables it, and `auto` follows the destination and `NO_COLOR`. Child data
+and captured paths are not recolored or changed.
+
+The compact spinner owns only one stderr line containing the safe current command
+and an additional-command count when needed. Each native attempt has a distinct
+identity, even when several attempts share a logical task. Its completion clears
+the spinner after output has drained and terminal ownership has been restored;
+that notification does not imply success. Capture-only results remain private.
+Before any visible output, the owned spinner line is erased and suppressed for
+that child. Ambiguous concurrent output may suppress other active spinners too;
+completion does not resurrect them. Partial lines and uncertain cursor positions
+suppress transient output rather than adding newlines or overwriting real output.
+Prompts and foreground children clear and park the spinner before taking ownership.
 
 ## Why the painter uses relative output commands
 
@@ -247,11 +317,15 @@ Crossterm move/clear commands in the normal screen. It establishes a known line
 anchor through its own output, reserves a terminal column to avoid soft wrapping,
 and invalidates its geometry after resize or terminal handoff. It compares the
 previous and current buffers, writes changed rows in one batch and skips identical
-frames. Ordinary activity updates coalesce to at most ten paints per second;
-elapsed text changes once per displayed second. It does not add blank space above
-the header or reserve a fixed empty panel. It never asks the terminal for cursor
-coordinates, enters an alternate screen, changes raw mode or reads keys. Resize
-comes from SIGWINCH and terminal-size ioctl.
+frames. Activity and stationary spinner updates coalesce to at most ten paints per
+second; elapsed text changes once per displayed second. Prompts and foreground
+children park painting, and terminal results stop the animation.
+The live frame pads unused rows inside its fixed viewport while work runs;
+completed snapshots omit that padding. A fresh anchor
+adds a newline when required output ended mid-line or a foreground child may have
+left a partial line. It never moves into unowned history to remove blank space,
+asks the terminal for cursor coordinates, enters an alternate screen, changes
+raw mode or reads keys. Resize comes from SIGWINCH and terminal-size ioctl.
 
 The locked dependencies explain this choice:
 
@@ -364,7 +438,8 @@ readiness while parked.
 
 ## Verification boundary
 
-Buffer tests check layout, independent activity counters and long log paths.
+Buffer tests check stable quiet/busy geometry, aligned completion counts and
+percentages, long log paths and compact checkpoint projections.
 Painter tests check that identical frames write nothing and a changed row does
 not rewrite the static header. Controlling-PTY fixtures exercise burst activity,
 quiet command starts, resize, prompt and foreground handoff, stop/continue and

@@ -91,7 +91,7 @@ pub(super) async fn run(
         .confirm(ConfirmPrompt {
             preview: vec![
                 message(
-                    Style::Plain,
+                    Style::Heading,
                     "Health checks will be run on the following machines:\n".into(),
                 ),
                 table,

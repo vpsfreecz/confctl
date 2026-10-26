@@ -103,6 +103,25 @@ impl OutputPolicy {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum PresentationMode {
+    Full,
+    CommandSpinner,
+    Plain,
+}
+
+impl PresentationMode {
+    fn resolve(full: bool, compact: bool, requested_full: bool) -> Self {
+        if requested_full && full {
+            Self::Full
+        } else if compact {
+            Self::CommandSpinner
+        } else {
+            Self::Plain
+        }
+    }
+}
+
 pub struct PresentationConfig {
     pub command: String,
     pub operation: String,
@@ -110,6 +129,7 @@ pub struct PresentationConfig {
     pub configuration_dir: Option<PathBuf>,
     pub invocation_log: Option<PathBuf>,
     pub policy: OutputPolicy,
+    pub(crate) mode: PresentationMode,
     pub initial_size: (u16, u16),
     pub terminal: Option<OwnedFd>,
     pub max_tasks: usize,
@@ -126,7 +146,13 @@ impl PresentationConfig {
     ) -> Self {
         let stdout = io::stdout();
         let stderr = io::stderr();
-        let terminal = stdout.as_fd().try_clone_to_owned().ok();
+        let terminal = if stdout.is_terminal() {
+            stdout.as_fd()
+        } else {
+            stderr.as_fd()
+        }
+        .try_clone_to_owned()
+        .ok();
         let dimensions = terminal
             .as_ref()
             .and_then(|fd| rustix::termios::tcgetwinsize(fd).ok())
@@ -147,6 +173,13 @@ impl PresentationConfig {
             std::env::var_os("CONFCTL_TTY").as_deref() != Some(std::ffi::OsStr::new("0")),
             no_color,
         );
+        let mode = PresentationMode::resolve(
+            policy.live,
+            stderr.is_terminal()
+                && usable
+                && std::env::var_os("CONFCTL_TTY").as_deref() != Some(std::ffi::OsStr::new("0")),
+            true,
+        );
         Self {
             command,
             operation,
@@ -154,11 +187,17 @@ impl PresentationConfig {
             configuration_dir: None,
             invocation_log: None,
             policy,
+            mode,
             initial_size: dimensions.unwrap_or((80, 24)),
             terminal,
             max_tasks: 5,
             tail_rows: 100,
             tail_line_bytes: 4096,
+        }
+    }
+    pub(crate) fn select_mode(&mut self, full: bool) {
+        if !full && self.mode == PresentationMode::Full {
+            self.mode = PresentationMode::CommandSpinner;
         }
     }
 }
@@ -368,15 +407,34 @@ pub struct Presentation {
     stderr: DeferredStream,
     unspooled: Option<UnspooledOutput>,
     painter: Option<live::RelativePainter<SharedOutput>>,
+    spinner_painter: Option<live::RelativePainter<SharedOutput>>,
+    mode: PresentationMode,
+    commands: Vec<ActiveCommand>,
+    compact_anchor: bool,
+    build_scope: Option<BuildScope>,
     resize: Option<tokio::signal::unix::Signal>,
     finish: watch::Receiver<bool>,
     completion: Arc<Completion>,
     cleaned: bool,
     active_view: bool,
     seen_groups: HashSet<u64>,
+    seen_checkpoints: HashSet<crate::events::TaskId>,
     last_geometry: Option<(u16, u16)>,
     last_paint: Option<Instant>,
     scrollback_logs: HashSet<PathBuf>,
+}
+
+struct ActiveCommand {
+    id: crate::events::CommandId,
+    task: crate::events::TaskId,
+    display: String,
+    suppressed: bool,
+}
+
+struct BuildScope {
+    mode: PresentationMode,
+    operation: String,
+    first_row: usize,
 }
 
 impl Presentation {
@@ -395,7 +453,13 @@ impl Presentation {
                 config.policy.stdout_color,
             )
         });
-        let resize = if config.policy.live {
+        let spinner_painter = (config.mode != PresentationMode::Plain).then(|| {
+            live::RelativePainter::new(
+                SharedOutput(outputs.stderr.clone()),
+                config.policy.stderr_color,
+            )
+        });
+        let resize = if config.mode != PresentationMode::Plain {
             Some(
                 tokio::signal::unix::signal(tokio::signal::unix::SignalKind::window_change())
                     .map_err(|source| output_io("observe terminal resize", source))?,
@@ -435,6 +499,7 @@ impl Presentation {
                 state,
                 current_state,
                 outputs,
+                mode: config.mode,
                 config,
                 timing,
                 started,
@@ -444,12 +509,17 @@ impl Presentation {
                 stderr,
                 unspooled: None,
                 painter,
+                spinner_painter,
+                commands: Vec::new(),
+                compact_anchor: true,
+                build_scope: None,
                 resize,
                 finish: finish_requests,
                 completion,
                 cleaned: false,
                 active_view: false,
                 seen_groups: HashSet::new(),
+                seen_checkpoints: HashSet::new(),
                 last_geometry: None,
                 last_paint: None,
                 scrollback_logs: HashSet::new(),
@@ -508,7 +578,10 @@ impl Presentation {
                     if let Some(painter) = &mut self.painter { painter.invalidate(); }
                     self.paint_now()?;
                 },
-                _ = timer.tick(), if self.config.policy.live && !self.parked() && self.active_view => { self.paint()?; },
+                _ = timer.tick(), if !self.parked() && self.transient_active() => {
+                    self.paint()?;
+
+                },
             }
         }
         // Explicit closure rejects blocked/new senders while queued required
@@ -529,13 +602,104 @@ impl Presentation {
     async fn deliver(&mut self, delivery: crate::events::Delivery) -> Result<(), ConfctlError> {
         let (event, acknowledgement) = delivery.into_parts();
         let result = match event {
-            UiEvent::CommandStarting { task, display } if self.config.policy.live => {
-                self.command_starting(task, display).await
+            UiEvent::CommandStarting {
+                command,
+                task,
+                display,
+            } => {
+                let state = *self.state.borrow_and_update();
+                self.transition(state)?;
+                self.admit_command(command, task, &display);
+                if self.mode == PresentationMode::Full {
+                    self.command_starting(task, display).await
+                } else {
+                    self.paint_now()
+                }
             }
             event => self.event(event),
         };
         acknowledgement.acknowledge(result.as_ref().map(|_| ()).map_err(ToString::to_string));
         result
+    }
+
+    fn admit_command(
+        &mut self,
+        id: crate::events::CommandId,
+        task: crate::events::TaskId,
+        display: &str,
+    ) {
+        self.commands.retain(|command| command.id != id);
+        self.commands.push(ActiveCommand {
+            id,
+            task,
+            display: model::sanitize_text(display).replace(['\n', '\r'], " "),
+            suppressed: !self.compact_anchor || self.parked(),
+        });
+    }
+
+    fn suppress_commands(&mut self, task: Option<crate::events::TaskId>) {
+        for command in &mut self.commands {
+            if task.is_none_or(|task| command.task == task) {
+                command.suppressed = true;
+            }
+        }
+    }
+
+    fn transient_active(&self) -> bool {
+        match self.mode {
+            PresentationMode::Full => self.active_view,
+            PresentationMode::CommandSpinner => {
+                self.compact_anchor && self.commands.iter().any(|command| !command.suppressed)
+            }
+            PresentationMode::Plain => false,
+        }
+    }
+
+    fn build_phase(&mut self, phase: crate::events::BuildPhase) -> Result<(), ConfctlError> {
+        use crate::events::BuildPhase;
+        match phase {
+            BuildPhase::Begin => {
+                if self.build_scope.is_some() || !self.config.policy.live {
+                    return Err(ConfctlError::EventDelivery(
+                        "invalid nested or unavailable build phase".into(),
+                    ));
+                }
+                self.park_painter()?;
+                self.build_scope = Some(BuildScope {
+                    mode: self.mode,
+                    operation: self.config.operation.clone(),
+                    first_row: self.model.rows().len(),
+                });
+                self.mode = PresentationMode::Full;
+                self.config.operation = "build".into();
+                self.active_view = true;
+                self.paint_now()
+            }
+            BuildPhase::End => {
+                let scope = self.build_scope.take().ok_or_else(|| {
+                    ConfctlError::EventDelivery("build phase ended without begin".into())
+                })?;
+                self.park_painter()?;
+                let tasks = self.model.finish_scope(scope.first_row);
+                let mut parts = Vec::new();
+                for row in self.model.checkpoint_rows(&tasks)? {
+                    parts.extend(live::summary_parts(
+                        row,
+                        usize::from(self.dimensions().0.saturating_sub(1)),
+                    ));
+                }
+                self.required(
+                    OutputStream::Stdout,
+                    plain::styled_diagnostic(&parts, self.config.policy.stdout_color),
+                )?;
+                self.model.mark_checkpoint(&tasks);
+                self.mode = scope.mode;
+                self.config.operation = scope.operation;
+                self.active_view =
+                    self.mode == PresentationMode::Full && self.model.has_active_tasks();
+                Ok(())
+            }
+        }
     }
 
     async fn command_starting(
@@ -565,12 +729,7 @@ impl Presentation {
             && announcement.len() <= self.config.tail_line_bytes
             && self.config.tail_rows > 0
             && wrapped.len()
-                <= live::tail_capacity(
-                    &self.model,
-                    &self.frame_info(log.as_deref()),
-                    width,
-                    rows.saturating_sub(2),
-                );
+                <= live::tail_capacity(&self.model, &self.frame_info(log.as_deref()), width, rows);
         self.model.command_starting(task, &display, fits);
         self.active_view = true;
         if !fits {
@@ -586,6 +745,25 @@ impl Presentation {
 
     fn event(&mut self, event: UiEvent) -> Result<(), ConfctlError> {
         match event {
+            UiEvent::CommandFinished { command } => {
+                if !self.commands.iter().any(|active| active.id == command) {
+                    return Ok(());
+                }
+                self.commands.retain(|active| active.id != command);
+                if self.mode == PresentationMode::CommandSpinner {
+                    self.park_painter()?;
+                    self.paint_now()?;
+                }
+                Ok(())
+            }
+            UiEvent::BuildPhase(phase) => self.build_phase(phase),
+            UiEvent::Checkpoint {
+                key,
+                label,
+                state,
+                tasks,
+            } => self.checkpoint(key, label, state, tasks),
+            UiEvent::BuildProgress { .. } if self.mode != PresentationMode::Full => Ok(()),
             UiEvent::TerminalState(state) => {
                 self.transition(state)?;
                 // This FIFO barrier includes bytes received after watch-state
@@ -600,11 +778,12 @@ impl Presentation {
                     return Err(ConfctlError::TerminalBusy);
                 }
                 validate_frame(&preview)?;
+                self.suppress_commands(None);
                 for event in preview {
                     let (stream, bytes) = self.formatted(event)?;
                     self.prompt_write(stream, bytes)?;
                 }
-                let text = if self.config.policy.live {
+                let text = if self.mode == PresentationMode::Full {
                     model::sanitize_text(&text)
                 } else {
                     text
@@ -620,7 +799,14 @@ impl Presentation {
                 if self.seen_groups.contains(&group) {
                     return Ok(());
                 }
-                self.finalize_group()?;
+                if !prelude.is_empty() {
+                    self.suppress_commands(None);
+                }
+                if self.build_scope.is_none() {
+                    self.finalize_group()?;
+                } else {
+                    self.park_painter()?;
+                }
                 for event in prelude {
                     let (stream, bytes) = self.formatted(event)?;
                     self.required(stream, bytes)?;
@@ -628,7 +814,10 @@ impl Presentation {
                 self.seen_groups.insert(group);
                 self.config.operation =
                     model::sanitize_text(&description).replace(['\n', '\r'], " ");
-                self.model = model::Model::new(self.config.tail_rows, self.config.tail_line_bytes);
+                if self.build_scope.is_none() {
+                    self.model =
+                        model::Model::new(self.config.tail_rows, self.config.tail_line_bytes);
+                }
                 if let Some(path) = &self.config.invocation_log {
                     self.model.apply(&UiEvent::LogAvailable {
                         task: crate::events::TaskId(0),
@@ -642,7 +831,10 @@ impl Presentation {
                 stream,
                 bytes,
             } => {
-                let bytes = if self.config.policy.live {
+                if !bytes.is_empty() {
+                    self.suppress_commands(Some(task));
+                }
+                let bytes = if self.mode == PresentationMode::Full {
                     self.model
                         .sanitize_output(task, stream, &bytes)
                         .into_bytes()
@@ -652,9 +844,12 @@ impl Presentation {
                 self.required(stream, bytes)
             }
             UiEvent::PlainOutput { stream, bytes } => {
-                if self.config.policy.live {
+                if self.mode == PresentationMode::Full {
                     Ok(())
                 } else {
+                    if !bytes.is_empty() {
+                        self.suppress_commands(None);
+                    }
                     self.required(stream, bytes)
                 }
             }
@@ -663,29 +858,82 @@ impl Presentation {
                 stream,
                 bytes,
             } => {
-                if self.config.policy.live {
+                if self.mode == PresentationMode::Full {
                     self.model.output(task, stream, &bytes);
-                    self.active_view = true;
+                    self.active_view = (!self.model.finalized() && self.model.rows().is_empty())
+                        || self.model.has_active_tasks();
                     Ok(())
                 } else {
+                    if !bytes.is_empty() {
+                        self.suppress_commands(Some(task));
+                    }
                     self.required(stream, bytes)
                 }
             }
-            event @ UiEvent::CommandStarting { .. } => {
-                self.model.apply(&event)?;
-                self.active_view = true;
-                Ok(())
+            event @ UiEvent::CommandStarting { command, task, .. } => {
+                if let UiEvent::CommandStarting { display, .. } = &event {
+                    self.admit_command(command, task, display);
+                }
+                if self.mode == PresentationMode::Full {
+                    self.model.apply(&event)?;
+                    self.active_view = true;
+                    Ok(())
+                } else {
+                    self.paint_now()
+                }
             }
-            event @ (UiEvent::Table { .. } | UiEvent::Diagnostic { .. }) => {
+            event @ (UiEvent::Table { .. }
+            | UiEvent::Diagnostic { .. }
+            | UiEvent::StyledDiagnostic { .. }) => {
                 let (stream, bytes) = self.formatted(event)?;
+                if !bytes.is_empty() {
+                    self.suppress_commands(None);
+                }
                 self.required(stream, bytes)
             }
             event => {
                 self.model.apply(&event)?;
-                self.active_view = true;
+                self.active_view = (!self.model.finalized() && self.model.rows().is_empty())
+                    || self.model.has_active_tasks();
                 Ok(())
             }
         }
+    }
+
+    fn checkpoint(
+        &mut self,
+        key: crate::events::TaskId,
+        label: String,
+        state: crate::events::TaskState,
+        tasks: Vec<crate::events::TaskId>,
+    ) -> Result<(), ConfctlError> {
+        if self.mode != PresentationMode::Full || self.seen_checkpoints.contains(&key) {
+            return Ok(());
+        }
+        let rows = self.model.checkpoint_rows(&tasks)?;
+        let mut parts = vec![
+            (
+                crate::events::Style::Heading,
+                model::sanitize_text(&label).replace(['\n', '\r'], " "),
+            ),
+            (crate::events::Style::Plain, ": ".into()),
+            (
+                live::result_style(state),
+                format!("{}\n", live::state_label(state)),
+            ),
+        ];
+        let columns = usize::from(self.dimensions().0.saturating_sub(1));
+        for row in rows {
+            parts.extend(live::summary_parts(row, columns));
+        }
+        let bytes = plain::styled_diagnostic(&parts, self.config.policy.stdout_color);
+        self.required(OutputStream::Stdout, bytes)?;
+        // Delivery has transferred to the normal deferred-output owner. Keep
+        // authoritative results, but retire only this unit's repeated detail.
+        self.seen_checkpoints.insert(key);
+        self.model.mark_checkpoint(&tasks);
+        self.active_view = self.model.has_active_tasks();
+        self.paint_now()
     }
 
     fn formatted(&self, event: UiEvent) -> Result<(OutputStream, Vec<u8>), ConfctlError> {
@@ -695,7 +943,7 @@ impl Presentation {
                 style,
                 text,
             } => {
-                let text = if self.config.policy.live {
+                let text = if self.mode == PresentationMode::Full {
                     model::sanitize_text(&text)
                 } else {
                     text
@@ -705,6 +953,17 @@ impl Presentation {
                     plain::diagnostic(&text, style, self.config.policy.color(stream)),
                 ))
             }
+            UiEvent::StyledDiagnostic { stream, mut parts } => {
+                if self.mode == PresentationMode::Full {
+                    for (_, text) in &mut parts {
+                        *text = model::sanitize_text(text);
+                    }
+                }
+                Ok((
+                    stream,
+                    plain::styled_diagnostic(&parts, self.config.policy.color(stream)),
+                ))
+            }
             UiEvent::Table {
                 stream,
                 mut columns,
@@ -712,7 +971,7 @@ impl Presentation {
                 cell_styles,
                 format,
             } => {
-                if self.config.policy.live {
+                if self.mode == PresentationMode::Full {
                     columns = columns
                         .into_iter()
                         .map(|value| model::sanitize_text(&value))
@@ -777,6 +1036,8 @@ impl Presentation {
     }
 
     fn prompt_write(&mut self, stream: OutputStream, bytes: Vec<u8>) -> Result<(), ConfctlError> {
+        self.suppress_commands(None);
+        self.compact_anchor = false;
         let result = lock_writer(self.outputs.writer(stream)).and_then(|mut writer| {
             writer.write_all(&bytes)?;
             writer.flush()
@@ -795,20 +1056,28 @@ impl Presentation {
 
     fn replay(&mut self) -> Result<(), ConfctlError> {
         let mut errors = Vec::new();
-        for (spool, writer, operation) in [
+        for (spool, writer, operation, stream) in [
             (
                 &mut self.stdout,
                 &self.outputs.stdout,
                 "replay deferred stdout",
+                OutputStream::Stdout,
             ),
             (
                 &mut self.stderr,
                 &self.outputs.stderr,
                 "replay deferred stderr",
+                OutputStream::Stderr,
             ),
         ] {
             match spool.replay(writer) {
                 Ok(Some(last)) => {
+                    // Only stderr can establish the spinner's stderr anchor.
+                    // A stdout LF may have gone to a file; unfinished stdout
+                    // still conservatively invalidates a possibly shared TTY.
+                    if stream == OutputStream::Stderr || last != b'\n' {
+                        self.compact_anchor = last == b'\n';
+                    }
                     if let Some(painter) = &mut self.painter {
                         painter.output_ended(last);
                     }
@@ -834,9 +1103,11 @@ impl Presentation {
         let was_parked = self.parked();
         self.current_state = state;
         if self.parked() {
+            self.suppress_commands(None);
             self.park_painter()?;
             self.flush_outputs()?;
         } else if was_parked {
+            self.compact_anchor = false;
             if let Some(painter) = &mut self.painter {
                 painter.foreign_output();
             }
@@ -851,15 +1122,26 @@ impl Presentation {
                 .park()
                 .map_err(|source| output_io("park live presentation", source))?;
         }
+        if let Some(painter) = &mut self.spinner_painter {
+            painter
+                .park()
+                .map_err(|source| output_io("park command spinner", source))?;
+        }
         Ok(())
     }
     fn release_painter(&mut self) -> Result<(), ConfctlError> {
-        if let Some(mut painter) = self.painter.take() {
-            painter
-                .finish()
-                .map_err(|source| output_io("release live presentation", source))?;
+        let mut errors = Vec::new();
+        if let Some(mut painter) = self.spinner_painter.take()
+            && let Err(source) = painter.finish()
+        {
+            errors.push(output_io("release command spinner", source));
         }
-        Ok(())
+        if let Some(mut painter) = self.painter.take()
+            && let Err(source) = painter.finish()
+        {
+            errors.push(output_io("release live presentation", source));
+        }
+        combine(errors)
     }
     fn dimensions(&self) -> (u16, u16) {
         self.config
@@ -875,6 +1157,12 @@ impl Presentation {
             && let Some(painter) = &mut self.painter
         {
             painter.invalidate();
+        }
+        if self.last_geometry.is_some_and(|previous| previous != size)
+            && self.mode == PresentationMode::CommandSpinner
+        {
+            self.suppress_commands(None);
+            self.compact_anchor = false;
         }
         self.last_geometry = Some(size);
     }
@@ -908,7 +1196,7 @@ impl Presentation {
             &self.model,
             &self.frame_info(log),
             columns.saturating_sub(1),
-            rows.saturating_sub(2),
+            rows,
         )
     }
     fn paint(&mut self) -> Result<(), ConfctlError> {
@@ -921,7 +1209,48 @@ impl Presentation {
         self.paint_now()
     }
     fn paint_now(&mut self) -> Result<(), ConfctlError> {
-        if !self.config.policy.live || self.parked() || !self.active_view {
+        if self.mode == PresentationMode::CommandSpinner {
+            self.refresh_geometry();
+            if !self.parked() && self.transient_active() {
+                let selected = self
+                    .commands
+                    .iter()
+                    .find(|command| !command.suppressed)
+                    .expect("active spinner command");
+                let count = self.commands.len();
+                let suffix = if count > 1 {
+                    format!(
+                        " (+{}{} running)",
+                        (count - 1).min(999),
+                        if count > 1000 { "+" } else { "" }
+                    )
+                } else {
+                    String::new()
+                };
+                let columns = usize::from(self.dimensions().0.saturating_sub(1));
+                let line = format!(
+                    "{} {}{}",
+                    live::spinner(self.origin.elapsed()),
+                    selected.display,
+                    suffix
+                );
+                let frame = ratatui::buffer::Buffer::with_lines([model::clip(&line, columns)]);
+                if let Some(painter) = &mut self.spinner_painter {
+                    painter
+                        .paint(&frame)
+                        .map_err(|source| output_io("paint command spinner", source))?;
+                }
+                self.last_paint = Some(Instant::now());
+            } else if !self.parked()
+                && let Some(painter) = &mut self.spinner_painter
+            {
+                painter
+                    .park()
+                    .map_err(|source| output_io("clear suppressed command spinner", source))?;
+            }
+            return Ok(());
+        }
+        if self.mode != PresentationMode::Full || self.parked() || !self.active_view {
             return Ok(());
         }
         self.refresh_geometry();
@@ -934,39 +1263,14 @@ impl Presentation {
             let (columns, rows) = self.dimensions();
             // Tiny panels cannot hold an entire wrapped locator plus useful
             // status. Publish it once in normal scrollback, never an ellipsis.
-            let width = usize::from(columns.saturating_sub(1));
-            let elapsed = self
-                .timing
-                .as_ref()
-                .map_or_else(|| self.origin.elapsed(), Timing::elapsed);
-            let header_rows = [
-                format!(
-                    "Command: {}",
-                    model::sanitize_text(&self.config.command).replace(['\n', '\r'], " ")
-                ),
-                format!(
-                    "Started: {}  Elapsed: {}",
-                    self.started,
-                    crate::timing::format_elapsed(elapsed)
-                ),
-                format!("Operation: {}", self.config.operation),
-                format!("Full log: {display}"),
-            ]
-            .iter()
-            .map(|text| live::wrap(text, width).len())
-            .sum::<usize>();
-            let task_rows = self
-                .model
-                .visible_rows(
-                    self.config
-                        .max_tasks
-                        .min(usize::from(rows.saturating_sub(3))),
+            if columns <= 2
+                || !live::headers_fit(
+                    &self.model,
+                    &self.frame_info(log.as_deref()),
+                    columns.saturating_sub(1),
+                    rows,
                 )
-                .iter()
-                .map(|row| if row.build.is_some() { 4 } else { 1 })
-                .sum::<usize>()
-                .min(usize::from(rows.saturating_sub(3)));
-            if columns <= 2 || header_rows + task_rows > usize::from(rows.saturating_sub(2)) {
+            {
                 let path = self
                     .model
                     .logs()
@@ -976,7 +1280,13 @@ impl Presentation {
                 if !self.scrollback_logs.contains(&path) {
                     self.required(
                         OutputStream::Stdout,
-                        format!("Full log: {display}\n").into_bytes(),
+                        plain::styled_diagnostic(
+                            &[
+                                (crate::events::Style::Heading, "Full log: ".into()),
+                                (crate::events::Style::Generation, format!("{display}\n")),
+                            ],
+                            self.config.policy.stdout_color,
+                        ),
                     )?;
                     self.scrollback_logs.insert(path);
                 }
@@ -994,40 +1304,26 @@ impl Presentation {
     }
     fn finalize_group(&mut self) -> Result<(), ConfctlError> {
         self.model.finalize();
-        if !self.config.policy.live || !self.active_view {
+        self.park_painter()?;
+        if self.mode != PresentationMode::Full {
             return Ok(());
         }
-        self.paint_now()?;
-        let (columns, rows) = self.dimensions();
-        let visible: HashSet<_> =
-            live::displayed_tasks(&self.model, self.config.max_tasks, rows.saturating_sub(2))
-                .into_iter()
-                .collect();
-        let omitted: Vec<_> = self
+        let columns = usize::from(self.dimensions().0.saturating_sub(1));
+        let tasks: Vec<_> = self
             .model
             .rows()
             .iter()
-            .filter(|row| {
-                !visible.contains(&row.id)
-                    || live::task_label(row, usize::from(columns.saturating_sub(1))).1
-            })
-            .map(live::task_summary)
+            .filter(|row| !self.model.was_snapshotted(row.id))
+            .map(|row| row.id)
             .collect();
-        if let Some(painter) = &mut self.painter {
-            painter
-                .finish()
-                .map_err(|source| output_io("retain final live panel", source))?;
+        let mut parts = Vec::new();
+        for row in self.model.checkpoint_rows(&tasks)? {
+            parts.extend(live::summary_parts(row, columns));
         }
+        let bytes = plain::styled_diagnostic(&parts, self.config.policy.stdout_color);
+        self.required(OutputStream::Stdout, bytes)?;
+        self.model.mark_checkpoint(&tasks);
         self.active_view = false;
-        if !omitted.is_empty() {
-            self.required(
-                OutputStream::Stdout,
-                format!("{} tasks not shown in full\n", omitted.len()).into_bytes(),
-            )?;
-        }
-        for line in omitted {
-            self.required(OutputStream::Stdout, line.into_bytes())?;
-        }
         // Native IDs and log ownership remain in the model/log/evidence. Final
         // retained locators are printed by the app only after retention succeeds.
         Ok(())
@@ -1125,7 +1421,7 @@ fn validate_frame(events: &[UiEvent]) -> Result<(), ConfctlError> {
                 cell_styles,
                 ..
             } => plain::validate_cell_styles(columns, rows, cell_styles)?,
-            UiEvent::Diagnostic { .. } => {}
+            UiEvent::Diagnostic { .. } | UiEvent::StyledDiagnostic { .. } => {}
             _ => {
                 return Err(ConfctlError::EventDelivery(
                     "prompt/group frame contains a non-presentation event".into(),
