@@ -176,6 +176,38 @@ set. Helpers continue to use the evaluated target's packages. Independent locks
 can select different revisions; cache reuse depends on the exact source, package
 set, system and derivation, rather than the channel name alone.
 
+The confctl repository's `cache.yml` builds and qualifies committed branch
+revisions on the existing x86_64 `vpsadminos runners` group. It uploads only the
+ordinary runtime closure to `cache.int.vpsadminos.org`, registers a flat
+`confctl-<branch SHA256>-x86_64-linux` profile through `push-ci-generation`, and
+checks the public cache signature. Existing server retention keeps these branch
+generations for 90 days. Hosted native ARM qualification remains separate; this
+workflow does not publish an ARM cache.
+
+The repository must have access to that runner group and the existing
+`VPSADMINOS_CACHE_SSH_KEY` secret. A missing secret fails on a hosted runner before
+allocating a private runner. The upload job writes the pinned cache host key to
+its own temporary `known_hosts` file and uses strict host verification for every
+SSH step, independently of the runner's global trust files. It fails before
+building if host verification or authentication fails.
+It never processes pull-request events or fork credentials. Cache publication
+requires successful explicit qualification and installed checks.
+
+`update-nixpkgs.yml` runs at 06:45 UTC. It updates only the direct stable input,
+rejects unrelated lock changes, and uses normal repository hooks for a minimal
+lock commit. A changed remote branch stops publication; there is no force push.
+The same workflow directly invokes the shared cache job for its resulting commit,
+including when the lock did not change. It does not depend on a bot push starting
+another workflow. These schedules take effect when present on the default branch.
+
+Clients need `https://cache.vpsadminos.org` in their Nix substituters and the public
+trusted key
+`cache.vpsadminos.org:wpIJlNZQIhS+0gFf1U3MC9sLZdLW3sh5qakOWGDoDrE=`.
+The package does not change a client's trust settings. Public metadata and a valid
+signature establish publication; a cache-hit acceptance check additionally
+substitutes the exact runtime output into a disposable store without build fallback.
+An already-built local output does not establish a cache hit.
+
 The self-hosted native VM/GC job runs automatically only for default-branch
 pushes matching its path filters. Feature branches and tags require deliberate
 `workflow_dispatch` with separate runner ownership and authorization. The guard skips the whole job before runner

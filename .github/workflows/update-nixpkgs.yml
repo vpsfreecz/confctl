@@ -1,0 +1,88 @@
+name: Update stable nixpkgs and populate cache
+
+on:
+  schedule:
+    - cron: '45 6 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: confctl-stable-nixpkgs-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.repository == 'vpsfreecz/confctl'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      revision: ${{ steps.update.outputs.revision }}
+      branch: ${{ steps.update.outputs.branch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # 31.11.3
+        with:
+          extra_nix_config: |
+            accept-flake-config = false
+            allow-import-from-derivation = false
+
+      - name: Refresh only the committed stable nixpkgs input
+        id: update
+        env:
+          UPDATE_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          baseline=$(git rev-parse HEAD)
+          test "$(git ls-remote origin "refs/heads/$UPDATE_BRANCH" | cut -f 1)" = "$baseline"
+          test -z "$(git status --porcelain=v1)"
+          cp flake.lock "$RUNNER_TEMP/confctl-old.lock"
+          nix flake update --store daemon --option allow-import-from-derivation false \
+            --option accept-flake-config false nixpkgs
+          python3 - "$RUNNER_TEMP/confctl-old.lock" <<'PY'
+          import copy, json, pathlib, subprocess, sys
+          old = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          new = json.loads(pathlib.Path('flake.lock').read_text())
+          root = old['root']
+          assert root == new['root']
+          node = old['nodes'][root]['inputs']['nixpkgs']
+          assert isinstance(node, str)
+          assert node == new['nodes'][root]['inputs']['nixpkgs']
+          expected = copy.deepcopy(old)
+          expected['nodes'][node]['locked'] = new['nodes'][node]['locked']
+          assert expected == new, 'Unrelated lock nodes or follows changed'
+          assert new['nodes'][node]['original'] == {
+              'owner': 'NixOS', 'repo': 'nixpkgs', 'ref': 'nixos-26.05', 'type': 'github'
+          }
+          changed = subprocess.check_output(['git', 'diff', '--name-only']).decode().splitlines()
+          assert changed in ([], ['flake.lock']), changed
+          PY
+          if ! git diff --quiet -- flake.lock; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git config --local core.hooksPath .githooks
+            printf 'flake: update stable nixpkgs\n\nRefresh the locked NixOS stable input for public packages and cache builds.\n' \
+              > "$RUNNER_TEMP/confctl-lock-message"
+            git add -- flake.lock
+            nix develop --no-update-lock-file --no-write-lock-file \
+              --option allow-import-from-derivation false --option accept-flake-config false \
+              --command git commit -F "$RUNNER_TEMP/confctl-lock-message"
+            test "$(git ls-remote origin "refs/heads/$UPDATE_BRANCH" | cut -f 1)" = "$baseline"
+            git -c push.followTags=false -c remote.origin.mirror=false push origin "HEAD:refs/heads/$UPDATE_BRANCH"
+          fi
+          test -z "$(git status --porcelain=v1)"
+          test "$(git ls-remote origin "refs/heads/$UPDATE_BRANCH" | cut -f 1)" = "$(git rev-parse HEAD)"
+          printf 'revision=%s\nbranch=%s\n' "$(git rev-parse HEAD)" "$UPDATE_BRANCH" >> "$GITHUB_OUTPUT"
+
+  cache:
+    needs: update
+    uses: ./.github/workflows/cache.yml
+    with:
+      revision: ${{ needs.update.outputs.revision }}
+      branch: ${{ needs.update.outputs.branch }}
+    secrets: inherit
