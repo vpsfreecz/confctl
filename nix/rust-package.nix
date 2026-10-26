@@ -29,6 +29,7 @@ let
     inherit src;
     cargoLock.lockFile = src + "/Cargo.lock";
     cargoBuildFlags = [ "--bins" ];
+    doCheck = false;
 
     # Keep the lexical multicall entry: login.rs captures this at compile time.
     CONFCTL_LOGNAME = "${pkgs.coreutils}/bin/logname";
@@ -67,6 +68,8 @@ let
         | sed 's|^// *||' > "$out/share/licenses/confctl/Boost-1.0.txt"
     '';
 
+    # Full tests are explicit CI/release work, never an input of an install.
+    passthru.tests.qualification = package.overrideAttrs { doCheck = true; };
     passthru.tests.smoke = pkgs.runCommand "confctl-rust-package-smoke" { } ''
       set -x
       unset CONFCTL_INTERNAL_CARRIER_ON_CHANGE CONFCTL_INTERNAL_NETBOOT_CONFIG \

@@ -68,66 +68,28 @@ jobs:
         include:
           - runner: ubuntu-24.04
             system: x86_64-linux
-            machine: x86_64
           - runner: ubuntu-24.04-arm
             system: aarch64-linux
-            machine: aarch64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 1
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # 31.11.3
         with:
           enable_kvm: false
           extra_nix_config: |
             accept-flake-config = false
             allow-import-from-derivation = false
 
-      - name: Build and inspect native package
+      - name: Qualify and inspect native runtime package
         shell: bash
         env:
           PACKAGE_SYSTEM: ${{ matrix.system }}
-          PACKAGE_MACHINE: ${{ matrix.machine }}
         run: |
-          set -euo pipefail
-          uname -m
-          nix --version
-          test "$(uname -m)" = "$PACKAGE_MACHINE"
-          test "$(nix config show system)" = "$PACKAGE_SYSTEM"
-          guards=(--store daemon --no-update-lock-file --no-write-lock-file
-            --option allow-import-from-derivation false
-            --option accept-flake-config false)
-          package_attr=".#packages.${PACKAGE_SYSTEM}.confctl"
-          alias_attr=".#packages.${PACKAGE_SYSTEM}.confctl-rust"
-          package_drv="$(nix eval "${guards[@]}" --raw "$package_attr.drvPath")"
-          alias_drv="$(nix eval "${guards[@]}" --raw "$alias_attr.drvPath")"
-          test "$package_drv" = "$alias_drv"
-          package_out="$(nix build "${guards[@]}" --no-link --print-out-paths "$package_attr")"
-          test -d "$package_out"
-          printf 'Package output: %s\n' "$package_out"
-          nix build "${guards[@]}" --no-link "$package_attr.tests.smoke" "$package_attr.tests.shellSelection"
-          for name in confctl confctl-rust; do
-            "$package_out/bin/$name" --help > "$RUNNER_TEMP/$name-help"
-            test -s "$RUNNER_TEMP/$name-help"
-          done
-          for name in confctl confctl-reference confctl-options.nix kexec-netboot; do
-            manual="$package_out/share/man/man8/$name.8"
-            test -s "$manual"
-            grep -q '^\.TH ' "$manual"
-          done
-          for notice in LICENSE.txt Boost-1.0.txt; do
-            test -s "$package_out/share/licenses/confctl/$notice"
-          done
-          unwanted="$(find "$package_out" \( -type d \( -name src -o -name tests -o -name spec -o -name oracles \) -o -type f -name '*.rb' \) -print)"
-          test -z "$unwanted" || { printf 'Unexpected installed source: %s\n' "$unwanted" >&2; exit 1; }
-          nix path-info --store daemon --recursive "$package_out" | tee "$RUNNER_TEMP/confctl-runtime-closure"
-          if sed 's|^/nix/store/[^-]*-||' "$RUNNER_TEMP/confctl-runtime-closure" | grep -E '^(ruby|bundler|pandoc)(-[0-9]|$)'; then
-            echo 'Unexpected Ruby, Bundler or Pandoc runtime dependency' >&2
-            exit 1
-          fi
+          bash .github/scripts/qualify-package.sh "$PACKAGE_SYSTEM"
