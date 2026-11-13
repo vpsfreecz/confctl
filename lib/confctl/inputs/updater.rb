@@ -14,7 +14,7 @@ module ConfCtl
 
         if forward_only
           after_install = if commit
-                            proc { |changes| commit_changes!(conf_dir, changes, changelog, downgrade, editor) }
+                            proc { |changes| commit_changes!(conf_dir, changes, changelog, downgrade, editor, selected_inputs: inputs) }
                           end
           return GuardedUpdate.new(conf_dir: conf_dir, inputs: inputs).run!(after_install: after_install) do |reference, output, targets|
             run_nix_flake_update!(conf_dir, targets, reference: reference, output: output)
@@ -38,8 +38,10 @@ module ConfCtl
         { changed: true, changes: changes }
       end
 
-      def self.commit_changes!(conf_dir, changes, changelog, downgrade, editor)
-        msg = ConfCtl::Inputs::CommitMessage.build(changes: changes, changelog: changelog, downgrade: downgrade)
+      def self.commit_changes!(conf_dir, changes, changelog, downgrade, editor, selected_inputs: nil)
+        msg = ConfCtl::Inputs::CommitMessage.build(
+          changes: changes, changelog: changelog, downgrade: downgrade, selected_inputs: selected_inputs
+        )
         ConfCtl::Inputs::GitCommit.commit!(conf_dir: conf_dir, message: msg, editor: editor, files: ['flake.lock'])
       end
 

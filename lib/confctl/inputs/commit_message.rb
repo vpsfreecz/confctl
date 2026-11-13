@@ -3,8 +3,13 @@ require 'confctl/git_repo_mirror'
 module ConfCtl
   module Inputs
     class CommitMessage
-      def self.build(changes:, changelog:, downgrade: false, action: :update)
+      def self.build(changes:, changelog:, downgrade: false, action: :update, selected_inputs: nil)
         raise ArgumentError, 'no changes' if changes.nil? || changes.empty?
+
+        if selected_inputs
+          changes = changes.select { |change| selected_inputs.include?(change.name) }
+          return "inputs: update #{selected_inputs.sort.join(', ')}" if changes.empty?
+        end
 
         title = build_title(changes, action)
 

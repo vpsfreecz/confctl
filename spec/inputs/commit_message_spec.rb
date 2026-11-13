@@ -176,6 +176,92 @@ RSpec.describe ConfCtl::Inputs::CommitMessage do
     expect(described_class.build(changes: changes, changelog: true)).to include('changelog unavailable: Git mirror operation failed')
   end
 
+  context 'with explicit message input selection' do
+    let(:old_rev) { 'a' * 40 }
+    let(:new_rev) { 'b' * 40 }
+    let(:os_url) { 'https://github.com/vpsfreecz/vpsadminos' }
+    let(:pkgs_url) { 'https://github.com/NixOS/nixpkgs' }
+    let(:changes) do
+      [
+        build_change(name: 'os', old_rev: old_rev, new_rev: new_rev, url: os_url),
+        build_change(name: 'os/nixpkgs', old_rev: old_rev, new_rev: 'c' * 40, url: pkgs_url)
+      ]
+    end
+
+    it 'limits the entire message to exact selected paths without mutating the full changes' do
+      expect_git_log(url: os_url, from: old_rev, to: new_rev, output: 'OS log marker')
+      expect(ConfCtl::GitRepoMirror).not_to receive(:new).with(pkgs_url, quiet: true)
+
+      message = described_class.build(changes: changes, changelog: true, selected_inputs: ['os'])
+
+      expect(message).to eq(<<~MSG.strip)
+        inputs: update os to bbbbbbbb
+
+        os: aaaaaaaa -> bbbbbbbb
+        OS log marker
+      MSG
+      expect(changes.map(&:name)).to eq(['os', 'os/nixpkgs'])
+    end
+
+    it 'does not widen nested selection to a parent or authorize logs by repository name' do
+      expect_git_log(url: pkgs_url, from: old_rev, to: 'c' * 40, output: 'selected nested log marker')
+      expect(ConfCtl::GitRepoMirror).not_to receive(:new).with(os_url, quiet: true)
+
+      message = described_class.build(changes: changes, changelog: true, selected_inputs: ['os/nixpkgs'])
+
+      expect(message).to eq("inputs: update os/nixpkgs to cccccccc\n\nos/nixpkgs: aaaaaaaa -> cccccccc\nselected nested log marker")
+    end
+
+    it 'keeps existing all-group behavior for nil selection' do
+      expect_git_log(url: os_url, from: old_rev, to: new_rev, output: 'OS log marker')
+      expect_git_log(url: pkgs_url, from: old_rev, to: 'c' * 40, output: 'Nixpkgs log marker')
+
+      message = described_class.build(changes: changes, changelog: true, selected_inputs: nil)
+
+      expect(message).to include('OS log marker', 'Nixpkgs log marker')
+    end
+
+    it 'uses only the sorted requested-input title when no selected revision changed' do
+      expect(ConfCtl::GitRepoMirror).not_to receive(:new)
+      message = described_class.build(changes: [changes.last], changelog: true, selected_inputs: %w[zRoot os])
+      expect(message).to eq('inputs: update os, zRoot')
+    end
+
+    [nil, []].each do |original_changes|
+      it "retains the no-changes error for original #{original_changes.inspect} changes" do
+        expect do
+          described_class.build(changes: original_changes, changelog: true, selected_inputs: ['os'])
+        end.to raise_error(ArgumentError, 'no changes')
+      end
+    end
+
+    it 'lets no-changelog override explicit selection' do
+      expect(ConfCtl::GitRepoMirror).not_to receive(:new)
+      message = described_class.build(changes: changes, changelog: false, selected_inputs: ['os/nixpkgs'])
+      expect(message).to eq("inputs: update os/nixpkgs to cccccccc\n\nos/nixpkgs: aaaaaaaa -> cccccccc")
+    end
+
+    it 'shows only a selected alias and preserves downgrade direction' do
+      changes << build_change(name: 'alias', old_rev: old_rev, new_rev: new_rev, url: "#{os_url}/")
+      expect_git_log(url: "#{os_url}/", from: new_rev, to: old_rev, output: 'reverse OS log marker')
+      expect(ConfCtl::GitRepoMirror).not_to receive(:new).with(pkgs_url, quiet: true)
+
+      message = described_class.build(changes: changes, changelog: true, downgrade: true, selected_inputs: ['alias'])
+
+      expect(message).to eq("inputs: update alias to bbbbbbbb\n\nalias: aaaaaaaa -> bbbbbbbb\nreverse OS log marker")
+    end
+
+    it 'queries a shared selected group only once' do
+      changes << build_change(name: 'alias', old_rev: old_rev, new_rev: new_rev, url: "#{os_url}/")
+      expect_git_log(url: os_url, from: old_rev, to: new_rev, output: 'shared OS log marker')
+      expect(ConfCtl::GitRepoMirror).not_to receive(:new).with(pkgs_url, quiet: true)
+
+      message = described_class.build(changes: changes, changelog: true, selected_inputs: %w[os alias])
+
+      expect(message).to eq("inputs: update alias, os to bbbbbbbb\n\nos: aaaaaaaa -> bbbbbbbb\nalias: aaaaaaaa -> bbbbbbbb\nshared OS log marker")
+    end
+  end
+
   it 'does not include the revision in title for changes from different sources' do
     changes = [
       build_change(

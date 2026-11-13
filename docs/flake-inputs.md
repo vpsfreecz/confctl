@@ -175,6 +175,14 @@ its bundled Nix; installing another Nix in CI does not necessarily change that
 runtime. Unsupported flags or unmatched selectors fail without updating the
 real lock. There is no fallback to an update in place.
 
+Guarded commit messages describe only explicitly selected logical input paths.
+Titles, revision summaries and Git logs omit unselected dependencies and aliases.
+Selected paths with the same source and revision range share one Git log. If
+only dependencies change, the message contains just a title naming the requested
+inputs, such as `inputs: update vpsadminos`. `--no-changelog` omits all Git logs
+while retaining selected revision summaries. Ancestry validation still checks
+the complete input graph.
+
 The Nix package starts confctl with its packaged Ruby gems and ignores inherited
 `RUBYOPT` options for that Ruby process. It retains `RUBYOPT` and `BUNDLE_*`
 environment variables for child commands, including Git hooks. User scripts

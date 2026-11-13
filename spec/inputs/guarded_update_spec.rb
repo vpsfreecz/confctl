@@ -237,6 +237,64 @@ RSpec.describe ConfCtl::Inputs::GuardedUpdate do
     expect_preserved
   end
 
+  context 'when a selected input has a changed descendant' do
+    before do
+      old_data['nodes']['source']['inputs'] = { 'nixpkgs' => 'pkgs' }
+      old_data['nodes']['pkgs'] = {
+        'locked' => old_data['nodes']['source']['locked'].merge('repo' => 'nixpkgs')
+      }
+      candidate['nodes']['pkgs']['locked']['rev'] = 'c' * 40
+      File.write(File.join(@conf_dir, 'flake.lock'), JSON.generate(old_data))
+      git_commit_all(@conf_dir, 'fixture: descendant')
+      @before_state = repository_state
+    end
+
+    it 'retains all result changes while limiting the message to the selected input' do
+      mirror = instance_double(ConfCtl::GitRepoMirror)
+      expect(ConfCtl::GitRepoMirror).to receive(:new).once.with('https://github.com/example/source', quiet: true).and_return(mirror)
+      expect(mirror).to receive(:synchronize).and_yield
+      expect(mirror).to receive(:setup)
+      expect(mirror).to receive(:log).with(old_rev, new_rev, opts: ['--oneline']).and_return('selected OS log marker')
+      expect(ConfCtl::Inputs::GitCommit).to receive(:commit!) do |**args|
+        expect(args[:message]).to eq("inputs: update source to bbbbbbbb\n\nsource: aaaaaaaa -> bbbbbbbb\nselected OS log marker")
+      end
+
+      response = update(commit: true, changelog: true)
+
+      expect(response).to include(status: :updated, changed: true)
+      expect(response[:changes].map(&:name)).to eq(['source', 'source/nixpkgs'])
+    end
+
+    it 'commits a descendant-only update with only the requested-input title and no log query' do
+      candidate['nodes']['source']['locked']['rev'] = old_rev
+      expect(ConfCtl::GitRepoMirror).not_to receive(:new)
+      expect(ConfCtl::Inputs::GitCommit).to receive(:commit!) do |**args|
+        expect(args[:message]).to eq('inputs: update source')
+      end
+
+      response = update(commit: true, changelog: true)
+
+      expect(response).to include(status: :updated, changed: true)
+      expect(response[:changes].map(&:name)).to eq(['source/nixpkgs'])
+    end
+
+    it 'does not query logs when Nixpkgs is explicitly selected with no-changelog' do
+      candidate['nodes']['source']['locked']['rev'] = old_rev
+      expect(ConfCtl::GitRepoMirror).not_to receive(:new)
+      response = update(inputs: ['source/nixpkgs'], commit: true, changelog: false)
+      expect(response).to include(status: :updated, changed: true)
+      expect(ConfCtl::Inputs::GitCommit).to have_received(:commit!).with(hash_including(message: "inputs: update source/nixpkgs to cccccccc\n\nsource/nixpkgs: aaaaaaaa -> cccccccc"))
+    end
+
+    it 'still rejects an excluded descendant rewind without installing or committing' do
+      allow(provider).to receive(:compare).with(hash_including(repo: 'nixpkgs')).and_return(:behind)
+      expect(ConfCtl::GitRepoMirror).not_to receive(:new)
+      expect(update(commit: true, changelog: true)).to include(status: :rejected, changed: false)
+      expect(provider).to have_received(:compare).with(hash_including(repo: 'nixpkgs'))
+      expect_preserved
+    end
+  end
+
   it 'updates the terminal follows target without widening to its parent' do
     old_data['nodes']['entry']['inputs'] = { 'parent' => 'parent', 'alias' => %w[parent leaf] }
     old_data['nodes']['parent'] = {
@@ -251,7 +309,15 @@ RSpec.describe ConfCtl::Inputs::GuardedUpdate do
       File.write(argv[argv.index('--output-lock-file') + 1], JSON.generate(candidate))
       result
     end
-    response = update(inputs: ['alias'])
+    mirror = instance_double(ConfCtl::GitRepoMirror)
+    expect(ConfCtl::GitRepoMirror).to receive(:new).once.with('https://github.com/example/source', quiet: true).and_return(mirror)
+    expect(mirror).to receive(:synchronize).and_yield
+    expect(mirror).to receive(:setup)
+    expect(mirror).to receive(:log).with(old_rev, new_rev, opts: ['--oneline']).and_return('alias log marker')
+    expect(ConfCtl::Inputs::GitCommit).to receive(:commit!) do |**args|
+      expect(args[:message]).to eq("inputs: update alias to bbbbbbbb\n\nalias: aaaaaaaa -> bbbbbbbb\nalias log marker")
+    end
+    response = update(inputs: ['alias'], commit: true, changelog: true)
     expect(response).to include(status: :updated)
     expect(response[:changes].map(&:name)).to eq(['alias', 'parent/leaf'])
     expect(JSON.parse(File.read(File.join(@conf_dir, 'flake.lock'))).dig('nodes', 'parent', 'locked', 'rev')).to eq(old_rev)
