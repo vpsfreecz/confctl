@@ -415,6 +415,117 @@ mod tests {
         );
     }
 
+    // RFC 1952 member for {"machines":[]}; FLG.FHCRC is set and the low
+    // 16 bits of the header's CRC32 are 0xab12 (stored little endian).
+    const GZIP_FHCRC: &[u8] = &[
+        0x1f, 0x8b, 0x08, 0x02, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x12, 0xab, 0xab, 0x56, 0xca,
+        0x4d, 0x4c, 0xce, 0xc8, 0xcc, 0x4b, 0x2d, 0x56, 0xb2, 0x8a, 0x8e, 0xad, 0x05, 0x00, 0x09,
+        0xff, 0x19, 0xd6, 0x0f, 0x00, 0x00, 0x00,
+    ];
+
+    async fn assert_gzip_fhcrc(wire: &[u8], expected_error: Option<io::ErrorKind>) {
+        use tokio::{io::AsyncWriteExt, net::TcpListener};
+
+        for image in [false, true] {
+            for chunked in [false, true] {
+                let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let address = listener.local_addr().unwrap();
+                let mut response =
+                    b"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Encoding: gzip\r\n".to_vec();
+                if chunked {
+                    response.extend_from_slice(b"Transfer-Encoding: chunked\r\n\r\n");
+                    for byte in wire {
+                        response.extend_from_slice(b"1\r\n");
+                        response.push(*byte);
+                        response.extend_from_slice(b"\r\n");
+                    }
+                    response.extend_from_slice(b"0\r\n\r\n");
+                } else {
+                    response.extend_from_slice(
+                        format!("Content-Length: {}\r\n\r\n", wire.len()).as_bytes(),
+                    );
+                    response.extend_from_slice(wire);
+                }
+                let server = tokio::spawn(async move {
+                    tokio::time::timeout(Duration::from_secs(3), async {
+                        let (mut socket, _) = listener.accept().await.unwrap();
+                        let mut request = Vec::new();
+                        while !request.ends_with(b"\r\n\r\n") {
+                            assert!(request.len() < 65536);
+                            request.push(socket.read_u8().await.unwrap());
+                        }
+                        assert!(
+                            request
+                                .windows(ACCEPTED_ENCODING.len())
+                                .any(|value| value == ACCEPTED_ENCODING.as_bytes())
+                        );
+                        socket.write_all(&response).await.unwrap();
+                    })
+                    .await
+                    .unwrap();
+                });
+                let http = client_builder().no_proxy().build().unwrap();
+                let url = format!("http://{address}/image");
+                let mut output = Vec::new();
+                let outcome = tokio::time::timeout(Duration::from_secs(3), async {
+                    if image {
+                        let path = download(&http, &url, &mut output).await?;
+                        let bytes = std::fs::read(&path);
+                        path.close()?;
+                        bytes
+                    } else {
+                        serde_json::to_vec(&index(&http, &url).await?).map_err(io::Error::other)
+                    }
+                })
+                .await;
+                server.await.unwrap();
+                let result = outcome.expect("finite loopback codec request");
+                match expected_error {
+                    None => assert_eq!(result.unwrap(), br#"{"machines":[]}"#),
+                    Some(kind) => {
+                        let error = result.unwrap_err();
+                        let primary = if image {
+                            let transfer = error
+                                .get_ref()
+                                .unwrap()
+                                .downcast_ref::<TransferFailure>()
+                                .unwrap();
+                            assert!(transfer.cleanup.is_empty());
+                            &transfer.primary
+                        } else {
+                            &error
+                        };
+                        assert_eq!(primary.kind(), kind, "{primary}");
+                    }
+                }
+                if image {
+                    let output = String::from_utf8(output).unwrap();
+                    let (_, path) = output.lines().next().unwrap().split_once(" -> ").unwrap();
+                    assert!(!Path::new(path).exists(), "download temporary file removed");
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn gzip_fhcrc_valid_header_decodes_index_and_image() {
+        assert_gzip_fhcrc(GZIP_FHCRC, None).await;
+    }
+
+    #[tokio::test]
+    async fn gzip_fhcrc_invalid_header_retains_error_and_cleans_image() {
+        let mut wire = GZIP_FHCRC.to_vec();
+        wire[10] ^= 1;
+        assert_gzip_fhcrc(&wire, Some(io::ErrorKind::InvalidData)).await;
+    }
+
+    #[tokio::test]
+    async fn gzip_fhcrc_truncated_header_retains_eof_and_cleans_image() {
+        for end in [10, 11] {
+            assert_gzip_fhcrc(&GZIP_FHCRC[..end], Some(io::ErrorKind::UnexpectedEof)).await;
+        }
+    }
+
     #[test]
     fn failed_transfer_retains_primary_and_ordered_cleanup_locator_without_debug_data() {
         let dir = tempfile::tempdir().unwrap();
