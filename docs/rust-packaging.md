@@ -158,6 +158,9 @@ wrappers or prove the installed closure. Runtime references, dependency notices,
 linked libraries, both architectures and real shell/helper selections still need
 native qualification.
 
+The x86 hosted package job also runs the shared tracked-Nix formatting check
+from `.githooks/check-nix-format`; the pre-commit hook uses the same check.
+
 The hosted Rust workflow uses Rust 1.95.0 with rustfmt and Clippy, verifies fixture
 prerequisites and sets the lexical GNU logname entry before compiling. It checks
 all targets/features and lints them, then runs default tests with qualification

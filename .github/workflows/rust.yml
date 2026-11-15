@@ -87,6 +87,14 @@ jobs:
             accept-flake-config = false
             allow-import-from-derivation = false
 
+      - name: Check tracked Nix formatting
+        if: matrix.system == 'x86_64-linux'
+        shell: bash
+        run: |
+          nix develop --no-update-lock-file --no-write-lock-file \
+            --option allow-import-from-derivation false --option accept-flake-config false \
+            --command bash .githooks/check-nix-format
+
       - name: Qualify and inspect native runtime package
         shell: bash
         env:
