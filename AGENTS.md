@@ -11,9 +11,12 @@
 - `man/man8/*.md` contains manual sources; `examples/generate-reference.rs`
   maintains the CLI reference and renders explicitly supplied option exports.
 - `tests/` contains Rust command tests, native VM suites and compatibility
-  fixtures. Preserve `tests/compat/**` immutable Ruby sources and captures.
-  Ruby native-runner extensions and VM test scripts are test infrastructure,
-  separate from the retired Ruby application.
+  fixtures. Preserve the frozen compatibility JSON and its source provenance.
+  Original Ruby replay/application sources are retired. The external native
+  runner, VM test scripts/extensions and the two mixed-version snapshots
+  `tests/compat/helpers/baseline/{auto-rollback,build-netboot-server}.rb.txt`
+  with their test-only builders are explicit exceptions; retain their bytes
+  and coverage. Candidate replay requires no Ruby or source archive.
 
 ## Development and hooks
 
@@ -51,8 +54,10 @@ compiling; preserve its multicall basename rather than resolving the symlink.
 
 Read [the packaging guide](docs/rust-packaging.md) before changing packages,
 helper producers or workflows. The public package and helper producers select
-Rust. Ruby in configuration tools mode belongs to those repositories' tools and
-must remain separate from confctl. Ruby extension APIs are removed; use the
+Rust. Configuration repositories compose their own independent tools; the
+exported minimal shell accepts extraPackages and does not bootstrap Ruby/gems.
+The retired mode="tools" requires configuration-owned shell migration before
+updating its confctl input. Ruby extension APIs are removed; use the
 existing typed settings and commands described in the project guides.
 
 Markdown manuals are rendered with build-only Pandoc. Maintain the CLI reference

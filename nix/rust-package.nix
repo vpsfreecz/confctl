@@ -115,21 +115,18 @@ let
       assert includes package (select {
         legacyCompat = false;
       });
-      assert includes pkgs.ruby (select {
-        mode = "tools";
+      assert includes pkgs.hello (select {
+        extraPackages = [ pkgs.hello ];
       });
-      assert includes (lib.getDev pkgs.openssl) (select {
-        mode = "tools";
-      });
-      assert lib.hasInfix
-        (builtins.unsafeDiscardStringContext "${package}/bin:$PWD/.bin:$GEM_HOME/bin:$PATH")
-        (select { mode = "tools"; }).shellHook;
+      assert !(includes pkgs.ruby (select { }));
+      assert !(lib.hasInfix "GEM_HOME" (select { }).shellHook);
+      assert !(lib.hasInfix "bundle" (select { }).shellHook);
+      assert
+        !(builtins.tryEval (select {
+          mode = "tools";
+        })).success;
       assert includes package (select {
         implementation = "rust";
-      });
-      assert includes package (select {
-        implementation = "rust";
-        mode = "tools";
       });
       assert
         !(builtins.tryEval (select {

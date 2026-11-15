@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Focused settings lifetime routes against the immutable Ruby baseline."""
+"""Focused settings lifetime routes against frozen observations."""
 
 import argparse
 import hashlib
 import json
 from pathlib import Path
-import shutil
 import sys
 import tempfile
 
@@ -94,17 +93,12 @@ def validate(actual, case):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--record-output", type=Path)
     parser.add_argument("--expected-dir", type=Path, default=HERE / "expected-settings")
-    parser.add_argument("--candidate", type=Path)
+    parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--case", action="append", default=[])
     args = parser.parse_args()
-    if args.record_output and args.candidate:
-        parser.error("record only from the preserved Ruby baseline")
     args.evidence.mkdir(parents=True, exist_ok=True)
-    if args.record_output:
-        args.record_output.mkdir(parents=True, exist_ok=True)
     selected = [case for case in cases() if not args.case or case["id"] in args.case]
     if args.case and set(args.case) != {case["id"] for case in selected}:
         parser.error("unknown case ID")
@@ -112,8 +106,8 @@ def main():
     executed = []
     failures, unqualified_cases = [], []
     with tempfile.TemporaryDirectory(prefix="confctl-settings-oracle-") as scratch:
-        oracle = core.export_baseline(Path(scratch))
-        command = [str(args.candidate.resolve())] if args.candidate else [shutil.which("ruby"), str(oracle / "bin/confctl")]
+        oracle = Path(scratch)  # normalization only; no Ruby source/archive
+        command = [str(args.candidate.resolve())]
         for case in selected:
             actual = core.execute(case, command, oracle, args.evidence / "raw")
             try:
@@ -123,25 +117,22 @@ def main():
                 executed.append(case["id"])
                 print("FAIL validation " + case["id"], flush=True)
                 continue
-            target = (args.record_output or args.expected_dir) / (case["id"] + ".json")
-            if args.record_output:
-                core.write_json(target, actual)
-            else:
-                comparison = core.compare_frame(case, json.loads(target.read_text()), actual,
-                                                candidate=bool(args.candidate))
-                if comparison["outcome"] == "DIFFERENT":
-                    failures.append(case["id"])
-                elif comparison["outcome"] == "UNQUALIFIED":
-                    unqualified_cases.append(case["id"])
-                if comparison["observations"] or comparison["outcome"] != "MATCH":
-                    print("DETAIL " + case["id"] + ": " + json.dumps(comparison, sort_keys=True), flush=True)
+            target = args.expected_dir / (case["id"] + ".json")
+            comparison = core.compare_frame(case, json.loads(target.read_text()), actual,
+                                            candidate=bool(args.candidate))
+            if comparison["outcome"] == "DIFFERENT":
+                failures.append(case["id"])
+            elif comparison["outcome"] == "UNQUALIFIED":
+                unqualified_cases.append(case["id"])
+            if comparison["observations"] or comparison["outcome"] != "MATCH":
+                print("DETAIL " + case["id"] + ": " + json.dumps(comparison, sort_keys=True), flush=True)
             label = "FAIL " if case["id"] in failures else "UNQUALIFIED " if case["id"] in unqualified_cases else "PASS "
             print(label + case["id"], flush=True)
             executed.append(case["id"])
     core.write_json(args.evidence / "qualification.json", dict(
         baseline=core.BASELINE, candidate=str(args.candidate) if args.candidate else None,
         cases=executed, failures=failures, unqualified=unqualified_cases, sources={name: hashlib.sha256((HERE / name).read_bytes()).hexdigest()
-                                for name in ("baseline.tar.gz", "qualify_settings.py", "child_settings.py")}))
+                                for name in ("baseline.json", "qualify_settings.py", "child_settings.py")}))
     return bool(failures or unqualified_cases)
 
 

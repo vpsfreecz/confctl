@@ -11,16 +11,22 @@ Configuration shells use Rust by default:
 ```nix
 confctl.lib.mkConfigDevShell {
   system = "x86_64-linux";
-  mode = "minimal"; # use "tools" for repository Gemfile tooling
+  mode = "minimal";
+  extraPackages = [ ]; # optional tools owned by the configuration
 }
 ```
 
-Minimal mode needs no Gemfile. Tools mode retains the configuration repository's
-Ruby, OpenSSL, Bundler and Gemfile tooling, with the packaged confctl ahead of
-those tools on PATH. Those gems are not loaded into confctl. Explicit
-`implementation = "ruby"`, `mode = "bundled-confctl"` or `legacyCompat = true`
-fails with migration instructions before Bundler bootstrap. Omitted or false
-`legacyCompat` has no effect. An explicit `implementation = "rust"` remains valid.
+The exported shell needs no Gemfile and does not add Ruby or OpenSSL, install
+Bundler, or set GEM/BUNDLE variables. It remains an ordinary `pkgs.mkShell`, so
+configuration repositories can pass `extraPackages` and compose their own
+`shellHook` through `overrideAttrs`. Keep their Gemfiles and tool setup in those
+repositories. Put the packaged confctl first on PATH after local tool setup.
+
+`mode = "tools"` now fails with composition guidance. Migrate a consumer's tool
+shell before updating its confctl input; preserve the old shell/provider pin as a
+rollback pair. `implementation = "ruby"`, `mode = "bundled-confctl"` and
+`legacyCompat = true` also fail before effects. Omitted or false `legacyCompat`
+has no effect; explicit `implementation = "rust"` remains valid.
 MANPATH uses the package's installed manuals.
 
 `mkConfctlOutputs` selects Rust helpers by default:
@@ -77,7 +83,8 @@ from the same Rust package as their backend. Pandoc is a build-only input.
 The package does not install source trees, Ruby application code, test fixtures
 or oracle archives. The application, helper producers, development shell and
 release procedure use Rust tooling. Ruby remains in native test infrastructure,
-immutable compatibility captures and independent configuration-repository tools.
+the two retained mixed-version helper fixtures and independent configuration
+repositories. Frozen compatibility data needs no Ruby interpreter.
 See [compatibility](compatibility.md) for extension and state migration limits.
 
 ## Reference maintenance
@@ -143,7 +150,7 @@ an actual export, and check the rendered manuals in the built package.
 
 The package's `passthru.tests.smoke` prepares installed help, executable and
 manual checks for later native execution. `passthru.tests.shellSelection` checks
-Rust defaults, minimal/tools selection and rejected legacy combinations
+Rust defaults, minimal/extraPackages composition and rejected legacy/tools selections
 against the shell function when evaluated. Cargo helper tests exercise actual
 binaries with confined fake native commands, distinct callbacks, literal native
 paths, empty FQDN, help-before-data and native failure. They do not evaluate Nix

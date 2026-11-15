@@ -70,9 +70,7 @@ confctl init
     {
       confctl = confctlOutputs;
 
-      # Shell modes:
-      # - minimal: no Gemfile, best default
-      # - tools: Gemfile for repo tools such as overcommit or rubocop
+      # Configuration tools are composed separately through extraPackages/shellHook.
       devShells.x86_64-linux.default = confctl.lib.mkConfigDevShell {
         system = "x86_64-linux";
         mode = "minimal";
@@ -93,9 +91,11 @@ nix develop
 This makes `confctl` available from the pinned flake input package and exposes
 its man pages on `MANPATH`.
 
-In tools mode, commit the configuration repository's `Gemfile.lock` to make
-its Ruby tools reproducible. Those gems are separate from the packaged Rust
-CLI. `bundled-confctl` mode is no longer supported.
+The exported shell is minimal and does not bootstrap repository gems.
+Configurations with independent Ruby tools keep their Gemfile, packages and
+Bundler setup in their own composed shell. Migrate that setup before updating
+from the retired `mode = "tools"`; see [shell composition](docs/rust-packaging.md).
+`bundled-confctl` mode is also unsupported.
 
 Before the first build or deploy, make sure the per-user gcroot directory
 exists:
@@ -187,8 +187,8 @@ See also existing configurations:
     ├── environments/           # Environment presets for various types of machines, optional
     ├── flake.nix               # Flake entrypoint
     ├── flake.lock              # Locked input sources
-    ├── Gemfile                 # Optional Ruby tools, used only in tools mode
-    ├── Gemfile.lock            # Recommended for tools mode
+    ├── Gemfile                 # Optional tools owned by the configuration
+    ├── Gemfile.lock            # Lock for those independent tools
     └── modules/                # User-defined modules
         └── cluster/default.nix # User-defined extensions of `cluster.` options used in `<machine>/module.nix` files
 
@@ -246,8 +246,9 @@ The [package and helper backends](docs/rust-packaging.md) are selected by
 `apps.<system>.confctl-rust` remains available. Configuration shells default to
 `implementation = "rust"` and outputs default to `rustHelpers = true`.
 Explicit Ruby selection, disabled Rust helpers, `bundled-confctl` mode and
-`legacyCompat = true` fail with migration instructions. Minimal and tools
-modes remain supported. Package builds, runtime closures and both target
+`legacyCompat = true` fail with migration instructions. Minimal mode and
+extraPackages composition remain supported; tools mode requires configuration-owned
+shell migration. Package builds, runtime closures and both target
 architectures require native qualification.
 
 ## Machine metadata and inputs

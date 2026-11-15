@@ -28,9 +28,11 @@ See the repository's `docs/swpins-to-flakes.md` for migration and rollback.
 ## PACKAGE SELECTION
 The public `confctl` flake package and its `confctl-rust` alias select the same
 Rust package. Configuration shells default to `implementation = "rust"` with
-minimal or tools mode. Tools mode retains independent repository gems; confctl
-does not load them. Explicit Ruby selection, `bundled-confctl` and
-`legacyCompat = true` fail with migration instructions.
+minimal mode. Compose independent repository packages and gem setup in the
+configuration's own shell through extraPackages and shellHook. Retired tools
+mode, explicit Ruby selection, `bundled-confctl` and `legacyCompat = true` fail
+with migration instructions; migrate the consumer shell before updating its
+provider pin.
 
 `mkConfctlOutputs` defaults to `rustHelpers = true`; explicit false fails.
 Standalone helper modules use the same-source Rust package with their target
@@ -725,7 +727,7 @@ there is no Ruby extension loader or application fallback.
 Pair the tool/module pin, typed settings and removal of the corresponding old
 script. Preserve existing state and generated files. Configuration edits reject
 remaining legacy scripts. Independent tools can still use a configuration
-repository's tools-mode gems outside the extension directory.
+repository's own gem environment outside the extension directory.
 
 Rollback requires the matched old tool/module pin, settings and scripts. If
 remote helper packages are also reverted, restore each old wrapper with its

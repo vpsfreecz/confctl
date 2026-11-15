@@ -1,9 +1,10 @@
 # Helper qualification drivers
 
-These sources are unrun qualification support. They neither establish parity
-nor replace the immutable Ruby helper sources and M0 captures. The declared
-test environment supplies Ruby 3.4.9, JSON 2.21.2 and Net::HTTP 0.6.0. The product
-backend has no Ruby/Python runtime fallback.
+These sources are opt-in qualification support. They do not establish parity
+or replace frozen captures. Ordinary Ruby recorders are retired; the external
+native test framework and two mixed-version helper snapshots remain the explicit
+[test exception](../../../../docs/compatibility-site.md#retained-native-test-exception).
+The product backend has no Ruby/Python runtime fallback.
 
 The two externally driven Rust fixture targets require the opt-in
 `qualification-fixtures` feature. Normal `cargo test --locked` skips their
@@ -22,24 +23,12 @@ fixture errors. They do not park the process or publish ownership markers.
 A failed or missing receipt cannot qualify a case or establish nested child
 identity. Partial receipt files remain failed output for driver diagnosis.
 
-`http_qualification.py` accepts an absolute original Ruby executable, the
-compiled Rust unit-test binary, an empty owned evidence directory and either
-`json` or `codec`. It serves fixed bytes on loopback HTTP, records complete raw
-request headers and both processes' raw stdout/stderr/native exit/signal, and
-joins its server thread. The original probe exercises the actual Net::HTTP
-index/image body APIs and JSON parser; the ignored Rust test exercises the real
-private client/body/parser. Neither side is a full installed helper process.
-
-The JSON family uses the input-only seven-row syntax list, including the one
-already approved bad-object case. It produces no new expected output. The codec
-family records identity/gzip/zlib, chunked framing, case-insensitive/x-gzip,
-Content-Range bypass, unsupported whole encoding, envelope/header mismatch,
-empty wire/member, corruption/truncation, trailing bytes/multiple members and
-late HTTP framing failure for both index and image bytes. Raw post-codec byte
-counts are observations, not a selected trailing-data rule. A retained table
-must adjudicate these results before decoder policy or wider KEXEC-03 promotion.
-Proxy and CA/TLS tests need separate controlled servers and remain open; this
-loopback driver deliberately removes proxy settings only in its test children.
+The former paired Ruby HTTP recorder and probe are retired. Frozen JSON syntax
+inputs, codec observations and diagnostics remain unchanged. Existing Rust
+HTTP/body tests cover their named framing, decode, timeout and cleanup cases.
+No Rust TLS/proxy fixture is claimed here. Trailing/member policy remains
+unqualified beyond explicit existing assertions. Retiring the recorder grants
+no new TLS/proxy, parser, codec-policy or native-custody acceptance.
 
 `watchdog_fixture.rs` is a standalone, harness-free, test-only artifact. Build
 its opt-in target with test compilation enabled so the named barriers and
@@ -93,8 +82,8 @@ wait-error termination and driver containment still need native evidence. These 
 review/acceptance gates. No signal disposition or product cancellation policy
 is altered to make a fixture pass.
 
-The frozen driver keeps exact comparisons for its named historical stderr
-rows and remains unchanged. Prospective acceptance preserves actionable
+Frozen diagnostic JSON keeps its named historical stderr rows unchanged.
+The existing Rust fixture and helper tests own their explicit comparisons. Prospective acceptance preserves actionable
 condition/context, stream role, status and effects under the
 [behavioral contract](../../../../docs/compatibility.md#candidate-acceptance-by-consumer);
 human wording/coordinates may differ only with an adequate information rule.

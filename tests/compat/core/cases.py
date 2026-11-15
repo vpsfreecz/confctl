@@ -1,4 +1,4 @@
-"""Declarative Ruby CLI oracle cases; all external effects use child.py."""
+"""Frozen CLI comparison cases; candidate external effects use child.py."""
 
 BASELINE = "cc40679d267165aecfa569128438bb55fe910268"
 

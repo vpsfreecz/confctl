@@ -35,20 +35,21 @@ SSH child data/display and boot/wire/opaque payloads still require actual raw
 byte evidence for their consumers. The existing normalized core frame cannot
 supply that proof for arbitrary changed payloads.
 
-Original Ruby replay remains an immutable-observation integrity check. Recording
-cannot use a candidate, original expected payloads never change, and
-LOCK-JSON-01 keeps its baseline/override hashes and full historical frame.
-This comparator does not accept new parser syntax, helper native behavior,
-codec/custody/monitoring gaps, every TUI transition or unimplemented routes.
+Frozen Ruby observations remain immutable. Candidate recording is not supported;
+original expected payloads and LOCK-JSON-01 baseline/override hashes remain
+unchanged. The comparator does not accept new parser syntax, helper native
+behavior, codec/custody/monitoring gaps, every TUI transition or unimplemented
+routes.
 
-
-The Ruby compatibility baseline is
-`cc40679d267165aecfa569128438bb55fe910268`. Its executable and library are
-preserved in `tests/compat/core/baseline.tar.gz`, bound by a SHA256 and tree ID in
-`baseline.json`. The [oracle runner](../tests/compat/core/README.md) executes
-that source independently of the candidate. `coverage.json` is the authoritative
-machine-readable route/option inventory; it contains all 29 action leaves,
-argument signatures, aliases and defaults.
+The historical baseline is `cc40679d267165aecfa569128438bb55fe910268`.
+`tests/compat/core/baseline.json` retains its source tree and archive SHA256
+provenance. Ordinary Ruby replay and the archive are retired; source remains
+recoverable from that Git revision. The [candidate runner](../tests/compat/core/README.md)
+requires an explicit executable and never extracts or invokes original code.
+`coverage.json` remains the authoritative frozen route/option inventory with all
+29 action leaves, signatures, aliases and defaults. The
+[site/helper assertion map](compatibility-site.md) identifies maintained Rust
+coverage and the two retained native mixed-version helper fixtures.
 
 Keep command meaning, results, input requirements and side effects compatible.
 A requested invocation timing appendix and the deliberate removal of Ruby
@@ -114,7 +115,8 @@ All parsed action leaves have concrete Rust dispatch. Route-specific option
 limits and separate native and site acceptance gates still apply. Help and version need no inventory, input broker or process supervisor.
 Static original help text is preserved in `src/cli/help.json`, with source
 provenance in that module; it does not load test snapshots or Ruby at runtime.
-The immutable M0 archive and expectations remain the differential oracle.
+The immutable M0 observations and source provenance remain the historical
+reference; candidate comparison no longer requires the original source archive.
 
 `cargo test --locked cli::tests` checks the parser against the frozen help,
 option and usage cases without executing operations. `cargo test --locked
@@ -122,7 +124,8 @@ domain::selection::tests` checks ordered name/key/filter selection and the Ruby
 pattern adapter. Command side effects require separate differential checks.
 The declared development shell provides Rust tools. The repository-owned
 pre-commit hook checks Rust and Nix formatting; application development does not
-bootstrap Ruby gems. Configuration tools mode retains its separate Ruby tools.
+bootstrap Ruby gems. Configuration repositories compose their own independent tools; the exported
+shell no longer bootstraps gems.
 
 ## Observable CLI contract
 

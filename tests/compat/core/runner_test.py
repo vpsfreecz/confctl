@@ -8,9 +8,31 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.dont_write_bytecode = True
 import run
+
+
+class CandidateOnlyTest(unittest.TestCase):
+    def test_explicit_candidate_replays_without_original_source_archive_or_ruby(self):
+        expected = json.loads((run.HERE / "expected/version.json").read_text())
+        with tempfile.TemporaryDirectory(prefix="confctl-candidate-test-") as directory:
+            root = Path(directory)
+            (root / "expected").mkdir()
+            (root / "expected/version.json").write_text(json.dumps(expected))
+            candidate = root / "candidate"
+            candidate.write_text(
+                f"#!{sys.executable}\nimport sys\n"
+                f"sys.stdout.write({expected['stdout']!r})\n"
+                f"sys.stderr.write({expected['stderr']!r})\n"
+                f"sys.exit({expected['exit']})\n"
+            )
+            candidate.chmod(0o755)
+            with mock.patch.object(run, "HERE", root):
+                self.assertEqual(run.main(["--candidate", str(candidate), "--case", "version"]), 0)
+            self.assertFalse((root / "baseline.tar.gz").exists())
+            self.assertFalse((root / "lib").exists())
 
 
 class EvidenceTest(unittest.TestCase):

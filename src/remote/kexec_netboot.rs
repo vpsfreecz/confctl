@@ -38,6 +38,232 @@ mod tests {
         }
     }
 
+    fn recording_kexec(directory: &Path) -> PathBuf {
+        let executable = directory.join("kexec");
+        // A waited writer avoids inheriting an open executable across forks.
+        let status = Command::new("/bin/sh")
+            .args(["-c", "set -C; printf '%s' \"$2\" > \"$1\"", "write-fixture"])
+            .arg(&executable)
+            .arg("#!/bin/sh\nprintf '%s\\000' \"$@\" > \"$0.argv\"\nexit 0\n")
+            .status()
+            .unwrap();
+        assert!(status.success());
+        std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o755)).unwrap();
+        executable
+    }
+
+    #[tokio::test]
+    async fn exec_and_unload_keep_no_sync_without_cmdline_or_http() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let http = client_builder().no_proxy().build().unwrap();
+        for action in ["--exec", "--unload"] {
+            let dir = tempfile::tempdir().unwrap();
+            let config = KexecNetbootConfig {
+                default_fqdn: String::new(),
+                kexec: recording_kexec(dir.path()),
+            };
+            let arguments = [
+                action.into(),
+                "--no-sync".into(),
+                "--server-url".into(),
+                format!("http://{}", listener.local_addr().unwrap()).into(),
+            ];
+            let Parsed::Run(options) = parse(&arguments).unwrap() else {
+                panic!("options")
+            };
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            assert_eq!(
+                run(
+                    &config,
+                    options,
+                    &dir.path().join("missing-cmdline"),
+                    &mut io::Cursor::new(b""),
+                    &mut out,
+                    &mut err,
+                    &http
+                )
+                .await
+                .unwrap(),
+                0
+            );
+            assert_eq!(
+                std::fs::read(dir.path().join("kexec.argv")).unwrap(),
+                format!("{action}\0--no-sync\0").as_bytes()
+            );
+            assert!(err.is_empty());
+            assert_eq!(
+                listener.accept().unwrap_err().kind(),
+                io::ErrorKind::WouldBlock
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn interactive_defaults_decline_and_index_failures_preserve_effects() {
+        use tokio::{io::AsyncWriteExt, net::TcpListener, sync::oneshot};
+
+        // Replaces the finite ordinary Ruby oracle's selection/effect assertions.
+        for (arguments, input, expected_code, has_httproot, http_status) in [
+            (vec!["-i", "-a", "debug=1"], "\n\n\ny\n", 0, true, 200),
+            (
+                vec!["-i", "-m", "node.invalid", "-g", "8", "-v", "rescue"],
+                "n\n",
+                1,
+                true,
+                200,
+            ),
+            (vec!["-g", "-3"], "", 1, true, 200),
+            (vec!["--server-url"], "", 1, false, 200),
+            (vec![], "", 1, true, 404),
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let generations = [9, 8, 6].map(|number| json!({
+                "generation":number,"current":number == 8,"time_s":"fixture-time",
+                "shortrev":"012345678","kernel_version":"6.12.3",
+                "kernel_params":["console=ttyS0"],
+                "variants":[{"name":"default","label":"Default","kernel_params":["runlevel=default"]},
+                            {"name":"rescue","label":"Rescue","kernel_params":["runlevel=rescue"]}],
+                "boot_files":{"bzImage":format!("http://{address}/node/{number}/bzImage"),
+                              "initrd":format!("http://{address}/node/{number}/initrd")}
+            }));
+            let index_body = serde_json::to_vec(&json!({"machines":[{
+                "fqdn":"node.invalid","spin":"vpsadminos","generations":generations
+            }]}))
+            .unwrap();
+            let (stop, mut stopped) = oneshot::channel();
+            let server = tokio::spawn(async move {
+                let mut paths = Vec::new();
+                loop {
+                    let (mut socket, _) = tokio::select! {
+                        _ = &mut stopped => break,
+                        accepted = listener.accept() => accepted.unwrap(),
+                    };
+                    tokio::time::timeout(Duration::from_secs(3), async {
+                        let mut request = Vec::new();
+                        while !request.ends_with(b"\r\n\r\n") {
+                            assert!(request.len() < 65536);
+                            request.push(socket.read_u8().await.unwrap());
+                        }
+                        let request = String::from_utf8(request).unwrap();
+                        let path = request.lines().next().unwrap().split_whitespace().nth(1).unwrap();
+                        paths.push(path.to_owned());
+                        let body = if path == "/machines.json" { index_body.as_slice() } else { b"boot-image" };
+                        socket.write_all(format!("HTTP/1.1 {http_status} fixture\r\nConnection: close\r\nContent-Length: {}\r\n\r\n", body.len()).as_bytes()).await.unwrap();
+                        socket.write_all(body).await.unwrap();
+                    }).await.unwrap();
+                }
+                paths
+            });
+            let cmdline = dir.path().join("cmdline");
+            let cmdline_text = if has_httproot {
+                format!("httproot=http://{address}/node/8/root.squashfs")
+            } else {
+                "console=ttyS0".into()
+            };
+            std::fs::write(&cmdline, cmdline_text).unwrap();
+            let config = KexecNetbootConfig {
+                default_fqdn: "node.invalid".into(),
+                kexec: recording_kexec(dir.path()),
+            };
+            let mut arguments = arguments
+                .into_iter()
+                .map(OsString::from)
+                .collect::<Vec<_>>();
+            if !has_httproot {
+                arguments.push(format!("http://{address}").into());
+            }
+            let Parsed::Run(options) = parse(&arguments).unwrap() else {
+                panic!("options")
+            };
+            let http = client_builder().no_proxy().build().unwrap();
+            let (mut out, mut err) = (Vec::new(), Vec::new());
+            let result = tokio::time::timeout(
+                Duration::from_secs(3),
+                run(
+                    &config,
+                    options,
+                    &cmdline,
+                    &mut io::Cursor::new(input),
+                    &mut out,
+                    &mut err,
+                    &http,
+                ),
+            )
+            .await;
+            let _ = stop.send(());
+            let paths = server.await.unwrap();
+            assert_eq!(
+                finish(result.unwrap(), &mut err),
+                expected_code,
+                "arguments={arguments:?}; requests={paths:?}; stderr={}; stdout={}",
+                String::from_utf8_lossy(&err),
+                String::from_utf8_lossy(&out),
+            );
+            let out = String::from_utf8(out).unwrap();
+            let err = String::from_utf8(err).unwrap();
+            let record = dir.path().join("kexec.argv");
+            if expected_code == 0 {
+                assert_eq!(
+                    paths,
+                    ["/machines.json", "/node/8/bzImage", "/node/8/initrd"]
+                );
+                for prompt in [
+                    "Select a machine",
+                    "Available generations",
+                    "Choose variant",
+                    "Continue?",
+                ] {
+                    assert!(out.contains(prompt), "{out}");
+                }
+                assert!(out.contains("Machine:       node.invalid"));
+                assert!(out.contains("Generation:    8"));
+                assert!(out.contains("Variant:       default"));
+                assert!(err.is_empty());
+                let bytes = std::fs::read(record).unwrap();
+                let args = bytes
+                    .split(|byte| *byte == 0)
+                    .filter(|arg| !arg.is_empty())
+                    .collect::<Vec<_>>();
+                assert_eq!(args.len(), 5);
+                assert_eq!(args[0], b"--load");
+                assert!(args[2].starts_with(b"--initrd="));
+                assert_eq!(args[3], b"--append=console=ttyS0 runlevel=default debug=1");
+                assert_eq!(args[4], b"--no-sync");
+                let paths = out
+                    .lines()
+                    .filter_map(|line| line.strip_prefix("Downloading "))
+                    .map(|line| line.split_once(" -> ").unwrap().1)
+                    .collect::<Vec<_>>();
+                assert_eq!(paths.len(), 2);
+                for path in paths {
+                    assert!(!Path::new(path).exists());
+                }
+            } else {
+                if has_httproot {
+                    assert_eq!(paths, ["/machines.json"]);
+                } else {
+                    assert!(paths.is_empty(), "explicit server must not bypass httproot");
+                }
+                assert!(!record.exists());
+                assert!(!out.contains("Downloading "));
+                if !has_httproot {
+                    assert!(err.contains("Could not find 'httproot='"));
+                } else if http_status == 404 {
+                    assert!(err.contains("HTTP 404"));
+                    assert!(!err.contains("Could not parse JSON"));
+                } else if input == "n\n" {
+                    assert_eq!(err, "Aborting\n");
+                } else {
+                    assert!(err.contains("not found (or invalid)"));
+                    assert!(err.contains("No generation found/selected"));
+                }
+            }
+        }
+    }
+
     #[test]
     fn options_consume_clusters_and_attached_or_separate_values() {
         for arguments in [
@@ -269,6 +495,10 @@ mod tests {
         assert_eq!(
             generation_input("-1", generations).unwrap()["generation"],
             8
+        );
+        assert_eq!(
+            generation_input("-2", generations).unwrap()["generation"],
+            6
         );
         assert!(generation_input("-3", generations).is_none());
         assert_eq!(

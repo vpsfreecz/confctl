@@ -9,8 +9,8 @@ Read the repository's `AGENTS.md`, [packaging guide](../../docs/rust-packaging.m
 and applicable workspace instructions first. Separate release preparation from
 publication. If asked to prepare a candidate, stop before default-branch
 integration, tagging or uploading. The installed application does not use a gem
-or load Ruby extensions; repository-tools Ruby and immutable compatibility
-fixtures remain separate.
+or load Ruby extensions; configuration-owned tools, frozen compatibility data and the explicit native
+test/mixed-helper exception remain separate.
 
 ## Prepare the source
 
@@ -53,8 +53,9 @@ Also build the actual public runtime package and its smoke and shell-selection
 checks. Verify the installed CLI/helper names, manuals, license notices and
 runtime references.
 No Ruby application, Bundler, test source or compatibility archive belongs in
-the installed product closure. Preserve site tools-mode Ruby as a separate
-consumer. Prove the locked graph on the declared MSRV as well as the normal
+the installed product closure. Preserve configuration-owned Ruby tooling as a separate consumer. Verify
+consumer shell composition before taking a provider pin that rejects tools mode.
+Prove the locked graph on the declared MSRV as well as the normal
 CI toolchain. A cross-build alone does not establish native execution.
 
 Release identity comes from the reviewed Cargo/lock/Nix package metadata and

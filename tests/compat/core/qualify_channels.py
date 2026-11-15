@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Focused full channel-list routes against the immutable Ruby baseline."""
+"""Focused full channel-list routes against frozen observations."""
 
 import argparse
 import base64
@@ -8,7 +8,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import sys
 import tempfile
 
@@ -159,27 +158,22 @@ def expected_frame(directory, case, candidate):
 def main():
     global held_writer, writer_identity
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--record-output", type=Path)
     parser.add_argument("--expected-dir", type=Path, default=HERE / "expected-channels")
-    parser.add_argument("--candidate", type=Path)
+    parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--case", action="append", default=[])
     args = parser.parse_args()
-    if args.record_output and args.candidate:
-        parser.error("record only from the archived Ruby baseline")
     selected = [case for case in cases() if not args.case or case["id"] in args.case]
     if args.case and set(args.case) != {case["id"] for case in selected}:
         parser.error("unknown case ID")
     args.evidence.mkdir(parents=True, exist_ok=True)
-    if args.record_output:
-        args.record_output.mkdir(parents=True, exist_ok=True)
     core.seed = seed
     core.snapshot = snapshot
     failures, unqualified_cases = [], []
     overrides = {}
     with tempfile.TemporaryDirectory(prefix="confctl-channels-oracle-") as scratch:
-        oracle = core.export_baseline(Path(scratch))
-        command = [str(args.candidate.resolve())] if args.candidate else [shutil.which("ruby"), str(oracle / "bin/confctl")]
+        oracle = Path(scratch)  # normalization only; no Ruby source/archive
+        command = [str(args.candidate.resolve())]
         for case in selected:
             observed_logs.clear()
             try:
@@ -188,19 +182,16 @@ def main():
                                                mode=log["mode"]) for log in observed_logs]
                 core.write_json(args.evidence / (case["id"] + "-logs.json"), list(observed_logs))
                 validate(actual, case)
-                if args.record_output:
-                    core.write_json(args.record_output / (case["id"] + ".json"), actual)
-                else:
-                    expected, decision = expected_frame(args.expected_dir, case, args.candidate)
-                    if decision:
-                        overrides[case["id"]] = decision
-                    comparison = core.compare_frame(case, expected, actual, candidate=bool(args.candidate))
-                    if comparison["outcome"] == "DIFFERENT":
-                        failures.append(case["id"])
-                    elif comparison["outcome"] == "UNQUALIFIED":
-                        unqualified_cases.append(case["id"])
-                    if comparison["observations"] or comparison["outcome"] != "MATCH":
-                        print("DETAIL " + case["id"] + ": " + json.dumps(comparison, sort_keys=True), flush=True)
+                expected, decision = expected_frame(args.expected_dir, case, args.candidate)
+                if decision:
+                    overrides[case["id"]] = decision
+                comparison = core.compare_frame(case, expected, actual, candidate=bool(args.candidate))
+                if comparison["outcome"] == "DIFFERENT":
+                    failures.append(case["id"])
+                elif comparison["outcome"] == "UNQUALIFIED":
+                    unqualified_cases.append(case["id"])
+                if comparison["observations"] or comparison["outcome"] != "MATCH":
+                    print("DETAIL " + case["id"] + ": " + json.dumps(comparison, sort_keys=True), flush=True)
             except (AssertionError, RuntimeError) as error:
                 failures.append(case["id"])
                 print(f"FAIL {case['id']}: {error}", flush=True)
@@ -215,7 +206,7 @@ def main():
         cases=[case["id"] for case in selected], failures=failures, unqualified=unqualified_cases, candidate=str(args.candidate) if args.candidate else None,
         candidate_overrides=overrides,
         sources={name: hashlib.sha256((HERE / name).read_bytes()).hexdigest()
-                 for name in ["baseline.tar.gz", "qualify_channels.py", "child_channels.py"]},
+                 for name in ["baseline.json", "qualify_channels.py", "child_channels.py"]},
         log_scope="Exact retained log names/modes; original raw log contents kept separately, without content normalization/parity claim"))
     return bool(failures or unqualified_cases)
 
