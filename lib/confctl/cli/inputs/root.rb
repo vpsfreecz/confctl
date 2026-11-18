@@ -65,7 +65,11 @@ module ConfCtl::Cli
       )
       ensure_update_success!(res)
 
-      print_update_summary(res[:changes])
+      if opts[:'forward-only']
+        print_guarded_update_summary(res)
+      else
+        print_update_summary(res[:changes])
+      end
     end
 
     def check_update
@@ -103,18 +107,6 @@ module ConfCtl::Cli
 
     def ensure_flake_config!
       ConfCtl::ConfDir.require_flake!
-    end
-
-    def print_update_summary(changes)
-      if changes.empty?
-        puts 'No changes.'
-        return
-      end
-
-      puts "Updated inputs (#{changes.length}):"
-      changes.each do |ch|
-        puts "  #{ch.name}: #{ch.old_short_rev || '-'} -> #{ch.new_short_rev || '-'}"
-      end
     end
   end
 end

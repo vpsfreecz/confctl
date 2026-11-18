@@ -36,6 +36,10 @@ module ConfCtl::Cli
         forward_only: opts[:'forward-only'] || false
       )
       ensure_update_success!(res)
+      if opts[:'forward-only']
+        print_guarded_update_summary(res, context: "#{machine_name}/#{role}")
+        return
+      end
 
       lock = ConfCtl::FlakeLock.load(File.join(ConfCtl::ConfDir.path, 'flake.lock'))
       info = lock.input_info(input)

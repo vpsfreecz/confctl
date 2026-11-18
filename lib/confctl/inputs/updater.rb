@@ -14,7 +14,7 @@ module ConfCtl
 
         if forward_only
           after_install = if commit
-                            proc { |changes| commit_changes!(conf_dir, changes, changelog, downgrade, editor, selected_inputs: inputs) }
+                            proc { |changes, updated_inputs| commit_changes!(conf_dir, changes, changelog, downgrade, editor, selected_inputs: updated_inputs) }
                           end
           return GuardedUpdate.new(conf_dir: conf_dir, inputs: inputs).run!(after_install: after_install) do |reference, output, targets|
             run_nix_flake_update!(conf_dir, targets, reference: reference, output: output)

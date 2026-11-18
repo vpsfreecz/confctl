@@ -1,5 +1,12 @@
 # Unreleased
 
+- Treat an older upstream revision as no update in `inputs update --forward-only`.
+  Keep the current pin and continue updating independent inputs. Attempt selected
+  inputs in lexical order of their resolved paths, then install and commit the
+  accepted lock once. Divergence and other policy or evidence failures still stop
+  the update. `inputs check-update` remains strict: a supplied lock containing a
+  revision behind its baseline returns exit status 3.
+
 - Remove software-pin configuration, commands, migration helper and pin metadata.
   Cluster configurations now require `flake.nix`. Migrate with confctl v3 before
   upgrading; keep v3 and required generations/GC roots for rollback.

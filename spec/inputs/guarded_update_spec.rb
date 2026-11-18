@@ -80,7 +80,7 @@ RSpec.describe ConfCtl::Inputs::GuardedUpdate do
   end
 
   it 'validates the separate candidate before installing and committing' do
-    expect(provider).to receive(:compare) do |**|
+    expect(provider).to receive(:compare).twice do |**|
       expect(repository_state).to eq(@before_state)
       :ahead
     end
@@ -94,9 +94,12 @@ RSpec.describe ConfCtl::Inputs::GuardedUpdate do
     expect(response[:changes].first.new_rev).to eq(new_rev)
   end
 
-  it 'rejects non-containing candidates even with --downgrade' do
+  it 'skips behind candidates successfully even with --downgrade' do
     allow(provider).to receive(:compare).and_return(:behind)
-    expect(update(commit: true, downgrade: true)).to include(status: :rejected, changed: false)
+    response = update(commit: true, downgrade: true)
+    expect(response).to include(status: :unchanged, changed: false, changes: [], updated_inputs: [])
+    expect(response[:skipped].first).to include(input: 'source', requested_inputs: ['source'])
+    expect(response[:skipped].first[:rejections].map(&:kind)).to eq([:behind])
     expect_preserved
   end
 
@@ -225,7 +228,7 @@ RSpec.describe ConfCtl::Inputs::GuardedUpdate do
     expect(repository_state.slice(:index, :head)).to eq(@before_state.slice(:index, :head))
   end
 
-  it 'rejects the whole candidate when one of several inputs goes backwards' do
+  it 'skips a whole attempt when it regresses another reachable input' do
     old_data['nodes']['entry']['inputs']['other'] = 'other'
     old_data['nodes']['other'] = { 'locked' => old_data['nodes']['source']['locked'].merge('repo' => 'other') }
     candidate['nodes']['other']['locked']['rev'] = 'c' * 40
@@ -233,7 +236,7 @@ RSpec.describe ConfCtl::Inputs::GuardedUpdate do
     git_commit_all(@conf_dir, 'fixture: second input')
     @before_state = repository_state
     allow(provider).to receive(:compare).with(hash_including(repo: 'other')).and_return(:behind)
-    expect(update(commit: true)).to include(status: :rejected)
+    expect(update(commit: true)).to include(status: :unchanged, changed: false)
     expect_preserved
   end
 
@@ -286,10 +289,10 @@ RSpec.describe ConfCtl::Inputs::GuardedUpdate do
       expect(ConfCtl::Inputs::GitCommit).to have_received(:commit!).with(hash_including(message: "inputs: update source/nixpkgs to cccccccc\n\nsource/nixpkgs: aaaaaaaa -> cccccccc"))
     end
 
-    it 'still rejects an excluded descendant rewind without installing or committing' do
+    it 'skips a parent attempt with an excluded descendant rewind without installing or committing' do
       allow(provider).to receive(:compare).with(hash_including(repo: 'nixpkgs')).and_return(:behind)
       expect(ConfCtl::GitRepoMirror).not_to receive(:new)
-      expect(update(commit: true, changelog: true)).to include(status: :rejected, changed: false)
+      expect(update(commit: true, changelog: true)).to include(status: :unchanged, changed: false)
       expect(provider).to have_received(:compare).with(hash_including(repo: 'nixpkgs'))
       expect_preserved
     end
@@ -321,5 +324,181 @@ RSpec.describe ConfCtl::Inputs::GuardedUpdate do
     expect(response).to include(status: :updated)
     expect(response[:changes].map(&:name)).to eq(['alias', 'parent/leaf'])
     expect(JSON.parse(File.read(File.join(@conf_dir, 'flake.lock'))).dig('nodes', 'parent', 'locked', 'rev')).to eq(old_rev)
+  end
+
+  context 'with multiple selected inputs' do
+    before do
+      %w[other third].each do |name|
+        old_data['nodes']['entry']['inputs'][name] = name
+        old_data['nodes'][name] = { 'locked' => old_data['nodes']['source']['locked'].merge('repo' => name) }
+      end
+      File.write(File.join(@conf_dir, 'flake.lock'), JSON.generate(old_data))
+      git_commit_all(@conf_dir, 'fixture: independent inputs')
+      @before_state = repository_state
+      @attempts = []
+      allow(cmd).to receive(:run) do |*argv|
+        target = argv.last
+        reference = JSON.parse(File.read(argv[argv.index('--reference-lock-file') + 1]))
+        @attempts << [target, Marshal.load(Marshal.dump(reference))]
+        expect(repository_state).to eq(@before_state)
+        reference['nodes'][target]['locked']['rev'] = new_rev
+        File.write(argv[argv.index('--output-lock-file') + 1], JSON.generate(reference))
+        result
+      end
+    end
+
+    it 'uses deterministic attempts, retains accepted references and commits only forward inputs once' do
+      allow(provider).to receive(:compare).with(hash_including(repo: 'source')).and_return(:behind)
+      expect(ConfCtl::Inputs::GitCommit).to receive(:commit!).once do |**args|
+        expect(args[:message]).to eq("inputs: update other, third\n\nother: aaaaaaaa -> bbbbbbbb\nthird: aaaaaaaa -> bbbbbbbb")
+      end
+      allow(File).to receive(:rename).and_call_original
+      expect(File).to receive(:rename).with(anything, File.join(@conf_dir, 'flake.lock')).once.and_call_original
+      response = update(inputs: %w[third source other], commit: true)
+      expect(response).to include(status: :updated, updated_inputs: %w[other third])
+      expect(response[:changes].map(&:name)).to eq(%w[other third])
+      expect(response[:skipped].map { |a| a[:input] }).to eq(['source'])
+      expect(@attempts.map(&:first)).to eq(%w[other source third])
+      expect(@attempts[1][1]['nodes']['other']['locked']['rev']).to eq(new_rev)
+      expect(@attempts[2][1]['nodes']['source']['locked']['rev']).to eq(old_rev)
+      expect(@attempts[2][1]['nodes']['other']['locked']['rev']).to eq(new_rev)
+      final = JSON.parse(File.read(File.join(@conf_dir, 'flake.lock')))
+      expect(final['nodes']['source']['locked']['rev']).to eq(old_rev)
+      expect(final['nodes']['third']['locked']['rev']).to eq(new_rev)
+    end
+
+    %i[diverged error nix metadata source removal].each do |failure|
+      it "installs nothing when #{failure} follows accepted temporary work" do
+        allow(cmd).to receive(:run) do |*argv|
+          target = argv.last
+          reference = JSON.parse(File.read(argv[argv.index('--reference-lock-file') + 1]))
+          expect(repository_state).to eq(@before_state)
+          reference['nodes'][target]['locked']['rev'] = new_rev
+          if target == 'source'
+            case failure
+            when :nix then raise ConfCtl::Error, 'Nix failed'
+            when :metadata then reference['nodes'][target]['locked'].merge!('rev' => old_rev, 'narHash' => 'changed')
+            when :source then reference['nodes'][target]['locked']['repo'] = 'different'
+            when :removal then reference['nodes']['entry']['inputs'].delete('third')
+            end
+          end
+          File.write(argv[argv.index('--output-lock-file') + 1], JSON.generate(reference))
+          result
+        end
+        if failure == :error
+          allow(provider).to receive(:compare).with(hash_including(repo: 'source')).and_raise(ConfCtl::Inputs::GitCompare::Error, 'no evidence')
+        elsif failure == :diverged
+          allow(provider).to receive(:compare).with(hash_including(repo: 'source')).and_return(:diverged)
+        end
+        expected = %i[error nix].include?(failure) ? :error : :rejected
+        expect(update(inputs: %w[other source], commit: true)).to include(status: expected, changed: false, changes: [])
+        expect_preserved
+      end
+    end
+  end
+
+  it 'does not suppress a hard policy violation alongside a behind path' do
+    candidate['nodes']['source']['locked']['narHash'] = 'changed'
+    old_data['nodes']['entry']['inputs']['other'] = 'other'
+    old_data['nodes']['other'] = { 'locked' => old_data['nodes']['source']['locked'].merge('repo' => 'other') }
+    candidate['nodes']['other'] = { 'locked' => old_data['nodes']['other']['locked'].merge('rev' => old_rev, 'narHash' => 'changed') }
+    candidate['nodes']['entry']['inputs']['other'] = 'other'
+    File.write(File.join(@conf_dir, 'flake.lock'), JSON.generate(old_data))
+    git_commit_all(@conf_dir, 'fixture: mixed rejection')
+    @before_state = repository_state
+    allow(provider).to receive(:compare).and_return(:behind)
+    expect(update(commit: true)).to include(status: :rejected, changed: false)
+    expect_preserved
+  end
+
+  it 'checks the final accepted graph strictly against the original baseline' do
+    allow(provider).to receive(:compare).and_return(:ahead, :behind)
+    expect(update(commit: true)).to include(status: :rejected, changed: false)
+    expect_preserved
+  end
+
+  it 'checks concurrent writers even when every attempt is skipped' do
+    allow(provider).to receive(:compare) do |**|
+      File.write(File.join(@conf_dir, 'flake.nix'), 'external writer')
+      :behind
+    end
+    expect(update(commit: true)).to include(status: :error, changed: false)
+    expect(File.read(File.join(@conf_dir, 'flake.nix'))).to eq('external writer')
+    expect_preserved
+  end
+
+  it 'deduplicates aliases and keeps their requested names in the skip result' do
+    old_data['nodes']['entry']['inputs']['alias'] = ['source']
+    File.write(File.join(@conf_dir, 'flake.lock'), JSON.generate(old_data))
+    git_commit_all(@conf_dir, 'fixture: alias')
+    @before_state = repository_state
+    allow(provider).to receive(:compare).and_return(:behind)
+    response = update(inputs: %w[source alias source], commit: true)
+    expect(cmd).to have_received(:run).once
+    expect(response[:skipped].first).to include(input: 'source', requested_inputs: %w[alias source])
+    expect_preserved
+  end
+
+  it 'rejects redirection of any selected alias in an otherwise accepted candidate' do
+    old_data['nodes']['entry']['inputs']['alias'] = ['source']
+    old_data['nodes']['entry']['inputs']['other'] = 'source'
+    candidate['nodes']['entry']['inputs']['alias'] = ['other']
+    File.write(File.join(@conf_dir, 'flake.lock'), JSON.generate(old_data))
+    git_commit_all(@conf_dir, 'fixture: alias selection')
+    @before_state = repository_state
+    expect(update(inputs: %w[source alias], commit: true)).to include(status: :error, changed: false)
+    expect_preserved
+  end
+
+  it 'uses real Nix reference/output locks sequentially without changing a no-op checkout' do
+    %w[a b].each do |name|
+      FileUtils.mkdir_p(File.join(@conf_dir, name))
+      File.write(File.join(@conf_dir, name, 'flake.nix'), '{ outputs = { ... }: {}; }')
+    end
+    File.write(File.join(@conf_dir, 'flake.nix'), <<~NIX)
+      {
+        inputs.a.url = "path:./a";
+        inputs.b.url = "path:./b";
+        outputs = { ... }: {};
+      }
+    NIX
+    File.unlink(File.join(@conf_dir, 'flake.lock'))
+    git_commit_all(@conf_dir, 'fixture: local flakes')
+    initial = run_cmd('nix', '--extra-experimental-features', 'nix-command flakes', 'flake', 'lock', chdir: @conf_dir)
+    expect(initial.success?).to be(true), initial.err
+    git_commit_all(@conf_dir, 'fixture: local lock')
+    @before_state = repository_state
+    allow(ConfCtl::SystemCommand).to receive(:new).and_return(TTY::Command.new(printer: :null))
+    expect(update(inputs: %w[b a], commit: true)).to include(status: :unchanged, changed: false, skipped: [])
+    expect_preserved
+  end
+
+  it 'never lets a later selected parent regress a shared dependency accepted earlier' do
+    old_data['nodes']['entry']['inputs']['a-shared'] = 'shared'
+    old_data['nodes']['shared'] = { 'locked' => old_data['nodes']['source']['locked'].merge('repo' => 'shared') }
+    old_data['nodes']['source']['inputs'] = { 'shared' => ['a-shared'] }
+    File.write(File.join(@conf_dir, 'flake.lock'), JSON.generate(old_data))
+    git_commit_all(@conf_dir, 'fixture: shared follows')
+    @before_state = repository_state
+    allow(cmd).to receive(:run) do |*argv|
+      reference = JSON.parse(File.read(argv[argv.index('--reference-lock-file') + 1]))
+      if argv.last == 'a-shared'
+        reference['nodes']['shared']['locked']['rev'] = new_rev
+      else
+        expect(reference['nodes']['shared']['locked']['rev']).to eq(new_rev)
+        reference['nodes']['shared']['locked']['rev'] = old_rev
+        reference['nodes']['source']['locked']['rev'] = new_rev
+      end
+      File.write(argv[argv.index('--output-lock-file') + 1], JSON.generate(reference))
+      result
+    end
+    allow(provider).to receive(:compare).with(hash_including(repo: 'shared', old_rev: new_rev, new_rev: old_rev)).and_return(:behind)
+    response = update(inputs: %w[source a-shared], commit: true)
+    expect(response).to include(status: :updated, updated_inputs: ['a-shared'])
+    expect(response[:skipped].map { |a| a[:input] }).to eq(['source'])
+    expect(response[:changes].map(&:name)).to contain_exactly('a-shared', 'source/shared')
+    final = JSON.parse(File.read(File.join(@conf_dir, 'flake.lock')))
+    expect(final['nodes']['source']['locked']['rev']).to eq(old_rev)
+    expect(final['nodes']['shared']['locked']['rev']).to eq(new_rev)
   end
 end

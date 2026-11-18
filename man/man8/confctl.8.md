@@ -558,18 +558,26 @@ Use retained confctl v3 for old software-pin generations.
       Validate the complete lock graph before installation. Every existing Git
       revision must remain an ancestor in the same supported source. Requires
       Nix 2.19 or newer, an existing tracked version-7 lock and a clean tracked
-      checkout and index. Resolves follows aliases to terminal update paths.
-      Exit 3 means policy rejection; exit 1 means unknown evidence or tool error.
-      Both statuses stop publication. `--downgrade` does not bypass this guard.
+      checkout and index. Attempts terminal update paths in lexical order,
+      deduplicating follows aliases. Behind-only attempts are skipped as a whole;
+      independent forward updates continue. Exit 0 includes skipped or unchanged
+      attempts. Other policy rejections exit 3; evidence or tool errors exit 1.
+      A rejected candidate or an error before installation leaves the lock
+      unchanged.
+      Success installs and optionally commits the final accepted graph once, or
+      preserves exact lock bytes when unchanged. A commit-hook failure after
+      installation leaves the validated lock in place. Both nonzero statuses stop
+      publication. `--downgrade` does not bypass this guard.
 
 `confctl inputs check-update` `--old-lock` *file* `--new-lock` *file*
   Read two locks and apply the same complete-graph ancestry policy as
   `--forward-only`. Does not update, install or commit a lock, and does not
   require cluster outputs. It may populate or fetch the shared Git mirror cache.
-  Returns 0 on acceptance, 3 on policy rejection and
-  1 on evidence or tool errors. After hooks and tests, export `HEAD:flake.lock`
-  and check that committed snapshot against the original workflow baseline
-  before publishing. See `docs/flake-inputs.md` for supported sources,
+  Returns 0 on acceptance, 3 on policy rejection (including behind revisions)
+  and 1 on evidence or tool errors. It validates the supplied final artifact
+  strictly; behind revisions are never treated as skipped attempts. After hooks
+  and tests, export `HEAD:flake.lock` and check that committed snapshot against
+  the original workflow baseline before publishing. See `docs/flake-inputs.md` for supported sources,
   cache behavior, Git authentication, transaction guarantees and limitations.
 
   Ancestry evidence uses full Git mirrors in
@@ -626,9 +634,16 @@ Use retained confctl v3 for old software-pin generations.
       Validate the complete lock graph before installation. Every existing Git
       revision must remain an ancestor in the same supported source. Requires
       Nix 2.19 or newer, an existing tracked version-7 lock and a clean tracked
-      checkout and index. Resolves follows aliases to terminal update paths.
-      Exit 3 means policy rejection; exit 1 means unknown evidence or tool error.
-      Both statuses stop publication. `--downgrade` does not bypass this guard.
+      checkout and index. Attempts terminal update paths in lexical order,
+      deduplicating follows aliases. Behind-only attempts are skipped as a whole;
+      independent forward updates continue. Exit 0 includes skipped or unchanged
+      attempts. Other policy rejections exit 3; evidence or tool errors exit 1.
+      A rejected candidate or an error before installation leaves the lock
+      unchanged.
+      Success installs and optionally commits the final accepted graph once, or
+      preserves exact lock bytes when unchanged. A commit-hook failure after
+      installation leaves the validated lock in place. Both nonzero statuses stop
+      publication. `--downgrade` does not bypass this guard.
 
 `confctl inputs channel set` *channels* *role* *rev*
   Set inputs referenced by selected channels for a specific role to *rev*.
@@ -674,9 +689,16 @@ Use retained confctl v3 for old software-pin generations.
       Validate the complete lock graph before installation. Every existing Git
       revision must remain an ancestor in the same supported source. Requires
       Nix 2.19 or newer, an existing tracked version-7 lock and a clean tracked
-      checkout and index. Resolves follows aliases to terminal update paths.
-      Exit 3 means policy rejection; exit 1 means unknown evidence or tool error.
-      Both statuses stop publication. `--downgrade` does not bypass this guard.
+      checkout and index. Attempts terminal update paths in lexical order,
+      deduplicating follows aliases. Behind-only attempts are skipped as a whole;
+      independent forward updates continue. Exit 0 includes skipped or unchanged
+      attempts. Other policy rejections exit 3; evidence or tool errors exit 1.
+      A rejected candidate or an error before installation leaves the lock
+      unchanged.
+      Success installs and optionally commits the final accepted graph once, or
+      preserves exact lock bytes when unchanged. A commit-hook failure after
+      installation leaves the validated lock in place. Both nonzero statuses stop
+      publication. `--downgrade` does not bypass this guard.
 
 `confctl inputs machine set` *machine* *role* *rev*
   Set the input used by a specific machine for a specific role to *rev*.

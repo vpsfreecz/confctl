@@ -84,7 +84,7 @@ module ConfCtl::Cli
           c.desc 'Update all root inputs (dangerous; normally specify names)'
           c.switch :all, default_value: false
 
-          c.desc 'Require every existing Git revision to remain an ancestor'
+          c.desc 'Skip behind inputs and require forward ancestry for accepted updates'
           c.switch :'forward-only', default_value: false
 
           c.action(&Command.run(c, Inputs::Root, :update))
@@ -130,7 +130,7 @@ module ConfCtl::Cli
             c.switch :changelog, default_value: true
             c.switch :editor, default_value: true
             c.switch %i[d downgrade], default_value: false
-            c.desc 'Require every existing Git revision to remain an ancestor'
+            c.desc 'Skip behind inputs and require forward ancestry for accepted updates'
             c.switch :'forward-only', default_value: false
 
             c.action(&Command.run(c, Inputs::Channels, :update))
@@ -158,7 +158,7 @@ module ConfCtl::Cli
             c.switch :changelog, default_value: true
             c.switch :editor, default_value: true
             c.switch %i[d downgrade], default_value: false
-            c.desc 'Require every existing Git revision to remain an ancestor'
+            c.desc 'Skip behind inputs and require forward ancestry for accepted updates'
             c.switch :'forward-only', default_value: false
 
             c.action(&Command.run(c, Inputs::Machines, :update))

@@ -216,4 +216,47 @@ RSpec.describe ConfCtl::Inputs::ForwardGuard do
     candidate['version'] = 100
     expect(guard.validate(graph, candidate)).to be_error
   end
+
+  it 'reports structured behind rejections without treating them as validator success' do
+    candidate = graph
+    candidate['nodes']['l']['locked']['rev'] = 'c' * 40
+    compare(repo: 'dependency', old_rev: 'b' * 40, result: :behind)
+    result = guard.validate(graph, candidate)
+    expect(result).to be_behind_only
+    expect(result).not_to be_success
+    expect(result.rejections.map { |r| [r.kind, r.path, r.old_rev, r.new_rev] }).to eq([
+                                                                                         [:behind, 'alias', 'b' * 40, 'c' * 40],
+                                                                                         [:behind, 'parent/leaf', 'b' * 40, 'c' * 40]
+                                                                                       ])
+  end
+
+  it 'never classifies mixed policy failures as behind-only' do
+    candidate = graph
+    candidate['nodes']['p']['locked']['rev'] = 'c' * 40
+    candidate['nodes']['l']['locked']['narHash'] = 'changed'
+    compare(result: :behind)
+    result = guard.validate(graph, candidate)
+    expect(result).not_to be_behind_only
+    expect(result.rejections.map(&:kind).uniq).to contain_exactly(:behind, :revision_metadata_changed)
+  end
+
+  it 'keeps evidence errors fatal even when every known rejection is behind' do
+    candidate = graph
+    candidate['nodes']['p']['locked']['rev'] = 'c' * 40
+    candidate['nodes']['l']['locked']['rev'] = 'd' * 40
+    compare(result: :behind)
+    allow(provider).to receive(:compare).with(hash_including(repo: 'dependency')).and_raise(ConfCtl::Inputs::GitCompare::Error, 'unknown')
+    result = guard.validate(graph, candidate)
+    expect(result).to be_error
+    expect(result).not_to be_behind_only
+  end
+
+  it 'classifies removed paths and source changes without parsing diagnostics' do
+    candidate = graph
+    candidate['nodes']['entry']['inputs'].delete('alias')
+    candidate['nodes']['p']['locked']['dir'] = 'subdir'
+    result = guard.validate(graph, candidate)
+    expect(result.rejections.map(&:kind)).to contain_exactly(:removed, :source_changed)
+    expect(result).not_to be_behind_only
+  end
 end

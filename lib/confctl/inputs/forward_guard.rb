@@ -4,16 +4,19 @@ require 'confctl/inputs/git_compare'
 module ConfCtl
   module Inputs
     class ForwardGuard
-      Result = Struct.new(:status, :changes, :issues) do
+      Result = Struct.new(:status, :changes, :issues, :rejections) do
         def success? = %i[unchanged updated].include?(status)
         def rejected? = status == :rejected
         def error? = status == :error
+        def behind_only? = rejected? && !rejections.empty? && rejections.all? { |r| r.kind == :behind }
       end
 
       Change = Struct.new(:path, :old_node, :new_node) do
         def old_rev = old_node&.dig('locked', 'rev')
         def new_rev = new_node&.dig('locked', 'rev')
       end
+
+      Rejection = Struct.new(:kind, :path, :old_rev, :new_rev)
 
       class UnsupportedSource < StandardError; end
 
@@ -26,6 +29,7 @@ module ConfCtl
         new_entries = LockGraph.new(candidate_lock).entries
         changes = []
         rejected = []
+        rejections = []
         errors = []
         cache = {}
 
@@ -36,7 +40,7 @@ module ConfCtl
 
           change = Change.new(path: path, old_node: old_node, new_node: new_node)
           changes << change
-          check_change(change, rejected, cache)
+          check_change(change, rejected, rejections, cache)
         rescue UnsupportedSource, GitCompare::Error => e
           errors << "#{path}: #{e.message}"
         end
@@ -50,9 +54,9 @@ module ConfCtl
                  else
                    :updated
                  end
-        Result.new(status: status, changes: changes, issues: errors + rejected)
+        Result.new(status: status, changes: changes, issues: errors + rejected, rejections: rejections)
       rescue LockGraph::Error => e
-        Result.new(status: :error, changes: [], issues: [e.message])
+        Result.new(status: :error, changes: [], issues: [e.message], rejections: [])
       end
 
       protected
@@ -62,9 +66,9 @@ module ConfCtl
           old_node.fetch('flake', true) == new_node.fetch('flake', true)
       end
 
-      def check_change(change, rejected, cache)
+      def check_change(change, rejected, rejections, cache)
         if change.new_node.nil?
-          rejected << "#{change.path}: previously reachable dependency was removed"
+          reject_change(change, :removed, "#{change.path}: previously reachable dependency was removed", rejected, rejections)
           return
         end
 
@@ -73,12 +77,12 @@ module ConfCtl
 
         old_source = source(change.old_node)
         if old_source != new_source || change.old_node.fetch('flake', true) != change.new_node.fetch('flake', true)
-          rejected << "#{change.path}: source or extraction attributes changed; manual review required"
+          reject_change(change, :source_changed, "#{change.path}: source or extraction attributes changed; manual review required", rejected, rejections)
           return
         end
 
         if change.old_rev == change.new_rev
-          rejected << "#{change.path}: locked attributes changed at the same revision"
+          reject_change(change, :revision_metadata_changed, "#{change.path}: locked attributes changed at the same revision", rejected, rejections)
           return
         end
 
@@ -101,7 +105,12 @@ module ConfCtl
           raise GitCompare::Error, 'Unknown ancestry comparison outcome'
         end
 
-        rejected << "#{change.path}: #{change.old_rev} -> #{change.new_rev} is #{outcome}"
+        reject_change(change, outcome, "#{change.path}: #{change.old_rev} -> #{change.new_rev} is #{outcome}", rejected, rejections)
+      end
+
+      def reject_change(change, kind, message, rejected, rejections)
+        rejected << message
+        rejections << Rejection.new(kind: kind, path: change.path, old_rev: change.old_rev, new_rev: change.new_rev)
       end
 
       def source(node)

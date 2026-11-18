@@ -75,6 +75,12 @@ module ConfCtl::Cli
         forward_only: opts[:'forward-only'] || false
       )
       ensure_update_success!(res)
+      if opts[:'forward-only']
+        context = "channels #{selected.join(', ')}"
+        context += "/#{role_name}" if role_name
+        print_guarded_update_summary(res, context: context)
+        return
+      end
 
       lock = ConfCtl::FlakeLock.load(File.join(ConfCtl::ConfDir.path, 'flake.lock'))
       targets.each do |t|

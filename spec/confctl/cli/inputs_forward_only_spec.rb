@@ -28,7 +28,7 @@ RSpec.describe 'forward-only input CLI' do
   it 'passes the channel guard option after selecting and deduplicating targets' do
     command = ConfCtl::Cli::Inputs::Channels.new({ color: 'never' }, options, ['{a,b}', 'nixpkgs'])
     allow(command).to receive(:eval_channels).and_return('a' => { 'nixpkgs' => 'source' }, 'b' => { 'nixpkgs' => 'source' })
-    expect { command.update }.to output(/Updating nixpkgs in a/).to_stdout
+    expect { command.update }.to output("Input update for channels a, b/nixpkgs:\nNo changes.\n").to_stdout
     expect(ConfCtl::Inputs::Updater).to have_received(:run!).with(hash_including(forward_only: true, inputs: ['source']))
   end
 
@@ -37,8 +37,32 @@ RSpec.describe 'forward-only input CLI' do
     nix = instance_double(ConfCtl::Nix)
     allow(ConfCtl::Nix).to receive(:new).and_return(nix)
     allow(nix).to receive(:eval_inputs_info).with('host').and_return('nixpkgs' => { 'input' => 'source' })
-    expect { command.update }.to output(/Updating nixpkgs in host/).to_stdout
+    expect { command.update }.to output("Input update for host/nixpkgs:\nNo changes.\n").to_stdout
     expect(ConfCtl::Inputs::Updater).to have_received(:run!).with(hash_including(forward_only: true, inputs: ['source']))
+  end
+
+  it 'reports all skipped attempts and retained revisions without claiming an update' do
+    rejection = ConfCtl::Inputs::ForwardGuard::Rejection.new(kind: :behind, path: 'source/nested', old_rev: 'a' * 40, new_rev: 'b' * 40)
+    response[:skipped] = [{ input: 'source', requested_inputs: %w[alias source], rejections: [rejection] }]
+    command = ConfCtl::Cli::Inputs::Root.new({ color: 'never' }, options, ['source'])
+    expect { command.update }.to output("Skipped update for alias, source (source): upstream is behind.\n  source/nested: retaining #{'a' * 40}; candidate #{'b' * 40}\nNo changes.\n").to_stdout
+  end
+
+  it 'keeps check-update strict for a supplied behind artifact' do
+    old_lock = {
+      'version' => 7, 'root' => 'root', 'nodes' => {
+        'root' => { 'inputs' => { 'source' => 'source' } },
+        'source' => { 'locked' => { 'type' => 'github', 'owner' => 'example', 'repo' => 'source', 'rev' => 'a' * 40 } }
+      }
+    }
+    new_lock = Marshal.load(Marshal.dump(old_lock))
+    new_lock['nodes']['source']['locked']['rev'] = 'b' * 40
+    allow(ConfCtl::FlakeLock).to receive(:load).with('old').and_return(old_lock)
+    allow(ConfCtl::FlakeLock).to receive(:load).with('new').and_return(new_lock)
+    provider = instance_double(ConfCtl::Inputs::GitCompare, compare: :behind)
+    allow(ConfCtl::Inputs::GitCompare).to receive(:new).and_return(provider)
+    command = ConfCtl::Cli::Inputs::Root.new({ color: 'never' }, { 'old-lock' => 'old', 'new-lock' => 'new' }, [])
+    expect { command.check_update }.to raise_error(GLI::CustomExit) { |e| expect(e.exit_code).to eq(3) }
   end
 
   it 'propagates a known rejection as exit 3 without printing success' do
@@ -149,7 +173,7 @@ RSpec.describe 'guarded channel update compatibility' do
       original = File.binread(File.join(dir, 'flake.lock'))
       res = run_confctl('inputs', 'channel', 'update', '--forward-only', 'legacy', 'nixpkgs', chdir: dir)
       expect(res.success?).to be(true), "#{res.out}\n#{res.err}"
-      expect(res.out).to include('Updating nixpkgs in legacy')
+      expect(res.out).to include('Input update for channels legacy/nixpkgs:', 'No changes.')
       expect(File.binread(File.join(dir, 'flake.lock'))).to eq(original)
     end
   end

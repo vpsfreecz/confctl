@@ -1,3 +1,4 @@
+require 'fileutils'
 require 'open3'
 require 'tmpdir'
 require 'tty-command'
@@ -28,28 +29,50 @@ module ConfCtl
 
           snapshot!
           old_lock = FlakeLock.new(@lock_path, JSON.parse(@original_lock))
-          targets = LockGraph.new(old_lock).update_inputs(@inputs)
+          groups = selection_groups(LockGraph.new(old_lock))
 
           Dir.mktmpdir('.confctl-update-', @conf_dir) do |dir|
             reference = File.join(dir, 'reference.lock')
             output = File.join(dir, 'candidate.lock')
             File.binwrite(reference, @original_lock)
-            yield reference, output, targets
-            raise ConfCtl::Error, 'Nix did not produce a candidate lock' unless File.file?(output)
+            accepted = old_lock
+            skipped = []
+            updated_inputs = []
 
-            candidate = FlakeLock.load(output)
-            result = @guard.validate(old_lock, candidate)
+            groups.each do |target, requested_inputs|
+              verify_selections!(LockGraph.new(accepted), groups)
+              FileUtils.rm_f(output)
+              yield reference, output, [target]
+              raise ConfCtl::Error, 'Nix did not produce a candidate lock' unless File.file?(output)
+
+              candidate = FlakeLock.load(output)
+              result = @guard.validate(accepted, candidate)
+              if result.behind_only?
+                skipped << { input: target, requested_inputs: requested_inputs, rejections: result.rejections }
+                next
+              end
+              return outcome(result.status, issues: result.issues) unless result.success?
+
+              verify_selections!(LockGraph.new(candidate), groups)
+              next if result.status == :unchanged
+
+              File.rename(output, reference)
+              accepted = candidate
+              updated_inputs.concat(requested_inputs)
+            end
+
+            result = @guard.validate(old_lock, accepted)
             return outcome(result.status, issues: result.issues) unless result.success?
 
             verify_snapshot!
-            return outcome(:unchanged) if result.status == :unchanged
+            return outcome(:unchanged, skipped: skipped) if result.status == :unchanged
 
-            changes = FlakeLockDiff.from_guard(result.changes, old_lock, candidate)
-            File.chmod(@original_mode, output)
-            File.rename(output, @lock_path)
+            changes = FlakeLockDiff.from_guard(result.changes, old_lock, accepted)
+            File.chmod(@original_mode, reference)
+            File.rename(reference, @lock_path)
             @installed = true
-            after_install&.call(changes)
-            outcome(:updated, changes: changes)
+            after_install&.call(changes, updated_inputs)
+            outcome(:updated, changes: changes, skipped: skipped, updated_inputs: updated_inputs)
           end
         end
       rescue StandardError => e
@@ -71,6 +94,20 @@ module ConfCtl
       end
 
       protected
+
+      def selection_groups(graph)
+        @inputs.uniq.sort.group_by { |name| graph.resolve_path(name).terminal_path }.sort.to_h
+      end
+
+      def verify_selections!(graph, groups)
+        groups.each do |target, names|
+          names.each do |name|
+            next if graph.resolve_path(name).terminal_path == target
+
+            raise ConfCtl::Error, "selected input '#{name}' now resolves to a different target; retry from a fresh baseline"
+          end
+        end
+      end
 
       def snapshot!
         unless File.file?(@lock_path) && !File.symlink?(@lock_path)
@@ -107,8 +144,9 @@ module ConfCtl
         out
       end
 
-      def outcome(status, changes: [], issues: [])
-        { status: status, changed: status == :updated, changes: changes, issues: issues }
+      def outcome(status, changes: [], issues: [], skipped: [], updated_inputs: [])
+        { status: status, changed: status == :updated, changes: changes, issues: issues,
+          skipped: skipped, updated_inputs: updated_inputs }
       end
     end
   end

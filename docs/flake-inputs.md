@@ -175,8 +175,9 @@ its bundled Nix; installing another Nix in CI does not necessarily change that
 runtime. Unsupported flags or unmatched selectors fail without updating the
 real lock. There is no fallback to an update in place.
 
-Guarded commit messages describe only explicitly selected logical input paths.
-Titles, revision summaries and Git logs omit unselected dependencies and aliases.
+Guarded commit messages describe only selected logical input paths whose attempts
+accepted changes. Titles, revision summaries and Git logs omit skipped attempts,
+unselected dependencies and aliases.
 Selected paths with the same source and revision range share one Git log. If
 only dependencies change, the message contains just a title naming the requested
 inputs, such as `inputs: update vpsadminos`. `--no-changelog` omits all Git logs
@@ -193,13 +194,34 @@ deduplicates shared targets. For example, a root `nixpkgs` following
 `vpsadminos/nixpkgs`, where `vpsadminos` follows `vpsadmin/vpsadminos`, updates
 `vpsadmin/vpsadminos/nixpkgs`. It leaves both parent revisions unchanged.
 
-Nix writes a candidate lock beside the original flake, using a separate snapshot
-of the old lock as its reference. confctl validates the complete reachable
-graph before atomically installing the candidate. It compares logical dependency
-paths, including descendants and aliases, rather than generated node IDs. A
-forward root update that regresses a nested dependency is rejected as a whole.
-Local lock bytes, root `flake.nix`, Git HEAD, index entries and tracked checkout
-state are checked again before installation. No commit runs before acceptance.
+confctl attempts selected terminal inputs in lexical order, once each. Aliases
+that resolve to the same terminal input share one attempt. Nix generates each
+complete candidate in temporary files beside the original flake, using the last
+accepted lock as its reference. confctl validates every reachable dependency,
+including descendants and aliases, by logical path rather than generated node ID.
+
+If a candidate contains revisions behind the retained commits and has no other
+policy or evidence failures, confctl skips the entire attempt and continues with
+the next selected input. The skipped candidate never becomes a reference. For
+example, a parent upgrade with a nested dependency that moves backward is skipped
+as a whole. Equal sources succeed without changes. Descendant candidates can
+advance independent inputs even when another input is skipped.
+
+A candidate with divergence, source changes, removed paths, changed metadata at
+the same revision, or evidence errors still fails the invocation. No accepted
+temporary work is installed on failure. Each selected name must keep resolving
+to its original terminal path throughout accepted steps; redirection or missing
+selections fail rather than silently changing the requested work.
+
+After all attempts, confctl strictly validates the accumulated graph against the
+original lock, rechecks local lock bytes, root `flake.nix`, Git HEAD, index
+entries and tracked checkout state, then atomically installs once and commits
+once when requested. An all-skipped or unchanged run preserves the exact lock
+bytes and creates no commit. Summaries identify skipped attempts and their
+blocking dependency revisions separately from final installed changes. A later
+accepted attempt may advance a shared dependency involved in an earlier skip.
+The deterministic pass can conservatively skip interdependent updates; it does
+not search for the largest acceptable combination or retry skipped attempts.
 
 Each existing Git revision must equal or be an ancestor of its replacement in
 the same supported source. Currently the ancestry provider supports
@@ -255,10 +277,12 @@ the validated candidate in place; hook side effects are not rolled back.
 Each invocation is a separate transaction: earlier local commits from a
 multi-command job are not undone when a later invocation fails.
 
-Exit status is `0` for an accepted update or no change, `3` for a known policy
-rejection, and `1` for missing or unsupported evidence and tool errors. Both
-nonzero statuses must stop publication. `--downgrade` only changes changelog
-direction and cannot bypass `--forward-only`. Unflagged manual updates and
+Exit status is `0` for accepted updates, unchanged sources and skipped behind
+attempts, `3` for other known policy rejections, and `1` for missing or unsupported
+evidence and tool errors. Independent forward inputs can be installed in the
+same successful invocation as skipped inputs. Both nonzero statuses must stop
+publication. `--downgrade` only changes changelog direction and cannot bypass
+`--forward-only`. Unflagged manual updates and
 `inputs set` retain their existing behavior for deliberate revision changes.
 
 Ancestry preservation retains the pinned commit in history. It does not detect
@@ -286,9 +310,11 @@ confctl inputs check-update --old-lock "$baseline" --new-lock "$final_lock"
 # Publish only after every preceding command succeeded.
 ```
 
-`check-update` reads both lock files and applies the same complete-graph policy.
-It does not invoke Nix, install a lock or commit. Its exit statuses are the same
-as guarded update statuses. It can run without confctl cluster outputs.
+`check-update` reads both lock files and strictly applies the complete-graph
+policy. A behind revision in the supplied final artifact is a rejection with
+exit status `3`; it is not a skipped update attempt. Acceptance returns `0`, and
+evidence or tool errors return `1`. The command does not invoke Nix, install a
+lock or commit. It can run without confctl cluster outputs.
 
 Use an ordinary non-force Git push after successful checks. If the target branch
 moved, retry in a new checkout from a fresh baseline so a
